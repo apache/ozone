@@ -614,7 +614,7 @@ public class TestOzoneAtRestEncryption {
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     Assert.assertNotEquals(kp3, kpSpy);
     // Restore ozClient and store
-    TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
-    TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+    ozClient = OzoneClientFactory.getRpcClient(conf);
+    store = ozClient.getObjectStore();
   }
 }

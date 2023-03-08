@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -160,6 +161,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
   @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
   }
 }

@@ -1335,30 +1335,28 @@ public final class TestSecureOzoneCluster {
       GenericTestUtils.waitFor(() -> om.isLeaderReady(), 500, 10000);
       String transportCls = GrpcOmTransportFactory.class.getName();
       conf.set(OZONE_OM_TRANSPORT_CLASS, transportCls);
-      OzoneClient client = OzoneClientFactory.getRpcClient(conf);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
 
-      ServiceInfoEx serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
+        ServiceInfoEx serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+            CertificateCodec.getPEMEncodedString(caCert)));
 
-      // Wait for OM certificate to renewed
-      GenericTestUtils.waitFor(() ->
-              !omCert.getSerialNumber().toString().equals(
-                  omCertClient.getCertificate().getSerialNumber().toString()),
-          500, certLifetime * 1000);
+        // Wait for OM certificate to renewed
+        GenericTestUtils.waitFor(() ->
+                !omCert.getSerialNumber().toString().equals(
+                    omCertClient.getCertificate().getSerialNumber().toString()),
+            500, certLifetime * 1000);
 
-      // rerun the command using old client, it should succeed
-      serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
-      client.close();
+        // rerun the command using old client, it should succeed
+        serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+            CertificateCodec.getPEMEncodedString(caCert)));
+      }
 
-      // get new client, it should succeed.
-      try {
-        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
-        client1.close();
+      try (OzoneClient ignored = OzoneClientFactory.getRpcClient(conf)) {
+        // get new client, it should succeed.
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());
@@ -1368,9 +1366,8 @@ public final class TestSecureOzoneCluster {
       // Wait for old OM certificate to expire
       GenericTestUtils.waitFor(() -> omCert.getNotAfter().before(new Date()),
           500, certLifetime * 1000);
-      // get new client, it should succeed too.
-      try {
-        OzoneClientFactory.getRpcClient(conf);
+      try (OzoneClient ignored = OzoneClientFactory.getRpcClient(conf)) {
+        // get new client, it should succeed too.
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());

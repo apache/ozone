@@ -208,17 +208,18 @@ public class TestHDDSUpgrade {
    */
   private void createKey() throws IOException {
     final String uniqueId = "testhddsupgrade";
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume(uniqueId);
-    objectStore.getVolume(uniqueId).createBucket(uniqueId);
-    OzoneOutputStream key =
-        objectStore.getVolume(uniqueId).getBucket(uniqueId)
-            .createKey(uniqueId, 1024, ReplicationType.RATIS,
-                ReplicationFactor.THREE, new HashMap<>());
-    key.write(uniqueId.getBytes(UTF_8));
-    key.flush();
-    key.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume(uniqueId);
+      objectStore.getVolume(uniqueId).createBucket(uniqueId);
+      OzoneOutputStream key =
+          objectStore.getVolume(uniqueId).getBucket(uniqueId)
+              .createKey(uniqueId, 1024, ReplicationType.RATIS,
+                  ReplicationFactor.THREE, new HashMap<>());
+      key.write(uniqueId.getBytes(UTF_8));
+      key.flush();
+      key.close();
+    }
   }
 
   /*

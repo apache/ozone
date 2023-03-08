@@ -197,7 +197,7 @@ public abstract class TestOzoneManagerHA {
   @AfterEach
   public void resetCluster()
       throws IOException {
-    IOUtils.close(null, client);
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
