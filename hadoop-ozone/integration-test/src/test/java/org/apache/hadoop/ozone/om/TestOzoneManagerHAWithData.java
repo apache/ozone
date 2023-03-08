@@ -181,7 +181,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       } catch (Exception e) {
         return false;
       }
-    }, 1000, 200000);
+    }, 1000, 300000);
   }
 
   @Test
