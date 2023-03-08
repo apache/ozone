@@ -234,7 +234,7 @@ public class ReplicationManager implements SCMService {
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
-        conf, nodeManager, rmConf.isPush());
+        conf, this, rmConf.isPush());
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =

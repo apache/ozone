@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
 
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws NodeNotFoundException {
     ECReplicationConfig repConfig = new ECReplicationConfig(DATA, PARITY);
     setup(repConfig);
   }
@@ -168,8 +169,8 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   @Override
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
-          NodeManager nodeManager) {
-    return new ECMisReplicationHandler(placementPolicy, conf, nodeManager,
-        false);
+          ReplicationManager replicationManager) {
+    return new ECMisReplicationHandler(placementPolicy, conf,
+        replicationManager, false);
   }
 }

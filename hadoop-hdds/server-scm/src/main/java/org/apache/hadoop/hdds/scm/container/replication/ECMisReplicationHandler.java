@@ -36,8 +36,9 @@ import java.util.Set;
 public class ECMisReplicationHandler extends MisReplicationHandler {
   public ECMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, NodeManager nodeManager, boolean push) {
-    super(containerPlacement, conf, nodeManager, push);
+          ConfigurationSource conf, ReplicationManager replicationManager,
+          boolean push) {
+    super(containerPlacement, conf, replicationManager, push);
   }
 
   @Override

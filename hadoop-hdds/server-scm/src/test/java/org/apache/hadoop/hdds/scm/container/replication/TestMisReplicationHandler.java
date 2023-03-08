@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -65,18 +66,20 @@ import static org.mockito.ArgumentMatchers.eq;
 public abstract class TestMisReplicationHandler {
 
   private ContainerInfo container;
-  private NodeManager nodeManager;
   private OzoneConfiguration conf;
+  private ReplicationManager replicationManager;
 
-  protected void setup(ReplicationConfig repConfig) {
-    nodeManager = new MockNodeManager(true, 10) {
-      @Override
-      public NodeStatus getNodeStatus(DatanodeDetails dd) {
-        return new NodeStatus(
-                dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
-      }
+  protected void setup(ReplicationConfig repConfig)
+      throws NodeNotFoundException {
 
-    };
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY, 0);
+        });
+
     conf = SCMTestUtils.getConf();
     container = ReplicationTestUtil
             .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
@@ -87,7 +90,7 @@ public abstract class TestMisReplicationHandler {
 
   protected abstract MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration configuration,
-          NodeManager nm);
+          ReplicationManager rm);
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
                                   List<ContainerReplicaOp> pendingOp,
                                   int maintenanceCnt, int misreplicationCount,
@@ -110,8 +113,8 @@ public abstract class TestMisReplicationHandler {
                                   int maintenanceCnt, int misreplicationCount,
                                   int expectedNumberOfNodes)
           throws IOException {
-    MisReplicationHandler misReplicationHandler =
-            getMisreplicationHandler(mockedPlacementPolicy, conf, nodeManager);
+    MisReplicationHandler misReplicationHandler = getMisreplicationHandler(
+        mockedPlacementPolicy, conf, replicationManager);
 
     ContainerHealthResult.MisReplicatedHealthResult result =
             Mockito.mock(ContainerHealthResult.MisReplicatedHealthResult.class);
@@ -123,7 +126,7 @@ public abstract class TestMisReplicationHandler {
                       if (r.getDatanodeDetails().getPersistedOpState()
                               == IN_SERVICE) {
                         try {
-                          return nodeManager.getNodeStatus(
+                          return replicationManager.getNodeStatus(
                                   r.getDatanodeDetails()).isHealthy();
                         } catch (NodeNotFoundException e) {
                           throw new RuntimeException(e);
@@ -147,7 +150,7 @@ public abstract class TestMisReplicationHandler {
                     .collect(Collectors.toList());
     if (expectedNumberOfNodes > 0) {
       Mockito.when(mockedPlacementPolicy.chooseDatanodes(
-                      Mockito.any(), Mockito.any(), Mockito.any(),
+                      any(), any(), any(),
                       eq(copy.size()), Mockito.anyLong(), Mockito.anyLong()))
               .thenAnswer(invocation -> {
                 List<DatanodeDetails> datanodeDetails =
