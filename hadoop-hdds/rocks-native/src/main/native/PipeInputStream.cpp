@@ -24,14 +24,14 @@
 
 
 jlong Java_org_apache_hadoop_hdds_utils_db_managed_PipeInputStream_newPipe(JNIEnv *, jobject) {
-    Pipe* pipe = new Pipe();
+    Pipe *pipe = new Pipe();
     return GET_CPLUSPLUS_POINTER(pipe);
 }
 
 jint Java_org_apache_hadoop_hdds_utils_db_managed_PipeInputStream_readInternal(JNIEnv *env, jobject object, jbyteArray jbyteArray, jint capacity, jlong nativeHandle) {
     int cap_int = capacity;
-    Pipe* pipe = reinterpret_cast<Pipe*>(nativeHandle);
-    jbyte* b = (env)->GetByteArrayElements(jbyteArray, JNI_FALSE);
+    Pipe *pipe = reinterpret_cast<Pipe *>(nativeHandle);
+    jbyte *b = (env)->GetByteArrayElements(jbyteArray, JNI_FALSE);
     cap_int = read(pipe->getReadFd(), b, cap_int);
     if (cap_int == 0) {
         if (!pipe->isOpen()) {
@@ -43,6 +43,6 @@ jint Java_org_apache_hadoop_hdds_utils_db_managed_PipeInputStream_readInternal(J
 }
 
 void Java_org_apache_hadoop_hdds_utils_db_managed_PipeInputStream_closeInternal(JNIEnv *env, jobject object, jlong nativeHandle) {
-    delete reinterpret_cast<Pipe*>(nativeHandle);
+    delete reinterpret_cast<Pipe *>(nativeHandle);
 }
 

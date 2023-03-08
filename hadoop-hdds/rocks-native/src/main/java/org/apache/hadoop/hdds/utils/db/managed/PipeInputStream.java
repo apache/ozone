@@ -82,6 +82,7 @@ public class PipeInputStream extends InputStream {
 
   private native int readInternal(byte[] buff, int numberOfBytes,
                                   long pipeHandle);
+
   private native void closeInternal(long pipeHandle);
 
   @Override
