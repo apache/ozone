@@ -87,11 +87,12 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
           submitRequest(NULL_RPC_CONTROLLER, request);
       responseObserver.onNext(omResponse);
     } catch (Throwable e) {
+      LOG.error("Failed to submit request", e);
       IOException ex = new IOException(e.getCause());
-      responseObserver.onError(Status
-          .INTERNAL
-          .withDescription(ex.getMessage())
-          .asRuntimeException());
+      responseObserver.onError(
+          Status.INTERNAL.withDescription(ex.getMessage())
+              .asRuntimeException());
+      return;
     }
     responseObserver.onCompleted();
   }

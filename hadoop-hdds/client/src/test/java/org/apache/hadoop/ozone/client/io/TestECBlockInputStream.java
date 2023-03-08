@@ -393,6 +393,7 @@ public class TestECBlockInputStream {
       buf.clear();
       BadDataLocationException e =
           assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      Assertions.assertEquals(1, e.getFailedLocations().size());
       Assertions.assertEquals(2,
           keyInfo.getPipeline().getReplicaIndex(e.getFailedLocations().get(0)));
     }

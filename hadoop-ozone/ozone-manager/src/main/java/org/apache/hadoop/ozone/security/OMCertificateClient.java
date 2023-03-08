@@ -20,16 +20,15 @@
 package org.apache.hadoop.ozone.security;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -42,6 +41,7 @@ import java.security.KeyPair;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.om.OzoneManager.getOmDetailsProto;
 
 /**
  * Certificate client for OzoneManager.
@@ -56,59 +56,19 @@ public class OMCertificateClient extends CommonCertificateClient {
   private final String clusterID;
   private final HddsProtos.OzoneManagerDetailsProto omInfo;
 
-  @SuppressWarnings("parameternumber")
-  public OMCertificateClient(SecurityConfig secConfig, String scmId,
-      String clusterId, HddsProtos.OzoneManagerDetailsProto omDetails,
-      String certSerialId, String localCrlId,
-      Consumer<String> persistCertIdCallback, Runnable shutdownCallback) {
-    super(secConfig, LOG, certSerialId, COMPONENT_NAME, persistCertIdCallback,
-        shutdownCallback);
-    this.setLocalCrlId(localCrlId != null ?
-        Long.parseLong(localCrlId) : 0);
-    this.scmID = scmId;
-    this.clusterID = clusterId;
-    this.omInfo = omDetails;
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig,
-      OMStorage omStorage, String scmID, Consumer<String> saveCertIdCallback,
-      Runnable shutdownCallback) {
-    this(secConfig, scmID, omStorage.getClusterID(),
-        OzoneManager.getOmDetailsProto(
-            (OzoneConfiguration) secConfig.getConfiguration(),
-            omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null,
+  public OMCertificateClient(
+      SecurityConfig secConfig,
+      OMStorage omStorage,
+      String scmID,
+      Consumer<String> saveCertIdCallback,
+      Runnable shutdownCallback
+  ) {
+    super(secConfig, LOG, omStorage.getOmCertSerialId(), COMPONENT_NAME,
         saveCertIdCallback, shutdownCallback);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig, OMStorage omStorage,
-      String scmID) {
-    this(secConfig, scmID, omStorage.getClusterID(),
-        OzoneManager.getOmDetailsProto(
-            (OzoneConfiguration) secConfig.getConfiguration(),
-            omStorage.getOmId()),
-        omStorage.getOmCertSerialId(), null, null, null);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig) {
-    this(secConfig, null, null, null, null, null, null, null);
-  }
-
-  public OMCertificateClient(SecurityConfig secConfig, String certSerialId) {
-    this(secConfig, null, null, null, certSerialId, null, null, null);
-  }
-
-  /**
-   * Returns a CSR builder that can be used to create a Certificate signing
-   * request.
-   * The default flag is added to allow basic SSL handshake.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException {
-    return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
+    this.scmID = scmID;
+    this.clusterID = omStorage.getClusterID();
+    this.omInfo =
+        getOmDetailsProto(secConfig.getConfiguration(), omStorage.getOmId());
   }
 
   /**
@@ -118,7 +78,7 @@ public class OMCertificateClient extends CommonCertificateClient {
    * @return CertificateSignRequest.Builder
    */
   @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+  public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
@@ -140,7 +100,7 @@ public class OMCertificateClient extends CommonCertificateClient {
     }
 
     builder.setCA(false)
-        .setKey(keyPair)
+        .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
         .setConfiguration(getConfig())
         .setScmID(scmID)
         .setClusterID(clusterID)
@@ -162,26 +122,27 @@ public class OMCertificateClient extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certificatePath) throws CertificateException {
     try {
       SCMGetCertResponseProto response = getScmSecureClient()
           .getOMCertChain(omInfo, getEncodedString(request));
 
       String pemEncodedCert = response.getX509Certificate();
       CertificateCodec certCodec = new CertificateCodec(
-          getSecurityConfig(), certPath);
+          getSecurityConfig(), certificatePath);
 
       // Store SCM CA certificate.
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
         storeCertificate(pemEncodedRootCert,
-            true, true, false, certCodec, false);
-        storeCertificate(pemEncodedCert, true, false, false, certCodec, false);
+            CAType.SUBORDINATE, certCodec, false);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec,
+            false);
 
         // Store Root CA certificate if available.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              true, false, true, certCodec, false);
+              CAType.ROOT, certCodec, false);
         }
         return CertificateCodec.getX509Certificate(pemEncodedCert)
             .getSerialNumber().toString();

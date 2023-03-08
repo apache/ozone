@@ -94,6 +94,11 @@ public final class ReplicateContainerCommand
   }
 
   @Override
+  public boolean contributesToQueueSize() {
+    return priority == ReplicationCommandPriority.NORMAL;
+  }
+
+  @Override
   public ReplicateContainerCommandProto getProto() {
     Builder builder = ReplicateContainerCommandProto.newBuilder()
         .setCmdId(getId())

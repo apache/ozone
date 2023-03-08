@@ -41,9 +41,10 @@ public class ReconfigurePropertiesSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
         .getSingleNodeReconfigureProxy(parent.getAddress());
+    String serverName = reconfigProxy.getServerName();
     List<String> properties = reconfigProxy.listReconfigureProperties();
-    System.out.printf("Node [%s] Reconfigurable properties:%n",
-        parent.getAddress());
+    System.out.printf("%s: Node [%s] Reconfigurable properties:%n",
+        serverName, parent.getAddress());
     for (String name : properties) {
       System.out.println(name);
     }

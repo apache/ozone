@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
 import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
@@ -106,21 +107,16 @@ public class GrpcOzoneManagerServer {
             new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
-    if (secConf.isGrpcTlsEnabled()) {
+    if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
       try {
-        if (secConf.isSecurityEnabled()) {
-          SslContextBuilder sslClientContextBuilder =
-              SslContextBuilder.forServer(caClient.getPrivateKey(),
-                  caClient.getCertificate());
-          SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
-              sslClientContextBuilder,
-              SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
-                  HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
-          nettyServerBuilder.sslContext(sslContextBuilder.build());
-        } else {
-          LOG.error("ozone.security not enabled when TLS specified," +
-                            " creating Om S3g GRPC channel using plaintext");
-        }
+        KeyStoresFactory factory = caClient.getServerKeyStoresFactory();
+        SslContextBuilder sslClientContextBuilder =
+            SslContextBuilder.forServer(factory.getKeyManagers()[0]);
+        SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
+            sslClientContextBuilder,
+            SslProvider.valueOf(omServerConfig.get(HDDS_GRPC_TLS_PROVIDER,
+                HDDS_GRPC_TLS_PROVIDER_DEFAULT)));
+        nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure Om S3g GRPC channel.", ex);
       }
