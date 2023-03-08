@@ -55,14 +55,22 @@ public class GrpcContainerUploader implements ContainerUploader {
   public OutputStream startUpload(long containerId, DatanodeDetails target,
       CompletableFuture<Void> callback, CopyContainerCompression compression)
       throws IOException {
-    GrpcReplicationClient client = null;
+    GrpcReplicationClient client = createReplicationClient(target, compression);
     try {
-      client = createReplicationClient(target, compression);
       StreamObserver<SendContainerRequest> requestStream = client.upload(
           new SendContainerResponseStreamObserver(containerId, target,
               callback));
-      return new SendContainerOutputStream(client, requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression);
+      return new SendContainerOutputStream(requestStream, containerId,
+          GrpcReplicationService.BUFFER_SIZE, compression) {
+        @Override
+        public void close() throws IOException {
+          try {
+            super.close();
+          } finally {
+            IOUtils.close(LOG, client);
+          }
+        }
+      };
     } catch (Exception e) {
       IOUtils.close(LOG, client);
       throw e;
