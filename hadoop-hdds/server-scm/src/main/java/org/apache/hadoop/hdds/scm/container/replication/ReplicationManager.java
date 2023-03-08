@@ -230,7 +230,7 @@ public class ReplicationManager implements SCMService {
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
-        ecContainerPlacement, conf, nodeManager, this);
+        ecContainerPlacement, conf, this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,

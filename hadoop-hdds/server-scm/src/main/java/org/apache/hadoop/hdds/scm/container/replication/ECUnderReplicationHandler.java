@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -61,7 +62,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
-  private final NodeManager nodeManager;
   private final ReplicationManager replicationManager;
 
   private static class CannotFindTargetsException extends IOException {
@@ -71,13 +71,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   }
 
   public ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
-      final ConfigurationSource conf, NodeManager nodeManager,
-      ReplicationManager replicationManager) {
+      final ConfigurationSource conf, ReplicationManager replicationManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
   }
 
@@ -212,7 +210,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
-              " container commands for {}.",
+              " container commands for container {}.",
           id, ex);
       throw ex;
     }
@@ -232,8 +230,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         // maintenance nodes, as the replicas will remain present in the
         // container manager, even when they go dead.
         .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-        .map(r -> Pair.of(r, ReplicationManager
-            .getNodeStatus(r.getDatanodeDetails(), nodeManager)))
+        .map(r -> {
+          try {
+            return Pair.of(r,
+                replicationManager.getNodeStatus(r.getDatanodeDetails()));
+          } catch (NodeNotFoundException e) {
+            throw new IllegalStateException("Unable to find NodeStatus for "
+                + r.getDatanodeDetails(), e);
+          }
+        })
         .filter(pair -> pair.getRight().isHealthy())
         // If there are multiple nodes online for a given index, we just
         // pick any IN_SERVICE one. At the moment, the input streams cannot
@@ -414,19 +419,25 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private void createReplicateCommand(
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commands,
       ContainerInfo container, Iterator<DatanodeDetails> iterator,
-      ContainerReplica replica) {
+      ContainerReplica replica) throws AllSourcesOverloadedException {
     final boolean push = replicationManager.getConfig().isPush();
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
     final long containerID = container.getContainerID();
-    final ReplicateContainerCommand replicateCommand = push
-        ? ReplicateContainerCommand.toTarget(containerID, target)
-        : ReplicateContainerCommand.fromSources(containerID,
-            ImmutableList.of(source));
-    // For EC containers, we need to track the replica index which is
-    // to be replicated, so add it to the command.
-    replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-    commands.add(Pair.of(push ? source : target, replicateCommand));
+
+    if (push) {
+      commands.add(replicationManager.createThrottledReplicationCommand(
+          containerID, Collections.singletonList(source), target,
+          replica.getReplicaIndex()));
+    } else {
+      ReplicateContainerCommand replicateCommand =
+          ReplicateContainerCommand.fromSources(containerID,
+          ImmutableList.of(source));
+      // For EC containers, we need to track the replica index which is
+      // to be replicated, so add it to the command.
+      replicateCommand.setReplicaIndex(replica.getReplicaIndex());
+      commands.add(Pair.of(target, replicateCommand));
+    }
   }
 
   private static byte[] int2byte(List<Integer> src) {
