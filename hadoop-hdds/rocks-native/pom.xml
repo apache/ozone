@@ -21,13 +21,13 @@
         <version>1.4.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <name>Apache Ozone HDDS Rocks</name>
+    <name>Apache Ozone HDDS RocksDB Tools</name>
     <artifactId>hdds-rocks-native</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.ozone</groupId>
-            <artifactId>hdds-common</artifactId>
+            <artifactId>hdds-managed-rocksdb</artifactId>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
