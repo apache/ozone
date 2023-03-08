@@ -893,8 +893,7 @@ public class TestReplicationManager {
         });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    Pair<DatanodeDetails, SCMCommand<?>> cmd = replicationManager
-        .createThrottledReplicationCommand(
+    replicationManager.createThrottledReplicationCommand(
             1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
   }
 
