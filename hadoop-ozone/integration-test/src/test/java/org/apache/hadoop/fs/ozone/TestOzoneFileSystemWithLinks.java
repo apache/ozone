@@ -111,7 +111,7 @@ public class TestOzoneFileSystemWithLinks {
         .build();
     cluster.waitForClusterToBeReady();
 
-    client = cluster.getRpcClient();
+    client = cluster.getClient();
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem

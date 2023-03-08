@@ -321,11 +321,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return OzoneClientFactory.getRpcClient(conf);
   }
 
-  @Override
-  public OzoneClient getRpcClient() throws IOException {
-    return OzoneClientFactory.getRpcClient(conf);
-  }
-
   /**
    * Returns an RPC proxy connected to this cluster's StorageContainerManager
    * for accessing container location information.  Callers take ownership of

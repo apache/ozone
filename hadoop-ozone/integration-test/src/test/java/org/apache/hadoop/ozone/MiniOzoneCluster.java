@@ -179,15 +179,6 @@ public interface MiniOzoneCluster {
   OzoneClient getClient() throws IOException;
 
   /**
-   * Returns an RPC based {@link OzoneClient} to access the
-   * {@link MiniOzoneCluster}.
-   *
-   * @return {@link OzoneClient}
-   * @throws IOException
-   */
-  OzoneClient getRpcClient() throws IOException;
-
-  /**
    * Returns StorageContainerLocationClient to communicate with
    * {@link StorageContainerManager} associated with the MiniOzoneCluster.
    *
