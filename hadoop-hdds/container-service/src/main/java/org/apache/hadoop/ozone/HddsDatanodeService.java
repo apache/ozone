@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -279,19 +278,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
-        int softwareLayoutVersion = datanodeStateMachine
-            .getLayoutVersionManager().getSoftwareLayoutVersion();
-        if (softwareLayoutVersion >=
-            HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.layoutVersion()) {
-          HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
-          if (policy.isHttpEnabled()) {
-            datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
-                    httpServer.getHttpAddress().getPort()));
-          }
-          if (policy.isHttpsEnabled()) {
-            datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
-                    httpServer.getHttpsAddress().getPort()));
-          }
+        HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+        if (policy.isHttpEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
+                  httpServer.getHttpAddress().getPort()));
+        }
+        if (policy.isHttpsEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
+                  httpServer.getHttpsAddress().getPort()));
         }
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
