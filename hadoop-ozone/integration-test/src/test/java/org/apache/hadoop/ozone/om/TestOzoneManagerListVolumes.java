@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -62,6 +63,7 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerListVolumes {
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = Timeout.seconds(120);
@@ -107,9 +109,9 @@ public class TestOzoneManagerListVolumes {
         .setClusterId(clusterId).setScmId(scmId).setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.getClient();
 
     // Create volumes with non-default owners and ACLs
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
@@ -129,6 +131,7 @@ public class TestOzoneManagerListVolumes {
 
   @AfterClass
   public static void shutdownClass() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -186,7 +189,6 @@ public class TestOzoneManagerListVolumes {
       List<String> expectVol, boolean expectListAllSuccess,
                          boolean expectListByUserSuccess) throws IOException {
 
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.

@@ -157,7 +157,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
    */
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
-    OzoneClient rpcClient = getCluster().getRpcClient();
+    OzoneClient rpcClient = getClient();
 
     HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(
@@ -352,8 +352,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       OzoneManager ozoneManager = getCluster().getOzoneManager(i);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
-      final ObjectStore store = OzoneClientFactory.getRpcClient(
-          getOmServiceId(), getConf()).getObjectStore();
+      final ObjectStore store = getClient().getObjectStore();
       final HadoopRpcOMFailoverProxyProvider proxyProvider =
           OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 

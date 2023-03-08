@@ -327,12 +327,13 @@ public class TestHDDSUpgrade {
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
-    ObjectStore store = cluster.getClient().getObjectStore();
-    store.createVolume("vol1");
-    store.getVolume("vol1").createBucket("buc1");
-    store.getVolume("vol1").getBucket("buc1").createKey("key1", 100,
-        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
-
+    try (OzoneClient client = cluster.getClient()) {
+      ObjectStore store = client.getObjectStore();
+      store.createVolume("vol1");
+      store.getVolume("vol1").createBucket("buc1");
+      store.getVolume("vol1").getBucket("buc1").createKey("key1", 100,
+          ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
+    }
   }
 
   /*

@@ -107,7 +107,7 @@ public class TestDecommissionAndMaintenance {
   private PipelineManager pm;
   private StorageContainerManager scm;
 
-  private OzoneClient ozoneClient;
+  private OzoneClient client;
   private ContainerOperationClient scmClient;
 
   private static MiniOzoneClusterProvider clusterProvider;
@@ -159,14 +159,14 @@ public class TestDecommissionAndMaintenance {
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
-    ozoneClient = cluster.getClient();
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
+    client = cluster.getClient();
+    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @AfterEach
   public void tearDown() throws InterruptedException, IOException {
-    IOUtils.close(LOG, ozoneClient);
+    IOUtils.close(LOG, client);
     IOUtils.close(LOG, scmClient);
     if (cluster != null) {
       clusterProvider.destroy(cluster);

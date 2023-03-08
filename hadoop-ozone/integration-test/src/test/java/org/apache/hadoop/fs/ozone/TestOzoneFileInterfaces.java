@@ -58,7 +58,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
@@ -176,8 +176,10 @@ public class TestOzoneFileInterfaces {
     OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
-        getBucketLayout());
+    try (OzoneClient client = cluster.getClient()) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          getBucketLayout());
+    }
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
@@ -551,31 +553,32 @@ public class TestOzoneFileInterfaces {
   public void testFileSystemWithObjectStoreLayout() throws IOException {
     String obsVolume = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
-    ObjectStore store = client.getObjectStore();
+    try (OzoneClient client = cluster.getClient()) {
+      ObjectStore store = client.getObjectStore();
 
-    // Create volume and bucket
-    store.createVolume(obsVolume);
-    OzoneVolume volume = store.getVolume(obsVolume);
-    String obsBucket = UUID.randomUUID().toString();
-    // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
-    volume.createBucket(obsBucket,
-        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
-            .build());
+      // Create volume and bucket
+      store.createVolume(obsVolume);
+      OzoneVolume volume = store.getVolume(obsVolume);
+      String obsBucket = UUID.randomUUID().toString();
+      // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
+      volume.createBucket(obsBucket,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+              .build());
 
-    String obsRootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
+      String obsRootPath = String.format("%s://%s.%s/",
+          OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
 
-    OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
-    config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
+      OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
+      config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
 
-    try {
-      fs = FileSystem.get(fs.getConf());
-      Assert.fail("Should throw Exception due incompatible bucket layout");
-    } catch (IllegalArgumentException iae) {
-      // Expected exception
-      Assert.assertTrue(iae.getMessage().contains(
-          "OBJECT_STORE, which does not support file system semantics"));
+      try {
+        fs = FileSystem.get(fs.getConf());
+        Assert.fail("Should throw Exception due incompatible bucket layout");
+      } catch (IllegalArgumentException iae) {
+        // Expected exception
+        Assert.assertTrue(iae.getMessage().contains(
+            "OBJECT_STORE, which does not support file system semantics"));
+      }
     }
   }
 

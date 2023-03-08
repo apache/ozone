@@ -68,4 +68,8 @@ public final class IOUtils {
     }
   }
 
+  public static void closeQuietly(AutoCloseable... closeables) {
+    close(null, closeables);
+  }
+
 }
