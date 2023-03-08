@@ -27,7 +27,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  * This is copied from Hadoop3 code to make Ozone compatible with Hadoop2.7
  * runtime dependency. Hadoop 2.7 does not support StreamCapabilities API.
  *
- * TODO: remove this interface once we drop Hadoop 2.7 support.
+ * TODO: remove this interface once we drop Hadoop 2.7 support. (HDDS-8113)
  *
  * Capability strings must be in lower case.
  *
@@ -76,21 +76,31 @@ public interface StreamCapabilities {
 
   /**
    * Stream read(long, ByteBuffer) capability implemented by
-   * {@link ByteBufferPositionedReadable#read(long, java.nio.ByteBuffer)}.
+   * ByteBufferPositionedReadable.
    */
   String PREADBYTEBUFFER = "in:preadbytebuffer";
 
   /**
    * IOStatisticsSource API.
    */
-  //String IOSTATISTICS = "iostatistics";
+  String IOSTATISTICS = "iostatistics";
 
   /**
-   * Stream abort() capability implemented by {@link Abortable#abort()}.
-   * This matches the Path Capability
-   * {@link CommonPathCapabilities#ABORTABLE_STREAM}.
+   * Support for vectored IO api.
+   * See {@code PositionedReadable#readVectored(List, IntFunction)}.
    */
-  //String ABORTABLE_STREAM =  CommonPathCapabilities.ABORTABLE_STREAM;
+  String VECTOREDIO = "in:readvectored";
+
+  /**
+   * Stream abort() capability implemented by Abortable.
+   */
+  String ABORTABLE_STREAM = "fs.capability.outputstream.abortable";
+
+  /**
+   * Streams that support IOStatistics context and capture thread-level
+   * IOStatistics.
+   */
+  String IOSTATISTICS_CONTEXT = "fs.capability.iocontext.supported";
 
   /**
    * Capabilities that a stream can support and be queried for.
