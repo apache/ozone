@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,11 +124,14 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           throws IOException;
 
   private void processContainer(HealthResult healthResult) throws IOException {
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds = getDatanodeCommands(
-            replicationManager, healthResult);
-    for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds) {
-      replicationManager.sendDatanodeCommand(cmd.getValue(),
-              healthResult.getContainerInfo(), cmd.getKey());
+    ContainerInfo containerInfo = healthResult.getContainerInfo();
+    synchronized (containerInfo) {
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds = getDatanodeCommands(
+          replicationManager, healthResult);
+      for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds) {
+        replicationManager.sendDatanodeCommand(cmd.getValue(),
+            healthResult.getContainerInfo(), cmd.getKey());
+      }
     }
   }
 

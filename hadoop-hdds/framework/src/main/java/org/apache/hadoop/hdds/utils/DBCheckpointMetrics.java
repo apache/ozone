@@ -53,6 +53,11 @@ public class DBCheckpointMetrics {
         new DBCheckpointMetrics());
   }
 
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
   @VisibleForTesting
   public void setLastCheckpointCreationTimeTaken(long val) {
     this.lastCheckpointCreationTimeTaken.set(val);

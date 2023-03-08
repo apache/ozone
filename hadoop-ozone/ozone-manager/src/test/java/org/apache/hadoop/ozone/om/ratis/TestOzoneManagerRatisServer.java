@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -61,6 +62,7 @@ import org.slf4j.LoggerFactory;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.junit.Assert.assertFalse;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -109,6 +111,10 @@ public class TestOzoneManagerRatisServer {
         .setOMNodeId(omID)
         .setOMServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)
         .build();
+    OMStorage omStorage = mock(OMStorage.class);
+    when(omStorage.getOmCertSerialId()).thenReturn(null);
+    when(omStorage.getClusterID()).thenReturn("test");
+    when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
     // Starts a single node Ratis server
     ozoneManager = Mockito.mock(OzoneManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -121,7 +127,8 @@ public class TestOzoneManagerRatisServer {
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     secConfig = new SecurityConfig(conf);
-    certClient = new OMCertificateClient(secConfig);
+    certClient =
+        new OMCertificateClient(secConfig, omStorage, null, null, null);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();

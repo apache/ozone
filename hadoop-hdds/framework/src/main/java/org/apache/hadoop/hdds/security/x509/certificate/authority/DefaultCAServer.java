@@ -58,6 +58,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -136,6 +137,7 @@ public class DefaultCAServer implements CertificateServer {
   private CRLApprover crlApprover;
   private CertificateStore store;
   private Lock lock;
+  private static boolean testSecureFlag;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -224,16 +226,14 @@ public class DefaultCAServer implements CertificateServer {
   public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role) {
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-
-    LocalDate endDate;
+    LocalDateTime beginDate = LocalDateTime.now();
+    LocalDateTime endDate;
     // When issuing certificates for sub-ca use the max certificate duration
     // similar to self signed root certificate.
     if (role == NodeType.SCM) {
-      endDate = temp.plus(config.getMaxCertificateDuration()).toLocalDate();
+      endDate = beginDate.plus(config.getMaxCertificateDuration());
     } else {
-      endDate = temp.plus(config.getDefaultCertDuration()).toLocalDate();
+      endDate = beginDate.plus(config.getDefaultCertDuration());
     }
 
     CompletableFuture<X509CertificateHolder> xcertHolder =
@@ -283,8 +283,8 @@ public class DefaultCAServer implements CertificateServer {
     return xCertHolders;
   }
 
-  private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
-      LocalDate endDate, PKCS10CertificationRequest csr, NodeType role)
+  private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
+      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
       OperatorCreationException, CertificateException, TimeoutException {
 
@@ -293,8 +293,10 @@ public class DefaultCAServer implements CertificateServer {
     try {
       xcert = approver.sign(config,
           getCAKeys().getPrivate(),
-          getCACertificate(), java.sql.Date.valueOf(beginDate),
-          java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
+          getCACertificate(),
+          Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
+          Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
+          csr, scmID, clusterID);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
         store.storeValidCertificate(xcert.getSerialNumber(),
@@ -670,5 +672,10 @@ public class DefaultCAServer implements CertificateServer {
     MISSING_KEYS, /* Private key is missing, certificate Exists.*/
     MISSING_CERTIFICATE, /* Keys exist, but root certificate missing.*/
     INITIALIZE /* All artifacts are missing, we should init the system. */
+  }
+
+  @VisibleForTesting
+  public static void setTestSecureFlag(boolean flag) {
+    testSecureFlag = flag;
   }
 }

@@ -165,7 +165,7 @@ public class TestOMSnapshotDAG {
 
   @Test
   public void testDAGReconstruction()
-          throws IOException, InterruptedException, TimeoutException {
+      throws IOException, InterruptedException, TimeoutException {
 
     // Generate keys
     RandomKeyGenerator randomKeyGenerator =

@@ -144,7 +144,8 @@ public class TestOzoneFsSnapshot {
    */
   @ParameterizedTest
   @ValueSource(strings = {"snap-1",
-      "snap75795657617173401188448010125899089001363595171500499231286"})
+      "snap75795657617173401188448010125899089001363595171500499231286",
+      "sn1"})
   public void testCreateSnapshotSuccess(String snapshotName)
       throws Exception {
     int res = ToolRunner.run(shell,
@@ -190,7 +191,12 @@ public class TestOzoneFsSnapshot {
             "",
             "",
             "Can not create a Path from an empty string",
-            -1)
+            -1),
+        Arguments.of("6th case: snapshot name length is less than 3 chars",
+             BUCKET_PATH,
+             "s1",
+             "Invalid snapshot name",
+             1)
     );
   }
 

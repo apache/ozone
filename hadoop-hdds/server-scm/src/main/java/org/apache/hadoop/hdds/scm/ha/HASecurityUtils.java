@@ -52,7 +52,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.security.KeyPair;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -93,7 +92,8 @@ public final class HASecurityUtils {
     LOG.info("Initializing secure StorageContainerManager.");
 
     CertificateClient certClient =
-        new SCMCertificateClient(new SecurityConfig(conf));
+        new SCMCertificateClient(
+            new SecurityConfig(conf), scmStorageConfig.getScmId());
     InitResponse response = certClient.init();
     LOG.info("Init response: {}", response);
     switch (response) {
@@ -157,7 +157,7 @@ public final class HASecurityUtils {
         String pemEncodedRootCert = response.getX509CACertificate();
         client.storeCertificate(
             pemEncodedRootCert, CAType.SUBORDINATE);
-        client.storeCertificate(pemEncodedCert);
+        client.storeCertificate(pemEncodedCert, CAType.NONE);
         //note: this does exactly the same as store certificate
         persistSubCACertificate(config, client,
             pemEncodedCert);
@@ -208,7 +208,7 @@ public final class HASecurityUtils {
 
       client.storeCertificate(
           pemEncodedRootCert, CAType.SUBORDINATE);
-      client.storeCertificate(pemEncodedCert);
+      client.storeCertificate(pemEncodedCert, CAType.NONE);
       //note: this does exactly the same as store certificate
       persistSubCACertificate(config, client, pemEncodedCert);
       X509Certificate cert =
@@ -262,15 +262,13 @@ public final class HASecurityUtils {
       OzoneConfiguration config, InetSocketAddress scmAddress)
       throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(client.getPublicKey(),
-        client.getPrivateKey());
 
     // Get host name.
     String hostname = scmAddress.getHostName();
 
     String subject = SCM_SUB_CA_PREFIX + hostname;
 
-    builder.setKey(keyPair)
+    builder
         .setConfiguration(config)
         .setScmID(scmStorageConfig.getScmId())
         .setClusterID(scmStorageConfig.getClusterID())

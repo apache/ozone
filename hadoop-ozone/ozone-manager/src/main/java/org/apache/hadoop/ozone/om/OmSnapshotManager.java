@@ -25,6 +25,7 @@ import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -55,6 +58,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -84,7 +88,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     this.snapshotDiffDb =
         createDbForSnapshotDiff(ozoneManager.getConfiguration());
-    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ);
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
+        ozoneManager.getConfiguration());
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
@@ -103,9 +108,11 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        boolean isSnapshotInCache =
+        CacheValue<SnapshotInfo> cacheValue =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .getCacheValue(new CacheKey<>(snapshotTableKey)) != null;
+                .getCacheValue(new CacheKey<>(snapshotTableKey));
+        boolean isSnapshotInCache = cacheValue != null && Optional.ofNullable(
+            cacheValue.getCacheValue()).isPresent();
 
         // read in the snapshot
         OzoneConfiguration conf = ozoneManager.getConfiguration();
@@ -346,10 +353,14 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
-  public SnapshotDiffReport getSnapshotDiffReport(final String volume,
-                                                  final String bucket,
-                                                  final String fromSnapshot,
-                                                  final String toSnapshot)
+  // TODO: [SNAPSHOT] Will pass token and page size to snapshotDiffManager in
+  //  HDDS-7548
+  public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
+                                                    final String bucket,
+                                                    final String fromSnapshot,
+                                                    final String toSnapshot,
+                                                    final String token,
+                                                    final int pageSize)
       throws IOException {
     // Validate fromSnapshot and toSnapshot
     final SnapshotInfo fsInfo = getSnapshotInfo(volume, bucket, fromSnapshot);
@@ -361,8 +372,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     try {
       final OmSnapshot fs = snapshotCache.get(fsKey);
       final OmSnapshot ts = snapshotCache.get(tsKey);
-      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
-          fsInfo, tsInfo);
+      SnapshotDiffReport snapshotDiffReport = snapshotDiffManager
+          .getSnapshotDiffReport(volume, bucket, fs, ts, fsInfo, tsInfo);
+      return new SnapshotDiffResponse(snapshotDiffReport, DONE, 0L);
     } catch (ExecutionException | RocksDBException e) {
       throw new IOException(e.getCause());
     }
