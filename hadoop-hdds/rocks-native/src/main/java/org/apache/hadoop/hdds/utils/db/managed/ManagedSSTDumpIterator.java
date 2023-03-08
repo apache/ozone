@@ -120,7 +120,7 @@ public class ManagedSSTDumpIterator implements
   }
 
   /**
-   *
+   * Returns the next record from SSTDumpTool
    * @return next Key
    * Throws Runtime Exception incase of failure.
    */
