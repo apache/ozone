@@ -241,7 +241,8 @@ public final class DatanodeIdYaml {
         } catch (NoSuchFieldException e) {
           e.printStackTrace();
         }
-        if (f != null && f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
+        if (f != null
+            && f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
           HDDSLayoutFeature layoutFeature
               = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
           if (layoutFeature.layoutVersion() <=

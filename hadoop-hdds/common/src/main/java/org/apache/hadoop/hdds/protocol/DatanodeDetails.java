@@ -807,7 +807,10 @@ public class DatanodeDetails extends NodeImpl implements
       RATIS_DATASTREAM,
       @BelongsToHDDSLayoutVersion(HDDSLayoutFeature
           .WEBUI_PORTS_IN_DATANODEDETAILS)
-      HTTP, HTTPS;
+      HTTP,
+      @BelongsToHDDSLayoutVersion(HDDSLayoutFeature
+          .WEBUI_PORTS_IN_DATANODEDETAILS)
+      HTTPS;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());
