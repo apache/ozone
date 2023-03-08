@@ -109,9 +109,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   @Test
   public void testOMHAMetrics() throws InterruptedException,
       TimeoutException, IOException {
+    waitForLeaderToBeReady();
 
     // Get leader OM
-    OzoneManager leaderOM = getCluster().getOMLeader(true);
+    OzoneManager leaderOM = getCluster().getOMLeader();
     // Store current leader's node ID,
     // to use it after restarting the OM
     String leaderOMId = leaderOM.getOMNodeId();
@@ -125,8 +126,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     leaderOM.stop();
     leaderOM.restart();
 
+    waitForLeaderToBeReady();
+
     // Get the new leader
-    OzoneManager newLeaderOM = getCluster().getOMLeader(true);
+    OzoneManager newLeaderOM = getCluster().getOMLeader();
     String newLeaderOMId = newLeaderOM.getOMNodeId();
     // Get a list of all OMs again
     omList = getCluster().getOzoneManagersList();
@@ -162,6 +165,23 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
       Assertions.assertEquals(nodeId, omhaMetrics.getOmhaInfoNodeId());
     }
+  }
+
+
+  /**
+   * Some tests are stopping or restarting OMs.
+   * There are test cases where we might need to
+   * wait for a leader to be elected and ready.
+   */
+  private void waitForLeaderToBeReady()
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return getCluster().getOMLeader().isLeaderReady();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 200000);
   }
 
   @Test
