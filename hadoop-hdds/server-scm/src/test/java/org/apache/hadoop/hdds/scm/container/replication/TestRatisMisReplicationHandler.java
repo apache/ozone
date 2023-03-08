@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +42,11 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 /**
  * Tests the RatisReplicationHandling functionality.
@@ -52,7 +54,8 @@ import static org.mockito.ArgumentMatchers.anyList;
 public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException,
+      AllSourcesOverloadedException {
     RatisReplicationConfig repConfig = RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE);
     setup(repConfig);
@@ -170,11 +173,27 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
             pendingOp, 0, 1, 0);
   }
 
+
+  @Test
+  public void testAllSourcesOverloaded() throws IOException {
+    ReplicationManager replicationManager = getReplicationManager();
+    Mockito.when(replicationManager.createThrottledReplicationCommand(
+            anyLong(), anyList(), any(), anyInt()))
+        .thenThrow(new AllSourcesOverloadedException("Overloaded"));
+
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
+            Pair.of(IN_SERVICE, 0));
+    assertThrows(AllSourcesOverloadedException.class,
+        () -> testMisReplication(availableReplicas, Collections.emptyList(),
+            0, 1, 1));
+  }
+
   @Override
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new RatisMisReplicationHandler(placementPolicy, conf,
-        replicationManager, false);
+        replicationManager, true);
   }
 }

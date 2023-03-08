@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +40,11 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 /**
  * Tests the ECMisReplicationHandling functionality.
@@ -53,7 +55,8 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
 
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException,
+      AllSourcesOverloadedException {
     ECReplicationConfig repConfig = new ECReplicationConfig(DATA, PARITY);
     setup(repConfig);
   }
@@ -84,7 +87,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
     Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
     Mockito.when(placementPolicy.chooseDatanodes(
-                    Mockito.any(), Mockito.any(), Mockito.any(),
+                    any(), any(), any(),
                     Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(new IOException("No nodes found"));
     Assertions.assertThrows(SCMException.class, () -> testMisReplication(
@@ -166,11 +169,27 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
             pendingOp, 0, 1, 0);
   }
 
+  @Test
+  public void testAllSourcesOverloaded() throws IOException {
+    ReplicationManager replicationManager = getReplicationManager();
+    Mockito.when(replicationManager.createThrottledReplicationCommand(
+        anyLong(), anyList(), any(), anyInt()))
+        .thenThrow(new AllSourcesOverloadedException("Overloaded"));
+
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+    assertThrows(AllSourcesOverloadedException.class,
+        () -> testMisReplication(availableReplicas, Collections.emptyList(),
+            0, 1, 1));
+  }
+
   @Override
   protected MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new ECMisReplicationHandler(placementPolicy, conf,
-        replicationManager, false);
+        replicationManager, true);
   }
 }

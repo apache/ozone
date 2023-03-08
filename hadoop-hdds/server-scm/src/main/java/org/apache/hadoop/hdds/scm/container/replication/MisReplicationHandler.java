@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -122,9 +121,10 @@ public abstract class MisReplicationHandler implements
           ReplicateContainerCommand command, ContainerReplica replica);
 
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> getReplicateCommands(
-          ContainerInfo containerInfo,
-          Set<ContainerReplica> replicasToBeReplicated,
-          List<DatanodeDetails> targetDns) {
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> targetDns)
+      throws AllSourcesOverloadedException {
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commandMap = new HashSet<>();
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
@@ -134,12 +134,16 @@ public abstract class MisReplicationHandler implements
       long containerID = containerInfo.getContainerID();
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
-      ReplicateContainerCommand replicateCommand = push
-          ? ReplicateContainerCommand.toTarget(containerID, target)
-          : ReplicateContainerCommand.fromSources(containerID,
-              Collections.singletonList(source));
-      replicateCommand = updateReplicateCommand(replicateCommand, replica);
-      commandMap.add(Pair.of(push ? source : target, replicateCommand));
+      if (push) {
+        commandMap.add(replicationManager.createThrottledReplicationCommand(
+            containerID, Collections.singletonList(source),
+            target, replica.getReplicaIndex()));
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, Collections.singletonList(source));
+        updateReplicateCommand(cmd, replica);
+        commandMap.add(Pair.of(target, cmd));
+      }
       datanodeIdx += 1;
     }
     return commandMap;
