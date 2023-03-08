@@ -93,15 +93,16 @@ public class TestCloseContainerHandler {
     cluster.waitForClusterToBeReady();
 
     //the easiest way to create an open container is creating a key
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
-    ObjectStore objectStore = client.getObjectStore();
-    objectStore.createVolume("test");
-    objectStore.getVolume("test").createBucket("test");
-    OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("test", 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
-    key.write("test".getBytes(UTF_8));
-    key.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume("test");
+      objectStore.getVolume("test").createBucket("test");
+      OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
+          .createKey("test", 1024, ReplicationType.RATIS,
+              ReplicationFactor.ONE, new HashMap<>());
+      key.write("test".getBytes(UTF_8));
+      key.close();
+    }
 
     //get the name of a valid container
     OmKeyArgs keyArgs =
