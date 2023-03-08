@@ -206,7 +206,8 @@ public class TestDatanodeStateMachine {
    */
   @Test
   public void testDatanodeStateContext() throws IOException,
-      InterruptedException, ExecutionException, TimeoutException {
+          InterruptedException, ExecutionException, TimeoutException,
+          NoSuchFieldException {
     // There is no mini cluster started in this test,
     // create a ID file so that state machine could load a fake datanode ID.
     File idPath = new File(
@@ -218,7 +219,7 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.STANDALONE,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
-    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf, null, null,
                  null)) {

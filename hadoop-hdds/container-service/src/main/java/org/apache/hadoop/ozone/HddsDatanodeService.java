@@ -279,8 +279,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
-        int softwareLayoutVersion = datanodeStateMachine.getLayoutVersionManager().getSoftwareLayoutVersion();
-        if (softwareLayoutVersion >= HDDSLayoutFeature.HTTP_PORT_FOR_DATANODE.layoutVersion()) {
+        int softwareLayoutVersion = datanodeStateMachine
+            .getLayoutVersionManager().getSoftwareLayoutVersion();
+        if (softwareLayoutVersion >=
+            HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.layoutVersion()) {
           HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
           if (policy.isHttpEnabled()) {
             datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
@@ -307,7 +309,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         startRatisForTest();
       }
       registerMXBean();
-    } catch (IOException e) {
+    } catch (IOException | NoSuchFieldException e) {
       throw new RuntimeException("Can't start the HDDS datanode plugin", e);
     } catch (AuthenticationException ex) {
       throw new RuntimeException("Fail to authentication when starting" +
@@ -345,7 +347,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * */
   @VisibleForTesting
   public CertificateClient initializeCertificateClient(
-      CertificateClient certClient) throws IOException {
+      CertificateClient certClient) throws IOException, NoSuchFieldException {
     LOG.info("Initializing secure Datanode.");
 
     CertificateClient.InitResponse response = certClient.init();
@@ -433,11 +435,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * @return DatanodeDetails
    */
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
-      throws IOException {
+          throws IOException, NoSuchFieldException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
 
   /**
@@ -591,7 +593,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     datanodeDetails.setCertSerialId(newCertId);
     try {
       persistDatanodeDetails(datanodeDetails);
-    } catch (IOException ex) {
+    } catch (IOException | NoSuchFieldException ex) {
       // New cert ID cannot be persisted into VERSION file.
       String msg = "Failed to persist new cert ID " + newCertId +
           "to VERSION file. Terminating datanode...";

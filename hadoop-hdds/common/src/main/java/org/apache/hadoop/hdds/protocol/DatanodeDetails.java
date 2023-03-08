@@ -805,10 +805,9 @@ public class DatanodeDetails extends NodeImpl implements
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
       RATIS_DATASTREAM,
-      @BelongsToHDDSLayoutVersion(HDDSLayoutFeature.HTTP_PORT_FOR_DATANODE)
-      HTTP,
-      @BelongsToHDDSLayoutVersion(HDDSLayoutFeature.HTTP_PORT_FOR_DATANODE)
-      HTTPS;
+      @BelongsToHDDSLayoutVersion(HDDSLayoutFeature
+          .WEBUI_PORTS_IN_DATANODEDETAILS)
+      HTTP, HTTPS;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());

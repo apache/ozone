@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -30,8 +31,12 @@ import java.util.UUID;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -52,7 +57,9 @@ public final class DatanodeIdYaml {
    * @param path            Path to datnode.id file
    */
   public static void createDatanodeIdFile(DatanodeDetails datanodeDetails,
-                                          File path) throws IOException {
+                                          File path,
+                                          ConfigurationSource conf)
+          throws IOException, NoSuchFieldException {
     DumperOptions options = new DumperOptions();
     options.setPrettyFlow(true);
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
@@ -60,7 +67,7 @@ public final class DatanodeIdYaml {
 
     try (Writer writer = new OutputStreamWriter(
         new FileOutputStream(path), StandardCharsets.UTF_8)) {
-      yaml.dump(getDatanodeDetailsYaml(datanodeDetails), writer);
+      yaml.dump(getDatanodeDetailsYaml(datanodeDetails, conf), writer);
     }
   }
 
@@ -219,11 +226,24 @@ public final class DatanodeIdYaml {
   }
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
-      DatanodeDetails datanodeDetails) {
+      DatanodeDetails datanodeDetails, ConfigurationSource conf)
+      throws IOException, NoSuchFieldException {
+
+    DatanodeLayoutStorage datanodeLayoutStorage
+        = new DatanodeLayoutStorage(conf, datanodeDetails.getUuidString());
 
     Map<String, Integer> portDetails = new LinkedHashMap<>();
     if (!CollectionUtils.isEmpty(datanodeDetails.getPorts())) {
       for (DatanodeDetails.Port port : datanodeDetails.getPorts()) {
+        Field f = port.getClass().getField(port.getName().toString());
+        if (f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
+          HDDSLayoutFeature layoutVersion
+              = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
+          if (layoutVersion.layoutVersion() <=
+              datanodeLayoutStorage.getLayoutVersion()) {
+            continue;
+          }
+        }
         portDetails.put(port.getName().toString(), port.getValue());
       }
     }
