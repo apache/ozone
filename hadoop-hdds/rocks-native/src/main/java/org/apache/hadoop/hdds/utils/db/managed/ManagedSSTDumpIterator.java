@@ -40,7 +40,7 @@ public class ManagedSSTDumpIterator implements
   private static final String SST_DUMP_TOOL_CLASS =
           "org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool";
   private static final String PATTERN_REGEX =
-          "'([^=>]+)' seq:([0-9]+), type:([0-9]+) =>";
+          "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
 
   public static final int PATTERN_KEY_GROUP_NUMBER = 1;
   public static final int PATTERN_SEQ_GROUP_NUMBER = 2;
