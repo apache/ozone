@@ -163,9 +163,9 @@ public class KeyDeletingService extends BackgroundService {
         runCount.incrementAndGet();
         try {
           long startTime = Time.monotonicNow();
-          // TODO: HDDS-7968. Reclaim eligible key blocks in snapshot's
-          //  deletedTable when active DB's deletedTable doesn't have enough
-          //  entries left.
+          // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
+          //  snapshot's deletedTable when active DB's deletedTable
+          //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
           //  from. And PurgeKeysRequest would have to be adjusted to be able
           //  to operate on snapshot checkpoints.

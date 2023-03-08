@@ -63,6 +63,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
+  // Threshold for the table iterator loop in nanoseconds.
+  private static final long DB_TABLE_ITER_LOOP_THRESHOLD_NS = 100000;
+
   private final OzoneManager ozoneManager;
   private final OMMetadataManager omMetadataManager;
   private final SnapshotDiffManager snapshotDiffManager;
@@ -174,6 +177,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       // with table write lock held
       deleteKeysInSnapshotScopeFromDTableInternal(omMetadataManager,
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+      // TODO: [SNAPSHOT] HDDS-8064. Clean up deletedDirTable as well
     } finally {
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
@@ -226,11 +230,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Range delete end key (exclusive) to be found
     String endKey;
 
+    // Start performance tracking timer
+    long startTime = System.nanoTime();
+
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
         keyIter = omMetadataManager.getDeletedTable().iterator()) {
 
-      // TODO: Start timer for perf tracking
       keyIter.seek(beginKey);
       // Continue only when there are entries of snapshot (bucket) scope
       // in deletedTable in the first place
@@ -242,7 +248,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         endKey = keyIter.next().getKey();
 
         // Loop until prefix mismatches.
-        // TODO: Room for optimization? Seek next predicted bucket name.
+        // TODO: [SNAPSHOT] Try to seek next predicted bucket name (speed up?)
         while (keyIter.hasNext()) {
           Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
           String dbKey = entry.getKey();
@@ -252,7 +258,13 @@ public final class OmSnapshotManager implements AutoCloseable {
         }
       }
     }
-    // TODO: End timer. Print time elapsed to debug log
+
+    // Time took for the iterator to finish (in ns)
+    long timeElapsed = System.nanoTime() - startTime;
+    if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
+      // Print time elapsed
+      LOG.warn("Took {} ns to clean up deletedTable", timeElapsed);
+    }
 
     if (endKey != null) {
       // Clean up deletedTable

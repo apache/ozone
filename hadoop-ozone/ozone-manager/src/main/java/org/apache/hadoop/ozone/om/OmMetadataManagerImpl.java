@@ -273,11 +273,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // Table-level locks that protects table read/write access.
   // This is intended to be a finer-grained lock than OzoneManagerLock.
   private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
-  // TODO: To discuss if there is a better way to achieve deletedTable mutex.
-  //
-  // 1. No extra room in OzoneManagerLock#Resource. All 8 bits in 1B are taken.
-  // 2. OzoneManagerLock enforces a lock hierarchy which may not be desired
-  //  in all cases, like deletedTable here.
 
   @Override
   public ReentrantReadWriteLock getTableLock(String tableName) {
@@ -1391,7 +1386,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             // Skip the key if it exists in the previous snapshot (of the same
             // scope) as in this case its blocks should not be reclaimed
 
-            // TODO: HDDS-7968
+            // TODO: [SNAPSHOT] HDDS-7968
             //  1. If previous snapshot keyTable has key info.getObjectID(),
             //  skip it. Pending HDDS-7740 merge to reuse the util methods to
             //  check previousSnapshot.
