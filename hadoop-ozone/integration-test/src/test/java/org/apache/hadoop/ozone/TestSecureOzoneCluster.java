@@ -1355,8 +1355,10 @@ public final class TestSecureOzoneCluster {
             CertificateCodec.getPEMEncodedString(caCert)));
       }
 
-      try (OzoneClient ignored = OzoneClientFactory.getRpcClient(conf)) {
-        // get new client, it should succeed.
+      // get new client, it should succeed.
+      try {
+        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
+        client1.close();
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());
@@ -1366,8 +1368,10 @@ public final class TestSecureOzoneCluster {
       // Wait for old OM certificate to expire
       GenericTestUtils.waitFor(() -> omCert.getNotAfter().before(new Date()),
           500, certLifetime * 1000);
-      try (OzoneClient ignored = OzoneClientFactory.getRpcClient(conf)) {
-        // get new client, it should succeed too.
+      // get new client, it should succeed too.
+      try {
+        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
+        client1.close();
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());

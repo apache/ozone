@@ -103,7 +103,7 @@ public class TestRefreshVolumeUsageHandler {
       key.write("test".getBytes(UTF_8));
       key.close();
 
-      //a new key is created , but the datanode default REFRESH_PERIOD is 1 hour,
+      //a new key is created, but the datanode default REFRESH_PERIOD is 1 hour,
       //still the cache is updated, so the scm will eventually get the new
       //used space from the datanode through node report.
       Assert.assertTrue(cluster.getStorageContainerManager()

@@ -177,7 +177,8 @@ public class TestStorageContainerManagerHA {
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
       is.close();
-      final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+      final OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setReplicationConfig(RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
@@ -187,7 +188,8 @@ public class TestStorageContainerManagerHA {
       final List<OmKeyLocationInfo> keyLocationInfos =
           keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
       long index = -1;
-      for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      for (StorageContainerManager scm : cluster
+          .getStorageContainerManagers()) {
         if (scm.checkLeader()) {
           index = getLastAppliedIndex(scm);
         }

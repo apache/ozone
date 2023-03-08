@@ -29,7 +29,6 @@ import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -60,6 +59,8 @@ import org.apache.hadoop.util.Time;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 import org.junit.After;
@@ -186,7 +187,7 @@ public class TestOzoneFileInterfaces {
             volumeName);
     if (setDefaultFs) {
       // Set the fs.defaultFS and start the filesystem
-      conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+      conf.set(FS_DEFAULT_NAME_KEY, rootPath);
       fs = FileSystem.get(conf);
     } else {
       fs = FileSystem.get(new URI(rootPath + "/test.txt"), conf);
@@ -569,7 +570,7 @@ public class TestOzoneFileInterfaces {
           OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
 
       OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
-      config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
+      config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
       try {
         fs = FileSystem.get(fs.getConf());
