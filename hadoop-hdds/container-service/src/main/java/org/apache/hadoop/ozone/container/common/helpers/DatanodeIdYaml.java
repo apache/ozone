@@ -59,7 +59,7 @@ public final class DatanodeIdYaml {
   public static void createDatanodeIdFile(DatanodeDetails datanodeDetails,
                                           File path,
                                           ConfigurationSource conf)
-          throws IOException, NoSuchFieldException {
+          throws IOException {
     DumperOptions options = new DumperOptions();
     options.setPrettyFlow(true);
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
@@ -227,7 +227,7 @@ public final class DatanodeIdYaml {
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
       DatanodeDetails datanodeDetails, ConfigurationSource conf)
-      throws IOException, NoSuchFieldException {
+      throws IOException {
 
     DatanodeLayoutStorage datanodeLayoutStorage
         = new DatanodeLayoutStorage(conf, datanodeDetails.getUuidString());
@@ -235,11 +235,16 @@ public final class DatanodeIdYaml {
     Map<String, Integer> portDetails = new LinkedHashMap<>();
     if (!CollectionUtils.isEmpty(datanodeDetails.getPorts())) {
       for (DatanodeDetails.Port port : datanodeDetails.getPorts()) {
-        Field f = port.getClass().getField(port.getName().toString());
+        Field f = null;
+        try {
+          f = port.getClass().getField(port.getName().toString());
+        } catch (NoSuchFieldException e) {
+          e.printStackTrace();
+        }
         if (f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
-          HDDSLayoutFeature layoutVersion
+          HDDSLayoutFeature layoutFeature
               = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
-          if (layoutVersion.layoutVersion() <=
+          if (layoutFeature.layoutVersion() <=
               datanodeLayoutStorage.getLayoutVersion()) {
             continue;
           }

@@ -93,7 +93,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
         setNodeCmd.getStateExpiryEpochSeconds());
     try {
       persistDatanodeDetails(dni);
-    } catch (IOException | NoSuchFieldException ioe) {
+    } catch (IOException ioe) {
       LOG.error("Failed to persist the datanode state", ioe);
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
@@ -104,7 +104,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
   // TODO - this duplicates code in HddsDatanodeService and InitDatanodeState
   //        Need to refactor.
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
-          throws IOException, NoSuchFieldException {
+      throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);

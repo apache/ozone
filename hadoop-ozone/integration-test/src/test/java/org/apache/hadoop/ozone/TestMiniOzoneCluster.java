@@ -181,7 +181,7 @@ public class TestMiniOzoneCluster {
   }
 
   private static void assertWriteRead(DatanodeDetails details)
-          throws IOException, NoSuchFieldException {
+      throws IOException {
     // Write a single ID to the file and read it out
     File file = new File(WRITE_TMP, "valid-values.id");
     file.delete();
@@ -303,7 +303,7 @@ public class TestMiniOzoneCluster {
   }
 
   private void createMalformedIDFile(File malformedFile)
-          throws IOException, NoSuchFieldException {
+      throws IOException {
     malformedFile.delete();
     DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile, conf);

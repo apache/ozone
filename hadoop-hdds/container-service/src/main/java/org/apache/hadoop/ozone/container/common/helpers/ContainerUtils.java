@@ -142,7 +142,7 @@ public final class ContainerUtils {
    */
   public static synchronized void writeDatanodeDetailsTo(
       DatanodeDetails datanodeDetails, File path, ConfigurationSource conf)
-      throws IOException, NoSuchFieldException {
+      throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
         throw new IOException("Unable to overwrite the datanode ID file.");

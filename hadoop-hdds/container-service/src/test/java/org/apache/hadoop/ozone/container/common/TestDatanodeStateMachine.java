@@ -206,8 +206,7 @@ public class TestDatanodeStateMachine {
    */
   @Test
   public void testDatanodeStateContext() throws IOException,
-          InterruptedException, ExecutionException, TimeoutException,
-          NoSuchFieldException {
+      InterruptedException, ExecutionException, TimeoutException {
     // There is no mini cluster started in this test,
     // create a ID file so that state machine could load a fake datanode ID.
     File idPath = new File(
