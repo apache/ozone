@@ -237,7 +237,8 @@ public final class DatanodeIdYaml {
       for (DatanodeDetails.Port port : datanodeDetails.getPorts()) {
         Field f = null;
         try {
-          f = port.getClass().getField(port.getName().toString());
+          f = port.getName().getClass()
+              .getDeclaredField(port.getName().toString());
         } catch (NoSuchFieldException e) {
           e.printStackTrace();
         }
@@ -245,7 +246,7 @@ public final class DatanodeIdYaml {
             && f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
           HDDSLayoutFeature layoutFeature
               = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
-          if (layoutFeature.layoutVersion() <=
+          if (layoutFeature.layoutVersion() >
               datanodeLayoutStorage.getLayoutVersion()) {
             continue;
           }
