@@ -162,8 +162,7 @@ public class TestSecureOzoneContainer {
       secretManager.start(caClient);
 
       ugi.doAs((PrivilegedAction<Void>) () -> {
-        try {
-          XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+        try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
           client.connect();
 
           Token<?> token = null;
