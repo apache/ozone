@@ -352,11 +352,11 @@ public abstract class TestOzoneManagerHA {
         ozoneKeyDetails.getVolumeName());
     Assert.assertEquals(data.length(), ozoneKeyDetails.getDataSize());
 
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-    ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent, UTF_8));
+    try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+      byte[] fileContent = new byte[data.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assert.assertEquals(data, new String(fileContent, UTF_8));
+    }
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
@@ -394,11 +394,11 @@ public abstract class TestOzoneManagerHA {
       ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
       ozoneOutputStream.close();
 
-      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
+      try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        ozoneInputStream.read(fileContent);
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+      }
 
     } catch (IOException e) {
       if (!checkSuccess) {
