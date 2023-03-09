@@ -331,9 +331,10 @@ public class TestCloseContainerHandlingByClient {
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    OzoneInputStream inputStream = bucket.readKey(keyName);
     byte[] readData = new byte[keyLen];
-    inputStream.read(readData);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(readData);
+    }
     Assert.assertArrayEquals(writtenData, readData);
 
     // Though we have written only block initially, the close will hit
