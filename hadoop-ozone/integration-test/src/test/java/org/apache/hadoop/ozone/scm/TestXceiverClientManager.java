@@ -239,7 +239,8 @@ public class TestXceiverClientManager {
               OzoneConsts.OZONE);
       XceiverClientSpi client1 =
           clientManager.acquireClient(container1.getPipeline());
-      clientManager.acquireClient(container1.getPipeline());
+      XceiverClientSpi client1SecondRef =
+          clientManager.acquireClient(container1.getPipeline());
       Assertions.assertEquals(2, client1.getRefcount());
 
       // client should be invalidated in the cache
@@ -261,6 +262,10 @@ public class TestXceiverClientManager {
       Assertions.assertNotNull(cache.getIfPresent(
           container1.getContainerInfo().getPipelineID().getId().toString()
               + container1.getContainerInfo().getReplicationType()));
+
+      // cleanup
+      clientManager.releaseClient(client1SecondRef, false);
+      clientManager.releaseClient(client2, false);
     }
   }
 }
