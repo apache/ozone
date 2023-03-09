@@ -309,6 +309,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
+  public boolean isContainerEmpty() throws IOException {
+    return KeyValueContainerUtil.noBlocksInContainer(containerData);
+  }
+
+  @Override
   public void markContainerForClose() throws StorageContainerException {
     writeLock();
     try {

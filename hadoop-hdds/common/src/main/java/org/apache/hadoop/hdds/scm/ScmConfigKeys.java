@@ -581,6 +581,13 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";
+
+  public static final String OZONE_SCM_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE =
+      "ozone.scm.check.empty.container.delete";
+  public static final Boolean
+      OZONE_SCM_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT =
+      true;
+
   /**
    * Never constructed.
    */
