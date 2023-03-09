@@ -145,7 +145,7 @@ public class KeyDeletingService extends BackgroundService {
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
    * to SCM for deletion. Once SCM confirms keys are deleted (once SCM persisted
-   * the blocks info in its deletedBlockLog), it removes these keys from the
+   * the blocks info in its deletedBlockLog), it removes these keys farom the
    * DB.
    */
   private class KeyDeletingTask implements BackgroundTask {
