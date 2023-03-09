@@ -1252,7 +1252,7 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
 
-        if (checkIfNoBlockFiles && !container.isContainerEmpty()) {
+        if (checkIfNoBlockFiles && !container.isEmpty()) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty",

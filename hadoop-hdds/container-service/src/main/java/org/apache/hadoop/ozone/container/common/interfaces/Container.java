@@ -62,7 +62,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    * @return true of container is empty
    * @throws IOException if was unable to check container status.
    */
-  boolean isContainerEmpty() throws IOException;
+  boolean isEmpty() throws IOException;
 
   /**
    * Update the container.

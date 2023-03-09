@@ -309,7 +309,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean isContainerEmpty() throws IOException {
+  public boolean isEmpty() throws IOException {
     return KeyValueContainerUtil.noBlocksInContainer(containerData);
   }
 
