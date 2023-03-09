@@ -358,7 +358,7 @@ public class TestOmSnapshotFileSystem {
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    fsDataInputStream.close();
 
     Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
@@ -501,8 +501,7 @@ public class TestOmSnapshotFileSystem {
     String snapshotKeyPrefix = createSnapshot();
     Path fileInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
 
-    try {
-      FSDataInputStream inputStream = fs.open(fileInSnapshot);
+    try (FSDataInputStream inputStream = fs.open(fileInSnapshot)) {
       ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
       inputStream.read(buffer);
       byte[] readBytes = new byte[strBytes.length];
