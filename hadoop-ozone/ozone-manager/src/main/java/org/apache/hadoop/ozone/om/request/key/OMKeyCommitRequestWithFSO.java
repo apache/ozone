@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -150,6 +151,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
                 dbOpenFileKey + "entry is not found in the OpenKey table",
                 KEY_NOT_FOUND);
       }
+      if (isHSync) {
+        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+            String.valueOf(commitKeyRequest.getClientID()));
+      }
+
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());

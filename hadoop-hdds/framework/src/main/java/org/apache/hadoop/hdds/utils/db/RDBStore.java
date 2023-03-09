@@ -41,8 +41,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -121,7 +121,8 @@ public class RDBStore implements DBStore {
         jmxProperties.put("dbName", dbJmxBeanName);
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), dbJmxBeanName));
+            RocksDBStoreMBean.create(dbOptions.statistics(), db,
+                dbJmxBeanName));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
               dbJmxBeanName);
