@@ -608,7 +608,7 @@ public class TestObjectStoreWithFSO {
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    fsDataInputStream.close();
 
     Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
