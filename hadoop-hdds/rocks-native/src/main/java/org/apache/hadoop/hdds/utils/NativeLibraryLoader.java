@@ -104,7 +104,7 @@ public class NativeLibraryLoader {
       try {
         System.loadLibrary(libraryName);
         loaded = true;
-      } catch (Exception e) {
+      } catch (Throwable e) {
 
       }
       if (!loaded) {
@@ -114,7 +114,7 @@ public class NativeLibraryLoader {
           loaded = true;
         }
       }
-    } catch (Exception e) {
+    } catch (Throwable e) {
       LOG.warn("Unable to load library: {}", libraryName, e);
     }
     this.librariesLoaded.put(libraryName, loaded);
