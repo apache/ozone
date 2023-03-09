@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -45,6 +47,9 @@ import org.yaml.snakeyaml.Yaml;
  * Class for creating datanode.id file in yaml format.
  */
 public final class DatanodeIdYaml {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DatanodeIdYaml.class);
 
   private DatanodeIdYaml() {
     // static helper methods only, no state.
@@ -237,10 +242,11 @@ public final class DatanodeIdYaml {
       for (DatanodeDetails.Port port : datanodeDetails.getPorts()) {
         Field f = null;
         try {
-          f = port.getName().getClass()
-              .getDeclaredField(port.getName().toString());
+          f = DatanodeDetails.Port.Name.class
+              .getDeclaredField(port.getName().name());
         } catch (NoSuchFieldException e) {
-          e.printStackTrace();
+          LOG.error("There is no such field as {} in {}", port.getName().name(),
+              DatanodeDetails.Port.Name.class);
         }
         if (f != null
             && f.isAnnotationPresent(BelongsToHDDSLayoutVersion.class)) {
