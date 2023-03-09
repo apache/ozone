@@ -94,8 +94,7 @@ public final class OzoneAclUtil {
     BitSet rights = a.getAclBitSet();
     switch (a.getType()) {
     case USER:
-      if (a.getName().equals(ugi.getShortUserName()) || a.getName()
-          .equals(ugi.getUserName())) {
+      if (a.getName().equals(ugi.getShortUserName())) {
         return checkIfAclBitIsSet(aclToCheck, rights);
       }
       break;
