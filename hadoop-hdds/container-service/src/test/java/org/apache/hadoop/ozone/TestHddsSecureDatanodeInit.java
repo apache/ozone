@@ -274,7 +274,6 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @Test
-  @Disabled("HDDS-7874")
   public void testCertificateRotation() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);
