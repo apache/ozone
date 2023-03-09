@@ -790,13 +790,11 @@ public class TestContainerStateMachineFailures {
 
       Assert.assertEquals(locationCount,
           keyInfo.getLatestVersionLocations().getLocationListCount());
-      OzoneInputStream
-          o = objectStore
-          .getVolume(volumeName)
-          .getBucket(bucketName)
-          .readKey(key);
       byte[] buffer = new byte[1024];
-      o.read(buffer, 0, 1024);
+      try (OzoneInputStream o = objectStore.getVolume(volumeName)
+          .getBucket(bucketName).readKey(key)) {
+        o.read(buffer, 0, 1024);
+      }
       int end = ArrayUtils.indexOf(buffer, (byte) 0);
       String response = new String(buffer, 0,
           end,
