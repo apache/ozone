@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -36,6 +35,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.Assert;
 import org.junit.Before;
@@ -66,7 +66,8 @@ public class TestRatisUnderReplicationHandler {
   private ReplicationManager replicationManager;
 
   @Before
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException,
+      AllSourcesOverloadedException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
@@ -79,14 +80,27 @@ public class TestRatisUnderReplicationHandler {
         .thenReturn(new ReplicationManagerConfiguration());
 
     /*
-     Return NodeStatus with NodeOperationalState as specified in
-     DatanodeDetails, and NodeState as HEALTHY.
-     */
-    Mockito.when(nodeManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+      Return NodeStatus with NodeOperationalState as specified in
+      DatanodeDetails, and NodeState as HEALTHY.
+    */
+    Mockito.when(
+        replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
           return new NodeStatus(dn.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY);
+        });
+
+    Mockito.when(replicationManager.createThrottledReplicationCommand(
+        Mockito.anyLong(), Mockito.anyList(),
+            Mockito.any(DatanodeDetails.class), Mockito.anyInt()))
+        .thenAnswer(invocationOnMock -> {
+          List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
+          ReplicateContainerCommand command = ReplicateContainerCommand
+              .toTarget(invocationOnMock.getArgument(0),
+              invocationOnMock.getArgument(2));
+          command.setReplicaIndex(invocationOnMock.getArgument(3));
+          return Pair.of(sources.get(0), command);
         });
   }
 
@@ -189,8 +203,7 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
         conf);
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager,
-            replicationManager);
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
@@ -226,16 +239,10 @@ public class TestRatisUnderReplicationHandler {
         testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 1);
     Assert.assertEquals(1, commands.size());
-    // only 1 command is present, get it and cast it to
-    // ReplicateContainerCommandProto
-    ReplicateContainerCommandProto command =
-        (ReplicateContainerCommandProto) commands.stream().findFirst().get()
-            .getValue().getProto();
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.stream()
+        .findFirst().get();
 
-    // assert that the only source DN is the DN that hosts closedReplica
-    Assert.assertEquals(1, command.getSourcesCount());
-    Assert.assertEquals(closedReplica.getDatanodeDetails().getUuidString(),
-        command.getSources(0).getUuid());
+    Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
   }
 
   /**
@@ -256,8 +263,7 @@ public class TestRatisUnderReplicationHandler {
       ContainerHealthResult healthResult,
       int minHealthyForMaintenance, int expectNumCommands) throws IOException {
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager,
-            replicationManager);
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         handler.processAndCreateCommands(replicas, pendingOps,

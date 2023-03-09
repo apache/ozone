@@ -74,6 +74,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -174,6 +176,7 @@ public class ReplicationManager implements SCMService {
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
+  private final int datanodeReplicationLimit;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -224,15 +227,16 @@ public class ReplicationManager implements SCMService {
     this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
+    this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
-        ecContainerPlacement, conf, nodeManager, this);
+        ecContainerPlacement, conf, this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
-        conf, nodeManager, rmConf.isPush());
+        conf, this, rmConf.isPush());
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
-        ratisContainerPlacement, conf, nodeManager, this);
+        ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
         new RatisOverReplicationHandler(ratisContainerPlacement, nodeManager);
     underReplicatedProcessor =
@@ -431,6 +435,54 @@ public class ReplicationManager implements SCMService {
         new DeleteContainerCommand(container.containerID(), force);
     deleteCommand.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(deleteCommand, container, datanode);
+  }
+
+  /**
+   * Create a ReplicateContainerCommand for the given container and to push the
+   * container to the target datanode. The list of sources are checked to ensure
+   * the datanode has sufficient capacity to accept the container command, and
+   * then the command is sent to the datanode with the fewest pending commands.
+   * If all sources are overloaded, an AllSourcesOverloadedException is thrown.
+   * @param containerID The containerID to be replicated
+   * @param sources The list of datanodes that can be used as sources
+   * @param target The target datanode where the container should be replicated
+   * @param replicaIndex The index of the container replica to be replicated
+   * @return A pair containing the datanode that the command was sent to, and
+   *         the command created.
+   * @throws AllSourcesOverloadedException
+   */
+  public Pair<DatanodeDetails, SCMCommand<?>>
+      createThrottledReplicationCommand(long containerID,
+      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
+      throws AllSourcesOverloadedException {
+    List<Pair<Integer, DatanodeDetails>> sourceWithCmds = new ArrayList<>();
+    for (DatanodeDetails source : sources)  {
+      try {
+        int commandCount = nodeManager.getTotalDatanodeCommandCount(source,
+            Type.replicateContainerCommand);
+        if (commandCount >= datanodeReplicationLimit) {
+          LOG.debug("Source {} has reached the maximum number of queued " +
+              "replication commands ({})", source, datanodeReplicationLimit);
+          continue;
+        }
+        sourceWithCmds.add(Pair.of(commandCount, source));
+      } catch (NodeNotFoundException e) {
+        LOG.error("Node {} not found in NodeManager. Should not happen",
+            source, e);
+      }
+    }
+    if (sourceWithCmds.isEmpty()) {
+      throw new AllSourcesOverloadedException("No sources with capacity " +
+          "available for replication of container " + containerID + " to " +
+          target);
+    }
+    // Put the least loaded source first
+    sourceWithCmds.sort(Comparator.comparingInt(Pair::getLeft));
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(containerID, target);
+    cmd.setReplicaIndex(replicaIndex);
+    return Pair.of(sourceWithCmds.get(0).getRight(), cmd);
   }
 
   /**
@@ -1015,13 +1067,13 @@ public class ReplicationManager implements SCMService {
 
     @Config(key = "push",
         type = ConfigType.BOOLEAN,
-        defaultValue = "false",
+        defaultValue = "true",
         tags = { SCM, DATANODE },
         description = "If false, replication happens by asking the target to " +
             "pull from source nodes.  If true, the source node is asked to " +
             "push to the target node."
     )
-    private boolean push;
+    private boolean push = true;
 
     @PostConstruct
     public void validate() {
@@ -1030,6 +1082,25 @@ public class ReplicationManager implements SCMService {
             + commandDeadlineFactor
             + " and must be greater than 0 and less than equal to 1");
       }
+    }
+
+    @Config(key = "datanode.replication.limit",
+        type = ConfigType.INT,
+        defaultValue = "20",
+        tags = { SCM, DATANODE },
+        description = "A limit to restrict the total number of replication " +
+            "commands queued on a datanode. Note this is intended to be a " +
+            " temporary config until we have a more dynamic way of limiting " +
+            "load."
+    )
+    private int datanodeReplicationLimit = 20;
+
+    public int getDatanodeReplicationLimit() {
+      return datanodeReplicationLimit;
+    }
+
+    public void setDatanodeReplicationLimit(int limit) {
+      this.datanodeReplicationLimit = limit;
     }
 
     public void setMaintenanceRemainingRedundancy(int redundancy) {
