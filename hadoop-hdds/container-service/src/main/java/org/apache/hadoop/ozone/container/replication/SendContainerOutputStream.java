@@ -18,31 +18,21 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * Output stream adapter for SendContainerResponse.
  */
 class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SendContainerOutputStream.class);
-
   private final CopyContainerCompression compression;
-  private final AutoCloseable client;
 
   SendContainerOutputStream(
-      AutoCloseable client, StreamObserver<SendContainerRequest> streamObserver,
+      StreamObserver<SendContainerRequest> streamObserver,
       long containerId, int bufferSize, CopyContainerCompression compression) {
     super(streamObserver, containerId, bufferSize);
     this.compression = compression;
-    this.client = client;
   }
 
   @Override
@@ -54,14 +44,5 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
         .setCompression(compression.toProto())
         .build();
     getStreamObserver().onNext(request);
-  }
-
-  @Override
-  public void close() throws IOException {
-    try {
-      super.close();
-    } finally {
-      IOUtils.close(LOG, client);
-    }
   }
 }
