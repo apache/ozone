@@ -123,7 +123,7 @@ public interface RatisTestHelper {
       RpcType rpc, DatanodeDetails dd, Pipeline pipeline) throws IOException {
     final RaftPeer p = RatisHelper.toRaftPeer(dd);
     final OzoneConfiguration conf = new OzoneConfiguration();
-    try (final RaftClient client = RatisHelper.newRaftClient(
+    try (RaftClient client = RatisHelper.newRaftClient(
         rpc, p, RatisHelper.createRetryPolicy(conf), conf)) {
       client.getGroupManagementApi(p.getId())
           .add(RatisHelper.newRaftGroup(pipeline));

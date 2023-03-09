@@ -150,7 +150,7 @@ public class TestXceiverClientManager {
           container1.getContainerInfo().getPipelineID().getId().toString()
               + container1.getContainerInfo().getReplicationType());
       Assertions.assertEquals(null, nonExistent1);
-      // However container call should succeed because of refcount on the client.
+      // However container call should succeed because of refcount on the client
       ContainerProtocolCalls.createContainer(client1,
           container1.getContainerInfo().getContainerID(), null);
 
@@ -256,7 +256,7 @@ public class TestXceiverClientManager {
       Assertions.assertNotEquals(client1, client2);
       Assertions.assertEquals(1, client2.getRefcount());
 
-      // on releasing the old client the entry in cache should not be invalidated
+      // on releasing the old client the cache entry should not be invalidated
       clientManager.releaseClient(client1, true);
       Assertions.assertEquals(0, client1.getRefcount());
       Assertions.assertNotNull(cache.getIfPresent(

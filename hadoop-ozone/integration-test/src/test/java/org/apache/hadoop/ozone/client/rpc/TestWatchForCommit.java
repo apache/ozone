@@ -332,10 +332,10 @@ public class TestWatchForCommit {
       // commitInfo Map will be reduced to 2 here
       Assert.assertEquals(2, ratisClient.getCommitInfoMap().size());
       clientManager.releaseClient(xceiverClient, false);
-      Assert.assertTrue(logCapturer.getOutput().contains("3 way commit failed"));
-      Assert.assertTrue(logCapturer.getOutput().contains("TimeoutException"));
-      Assert
-          .assertTrue(logCapturer.getOutput().contains("Committed by majority"));
+      String output = logCapturer.getOutput();
+      Assert.assertTrue(output.contains("3 way commit failed"));
+      Assert.assertTrue(output.contains("TimeoutException"));
+      Assert.assertTrue(output.contains("Committed by majority"));
     }
     logCapturer.stopCapturing();
   }
