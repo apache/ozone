@@ -17,27 +17,13 @@
  */
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-
-import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,6 +49,7 @@ public interface MiniOzoneCluster {
    * Returns the Builder to construct MiniOzoneCluster.
    *
    * @param conf OzoneConfiguration
+   *
    * @return MiniOzoneCluster builder
    */
   static Builder newBuilder(OzoneConfiguration conf) {
@@ -73,6 +60,7 @@ public interface MiniOzoneCluster {
    * Returns the Builder to construct MiniOzoneHACluster.
    *
    * @param conf OzoneConfiguration
+   *
    * @return MiniOzoneCluster builder
    */
   static Builder newOMHABuilder(OzoneConfiguration conf) {
@@ -100,7 +88,7 @@ public interface MiniOzoneCluster {
    * configured {@link HddsDatanodeService} registers with
    * {@link StorageContainerManager}.
    *
-   * @throws TimeoutException     In case of timeout
+   * @throws TimeoutException In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
@@ -109,14 +97,14 @@ public interface MiniOzoneCluster {
    * Waits for atleast one RATIS pipeline of given factor to be reported in open
    * state.
    *
-   * @param factor      replication factor
+   * @param factor replication factor
    * @param timeoutInMs timeout value in milliseconds
-   * @throws TimeoutException     In case of timeout
+   * @throws TimeoutException In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
                                 int timeoutInMs)
-      throws TimeoutException, InterruptedException;
+          throws TimeoutException, InterruptedException;
 
   /**
    * Sets the timeout value after which
@@ -129,7 +117,7 @@ public interface MiniOzoneCluster {
   /**
    * Waits/blocks till the cluster is out of safe mode.
    *
-   * @throws TimeoutException     TimeoutException In case of timeout
+   * @throws TimeoutException TimeoutException In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitTobeOutOfSafeMode() throws TimeoutException, InterruptedException;
@@ -241,7 +229,6 @@ public interface MiniOzoneCluster {
    */
   void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException;
-
   /**
    * Shutdown a particular HddsDatanode.
    *
@@ -348,7 +335,7 @@ public interface MiniOzoneCluster {
     protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
-    protected boolean startDataNodes = true;
+    protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
@@ -374,6 +361,7 @@ public interface MiniOzoneCluster {
      * Sets the cluster Id.
      *
      * @param id cluster Id
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setClusterId(String id) {
@@ -403,6 +391,7 @@ public interface MiniOzoneCluster {
      * Sets the certificate client.
      *
      * @param client
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setCertificateClient(CertificateClient client) {
@@ -414,6 +403,7 @@ public interface MiniOzoneCluster {
      * Sets the SCM id.
      *
      * @param id SCM Id
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setScmId(String id) {
@@ -425,6 +415,7 @@ public interface MiniOzoneCluster {
      * Sets the OM id.
      *
      * @param id OM Id
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setOmId(String id) {
@@ -436,6 +427,7 @@ public interface MiniOzoneCluster {
      * If set to true container service will be started in a random port.
      *
      * @param randomPort enable random port
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setRandomContainerPort(boolean randomPort) {
@@ -448,6 +440,7 @@ public interface MiniOzoneCluster {
      * MiniOzoneCluster.
      *
      * @param val number of datanodes
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setNumDatanodes(int val) {
@@ -459,6 +452,7 @@ public interface MiniOzoneCluster {
      * Sets the number of data volumes per datanode.
      *
      * @param val number of volumes per datanode.
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setNumDataVolumes(int val) {
@@ -468,7 +462,6 @@ public interface MiniOzoneCluster {
 
     /**
      * Sets the total number of pipelines to create.
-     *
      * @param val number of pipelines
      * @return MiniOzoneCluster.Builder
      */
@@ -482,6 +475,7 @@ public interface MiniOzoneCluster {
      * in MilliSeconds.
      *
      * @param val HeartBeat interval in milliseconds
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setHbInterval(int val) {
@@ -494,6 +488,7 @@ public interface MiniOzoneCluster {
      * the value should be in MilliSeconds.
      *
      * @param val HeartBeat Processor interval in milliseconds
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setHbProcessorInterval(int val) {
@@ -505,6 +500,7 @@ public interface MiniOzoneCluster {
      * When set to true, enables trace level logging.
      *
      * @param trace true or false
+     *
      * @return MiniOzoneCluster.Builder
      */
     public Builder setTrace(Boolean trace) {
@@ -517,13 +513,13 @@ public interface MiniOzoneCluster {
      * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
      * HDDS_DATANODE_DIR_DU_RESERVED
      * for each volume in each datanode.
-     *
      * @param reservedSpace String that contains the numeric size value and
      *                      ends with a
      *                      {@link org.apache.hadoop.hdds.conf.StorageUnit}
      *                      suffix. For example, "50GB".
-     * @return {@link MiniOzoneCluster} Builder
      * @see org.apache.hadoop.ozone.container.common.volume.VolumeInfo
+     *
+     * @return {@link MiniOzoneCluster} Builder
      */
     public Builder setDatanodeReservedSpace(String reservedSpace) {
       datanodeReservedSpace = Optional.of(reservedSpace);
@@ -649,32 +645,9 @@ public interface MiniOzoneCluster {
      * Constructs and returns MiniOzoneCluster.
      *
      * @return {@link MiniOzoneCluster}
+     *
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
-  }
-
-  static void setupKerberosConfiguration(Configuration conf,
-      String userName, File keytab, String realm) throws Exception {
-    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    String host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
-
-    conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-    conf.set(OZONE_ADMINISTRATORS, userName);
-
-    String hostAndRealm = host + "@" + realm;
-    String userPrincipal = userName + "/" + hostAndRealm;
-
-    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, userPrincipal);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, userPrincipal);
-    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, userPrincipal);
-
-    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        keytab.getAbsolutePath());
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        keytab.getAbsolutePath());
-    conf.set(DFS_DATANODE_KEYTAB_FILE_KEY,
-        keytab.getAbsolutePath());
   }
 }
