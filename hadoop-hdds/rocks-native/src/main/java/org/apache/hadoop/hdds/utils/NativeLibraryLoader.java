@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +34,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Class to load Native Libraries.
  */
 public class NativeLibraryLoader {
+
+  private static final Logger LOG =
+          LoggerFactory.getLogger(NativeLibraryLoader.class);
   private static final String OS = System.getProperty("os.name").toLowerCase();
   private Map<String, Boolean> librariesLoaded;
   private static volatile NativeLibraryLoader instance;
@@ -83,8 +89,9 @@ public class NativeLibraryLoader {
     return libraryFileName + getLibOsSuffix();
   }
 
-  public boolean isLibraryLoaded(final String libraryName) {
-    return librariesLoaded.getOrDefault(libraryName, false);
+  public static boolean isLibraryLoaded(final String libraryName) {
+    return getInstance().librariesLoaded
+            .getOrDefault(libraryName, false);
   }
 
   public synchronized boolean loadLibrary(final String libraryName) {
@@ -93,23 +100,22 @@ public class NativeLibraryLoader {
     }
     boolean loaded = false;
     try {
-      System.loadLibrary(libraryName);
-      loaded = true;
-    } catch (final UnsatisfiedLinkError ule) {
-
-    }
-    if (!loaded) {
+      loaded = false;
       try {
+        System.loadLibrary(libraryName);
+        loaded = true;
+      } catch (Exception e) {
+
+      }
+      if (!loaded) {
         Optional<File> file = copyResourceFromJarToTemp(libraryName);
         if (file.isPresent()) {
           System.load(file.get().getAbsolutePath());
           loaded = true;
         }
-
-      } catch (IOException e) {
-
       }
-
+    } catch (Exception e) {
+      LOG.warn("Unable to load library: {}", libraryName, e);
     }
     this.librariesLoaded.put(libraryName, loaded);
     return isLibraryLoaded(libraryName);

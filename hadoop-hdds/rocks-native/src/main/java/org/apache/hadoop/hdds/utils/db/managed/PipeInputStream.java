@@ -43,8 +43,7 @@ public class PipeInputStream extends InputStream {
   private AtomicBoolean cleanup;
 
   PipeInputStream(int capacity) throws NativeLibraryNotLoadedException {
-    if (!NativeLibraryLoader.getInstance()
-            .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+    if (!NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       throw new NativeLibraryNotLoadedException(
               ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }

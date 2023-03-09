@@ -43,8 +43,7 @@ public class ManagedSSTDumpTool {
   public ManagedSSTDumpTool(ExecutorService executorService,
                             int bufferCapacity)
           throws NativeLibraryNotLoadedException {
-    if (!NativeLibraryLoader.getInstance()
-            .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+    if (!NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       throw new NativeLibraryNotLoadedException(
               ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }

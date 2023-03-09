@@ -31,17 +31,17 @@ jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal
     Pipe *pipe = reinterpret_cast<Pipe *>(pipeHandle);
     int length = env->GetArrayLength(argsArray);
     char *args[length + 1];
-    args[0] = strdup("./sst_dump");
+    args[0] = "";
     for (int i = 0; i < length; i++) {
         jstring str_val = (jstring)env->GetObjectArrayElement(argsArray, (jsize)i);
         char *utf_str = (char *)env->GetStringUTFChars(str_val, JNI_FALSE);
-        args[i + 1] = strdup(utf_str);
-        env->ReleaseStringUTFChars(str_val, utf_str);
+        args[i + 1] = utf_str;
     }
     FILE *wr = fdopen(pipe->getWriteFd(), "w");
     int ret = dumpTool.Run(length + 1, args, *options, wr);
-    for (int i = 0; i < length + 1; i++) {
-        free(args[i]);
+    for (int i = 1; i < length + 1; i++) {
+        jstring str_val = (jstring)env->GetObjectArrayElement(argsArray, (jsize)(i - 1));
+        env->ReleaseStringUTFChars(str_val, args[i]);
     }
     fclose(wr);
     pipe->close();
