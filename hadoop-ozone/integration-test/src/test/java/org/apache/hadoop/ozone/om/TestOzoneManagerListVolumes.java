@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -63,7 +62,6 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerListVolumes {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = Timeout.seconds(120);
@@ -109,21 +107,23 @@ public class TestOzoneManagerListVolumes {
         .setClusterId(clusterId).setScmId(scmId).setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
 
     // Create volumes with non-default owners and ACLs
-    ObjectStore objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.getClient()) {
+      ObjectStore objectStore = client.getObjectStore();
 
-    /* r = READ, w = WRITE, c = CREATE, d = DELETE
-       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
-    String aclUser1All = "user:user1:a";
-    String aclUser2All = "user:user2:a";
-    String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+      /* r = READ, w = WRITE, c = CREATE, d = DELETE
+         l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
+      String aclUser1All = "user:user1:a";
+      String aclUser2All = "user:user2:a";
+      String aclWorldAll = "world::a";
+      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+    }
+
     OzoneManager om = cluster.getOzoneManager();
     om.stop();
     om.join();
@@ -131,7 +131,6 @@ public class TestOzoneManagerListVolumes {
 
   @AfterClass
   public static void shutdownClass() {
-    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -188,6 +187,15 @@ public class TestOzoneManagerListVolumes {
   private void checkUser(UserGroupInformation user,
       List<String> expectVol, boolean expectListAllSuccess,
                          boolean expectListByUserSuccess) throws IOException {
+    try (OzoneClient client = cluster.getClient()) {
+      checkUser(client, user,
+          expectVol, expectListAllSuccess, expectListByUserSuccess);
+    }
+  }
+
+  private static void checkUser(OzoneClient client, UserGroupInformation user,
+      List<String> expectVol, boolean expectListAllSuccess,
+      boolean expectListByUserSuccess) throws IOException {
 
     ObjectStore objectStore = client.getObjectStore();
 

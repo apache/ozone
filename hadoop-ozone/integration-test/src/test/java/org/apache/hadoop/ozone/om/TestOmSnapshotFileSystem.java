@@ -90,6 +90,8 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class TestOmSnapshotFileSystem {
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
+  private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
   private static String volumeName;
   private static String bucketName;
@@ -109,7 +111,6 @@ public class TestOmSnapshotFileSystem {
 
   @Rule
   public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
-  private OzoneClient client;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -141,7 +142,7 @@ public class TestOmSnapshotFileSystem {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  private void init() throws Exception {
+  private static void init() throws Exception {
     conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
@@ -170,7 +171,7 @@ public class TestOmSnapshotFileSystem {
     fs = FileSystem.get(conf);
     o3fs = (OzoneFileSystem) fs;
 
-    ObjectStore objectStore = client.getObjectStore();
+    objectStore = client.getObjectStore();
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster.getOzoneManager();
     metaDir = OMStorage.getOmDbDir(conf);
@@ -191,7 +192,6 @@ public class TestOmSnapshotFileSystem {
   @Test
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
   public void testListKeysAtDifferentLevels() throws Exception {
-    ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
