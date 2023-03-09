@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.collections.iterators.LoopingIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -28,7 +27,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -37,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -53,18 +51,16 @@ public class RatisUnderReplicationHandler
   public static final Logger LOG =
       LoggerFactory.getLogger(RatisUnderReplicationHandler.class);
   private final PlacementPolicy placementPolicy;
-  private final NodeManager nodeManager;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
-      final ConfigurationSource conf, final NodeManager nodeManager,
+      final ConfigurationSource conf,
       final ReplicationManager replicationManager) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
   }
 
@@ -207,8 +203,14 @@ public class RatisUnderReplicationHandler
      */
     return replicaCount.getReplicas().stream()
         .filter(predicate)
-        .filter(r -> ReplicationManager.getNodeStatus(r.getDatanodeDetails(),
-            nodeManager).isHealthy())
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
         .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
         .map(ContainerReplica::getDatanodeDetails)
@@ -246,20 +248,14 @@ public class RatisUnderReplicationHandler
 
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
       long containerID, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) {
+      List<DatanodeDetails> targets) throws AllSourcesOverloadedException {
     final boolean push = replicationManager.getConfig().isPush();
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
 
     if (push) {
-      Collections.shuffle(sources);
-      for (Iterator<DatanodeDetails> srcIter = new LoopingIterator(sources),
-              targetIter = targets.iterator();
-          srcIter.hasNext() && targetIter.hasNext();) {
-        DatanodeDetails source = srcIter.next();
-        DatanodeDetails target = targetIter.next();
-        ReplicateContainerCommand command =
-            ReplicateContainerCommand.toTarget(containerID, target);
-        commands.add(Pair.of(source, command));
+      for (DatanodeDetails target : targets) {
+        commands.add(replicationManager.createThrottledReplicationCommand(
+            containerID, sources, target, 0));
       }
     } else {
       for (DatanodeDetails target : targets) {
@@ -268,7 +264,6 @@ public class RatisUnderReplicationHandler
         commands.add(Pair.of(target, command));
       }
     }
-
     return commands;
   }
 }
