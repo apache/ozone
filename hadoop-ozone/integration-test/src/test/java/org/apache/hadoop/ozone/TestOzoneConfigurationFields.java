@@ -57,7 +57,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
-    xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
         ".EXAMPLEOMSERVICEID");

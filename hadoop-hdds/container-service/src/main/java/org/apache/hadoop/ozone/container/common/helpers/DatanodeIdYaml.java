@@ -32,6 +32,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.YamlUtils;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -71,11 +72,10 @@ public final class DatanodeIdYaml {
       throws IOException {
     DatanodeDetails datanodeDetails;
     try (FileInputStream inputFileStream = new FileInputStream(path)) {
-      Yaml yaml = new Yaml();
       DatanodeDetailsYaml datanodeDetailsYaml;
       try {
         datanodeDetailsYaml =
-            yaml.loadAs(inputFileStream, DatanodeDetailsYaml.class);
+            YamlUtils.loadAs(inputFileStream, DatanodeDetailsYaml.class);
       } catch (Exception e) {
         throw new IOException("Unable to parse yaml file.", e);
       }
