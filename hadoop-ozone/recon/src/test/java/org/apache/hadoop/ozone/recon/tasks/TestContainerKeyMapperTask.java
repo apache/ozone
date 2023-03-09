@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
@@ -432,9 +431,9 @@ public class TestContainerKeyMapperTask {
     ContainerKeyPrefix firstKeyPrefix = iterator.next();
     ContainerKeyPrefix secondKeyPrefix = iterator.next();
 
-    assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
+    assertEquals("/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + DELETED_KEY,
         firstKeyPrefix.getKeyPrefix());
-    assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/" + DELETED_KEY,
+    assertEquals("/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
         secondKeyPrefix.getKeyPrefix());
 
     omKey = omMetadataManager.getOzoneKey(volume, bucket, key2);
@@ -462,7 +461,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, keyPrefixesForContainer.size());
     iterator = keyPrefixesForContainer.keySet().iterator();
     firstKeyPrefix = iterator.next();
-    assertEquals(VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
+    assertEquals("/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
         firstKeyPrefix.getKeyPrefix());
   }
 
