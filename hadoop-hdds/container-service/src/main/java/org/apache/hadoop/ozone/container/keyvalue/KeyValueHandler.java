@@ -1271,8 +1271,7 @@ public class KeyValueHandler extends Handler {
       containerSet.removeContainer(containerId);
     } catch (StorageContainerException e) {
       throw e;
-    }
-    catch (IOException e) {
+    } catch (IOException e) {
       // All other IO Exceptions should be treated as if the container is not
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",

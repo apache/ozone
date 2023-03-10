@@ -301,11 +301,14 @@ public class TestDeleteContainerHandler {
     // Set container blockCount to 0 to mock that it is empty
     Container containerToDelete = getContainerfromDN(
         hddsDatanodeService, containerId.getId());
-        containerToDelete.getContainerData().setBlockCount(0);
+    containerToDelete.getContainerData().setBlockCount(0);
     File chunkDir = new File(containerToDelete.
         getContainerData().getChunksPath());
-    for (File file: chunkDir.listFiles()) {
-      FileUtils.delete(file);
+    File[] files = chunkDir.listFiles();
+    if (files != null) {
+      for (File file : files) {
+        FileUtils.delete(file);
+      }
     }
     // Send the delete command again. It should succeed this time.
     command.setTerm(
