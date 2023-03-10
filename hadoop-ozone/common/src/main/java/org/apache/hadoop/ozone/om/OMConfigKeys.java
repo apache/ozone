@@ -151,6 +151,15 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
+  public static final String OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX
+      = "ozone.om.ratis.log.purge.upto.snapshot.index";
+  public static final boolean
+      OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX_DEFAULT = true;
+  public static final String
+      OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM
+      = "ozone.om.ratis.log.purge.preservation.log.num";
+  public static final long
+      OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT = 0L;
 
   public static final String OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
       = "ozone.om.ratis.snapshot.auto.trigger.threshold";
