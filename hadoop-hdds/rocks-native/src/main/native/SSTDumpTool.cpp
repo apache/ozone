@@ -31,7 +31,6 @@ jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal
     Pipe *pipe = reinterpret_cast<Pipe *>(pipeHandle);
     int length = env->GetArrayLength(argsArray);
     char *args[length + 1];
-    args[0] = "";
     for (int i = 0; i < length; i++) {
         jstring str_val = (jstring)env->GetObjectArrayElement(argsArray, (jsize)i);
         char *utf_str = (char *)env->GetStringUTFChars(str_val, JNI_FALSE);

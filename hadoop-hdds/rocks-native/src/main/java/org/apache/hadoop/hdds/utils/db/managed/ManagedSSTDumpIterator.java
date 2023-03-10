@@ -27,8 +27,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,24 +54,19 @@ public class ManagedSSTDumpIterator implements
   private char[] charBuffer;
   private KeyValue nextKey;
 
-  private long pollIntervalMillis;
   private ManagedSSTDumpTool.SSTDumpToolTask sstDumpToolTask;
-  private Lock lock;
   private AtomicBoolean open;
 
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath,
-                                ManagedOptions options,
-                                long pollIntervalMillis) throws IOException,
+                                ManagedOptions options) throws IOException,
           NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists() || !sstFile.isFile()) {
       throw new IOException(String.format("Invalid SST File Path : %s",
               sstFile.getAbsolutePath()));
     }
-    this.pollIntervalMillis = pollIntervalMillis;
-    this.lock = new ReentrantLock();
     init(sstDumpTool, sstFile, options);
   }
 
@@ -126,63 +119,52 @@ public class ManagedSSTDumpIterator implements
    */
   @Override
   public KeyValue next() {
-    lock.lock();
-    try {
-      checkSanityOfProcess();
-      currentKey = nextKey;
-      nextKey = null;
-      while (!currentMatcher.find()) {
-        try {
-          if (prevMatchEndIndex != 0) {
-            stdoutString = new StringBuilder(stdoutString.substring(
-                    prevMatchEndIndex, stdoutString.length()));
-            prevMatchEndIndex = 0;
-            currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
-          }
-          Thread.sleep(pollIntervalMillis);
-          int numberOfCharsRead = processOutput.read(charBuffer);
-          if (numberOfCharsRead < 0) {
-            if (currentKey != null) {
-              currentKey.setValue(stdoutString.substring(0,
-                      Math.max(stdoutString.length() - 1, 0)));
-            }
-            return currentKey;
-          }
-          stdoutString.append(charBuffer, 0, numberOfCharsRead);
-          currentMatcher.reset();
-        } catch (IOException | InterruptedException e) {
-          throw new RuntimeIOException(e);
+    checkSanityOfProcess();
+    currentKey = nextKey;
+    nextKey = null;
+    while (!currentMatcher.find()) {
+      try {
+        if (prevMatchEndIndex != 0) {
+          stdoutString = new StringBuilder(stdoutString.substring(
+                  prevMatchEndIndex, stdoutString.length()));
+          prevMatchEndIndex = 0;
+          currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
         }
+        int numberOfCharsRead = processOutput.read(charBuffer);
+        if (numberOfCharsRead < 0) {
+          if (currentKey != null) {
+            currentKey.setValue(stdoutString.substring(0,
+                    Math.max(stdoutString.length() - 1, 0)));
+          }
+          return currentKey;
+        }
+        stdoutString.append(charBuffer, 0, numberOfCharsRead);
+        currentMatcher.reset();
+      } catch (IOException e) {
+        throw new RuntimeIOException(e);
       }
-      if (currentKey != null) {
-        currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-                currentMatcher.start() - 1));
-      }
-      prevMatchEndIndex = currentMatcher.end();
-      nextKey =  new KeyValue(
-              currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
-              currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
-              currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
-      return currentKey;
-    } finally {
-      lock.unlock();
     }
+    if (currentKey != null) {
+      currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
+              currentMatcher.start() - 1));
+    }
+    prevMatchEndIndex = currentMatcher.end();
+    nextKey =  new KeyValue(
+            currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
+            currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
+            currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
+    return currentKey;
   }
 
   @Override
   public synchronized void close() throws Exception {
-    lock.lock();
-    try {
-      if (this.sstDumpToolTask != null) {
-        if (!this.sstDumpToolTask.getFuture().isDone()) {
-          this.sstDumpToolTask.getFuture().cancel(true);
-        }
-        this.processOutput.close();
+    if (this.sstDumpToolTask != null) {
+      if (!this.sstDumpToolTask.getFuture().isDone()) {
+        this.sstDumpToolTask.getFuture().cancel(true);
       }
-      open.compareAndSet(true, false);
-    } finally {
-      lock.unlock();
+      this.processOutput.close();
     }
+    open.compareAndSet(true, false);
   }
 
   @Override
