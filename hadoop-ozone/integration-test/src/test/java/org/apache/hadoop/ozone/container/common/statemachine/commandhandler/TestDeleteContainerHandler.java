@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -298,9 +299,14 @@ public class TestDeleteContainerHandler {
     Assert.assertEquals(1,
         metrics.getContainerDeleteFailedBlockCountNotZero());
     // Set container blockCount to 0 to mock that it is empty
-    getContainerfromDN(hddsDatanodeService, containerId.getId())
-        .getContainerData().setBlockCount(0);
-
+    Container containerToDelete = getContainerfromDN(
+        hddsDatanodeService, containerId.getId());
+        containerToDelete.getContainerData().setBlockCount(0);
+    File chunkDir = new File(containerToDelete.
+        getContainerData().getChunksPath());
+    for (File file: chunkDir.listFiles()) {
+      FileUtils.delete(file);
+    }
     // Send the delete command again. It should succeed this time.
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());

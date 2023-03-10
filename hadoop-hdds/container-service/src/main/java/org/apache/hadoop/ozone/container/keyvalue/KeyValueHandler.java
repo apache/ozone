@@ -159,9 +159,10 @@ public class KeyValueHandler extends Handler {
 
     checkIfNoBlockFiles =
         conf.getBoolean(
-            ScmConfigKeys.OZONE_SCM_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
-        ScmConfigKeys.
-            OZONE_SCM_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+        DatanodeConfiguration.
+            OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -1268,7 +1269,12 @@ public class KeyValueHandler extends Handler {
       }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);
-    } catch (IOException e) {
+    } catch (StorageContainerException e) {
+      throw e;
+    }
+    catch (IOException e) {
+      // All other IO Exceptions should be treated as if the container is not
+      // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
           container.getContainerData().getContainerID(), e);
       throw new StorageContainerException("Could not determine if container "

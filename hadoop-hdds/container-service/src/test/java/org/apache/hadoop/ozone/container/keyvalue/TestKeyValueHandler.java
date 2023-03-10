@@ -363,9 +363,7 @@ public class TestKeyValueHandler {
       Mockito.when(volumeSet.getVolumesList())
           .thenReturn(Collections.singletonList(hddsVolume));
 
-      final int[] interval = new int[1];
-      interval[0] = 2;
-      final ContainerMetrics metrics = new ContainerMetrics(interval);
+      final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
