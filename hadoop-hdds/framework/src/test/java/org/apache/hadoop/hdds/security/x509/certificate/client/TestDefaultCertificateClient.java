@@ -125,7 +125,8 @@ public class TestDefaultCertificateClient {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
+    dnCertClient.close();
     dnCertClient = null;
     FileUtils.deleteQuietly(dnMetaDirPath.toFile());
   }
