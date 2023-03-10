@@ -25,7 +25,7 @@
 #include <iostream>
 
 jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedSSTDumpTool_runInternal(JNIEnv *env, jobject obj,
- jobjectArray argsArray, jlong optionsHandle, jlong pipeHandle) {
+  jobjectArray argsArray, jlong optionsHandle, jlong pipeHandle) {
     ROCKSDB_NAMESPACE::SSTDumpTool dumpTool;
     ROCKSDB_NAMESPACE::Options *options = reinterpret_cast<ROCKSDB_NAMESPACE::Options *>(optionsHandle);
     Pipe *pipe = reinterpret_cast<Pipe *>(pipeHandle);

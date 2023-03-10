@@ -149,7 +149,7 @@ public class ManagedSSTDumpIterator implements
               currentMatcher.start() - 1));
     }
     prevMatchEndIndex = currentMatcher.end();
-    nextKey =  new KeyValue(
+    nextKey = new KeyValue(
             currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
             currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
             currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));

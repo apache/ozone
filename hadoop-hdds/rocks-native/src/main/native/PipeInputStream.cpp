@@ -38,7 +38,7 @@ jint Java_org_apache_hadoop_hdds_utils_db_managed_PipeInputStream_readInternal(J
             cap_int = -1;
         }
     }
-    (env)->ReleaseByteArrayElements(jbyteArray, b, 0);
+    env->ReleaseByteArrayElements(jbyteArray, b, 0);
     return cap_int;
 }
 
