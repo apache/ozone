@@ -115,7 +115,10 @@ public class TestDefaultCertificateClient {
     getCertClient();
   }
 
-  private void getCertClient() {
+  private void getCertClient() throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = new DNCertificateClient(dnSecurityConfig,
         MockDatanodeDetails.randomDatanodeDetails(), certSerialId, null,
         () -> System.exit(1));
@@ -293,6 +296,9 @@ public class TestDefaultCertificateClient {
         getPEMEncodedString(cert3));
 
     // Re instantiate DN client which will load certificates from filesystem.
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
         certSerialId, null, null);
 
@@ -409,7 +415,7 @@ public class TestDefaultCertificateClient {
     X509Certificate mockCert = mock(X509Certificate.class);
     when(mockCert.getNotAfter()).thenReturn(expiration);
 
-    DefaultCertificateClient client =
+    try (DefaultCertificateClient client =
         new DefaultCertificateClient(config, mockLogger, certId, compName,
             null, null) {
           @Override
@@ -433,11 +439,12 @@ public class TestDefaultCertificateClient {
               throws CertificateException {
             return null;
           }
-        };
+        };) {
 
-    InitResponse resp = client.init();
-    verify(mockLogger, atLeastOnce()).info(anyString());
-    assertEquals(resp, REINIT);
+      InitResponse resp = client.init();
+      verify(mockLogger, atLeastOnce()).info(anyString());
+      assertEquals(resp, REINIT);
+    }
   }
 
   @Test

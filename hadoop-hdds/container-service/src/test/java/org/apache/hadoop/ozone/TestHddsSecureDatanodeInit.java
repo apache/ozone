@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -57,6 +58,7 @@ import static org.mockito.Mockito.when;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,6 +143,11 @@ public class TestHddsSecureDatanodeInit {
     client = new DNCertificateClient(securityConfig, datanodeDetails,
         certHolder.getSerialNumber().toString(), null, null);
     service.setCertificateClient(client);
+  }
+
+  @AfterEach
+  public void tearDownClient() throws IOException {
+    client.close();
   }
 
   @Test
