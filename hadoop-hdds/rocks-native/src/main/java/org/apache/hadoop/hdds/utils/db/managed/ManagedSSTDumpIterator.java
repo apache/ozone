@@ -63,8 +63,12 @@ public class ManagedSSTDumpIterator implements
                                 ManagedOptions options) throws IOException,
           NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
-    if (!sstFile.exists() || !sstFile.isFile()) {
-      throw new IOException(String.format("Invalid SST File Path : %s",
+    if (!sstFile.exists()) {
+      throw new IOException(String.format("File in path : %s doesn't exist",
+              sstFile.getAbsolutePath()));
+    }
+    if (!sstFile.isFile()) {
+      throw new IOException(String.format("Path given: %s is not a file",
               sstFile.getAbsolutePath()));
     }
     init(sstDumpTool, sstFile, options);
