@@ -52,7 +52,7 @@ public class WithObjectID extends WithMetadata {
   }
 
   /**
-   * Set the Object ID. If this value is already set then this function throws.
+   * Set the Object ID.
    * There is a reason why we cannot use the final here. The object
    * ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
    * deserialized from the protobuf in many places in code. We need to set
@@ -61,10 +61,6 @@ public class WithObjectID extends WithMetadata {
    * @param obId - long
    */
   public void setObjectID(long obId) {
-    if (this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
     this.objectID = obId;
   }
 

@@ -237,6 +237,8 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
+  public static final long OBJECT_ID_DEFAULT = 0L;
+
 
   /**
    * Default SCM Datanode ID file name.

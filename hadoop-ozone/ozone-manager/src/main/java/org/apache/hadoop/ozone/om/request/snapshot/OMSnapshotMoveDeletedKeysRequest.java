@@ -72,15 +72,19 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
+      OmSnapshot omFromSnapshot = (OmSnapshot) omSnapshotManager
+          .checkForSnapshot(fromSnapshot.getVolumeName(),
+              fromSnapshot.getBucketName(),
+              getSnapshotPrefix(fromSnapshot.getName()));
+
       nextSnapshot = getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
 
       // Get next non-deleted snapshot.
-
-      List<SnapshotMoveKeyInfos> activeDBKeysList =
-          moveDeletedKeysRequest.getActiveDBKeysList();
       List<SnapshotMoveKeyInfos> nextDBKeysList =
           moveDeletedKeysRequest.getNextDBKeysList();
+      List<SnapshotMoveKeyInfos> reclaimKeysList =
+          moveDeletedKeysRequest.getReclaimKeysList();
 
       OmSnapshot omNextSnapshot = null;
 
@@ -92,7 +96,8 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       }
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), omNextSnapshot, activeDBKeysList, nextDBKeysList);
+          omResponse.build(), omFromSnapshot, omNextSnapshot,
+          nextDBKeysList, reclaimKeysList);
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

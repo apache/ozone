@@ -289,8 +289,8 @@ public class TestSnapshotDeletingService {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMetadataManager.getSnapshotInfoTable()
-            .getEstimatedKeyCount() >= count;
+        return omMetadataManager.countRowsInTable(
+            omMetadataManager.getSnapshotInfoTable()) >= count;
       } catch (IOException e) {
         e.printStackTrace();
       }
