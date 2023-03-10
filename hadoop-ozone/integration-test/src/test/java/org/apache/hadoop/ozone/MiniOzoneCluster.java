@@ -309,7 +309,7 @@ public interface MiniOzoneCluster {
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
-
+    
     protected Boolean randomContainerPort = true;
     protected Boolean randomContainerStreamPort = true;
     protected Boolean enableContainerDatastream = true;
