@@ -3607,12 +3607,4 @@
       without using the optimised DAG based pruning approach
     </description>
   </property>
-  <property>
-    <name>hdds.datanode.check.empty.container.delete</name>
-    <value>true</value>
-    <tag>DATANODE</tag>
-    <description>
-      Disallow deletion of containers if on disk there are chunks still present.
-    </description>
-  </property>
 </configuration>
