@@ -126,6 +126,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.4</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
+    <download-maven-plugin.version>1.6.8</download-maven-plugin.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <test.build.data>${test.build.dir}</test.build.data>
@@ -294,6 +295,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
     <awaitility.version>4.2.0</awaitility.version>
+    <bzip2.version>1.0.8</bzip2.version>
+    <zlib.version>1.2.13</zlib.version>
+    <lz4.version>1.9.3</lz4.version>
+    <snappy.version>1.1.8</snappy.version>
+    <zstd.version>1.4.9</zstd.version>
   </properties>
 
 
@@ -1810,6 +1816,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>io.fabric8</groupId>
           <artifactId>docker-maven-plugin</artifactId>
           <version>${docker-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <artifactId>download-maven-plugin</artifactId>
+          <version>${download-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

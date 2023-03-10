@@ -49,6 +49,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>config</module>
     <module>test-utils</module>
     <module>erasurecode</module>
+    <module>rocks-native</module>
   </modules>
 
   <repositories>
@@ -247,6 +248,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocks-native</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
