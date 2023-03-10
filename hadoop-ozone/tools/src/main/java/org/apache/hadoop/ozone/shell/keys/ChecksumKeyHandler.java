@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -55,10 +56,20 @@ public class ChecksumKeyHandler extends KeyHandler {
   }
 
   /**
+   * Wrapper to the checksum computer to allow it to be override in tests.
+   */
+  protected FileChecksum getFileChecksum(OzoneVolume vol, OzoneBucket bucket,
+      String keyName, long dataSize, ClientProtocol clientProxy)
+      throws IOException {
+    return getFileChecksumWithCombineMode(vol, bucket, keyName, dataSize, mode,
+        clientProxy);
+  }
+
+  /**
    * Wrapper class to allow checksum information to be printed as JSON.
    */
   @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-  private static class ChecksumInfo {
+  private class ChecksumInfo {
 
     private final String volumeName;
     private final String bucketName;
@@ -78,8 +89,8 @@ public class ChecksumKeyHandler extends KeyHandler {
       OzoneKeyDetails key = bucket.getKey(name);
       dataSize = key.getDataSize();
 
-      FileChecksum fileChecksum = getFileChecksumWithCombineMode(vol, bucket,
-          name, dataSize, mode, client.getObjectStore().getClientProxy());
+      FileChecksum fileChecksum = getFileChecksum(vol, bucket,
+          name, dataSize, client.getObjectStore().getClientProxy());
 
       this.algorithm = fileChecksum.getAlgorithmName();
       this.checksum = javax.xml.bind.DatatypeConverter.printHexBinary(
