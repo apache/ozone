@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -61,11 +60,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -590,9 +586,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     public MiniOzoneCluster build() throws IOException {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
-      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        generateKeyPair();
-      }
       StorageContainerManager scm = null;
       OzoneManager om = null;
       ReconServer reconServer = null;
@@ -728,18 +721,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       FileUtils.deleteQuietly(new File(path));
     }
 
-    private void generateKeyPair() throws IOException {
-      try {
-        HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(conf);
-        KeyPair keyPair = keyGenerator.generateKey();
-        KeyCodec pemWriter = new KeyCodec(new SecurityConfig(conf), "test");
-        pemWriter.writeKey(keyPair, true);
-      } catch (Exception ex) {
-        LOG.info("Generate key pair failed, casued by ", ex);
-        throw new IOException(ex);
-      }
-    }
-
     /**
      * Creates a new StorageContainerManager instance.
      *
@@ -784,7 +765,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       //Disabling Ratis for only of MiniOzoneClusterImpl.
       //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
       if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
-          && SCMHAUtils.isSCMHAEnabled(conf)) {
+              && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
