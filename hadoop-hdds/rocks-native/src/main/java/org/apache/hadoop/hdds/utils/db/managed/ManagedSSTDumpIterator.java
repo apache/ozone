@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 
@@ -25,7 +26,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,10 +35,9 @@ import java.util.regex.Pattern;
 /**
  * Iterator to Parse output of RocksDBSSTDumpTool.
  */
-public class ManagedSSTDumpIterator implements
-        Iterator<ManagedSSTDumpIterator.KeyValue>, AutoCloseable {
-  private static final String SST_DUMP_TOOL_CLASS =
-          "org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool";
+public abstract class ManagedSSTDumpIterator<T> implements
+        HddsUtils.CloseableIterator<T> {
+
   private static final String PATTERN_REGEX =
           "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
 
@@ -117,12 +118,19 @@ public class ManagedSSTDumpIterator implements
   }
 
   /**
+   * Transform function to transform key to a certain value
+   * @param value
+   * @return
+   */
+  protected abstract T getTransformedValue(KeyValue value);
+
+  /**
    * Returns the next record from SSTDumpTool.
    * @return next Key
    * Throws Runtime Exception incase of failure.
    */
   @Override
-  public KeyValue next() {
+  public T next() {
     checkSanityOfProcess();
     currentKey = nextKey;
     nextKey = null;
@@ -139,8 +147,9 @@ public class ManagedSSTDumpIterator implements
           if (currentKey != null) {
             currentKey.setValue(stdoutString.substring(0,
                     Math.max(stdoutString.length() - 1, 0)));
+            return getTransformedValue(currentKey);
           }
-          return currentKey;
+          throw new NoSuchElementException("No more records found");
         }
         stdoutString.append(charBuffer, 0, numberOfCharsRead);
         currentMatcher.reset();
@@ -157,11 +166,11 @@ public class ManagedSSTDumpIterator implements
             currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
             currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
             currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
-    return currentKey;
+    return getTransformedValue(currentKey);
   }
 
   @Override
-  public synchronized void close() throws Exception {
+  public synchronized void close() throws IOException {
     if (this.sstDumpToolTask != null) {
       if (!this.sstDumpToolTask.getFuture().isDone()) {
         this.sstDumpToolTask.getFuture().cancel(true);
@@ -221,5 +230,26 @@ public class ManagedSSTDumpIterator implements
               ", value='" + value + '\'' +
               '}';
     }
+  }
+
+  public static void main(String[] args) throws NativeLibraryNotLoadedException, IOException {
+    ManagedSSTDumpTool sstDumpTool =
+            new ManagedSSTDumpTool(new ForkJoinPool(), 50);
+    try (ManagedOptions options = new ManagedOptions();
+         ManagedSSTDumpIterator<KeyValue> iterator = new ManagedSSTDumpIterator<KeyValue>(sstDumpTool,
+                 "/Users/sbalachandran/Documents/code/dummyrocks/rocks/000025.sst", options) {
+           @Override
+           protected KeyValue getTransformedValue(KeyValue value) {
+             return value;
+           }
+         };
+    ) {
+      while (iterator.hasNext()) {
+        System.out.println(iterator.next());
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
   }
 }

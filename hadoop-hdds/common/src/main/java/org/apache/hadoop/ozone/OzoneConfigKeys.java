@@ -616,6 +616,21 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL =
       "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval";
 
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE =
+          "ozone.om.snapshot.sst_dumptool.pool.size";
+
+  public static final int
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+
+  public static final String
+          OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
+          "ozone.om.snapshot.sst_dumptool.buffer.size";
+
+  public static final String
+          OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT = "8KB";
+
+
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);

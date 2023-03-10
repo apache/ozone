@@ -20,17 +20,24 @@ package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Temporary class to test snapshot diff functionality.
@@ -57,6 +64,19 @@ public final class RdbUtil {
           .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
           .collect(Collectors.toCollection(HashSet::new));
     }
+  }
+
+  public static <T> Stream<T> getStreamFromIterator(
+          HddsUtils.CloseableIterator<T> itr) {
+    final Spliterator<T> spliterator = Spliterators
+            .spliteratorUnknownSize(itr, 0);
+    return StreamSupport.stream(spliterator, false).onClose(() -> {
+      try {
+        itr.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
   }
 
 }
