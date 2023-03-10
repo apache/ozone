@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Pattern;
 
 /**
  * AWS v4 authentication payload validator. For more details refer to AWS
@@ -39,6 +40,11 @@ final class AWSV4AuthValidator {
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
+  private static final Pattern STR_TO_SIGN_PATTERN =
+          Pattern.compile("^AWS4-HMAC-SHA256\n"+
+                  "\\d{8}T\\d{6}Z\n"+
+                  "\\d{8}/[a-z\\-\\d]+/[a-zA-Z0-9]+/aws4_request\n"+
+                  "[a-fA-F0-9]+$");
 
   private AWSV4AuthValidator() {
   }
@@ -47,6 +53,24 @@ final class AWSV4AuthValidator {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(payload.getBytes(StandardCharsets.UTF_8));
     return String.format("%064x", new java.math.BigInteger(1, md.digest()));
+  }
+
+  /**
+   * Returns true if strToSign is valid.
+   *
+   * @param strToSign
+   *
+   * strToSignFormat = "AWS4-HMAC-SHA256" + "\n" +
+   * timeStampISO8601Format + "\n" +
+   * YYYYMMDD/<region>/<service>/aws4_request + "\n" +
+   * Hex(SHA256Hash(<CanonicalRequest>))
+   *
+   * For more details refer to AWS documentation: https://docs.aws.amazon.com
+   * /general/latest/gr/create-signed-request.html#create-string-to-sign
+   *
+   * */
+  private static boolean validateStrToSign(String strToSign){
+    return STR_TO_SIGN_PATTERN.matcher(strToSign).find();
   }
 
   private static byte[] sign(byte[] key, String msg) {
@@ -100,6 +124,9 @@ final class AWSV4AuthValidator {
    */
   public static boolean validateRequest(String strToSign, String signature,
       String userKey) {
+    if(!validateStrToSign(strToSign)) {
+      return false;
+    }
     String expectedSignature = Hex.encode(sign(getSigningKey(userKey,
         strToSign), strToSign));
     return expectedSignature.equals(signature);

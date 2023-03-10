@@ -24,7 +24,7 @@ import org.junit.runners.Parameterized;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test for {@link AWSV4AuthValidator}.
@@ -35,12 +35,14 @@ public class TestAWSV4AuthValidator {
   private String strToSign;
   private String signature;
   private String awsAccessKey;
+  private Boolean result;
 
   public TestAWSV4AuthValidator(String strToSign, String signature,
-      String awsAccessKey) {
+      String awsAccessKey, Boolean result) {
     this.strToSign = strToSign;
     this.signature = signature;
     this.awsAccessKey = awsAccessKey;
+    this.result = result;
   }
 
   @Parameterized.Parameters
@@ -54,7 +56,8 @@ public class TestAWSV4AuthValidator {
                 "91851294efc47d",
             "56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf" +
                 "4765f46a14cd745ad",
-            "dbaksbzljandlkandlsd"
+            "dbaksbzljandlkandlsd",
+            true
         },
         {
             "AWS4-HMAC-SHA256\n" +
@@ -64,15 +67,25 @@ public class TestAWSV4AuthValidator {
                 "577efef23edd43b7e1a59",
             "5d672d79c15b13162d9279b0855cfba" +
                 "6789a8edb4c82c400e06b5924a6f2b5d7",
-            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            true
+        },
+        {
+            "PUT\n" +
+                "\n" +
+                "application/octet-stream\n" +
+                "Thu, 09 Mar 2023 18:57:26 -0800\n" +
+                "/bucket1/1.txt",
+            "CevEya+7yP3B0zqYoyTz2aVDuP0=",
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            false
         }
-
     });
   }
 
   @Test
   public void testValidateRequest() {
-    assertTrue(AWSV4AuthValidator.validateRequest(strToSign, signature,
-        awsAccessKey));
+    assertEquals(result, AWSV4AuthValidator.validateRequest(
+            strToSign, signature, awsAccessKey));
   }
 }
