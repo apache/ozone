@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -118,7 +117,7 @@ public abstract class ManagedSSTDumpIterator<T> implements
   }
 
   /**
-   * Transform function to transform key to a certain value
+   * Transform function to transform key to a certain value.
    * @param value
    * @return
    */
@@ -230,26 +229,5 @@ public abstract class ManagedSSTDumpIterator<T> implements
               ", value='" + value + '\'' +
               '}';
     }
-  }
-
-  public static void main(String[] args) throws NativeLibraryNotLoadedException, IOException {
-    ManagedSSTDumpTool sstDumpTool =
-            new ManagedSSTDumpTool(new ForkJoinPool(), 50);
-    try (ManagedOptions options = new ManagedOptions();
-         ManagedSSTDumpIterator<KeyValue> iterator = new ManagedSSTDumpIterator<KeyValue>(sstDumpTool,
-                 "/Users/sbalachandran/Documents/code/dummyrocks/rocks/000025.sst", options) {
-           @Override
-           protected KeyValue getTransformedValue(KeyValue value) {
-             return value;
-           }
-         };
-    ) {
-      while (iterator.hasNext()) {
-        System.out.println(iterator.next());
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
   }
 }

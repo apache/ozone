@@ -29,17 +29,10 @@ import org.rocksdb.SstFileReader;
 import org.rocksdb.SstFileReaderIterator;
 
 import java.io.IOException;
-import java.io.InvalidObjectException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Optional;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -62,25 +55,26 @@ public class ManagedSstFileReader {
     ReadOptions readOptions = new ReadOptions();
     final MultipleSstFileIterator<String> itr =
             new MultipleSstFileIterator<String>(sstFiles) {
-      @Override
-      protected HddsUtils.CloseableIterator<String> initNewKeyIteratorForFile(
-              String file) throws RocksDBException {
-        return new ManagedSstFileIterator<String>(file, options,
-                readOptions) {
           @Override
-          protected String getIteratorValue(SstFileReaderIterator iterator) {
-            return new String(iterator.key(), UTF_8);
+          protected HddsUtils.CloseableIterator<String>
+              initNewKeyIteratorForFile(String file) throws RocksDBException {
+            return new ManagedSstFileIterator<String>(file, options,
+                    readOptions) {
+              @Override
+              protected String getIteratorValue(
+                      SstFileReaderIterator iterator) {
+                return new String(iterator.key(), UTF_8);
+              }
+            };
+          }
+
+          @Override
+          public void close() throws IOException {
+            super.close();
+            options.close();
+            readOptions.close();
           }
         };
-      }
-
-      @Override
-      public void close() throws IOException {
-        super.close();
-        options.close();
-        readOptions.close();
-      }
-    };
     return RdbUtil.getStreamFromIterator(itr);
   }
   public Stream<String> getKeyStreamWithTombstone(
@@ -90,25 +84,25 @@ public class ManagedSstFileReader {
     ManagedOptions options = new ManagedOptions();
     final MultipleSstFileIterator<String> itr =
             new MultipleSstFileIterator<String>(sstFiles) {
-      @Override
-      protected HddsUtils.CloseableIterator<String> initNewKeyIteratorForFile(
-              String file) throws NativeLibraryNotLoadedException,
-              IOException {
-        return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                options) {
           @Override
-          protected String getTransformedValue(KeyValue value) {
-            return value.getKey();
+          protected HddsUtils.CloseableIterator<String>
+              initNewKeyIteratorForFile(String file)
+                  throws NativeLibraryNotLoadedException, IOException {
+            return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
+                    options) {
+              @Override
+              protected String getTransformedValue(KeyValue value) {
+                return value.getKey();
+              }
+            };
+          }
+
+          @Override
+          public void close() throws IOException {
+            super.close();
+            options.close();
           }
         };
-      }
-
-      @Override
-      public void close() throws IOException {
-        super.close();
-        options.close();
-      }
-    };
     return RdbUtil.getStreamFromIterator(itr);
   }
 
@@ -117,8 +111,8 @@ public class ManagedSstFileReader {
     private SstFileReader fileReader;
     private SstFileReaderIterator fileReaderIterator;
 
-    public ManagedSstFileIterator(String path, ManagedOptions options,
-                                  ReadOptions readOptions)
+    ManagedSstFileIterator(String path, ManagedOptions options,
+                           ReadOptions readOptions)
             throws RocksDBException {
       this.fileReader = new SstFileReader(options);
       this.fileReader.open(path);

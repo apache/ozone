@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeConstants;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
@@ -207,13 +208,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private void initSSTDumpTool(OzoneConfiguration configuration)
+  private void initSSTDumpTool(OzoneConfiguration conf)
           throws NativeLibraryNotLoadedException {
-    int threadPoolSize = configuration.getInt(
+    int threadPoolSize = conf.getInt(
             OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
             OzoneConfigKeys
                     .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-    int bufferSize = (int)configuration.getStorageSize(
+    int bufferSize = (int)conf.getStorageSize(
             OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
             OzoneConfigKeys
                 .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
@@ -545,11 +546,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       try {
         addToObjectIdMap(fsKeyTable,
             tsKeyTable,
-            deltaFilesForKeyOrFileTable,
+            Pair.of(isNativeRocksToolsLoaded, deltaFilesForKeyOrFileTable),
             objectIdToKeyNameMapForFromSnapshot,
             objectIdToKeyNameMapForToSnapshot,
             objectIDsToCheckMap,
-            tablePrefixes, isNativeRocksToolsLoaded);
+            tablePrefixes);
       } catch (NativeLibraryNotLoadedException e) {
         // Workaround to handle deletes if use of native rockstools for reading
         // tombstone fails.
@@ -560,11 +561,11 @@ public class SnapshotDiffManager implements AutoCloseable {
         try {
           addToObjectIdMap(fsKeyTable,
                   tsKeyTable,
-                  deltaFilesForKeyOrFileTable,
+                  Pair.of(false, deltaFilesForKeyOrFileTable),
                   objectIdToKeyNameMapForFromSnapshot,
                   objectIdToKeyNameMapForToSnapshot,
                   objectIDsToCheckMap,
-                  tablePrefixes, false);
+                  tablePrefixes);
         } catch (NativeLibraryNotLoadedException ex) {
           //This code should never be never executed.
           throw new RuntimeException(ex);
@@ -587,11 +588,11 @@ public class SnapshotDiffManager implements AutoCloseable {
         try {
           addToObjectIdMap(fsDirTable,
               tsDirTable,
-              deltaFilesForDirTable,
+              Pair.of(isNativeRocksToolsLoaded, deltaFilesForDirTable),
               objectIdToKeyNameMapForFromSnapshot,
               objectIdToKeyNameMapForToSnapshot,
               objectIDsToCheckMap,
-              tablePrefixes, isNativeRocksToolsLoaded);
+              tablePrefixes);
         } catch (NativeLibraryNotLoadedException e) {
           try {
             // Workaround to handle deletes if use of native rockstools for
@@ -602,11 +603,11 @@ public class SnapshotDiffManager implements AutoCloseable {
                     fromSnapshot, tablesToLookUp));
             addToObjectIdMap(fsDirTable,
                     tsDirTable,
-                    deltaFilesForDirTable,
+                    Pair.of(false, deltaFilesForDirTable),
                     objectIdToKeyNameMapForFromSnapshot,
                     objectIdToKeyNameMapForToSnapshot,
                     objectIDsToCheckMap,
-                    tablePrefixes, false);
+                    tablePrefixes);
           } catch (NativeLibraryNotLoadedException ex) {
             //This code should never be never executed.
             throw new RuntimeException(ex);
@@ -633,28 +634,25 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
                                 Table<String, ? extends WithObjectID> tsTable,
-                                Set<String> deltaFiles,
+                                Pair<Boolean, Set<String>>
+                                    isNativeRocksToolsLoadedDeltaFilesPair,
                                 PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
                                 PersistentMap<byte[], byte[]> newObjIdToKeyMap,
                                 PersistentSet<byte[]> objectIDsToCheck,
-                                Map<String, String> tablePrefixes,
-                                boolean isNativeRocksToolsLoaded)
+                                Map<String, String> tablePrefixes)
       throws IOException, NativeLibraryNotLoadedException {
 
-    if (deltaFiles.isEmpty()) {
-      return;
-    }
-
+    Set<String> deltaFiles = isNativeRocksToolsLoadedDeltaFilesPair.getRight();
+    boolean nativeRocksToolsLoaded =
+            isNativeRocksToolsLoadedDeltaFilesPair.getLeft();
     boolean isDirectoryTable =
         fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
 
-    try (Stream<String> keysToCheck = new ManagedSstFileReader(deltaFiles)
-        .getKeyStream()) {
     if (deltaFiles.isEmpty()) {
       return;
     }
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
-    try (Stream<String> keysToCheck = isNativeRocksToolsLoaded
+    try (Stream<String> keysToCheck = nativeRocksToolsLoaded
                  ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool)
                  : sstFileReader.getKeyStream()) {
       keysToCheck.forEach(key -> {
