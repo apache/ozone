@@ -211,8 +211,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     if (ownerName == null) {
       return false;
     }
-    if (callerUgi.getUserName().equals(ownerName) ||
-        callerUgi.getShortUserName().equals(ownerName)) {
+    if (callerUgi.getShortUserName().equals(ownerName)) {
       return true;
     }
     return false;

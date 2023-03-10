@@ -42,6 +42,7 @@ Setup ACL tests
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
     Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
+
     ${principal} =      Get test user principal    testuser2
     Execute             ozone sh volume addacl --acl user:${principal}:r ${target}
     Execute             ozone sh volume addacl --acl user:${principal}:rl ${source}
