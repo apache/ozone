@@ -41,10 +41,10 @@ final class AWSV4AuthValidator {
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
   private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
   private static final Pattern STR_TO_SIGN_PATTERN =
-          Pattern.compile("^AWS4-HMAC-SHA256\n" +
+          Pattern.compile("^AWS4[A-Z\\-\\d]+\n" +
                   "\\d{8}T\\d{6}Z\n" +
-                  "\\d{8}/[a-z\\-\\d]+/[a-zA-Z0-9]+/aws4_request\n" +
-                  "[a-fA-F0-9]+$");
+                  "\\d{8}/[a-z\\-\\d]+/[a-zA-Z\\d]+/aws4_request\n" +
+                  "[a-fA-F\\d]+$");
 
   private AWSV4AuthValidator() {
   }
