@@ -55,6 +55,7 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_robot_test scm -v USERNAME:httpfs httpfs
 execute_debug_tests
 
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot

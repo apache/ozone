@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -317,7 +318,20 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void transferLeadership(String newLeaderId) throws IOException;
 
   /**
-   * Reset the expired deleted block retry count.
+   * Return the failed transactions of the Deleted blocks. A transaction is
+   * considered to be failed if it has been sent more than MAX_RETRY limit
+   * and its count is reset to -1.
+   *
+   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
+   * @return a list of failed deleted block transactions.
+   * @throws IOException
+   */
+  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException;
+
+  /**
+   * Reset the failed deleted block retry count.
    *
    * @param txIDs transactionId list to be reset
    * @return num of successful reset

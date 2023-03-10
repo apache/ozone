@@ -53,6 +53,9 @@ execute_robot_test scm recon
 
 execute_robot_test scm admincli
 execute_robot_test scm spnego
+execute_robot_test scm snapshot/snapshot-acls.robot
+
+execute_robot_test scm httpfs
 
 # test replication
 docker-compose up -d --scale datanode=2

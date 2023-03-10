@@ -104,7 +104,7 @@ public final class SelfSignedCertificate {
     return new Builder();
   }
 
-  private X509CertificateHolder generateCertificate(boolean isCA)
+  private X509CertificateHolder generateCertificate(BigInteger caCertSerialId)
       throws OperatorCreationException, IOException {
     // For the Root Certificate we form the name from Subject, SCM ID and
     // Cluster ID.
@@ -119,13 +119,11 @@ public final class SelfSignedCertificate {
         new JcaContentSignerBuilder(config.getSignatureAlgo())
             .setProvider(config.getProvider()).build(key.getPrivate());
 
-    // Please note: Since this is a root certificate we use "ONE" as the
-    // serial number. Also note that skip enforcing locale or UTC. We are
-    // trying to operate at the Days level, hence Time zone is also skipped for
-    // now.
-    BigInteger serial = BigInteger.ONE;
-    if (!isCA) {
+    BigInteger serial;
+    if (caCertSerialId == null) {
       serial = new BigInteger(Long.toString(Time.monotonicNow()));
+    } else {
+      serial = caCertSerialId;
     }
 
     // Valid from the Start of the day when we generate this Certificate.
@@ -139,7 +137,7 @@ public final class SelfSignedCertificate {
     X509v3CertificateBuilder builder = new X509v3CertificateBuilder(name,
         serial, validFrom, validTill, name, publicKeyInfo);
 
-    if (isCA) {
+    if (caCertSerialId != null) {
       builder.addExtension(Extension.basicConstraints, true,
           new BasicConstraints(true));
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
@@ -170,7 +168,7 @@ public final class SelfSignedCertificate {
     private LocalDateTime endDate;
     private KeyPair key;
     private SecurityConfig config;
-    private boolean isCA;
+    private BigInteger caCertSerialId;
     private List<GeneralName> altNames;
 
     public Builder setConfiguration(ConfigurationSource configuration) {
@@ -209,7 +207,11 @@ public final class SelfSignedCertificate {
     }
 
     public Builder makeCA() {
-      isCA = true;
+      return makeCA(BigInteger.ONE);
+    }
+
+    public Builder makeCA(BigInteger serialId) {
+      this.caCertSerialId = serialId;
       return this;
     }
 
@@ -296,7 +298,7 @@ public final class SelfSignedCertificate {
       SelfSignedCertificate rootCertificate =
           new SelfSignedCertificate(this);
       try {
-        return rootCertificate.generateCertificate(isCA);
+        return rootCertificate.generateCertificate(caCertSerialId);
       } catch (OperatorCreationException | CertIOException e) {
         throw new CertificateException("Unable to create root certificate.",
             e.getCause());

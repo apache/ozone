@@ -182,11 +182,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
+    OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
       StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-          HddsDatanodeService.class, args, LOG);
+          HddsDatanodeService.class, args, LOG, configuration);
     }
-    start(createOzoneConfiguration());
+    start(configuration);
     ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
@@ -371,8 +372,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // persist cert ID to VERSION file
       datanodeDetails.setCertSerialId(dnCertSerialId);
       persistDatanodeDetails(datanodeDetails);
-      // set new certificate ID
-      certClient.setCertificateId(dnCertSerialId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
