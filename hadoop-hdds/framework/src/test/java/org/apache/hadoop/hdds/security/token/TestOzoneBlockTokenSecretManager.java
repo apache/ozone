@@ -24,7 +24,11 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockR
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -54,16 +58,18 @@ import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
+import org.slf4j.Logger;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.SecureRandom;
 import java.security.Signature;
@@ -106,18 +112,22 @@ public class TestOzoneBlockTokenSecretManager {
     omCertSerialId = x509Certificate.getSerialNumber().toString();
     secretManager = new OzoneBlockTokenSecretManager(securityConfig,
         TimeUnit.HOURS.toMillis(1));
-    client = Mockito.mock(DefaultCertificateClient.class);
-    when(client.getCertificate()).thenReturn(x509Certificate);
-    when(client.getCertificate(anyString())).
-        thenReturn(x509Certificate);
-    when(client.getPublicKey()).thenReturn(keyPair.getPublic());
-    when(client.getPrivateKey()).thenReturn(keyPair.getPrivate());
-    when(client.getSignatureAlgorithm()).thenReturn(
-        securityConfig.getSignatureAlgo());
-    when(client.getSecurityProvider()).thenReturn(
-        securityConfig.getProvider());
-    when(client.verifySignature((byte[]) Mockito.any(),
-        Mockito.any(), Mockito.any())).thenCallRealMethod();
+    Logger log = mock(Logger.class);
+    DefaultCertificateClient toStub =
+        new DefaultCertificateClient(
+            securityConfig, log, null, "test", null, null) {
+          @Override
+          protected String signAndStoreCertificate(
+              PKCS10CertificationRequest request, Path certificatePath) {
+            return null;
+          }
+        };
+    client = mock(DefaultCertificateClient.class, delegatesTo(toStub));
+    doReturn(x509Certificate).when(client).getCertificate();
+    doReturn(x509Certificate).when(client).getCertificate(anyString());
+    doReturn(keyPair.getPublic()).when(client).getPublicKey();
+    doReturn(keyPair.getPrivate()).when(client).getPrivateKey();
+    doReturn(null).when(client).signData(any(byte[].class));
 
     secretManager.start(client);
     tokenVerifier = new BlockTokenVerifier(securityConfig, client);

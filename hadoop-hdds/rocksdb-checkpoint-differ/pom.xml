@@ -37,7 +37,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
-      <version>${hdds.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

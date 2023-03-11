@@ -193,7 +193,8 @@ public class ReplicationSupervisor {
         if (context != null) {
           DatanodeDetails dn = context.getParent().getDatanodeDetails();
           if (dn != null && dn.getPersistedOpState() !=
-              HddsProtos.NodeOperationalState.IN_SERVICE) {
+              HddsProtos.NodeOperationalState.IN_SERVICE
+              && task.shouldOnlyRunOnInServiceDatanodes()) {
             LOG.info("Dn is of {} state. Ignore {}",
                 dn.getPersistedOpState(), this);
             return;

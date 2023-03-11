@@ -215,9 +215,15 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, Container container,
       DispatcherContext dispatcherContext) {
 
-    return KeyValueHandler
-        .dispatchRequest(this, request, (KeyValueContainer) container,
-            dispatcherContext);
+    try {
+      return KeyValueHandler
+          .dispatchRequest(this, request, (KeyValueContainer) container,
+              dispatcherContext);
+    } catch (RuntimeException e) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(e, CONTAINER_INTERNAL_ERROR),
+          request);
+    }
   }
 
   @VisibleForTesting

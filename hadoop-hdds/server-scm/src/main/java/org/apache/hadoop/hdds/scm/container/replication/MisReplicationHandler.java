@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -57,18 +57,18 @@ public abstract class MisReplicationHandler implements
           LoggerFactory.getLogger(MisReplicationHandler.class);
   private final PlacementPolicy<ContainerReplica> containerPlacement;
   private final long currentContainerSize;
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
   private boolean push;
 
   public MisReplicationHandler(
           final PlacementPolicy<ContainerReplica> containerPlacement,
-          final ConfigurationSource conf, NodeManager nodeManager,
+          final ConfigurationSource conf, ReplicationManager replicationManager,
       final boolean push) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
     this.push = push;
   }
 
@@ -104,8 +104,14 @@ public abstract class MisReplicationHandler implements
                 StorageContainerDatanodeProtocolProtos
                     .ContainerReplicaProto.State.QUASI_CLOSED
         )
-        .filter(r -> ReplicationManager.getNodeStatus(
-            r.getDatanodeDetails(), nodeManager).isHealthy())
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
         .filter(r -> r.getDatanodeDetails().getPersistedOpState()
             == HddsProtos.NodeOperationalState.IN_SERVICE)
         .collect(Collectors.toSet());
@@ -115,9 +121,10 @@ public abstract class MisReplicationHandler implements
           ReplicateContainerCommand command, ContainerReplica replica);
 
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> getReplicateCommands(
-          ContainerInfo containerInfo,
-          Set<ContainerReplica> replicasToBeReplicated,
-          List<DatanodeDetails> targetDns) {
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> targetDns)
+      throws AllSourcesOverloadedException {
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commandMap = new HashSet<>();
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
@@ -127,12 +134,16 @@ public abstract class MisReplicationHandler implements
       long containerID = containerInfo.getContainerID();
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
-      ReplicateContainerCommand replicateCommand = push
-          ? ReplicateContainerCommand.toTarget(containerID, target)
-          : ReplicateContainerCommand.fromSources(containerID,
-              Collections.singletonList(source));
-      replicateCommand = updateReplicateCommand(replicateCommand, replica);
-      commandMap.add(Pair.of(push ? source : target, replicateCommand));
+      if (push) {
+        commandMap.add(replicationManager.createThrottledReplicationCommand(
+            containerID, Collections.singletonList(source),
+            target, replica.getReplicaIndex()));
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, Collections.singletonList(source));
+        updateReplicateCommand(cmd, replica);
+        commandMap.add(Pair.of(target, cmd));
+      }
       datanodeIdx += 1;
     }
     return commandMap;
