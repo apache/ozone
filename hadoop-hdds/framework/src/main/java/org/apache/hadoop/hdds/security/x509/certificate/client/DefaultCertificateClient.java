@@ -53,8 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -122,20 +120,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
 
-  // Lock to protect the certificate renew process, to make sure there is only
-  // one renew process is ongoing at one time.
-  // Certificate renew steps:
-  //  1. generate new keys and sign new certificate, persist all data to disk
-  //  2. switch on disk new keys and certificate with current ones
-  //  3. save new certificate ID into service VERSION file
-  //  4. refresh in memory certificate ID and reload all new certificates
-  private Lock renewLock = new ReentrantLock();
-
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient;
-  private Set<CertificateNotification> notificationReceivers;
+  private final Set<CertificateNotification> notificationReceivers;
   private static UserGroupInformation ugi;
 
   protected DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
@@ -935,7 +924,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public synchronized void close() throws IOException {
     if (executorService != null) {
-      executorService.shutdown();
+      executorService.shutdownNow();
+      executorService = null;
     }
 
     if (serverKeyStoresFactory != null) {
@@ -1249,9 +1239,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     @Override
     public void run() {
-
-      renewLock.lock();
-      try {
+      // Lock to protect the certificate renew process, to make sure there is
+      // only one renew process is ongoing at one time.
+      // Certificate renew steps:
+      //  1. generate new keys and sign new certificate, persist data to disk
+      //  2. switch on disk new keys and certificate with current ones
+      //  3. save new certificate ID into service VERSION file
+      //  4. refresh in memory certificate ID and reload all new certificates
+      synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
         if (timeLeft.isZero()) {
@@ -1288,8 +1283,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
               certClient, currentCert.getSerialNumber().toString(), newCertId));
         }
-      } finally {
-        renewLock.unlock();
       }
     }
   }
