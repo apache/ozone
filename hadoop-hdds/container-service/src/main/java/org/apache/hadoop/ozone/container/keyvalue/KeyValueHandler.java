@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -1236,10 +1235,10 @@ public class KeyValueHandler extends Handler {
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
       BlockIterator<BlockData>
-      blockIterator = dbHandle.getStore().
+          blockIterator = dbHandle.getStore().
           getBlockIterator(container.getContainerData().getContainerID());
       StringBuilder stringBuilder = new StringBuilder();
-      while(blockIterator.hasNext()) {
+      while (blockIterator.hasNext()) {
         nonZero = true;
         stringBuilder.append(blockIterator.nextBlock());
         if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
@@ -1268,7 +1267,7 @@ public class KeyValueHandler extends Handler {
           stringBuilder.append(",");
         }
         stringBuilder.append(block);
-        notEmpty=true;
+        notEmpty = true;
         if (stringBuilder.length() > StorageUnit.KB.toBytes(16)) {
           break;
         }
