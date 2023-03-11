@@ -202,14 +202,13 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
-    // Deleting a non-empty container should pass on the DN when the force flag
-    // is true
     // Check the log for the error message when deleting non-empty containers
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(KeyValueHandler.class));
     GenericTestUtils.waitFor(() ->
-            logCapturer.getOutput().contains("container is not empty"),
+            logCapturer.getOutput().
+                contains("Files still part of the container on delete"),
         500,
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
@@ -217,6 +216,8 @@ public class TestDeleteContainerHandler {
     Assert.assertEquals(1,
         metrics.getContainerDeleteFailedNonEmptyDir());
     // Send the delete command. It should pass with force flag.
+    // Deleting a non-empty container should pass on the DN when the force flag
+    // is true
     long beforeForceCount = metrics.getContainerForceDelete();
     command = new DeleteContainerCommand(containerId.getId(), true);
 
@@ -327,7 +328,8 @@ public class TestDeleteContainerHandler {
         GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(KeyValueHandler.class));
     GenericTestUtils.waitFor(() ->
-            logCapturer.getOutput().contains("container is not empty"),
+            logCapturer.getOutput().
+                contains("Files still part of the container on delete"),
         500,
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,

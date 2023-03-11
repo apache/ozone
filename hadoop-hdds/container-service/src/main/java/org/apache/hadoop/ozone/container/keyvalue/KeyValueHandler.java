@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -1234,19 +1235,13 @@ public class KeyValueHandler extends Handler {
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
-      List<? extends Table.KeyValue<String, BlockData>>
-          blocks = dbHandle.getStore().getBlockDataTable().getRangeKVs(
-          ((KeyValueContainerData) container.getContainerData()).
-              startKeyEmpty(),
-          Integer.MAX_VALUE,
-          ((KeyValueContainerData) container.getContainerData()).
-              containerPrefix(),
-          ((KeyValueContainerData) container.getContainerData()).
-              getUnprefixedKeyFilter());
+      BlockIterator<BlockData>
+      blockIterator = dbHandle.getStore().
+          getBlockIterator(container.getContainerData().getContainerID());
       StringBuilder stringBuilder = new StringBuilder();
-      for (Table.KeyValue<String, BlockData> kv : blocks) {
+      while(blockIterator.hasNext()) {
         nonZero = true;
-        stringBuilder.append(kv.getValue());
+        stringBuilder.append(blockIterator.nextBlock());
         if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
           break;
         }
@@ -1259,28 +1254,31 @@ public class KeyValueHandler extends Handler {
     return nonZero;
   }
 
-  private void logBlocksFoundOnDisk(Container container) throws IOException {
+  private boolean logBlocksFoundOnDisk(Container container) throws IOException {
     // List files left over
     File chunksPath = new
         File(container.getContainerData().getChunksPath());
     Preconditions.checkArgument(chunksPath.isDirectory());
+    boolean notEmpty = false;
     try (DirectoryStream<Path> dir
              = Files.newDirectoryStream(chunksPath.toPath())) {
       StringBuilder stringBuilder = new StringBuilder();
       for (Path block : dir) {
+        if (notEmpty) {
+          stringBuilder.append(",");
+        }
         stringBuilder.append(block);
-        stringBuilder.append(",");
+        notEmpty=true;
         if (stringBuilder.length() > StorageUnit.KB.toBytes(16)) {
           break;
         }
-        LOG.error(
-            "Received container deletion command for container {} but" +
-                " the container is not empty",
-            container.getContainerData().getContainerID());
       }
-      LOG.error("Files still part of the container on delete: {}",
-          stringBuilder.toString());
+      if (notEmpty) {
+        LOG.error("Files still part of the container on delete: {}",
+            stringBuilder.toString());
+      }
     }
+    return notEmpty;
   }
 
   private void deleteInternal(Container container, boolean force)
