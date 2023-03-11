@@ -131,6 +131,7 @@ public class KeyValueHandler extends Handler {
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
+  private boolean checkIfNoBlockFiles;
 
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
@@ -155,6 +156,14 @@ public class KeyValueHandler extends Handler {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    checkIfNoBlockFiles =
+        conf.getBoolean(
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+        DatanodeConfiguration.
+            OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -1231,19 +1240,45 @@ public class KeyValueHandler extends Handler {
         }
         // Safety check that the container is empty.
         // If the container is not empty, it should not be deleted unless the
-        // container is beinf forcefully deleted (which happens when
+        // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
         if (container.getContainerData().getBlockCount() != 0) {
+          metrics.incContainerDeleteFailedBlockCountNotZero();
           LOG.error("Received container deletion command for container {} but" +
-              " the container is not empty.",
-              container.getContainerData().getContainerID());
+              " the container is not empty with blockCount {}",
+              container.getContainerData().getContainerID(),
+              container.getContainerData().getBlockCount());
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
+
+        if (checkIfNoBlockFiles && !container.isEmpty()) {
+          metrics.incContainerDeleteFailedNonEmpty();
+          LOG.error("Received container deletion command for container {} but" +
+                  " the container is not empty",
+              container.getContainerData().getContainerID());
+          throw new StorageContainerException("Non-force deletion of " +
+              "non-empty container:" +
+              container.getContainerData().getContainerID() +
+              " is not allowed.",
+              DELETE_ON_NON_EMPTY_CONTAINER);
+        }
+      } else {
+        metrics.incContainersForceDelete();
       }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);
+    } catch (StorageContainerException e) {
+      throw e;
+    } catch (IOException e) {
+      // All other IO Exceptions should be treated as if the container is not
+      // empty as a defensive check.
+      LOG.error("Could not determine if the container {} is empty",
+          container.getContainerData().getContainerID(), e);
+      throw new StorageContainerException("Could not determine if container "
+          + container.getContainerData().getContainerID() +
+          " is empty", DELETE_ON_NON_EMPTY_CONTAINER);
     } finally {
       container.writeUnlock();
     }
