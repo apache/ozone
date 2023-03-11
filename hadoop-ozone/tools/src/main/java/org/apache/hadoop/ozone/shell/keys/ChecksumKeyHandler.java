@@ -41,7 +41,7 @@ import static org.apache.hadoop.fs.ozone.OzoneClientUtils.getFileChecksumWithCom
 public class ChecksumKeyHandler extends KeyHandler {
 
   @CommandLine.Option(
-      names = {"-c", "--combineMode"},
+      names = {"-c", "--combine-mode"},
       description = "Method of combining the chunk checksums. Valid values are "
           + "COMPOSITE_CRC and MD5MD5CRC. Defaults to COMPOSITE_CRC.")
   private OzoneClientConfig.ChecksumCombineMode mode =
