@@ -88,6 +88,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
+    address.ensureKeyAddress();
+
     boolean isChecksumVerifyEnabled
         = getConf().getBoolean("ozone.client.verify.checksum", true);
     OzoneConfiguration configuration = new OzoneConfiguration(getConf());
@@ -106,7 +108,6 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         noChecksumClient = client.getObjectStore().getClientProxy();
       }
 
-      address.ensureKeyAddress();
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
