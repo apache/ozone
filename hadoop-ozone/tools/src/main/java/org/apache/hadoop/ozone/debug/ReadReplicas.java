@@ -44,6 +44,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -112,7 +113,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
 
-      String directoryName = createDirectory(volumeName, bucketName, keyName);
+      File dir = createDirectory(volumeName, bucketName, keyName);
 
       OzoneKeyDetails keyInfoDetails
           = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
@@ -131,7 +132,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
       JsonArray blocks = new JsonArray();
       downloadReplicasAndCreateManifest(keyName, replicas,
-          replicasWithoutChecksum, directoryName, blocks);
+          replicasWithoutChecksum, dir, blocks);
       result.add(JSON_PROPERTY_FILE_BLOCKS, blocks);
 
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -140,7 +141,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       String manifestFileName = keyName + "_manifest";
       System.out.println("Writing manifest file : " + manifestFileName);
       File manifestFile
-          = new File(outputDir + "/" + directoryName + "/" + manifestFileName);
+          = new File(dir, manifestFileName);
       Files.write(manifestFile.toPath(),
           prettyJson.getBytes(StandardCharsets.UTF_8));
     } finally {
@@ -153,7 +154,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas,
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
           replicasWithoutChecksum,
-      String directoryName, JsonArray blocks) throws IOException {
+      File dir, JsonArray blocks) throws IOException {
     int blockIndex = 0;
 
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
@@ -185,12 +186,10 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         String fileName = keyName + "_block" + blockIndex + "_" +
             replica.getKey().getHostName();
         System.out.println("Writing : " + fileName);
-        File replicaFile
-            = new File(outputDir + "/" + directoryName + "/" + fileName);
+        Path path = new File(dir, fileName).toPath();
 
         try {
-          Files.copy(is, replicaFile.toPath(),
-              StandardCopyOption.REPLACE_EXISTING);
+          Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
           Throwable cause = e.getCause();
           replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
@@ -200,8 +199,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
             is.close();
             is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
                 replica.getKey(), blockID);
-            Files.copy(is, replicaFile.toPath(),
-                StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
           } else if (cause instanceof StatusRuntimeException) {
             break;
           }
@@ -228,14 +226,14 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   }
 
   @NotNull
-  private String createDirectory(String volumeName, String bucketName,
+  private File createDirectory(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     String fileSuffix
         = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
     String directoryName = volumeName + "_" + bucketName + "_" + keyName +
         "_" + fileSuffix;
     System.out.println("Creating directory : " + directoryName);
-    File dir = new File(outputDir + "/" + directoryName);
+    File dir = new File(outputDir, directoryName);
     if (!dir.exists()) {
       if (dir.mkdir()) {
         System.out.println("Successfully created!");
@@ -244,6 +242,6 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
             "Failed to create directory %s.", dir));
       }
     }
-    return directoryName;
+    return dir;
   }
 }
