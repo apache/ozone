@@ -219,19 +219,18 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   private OzoneInputStream getInputStreamWithoutChecksum(
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
           replicasWithoutChecksum, String datanodeUUID, BlockID blockID) {
-    OzoneInputStream is = new OzoneInputStream();
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicasWithoutChecksum.entrySet()) {
       if (block.getKey().getBlockID().equals(blockID)) {
         for (Map.Entry<DatanodeDetails, OzoneInputStream>
             replica : block.getValue().entrySet()) {
           if (replica.getKey().getUuidString().equals(datanodeUUID)) {
-            is = replica.getValue();
+            return replica.getValue();
           }
         }
       }
     }
-    return is;
+    return new OzoneInputStream();
   }
 
   @NotNull
