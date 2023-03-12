@@ -79,8 +79,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
-  private ClientProtocol clientProtocol;
-  private ClientProtocol clientProtocolWithoutChecksum;
+  private ClientProtocol checksumClient;
+  private ClientProtocol noChecksumClient;
 
   @Override
   public Class<?> getParentType() {
@@ -100,11 +100,11 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     RpcClient newClient = new RpcClient(configuration, null);
     try {
       if (isChecksumVerifyEnabled) {
-        clientProtocol = client.getObjectStore().getClientProxy();
-        clientProtocolWithoutChecksum = newClient;
+        checksumClient = client.getObjectStore().getClientProxy();
+        noChecksumClient = newClient;
       } else {
-        clientProtocol = newClient;
-        clientProtocolWithoutChecksum = client.getObjectStore().getClientProxy();
+        checksumClient = newClient;
+        noChecksumClient = client.getObjectStore().getClientProxy();
       }
 
       address.ensureKeyAddress();
@@ -115,13 +115,13 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
       String directoryName = createDirectory(volumeName, bucketName, keyName);
 
       OzoneKeyDetails keyInfoDetails
-          = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
+          = checksumClient.getKeyDetails(volumeName, bucketName, keyName);
 
-      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas
-          = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas =
+          checksumClient.getKeysEveryReplicas(volumeName, bucketName, keyName);
 
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-          replicasWithoutChecksum = clientProtocolWithoutChecksum
+          replicasWithoutChecksum = noChecksumClient
           .getKeysEveryReplicas(volumeName, bucketName, keyName);
 
       JsonObject result = new JsonObject();
