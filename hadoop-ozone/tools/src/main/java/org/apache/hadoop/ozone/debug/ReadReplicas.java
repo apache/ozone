@@ -198,6 +198,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
           if (cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
             String datanodeUUID = replica.getKey().getUuidString();
+            is.close();
             is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
                 datanodeUUID, blockID);
             Files.copy(is, replicaFile.toPath(),
