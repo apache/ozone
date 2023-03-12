@@ -79,9 +79,6 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
   private static final String JSON_PROPERTY_REPLICA_UUID = "uuid";
   private static final String JSON_PROPERTY_REPLICA_EXCEPTION = "exception";
 
-  private ClientProtocol checksumClient;
-  private ClientProtocol noChecksumClient;
-
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
@@ -99,6 +96,8 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
     RpcClient newClient = new RpcClient(configuration, null);
     try {
+      ClientProtocol noChecksumClient;
+      ClientProtocol checksumClient;
       if (isChecksumVerifyEnabled) {
         checksumClient = client.getObjectStore().getClientProxy();
         noChecksumClient = newClient;
