@@ -97,50 +97,55 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     configuration.setBoolean("ozone.client.verify.checksum",
         !isChecksumVerifyEnabled);
 
-    if (isChecksumVerifyEnabled) {
-      clientProtocol = client.getObjectStore().getClientProxy();
-      clientProtocolWithoutChecksum = new RpcClient(configuration, null);
-    } else {
-      clientProtocol = new RpcClient(configuration, null);
-      clientProtocolWithoutChecksum = client.getObjectStore().getClientProxy();
+    RpcClient newClient = new RpcClient(configuration, null);
+    try {
+      if (isChecksumVerifyEnabled) {
+        clientProtocol = client.getObjectStore().getClientProxy();
+        clientProtocolWithoutChecksum = newClient;
+      } else {
+        clientProtocol = newClient;
+        clientProtocolWithoutChecksum = client.getObjectStore().getClientProxy();
+      }
+
+      address.ensureKeyAddress();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
+
+      String directoryName = createDirectory(volumeName, bucketName, keyName);
+
+      OzoneKeyDetails keyInfoDetails
+          = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
+
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas
+          = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
+
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
+          replicasWithoutChecksum = clientProtocolWithoutChecksum
+          .getKeysEveryReplicas(volumeName, bucketName, keyName);
+
+      JsonObject result = new JsonObject();
+      result.addProperty(JSON_PROPERTY_FILE_NAME,
+          volumeName + "/" + bucketName + "/" + keyName);
+      result.addProperty(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
+
+      JsonArray blocks = new JsonArray();
+      downloadReplicasAndCreateManifest(keyName, replicas,
+          replicasWithoutChecksum, directoryName, blocks);
+      result.add(JSON_PROPERTY_FILE_BLOCKS, blocks);
+
+      Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      String prettyJson = gson.toJson(result);
+
+      String manifestFileName = keyName + "_manifest";
+      System.out.println("Writing manifest file : " + manifestFileName);
+      File manifestFile
+          = new File(outputDir + "/" + directoryName + "/" + manifestFileName);
+      Files.write(manifestFile.toPath(),
+          prettyJson.getBytes(StandardCharsets.UTF_8));
+    } finally {
+      newClient.close();
     }
-
-    address.ensureKeyAddress();
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
-
-    String directoryName = createDirectory(volumeName, bucketName, keyName);
-
-    OzoneKeyDetails keyInfoDetails
-        = clientProtocol.getKeyDetails(volumeName, bucketName, keyName);
-
-    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas
-        = clientProtocol.getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-    Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-        replicasWithoutChecksum = clientProtocolWithoutChecksum
-        .getKeysEveryReplicas(volumeName, bucketName, keyName);
-
-    JsonObject result = new JsonObject();
-    result.addProperty(JSON_PROPERTY_FILE_NAME,
-        volumeName + "/" + bucketName + "/" + keyName);
-    result.addProperty(JSON_PROPERTY_FILE_SIZE, keyInfoDetails.getDataSize());
-
-    JsonArray blocks = new JsonArray();
-    downloadReplicasAndCreateManifest(keyName, replicas,
-        replicasWithoutChecksum, directoryName, blocks);
-    result.add(JSON_PROPERTY_FILE_BLOCKS, blocks);
-
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String prettyJson = gson.toJson(result);
-
-    String manifestFileName = keyName + "_manifest";
-    System.out.println("Writing manifest file : " + manifestFileName);
-    File manifestFile
-        = new File(outputDir + "/" + directoryName + "/" + manifestFileName);
-    Files.write(manifestFile.toPath(),
-        prettyJson.getBytes(StandardCharsets.UTF_8));
   }
 
   private void downloadReplicasAndCreateManifest(
