@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -133,7 +133,7 @@ public final class ContainerProtocolCalls  {
 
   static <T> T tryEachDatanode(Pipeline pipeline,
       CheckedFunction<DatanodeDetails, T, IOException> op,
-      BiConsumer<DatanodeDetails, IOException> exceptionHandler)
+      Function<DatanodeDetails, String> toErrorMessage)
       throws IOException {
     final Set<DatanodeDetails> excluded = new HashSet<>();
     for (; ;) {
@@ -144,7 +144,8 @@ public final class ContainerProtocolCalls  {
       } catch (IOException e) {
         excluded.add(d);
         if (excluded.size() < pipeline.size()) {
-          exceptionHandler.accept(d, e);
+          LOG.warn(toErrorMessage.apply(d)
+              + "; will try another datanode.", e);
         } else {
           throw e;
         }
@@ -180,7 +181,12 @@ public final class ContainerProtocolCalls  {
 
     return tryEachDatanode(xceiverClient.getPipeline(),
         d -> getBlock(xceiverClient, validators, builder, d),
-        (d, e) -> LOG.warn("Failed to getBlock from " + d, e));
+        d -> toErrorMessage(datanodeBlockID, d));
+  }
+
+  static String toErrorMessage(DatanodeBlockID blockId, DatanodeDetails d) {
+    return String.format("Failed to get block #%s in container #%s from %s",
+        blockId.getLocalID(), blockId.getContainerID(), d);
   }
 
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
@@ -335,7 +341,7 @@ public final class ContainerProtocolCalls  {
     return tryEachDatanode(xceiverClient.getPipeline(),
         d -> readChunk(xceiverClient, chunk, blockID,
             validators, builder, d),
-        (d, e) -> LOG.warn(toErrorMessage(chunk, blockID, d), e));
+        d -> toErrorMessage(chunk, blockID, d));
   }
 
   private static ContainerProtos.ReadChunkResponseProto readChunk(
@@ -716,9 +722,9 @@ public final class ContainerProtocolCalls  {
     return VALIDATORS;
   }
 
-  static final List<CheckedBiFunction> VALIDATORS = createValidatorList();
+  private static final List<CheckedBiFunction> VALIDATORS = createValidators();
 
-  private static List<CheckedBiFunction> createValidatorList() {
+  private static List<CheckedBiFunction> createValidators() {
     CheckedBiFunction<ContainerProtos.ContainerCommandRequestProto,
         ContainerProtos.ContainerCommandResponseProto, IOException>
         validator = (request, response) -> validateContainerResponse(response);

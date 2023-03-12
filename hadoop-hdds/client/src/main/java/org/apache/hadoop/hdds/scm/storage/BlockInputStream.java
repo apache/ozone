@@ -257,8 +257,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  static final List<CheckedBiFunction> VALIDATORS = ContainerProtocolCalls
-      .getValidatorList((request, response) -> validate(response));
+  private static final List<CheckedBiFunction> VALIDATORS
+      = ContainerProtocolCalls.getValidatorList(
+          (request, response) -> validate(response));
 
   static void validate(ContainerCommandResponseProto response)
       throws IOException {

@@ -106,6 +106,48 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
+  @Timeout(5)
+  public void testGetBlockRetryAlNodes() {
+    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    Assertions.assertTrue(allDNs.size() > 1);
+    try(XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        allDNs.remove(dn);
+        throw new IOException("Failed " + dn);
+      }
+    }) {
+      invokeXceiverClientGetBlock(client);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    Assertions.assertEquals(0, allDNs.size());
+  }
+
+  @Test
+  @Timeout(5)
+  public void testReadChunkRetryAllNodes() {
+    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    Assertions.assertTrue(allDNs.size() > 1);
+    try(XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        allDNs.remove(dn);
+        throw new IOException("Failed " + dn);
+      }
+    }) {
+      invokeXceiverClientReadChunk(client);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    Assertions.assertEquals(0, allDNs.size());
+  }
+
+  @Test
   public void testFirstNodeIsCorrectWithTopologyForCommandTarget()
       throws IOException {
     final Set<DatanodeDetails> seenDNs = new HashSet<>();
