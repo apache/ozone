@@ -24,6 +24,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -42,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
@@ -64,7 +66,9 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
@@ -124,14 +128,13 @@ public class KeyValueHandler extends Handler {
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
-  private final ContainerType containerType;
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
-  private boolean checkIfNoBlockFiles;
+  private final boolean checkIfNoBlockFiles;
 
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
@@ -143,7 +146,6 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
-    containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
@@ -398,11 +400,10 @@ public class KeyValueHandler extends Handler {
   private void populateContainerPathFields(KeyValueContainer container,
       HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
-    HddsVolume containerVolume = hddsVolume;
     try {
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-              containerVolume, clusterId);
-      container.populatePathFields(idDir, containerVolume);
+          hddsVolume, clusterId);
+      container.populatePathFields(idDir, hddsVolume);
     } finally {
       volumeSet.readUnlock();
     }
@@ -659,8 +660,8 @@ public class KeyValueHandler extends Handler {
       }
       List<BlockData> responseData =
           blockManager.listBlock(kvContainer, startLocalId, count);
-      for (int i = 0; i < responseData.size(); i++) {
-        returnData.add(responseData.get(i).getProtoBufMessage());
+      for (BlockData responseDatum : responseData) {
+        returnData.add(responseDatum.getProtoBufMessage());
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -1226,11 +1227,64 @@ public class KeyValueHandler extends Handler {
     return chunkDir.list(filter);
   }
 
+  private boolean logBlocksIfNonZero(Container container)
+      throws IOException {
+    boolean nonZero = false;
+    try (DBHandle dbHandle
+             = BlockUtils.getDB(
+        (KeyValueContainerData) container.getContainerData(),
+        conf)) {
+      BlockIterator<BlockData>
+          blockIterator = dbHandle.getStore().
+          getBlockIterator(container.getContainerData().getContainerID());
+      StringBuilder stringBuilder = new StringBuilder();
+      while (blockIterator.hasNext()) {
+        nonZero = true;
+        stringBuilder.append(blockIterator.nextBlock());
+        if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
+          break;
+        }
+      }
+      if (nonZero) {
+        LOG.error("blocks in rocksDB on container delete: {}",
+            stringBuilder.toString());
+      }
+    }
+    return nonZero;
+  }
+
+  private boolean logBlocksFoundOnDisk(Container container) throws IOException {
+    // List files left over
+    File chunksPath = new
+        File(container.getContainerData().getChunksPath());
+    Preconditions.checkArgument(chunksPath.isDirectory());
+    boolean notEmpty = false;
+    try (DirectoryStream<Path> dir
+             = Files.newDirectoryStream(chunksPath.toPath())) {
+      StringBuilder stringBuilder = new StringBuilder();
+      for (Path block : dir) {
+        if (notEmpty) {
+          stringBuilder.append(",");
+        }
+        stringBuilder.append(block);
+        notEmpty = true;
+        if (stringBuilder.length() > StorageUnit.KB.toBytes(16)) {
+          break;
+        }
+      }
+      if (notEmpty) {
+        LOG.error("Files still part of the container on delete: {}",
+            stringBuilder.toString());
+      }
+    }
+    return notEmpty;
+  }
+
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
     container.writeLock();
     try {
-    // If force is false, we check container state.
+      // If force is false, we check container state.
       if (!force) {
         // Check if container is open
         if (container.getContainerData().isOpen()) {
@@ -1245,7 +1299,7 @@ public class KeyValueHandler extends Handler {
         if (container.getContainerData().getBlockCount() != 0) {
           metrics.incContainerDeleteFailedBlockCountNotZero();
           LOG.error("Received container deletion command for container {} but" +
-              " the container is not empty with blockCount {}",
+                  " the container is not empty with blockCount {}",
               container.getContainerData().getContainerID(),
               container.getContainerData().getBlockCount());
           throw new StorageContainerException("Non-force deletion of " +
@@ -1253,16 +1307,52 @@ public class KeyValueHandler extends Handler {
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
 
-        if (checkIfNoBlockFiles && !container.isEmpty()) {
-          metrics.incContainerDeleteFailedNonEmpty();
-          LOG.error("Received container deletion command for container {} but" +
-                  " the container is not empty",
-              container.getContainerData().getContainerID());
-          throw new StorageContainerException("Non-force deletion of " +
-              "non-empty container:" +
-              container.getContainerData().getContainerID() +
-              " is not allowed.",
-              DELETE_ON_NON_EMPTY_CONTAINER);
+        // This is a defensive check to make sure there is no data loss if
+        // 1. There are one or more blocks on the filesystem
+        // 2. There are one or more blocks in the block table
+        // This can lead to false positives as
+        // 1. Chunks written to disk that did not get recorded in RocksDB can
+        //    occur due to failures during write
+        // 2. Blocks that were deleted from blocks table but the deletion of
+        //    the underlying file could not be completed
+        // 3. Failures between files being deleted from disk but not being
+        //    cleaned up.
+        // 4. Bugs in the code.
+        // Blocks stored on disk represent data written by a client and should
+        // be treated with care at the expense of creating artifacts on disk
+        // that  might be unreferenced.
+        // https://issues.apache.org/jira/browse/HDDS-8138 will move the
+        // implementation to only depend on consistency of the chunks folder
+
+        // First check if any files are in the chunks folder. If there are
+        // to help with debugging also dump the blocks table data.
+        if (checkIfNoBlockFiles) {
+          if (!container.isEmpty()) {
+            metrics.incContainerDeleteFailedNonEmpty();
+            logBlocksFoundOnDisk(container);
+            logBlocksIfNonZero(container);
+            // List Blocks from Blocks Table
+            throw new StorageContainerException("Non-force deletion of " +
+                "non-empty container dir:" +
+                container.getContainerData().getContainerID() +
+                " is not allowed.",
+                DELETE_ON_NON_EMPTY_CONTAINER);
+          }
+
+          // The chunks folder is empty, not check if the blocks table has any
+          // blocks still referenced. This will avoid cleaning up the
+          // blocks table for future debugging.
+          // List rocks
+          if (logBlocksIfNonZero(container)) {
+            LOG.error("Non-empty blocks table for container {}",
+                container.getContainerData().getContainerID());
+            metrics.incContainerDeleteFailedNonEmptyBlocksDB();
+            throw new StorageContainerException("Non-force deletion of " +
+                "non-empty container block table:" +
+                container.getContainerData().getContainerID() +
+                " is not allowed.",
+                DELETE_ON_NON_EMPTY_CONTAINER);
+          }
         }
       } else {
         metrics.incContainersForceDelete();
