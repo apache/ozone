@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -35,7 +36,6 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
-import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.jetbrains.annotations.NotNull;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
@@ -51,6 +51,8 @@ import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Class that downloads every replica for all the blocks associated with a
@@ -166,64 +168,75 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
       blockIndex += 1;
       blockJson.addProperty(JSON_PROPERTY_BLOCK_INDEX, blockIndex);
+      OmKeyLocationInfo locationInfo = block.getKey();
       blockJson.addProperty(JSON_PROPERTY_BLOCK_CONTAINERID,
-          block.getKey().getContainerID());
+          locationInfo.getContainerID());
       blockJson.addProperty(JSON_PROPERTY_BLOCK_LOCALID,
-          block.getKey().getLocalID());
+          locationInfo.getLocalID());
       blockJson.addProperty(JSON_PROPERTY_BLOCK_LENGTH,
-          block.getKey().getLength());
+          locationInfo.getLength());
       blockJson.addProperty(JSON_PROPERTY_BLOCK_OFFSET,
-          block.getKey().getOffset());
+          locationInfo.getOffset());
+
+      BlockID blockID = locationInfo.getBlockID();
+      Map<DatanodeDetails, OzoneInputStream> blockReplicasWithoutChecksum =
+          replicasOf(blockID, replicasWithoutChecksum);
 
       for (Map.Entry<DatanodeDetails, OzoneInputStream>
           replica : block.getValue().entrySet()) {
+        DatanodeDetails datanode = replica.getKey();
+
         JsonObject replicaJson = new JsonObject();
 
         replicaJson.addProperty(JSON_PROPERTY_REPLICA_HOSTNAME,
-            replica.getKey().getHostName());
+            datanode.getHostName());
         replicaJson.addProperty(JSON_PROPERTY_REPLICA_UUID,
-            replica.getKey().getUuidString());
+            datanode.getUuidString());
 
         String fileName = keyName + "_block" + blockIndex + "_" +
-            replica.getKey().getHostName();
+            datanode.getHostName();
         System.out.println("Writing : " + fileName);
         Path path = new File(dir, fileName).toPath();
-        BlockID blockID = block.getKey().getBlockID();
 
         try (InputStream is = replica.getValue()) {
           Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
-          getInputStreamWithoutChecksum(replicasWithoutChecksum,
-              replica.getKey(), blockID).close();
         } catch (IOException e) {
           Throwable cause = e.getCause();
           replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
               e.getMessage());
           if (cause instanceof OzoneChecksumException) {
-            try (InputStream is = getInputStreamWithoutChecksum(
-                replicasWithoutChecksum, replica.getKey(), blockID)) {
+            try (InputStream is = getReplica(
+                blockReplicasWithoutChecksum, datanode)) {
               Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
             }
-          } else if (cause instanceof StatusRuntimeException) {
-            break;
           }
         }
         replicasJson.add(replicaJson);
       }
       blockJson.add(JSON_PROPERTY_BLOCK_REPLICAS, replicasJson);
       blocks.add(blockJson);
+
+      blockReplicasWithoutChecksum.values()
+          .forEach(each -> IOUtils.close(LOG, each));
     }
   }
 
-  private InputStream getInputStreamWithoutChecksum(
-      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-          replicasWithoutChecksum, DatanodeDetails datanode, BlockID blockID) {
+  private Map<DatanodeDetails, OzoneInputStream> replicasOf(BlockID blockID,
+      Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>> replicas) {
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-        block : replicasWithoutChecksum.entrySet()) {
+        block : replicas.entrySet()) {
       if (block.getKey().getBlockID().equals(blockID)) {
-        return block.getValue().get(datanode);
+        return block.getValue();
       }
     }
-    return new ByteArrayInputStream(new byte[0]);
+    return emptyMap();
+  }
+
+  private InputStream getReplica(
+      Map<DatanodeDetails, OzoneInputStream> replicas, DatanodeDetails datanode
+  ) {
+    InputStream input = replicas.remove(datanode);
+    return input != null ? input : new ByteArrayInputStream(new byte[0]);
   }
 
   @NotNull
