@@ -110,7 +110,7 @@ public class TestXceiverClientGrpc {
   public void testGetBlockRetryAlNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     Assertions.assertTrue(allDNs.size() > 1);
-    try(XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
@@ -131,7 +131,7 @@ public class TestXceiverClientGrpc {
   public void testReadChunkRetryAllNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     Assertions.assertTrue(allDNs.size() > 1);
-    try(XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
