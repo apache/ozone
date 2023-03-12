@@ -197,10 +197,9 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
               e.getMessage());
           if (cause instanceof OzoneChecksumException) {
             BlockID blockID = block.getKey().getBlockID();
-            String datanodeUUID = replica.getKey().getUuidString();
             is.close();
             is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
-                datanodeUUID, blockID);
+                replica.getKey(), blockID);
             Files.copy(is, replicaFile.toPath(),
                 StandardCopyOption.REPLACE_EXISTING);
           } else if (cause instanceof StatusRuntimeException) {
@@ -218,16 +217,11 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
   private OzoneInputStream getInputStreamWithoutChecksum(
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
-          replicasWithoutChecksum, String datanodeUUID, BlockID blockID) {
+          replicasWithoutChecksum, DatanodeDetails datanode, BlockID blockID) {
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
         block : replicasWithoutChecksum.entrySet()) {
       if (block.getKey().getBlockID().equals(blockID)) {
-        for (Map.Entry<DatanodeDetails, OzoneInputStream>
-            replica : block.getValue().entrySet()) {
-          if (replica.getKey().getUuidString().equals(datanodeUUID)) {
-            return replica.getValue();
-          }
-        }
+        return block.getValue().get(datanode);
       }
     }
     return new OzoneInputStream();
