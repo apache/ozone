@@ -40,8 +40,10 @@ import org.jetbrains.annotations.NotNull;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -182,29 +184,28 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         replicaJson.addProperty(JSON_PROPERTY_REPLICA_UUID,
             replica.getKey().getUuidString());
 
-        OzoneInputStream is = replica.getValue();
         String fileName = keyName + "_block" + blockIndex + "_" +
             replica.getKey().getHostName();
         System.out.println("Writing : " + fileName);
         Path path = new File(dir, fileName).toPath();
+        BlockID blockID = block.getKey().getBlockID();
 
-        try {
+        try (InputStream is = replica.getValue()) {
           Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+          getInputStreamWithoutChecksum(replicasWithoutChecksum,
+              replica.getKey(), blockID).close();
         } catch (IOException e) {
           Throwable cause = e.getCause();
           replicaJson.addProperty(JSON_PROPERTY_REPLICA_EXCEPTION,
               e.getMessage());
           if (cause instanceof OzoneChecksumException) {
-            BlockID blockID = block.getKey().getBlockID();
-            is.close();
-            is = getInputStreamWithoutChecksum(replicasWithoutChecksum,
-                replica.getKey(), blockID);
-            Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream is = getInputStreamWithoutChecksum(
+                replicasWithoutChecksum, replica.getKey(), blockID)) {
+              Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+            }
           } else if (cause instanceof StatusRuntimeException) {
             break;
           }
-        } finally {
-          is.close();
         }
         replicasJson.add(replicaJson);
       }
@@ -213,7 +214,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     }
   }
 
-  private OzoneInputStream getInputStreamWithoutChecksum(
+  private InputStream getInputStreamWithoutChecksum(
       Map<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
           replicasWithoutChecksum, DatanodeDetails datanode, BlockID blockID) {
     for (Map.Entry<OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream>>
@@ -222,7 +223,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
         return block.getValue().get(datanode);
       }
     }
-    return new OzoneInputStream();
+    return new ByteArrayInputStream(new byte[0]);
   }
 
   @NotNull
