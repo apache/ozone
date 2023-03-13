@@ -126,12 +126,12 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
    */
   @Override
   public synchronized void destroy() {
-    if (keyManagers != null) {
-      keyManagers = null;
+    if (keyManagers.get() != null) {
+      keyManagers.set(null);
     }
 
-    if (trustManagers != null) {
-      trustManagers = null;
+    if (trustManagers.get() != null) {
+      trustManagers.set(null);
     }
   }
 
@@ -154,8 +154,8 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   }
 
   @Override
-  public void notifyCertificateRenewed(CertificateClient certClient,
-      String oldCertId, String newCertId) {
+  public synchronized void notifyCertificateRenewed(
+      CertificateClient certClient, String oldCertId, String newCertId) {
     LOG.info("{} notify certificate renewed", certClient.getComponentName());
     if (keyManagers.get() != null) {
       for (KeyManager km: keyManagers.get()) {
