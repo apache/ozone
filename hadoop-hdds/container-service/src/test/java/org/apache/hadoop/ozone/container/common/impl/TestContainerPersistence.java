@@ -285,10 +285,10 @@ public class TestContainerPersistence {
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
     exception.expectMessage("Error opening DB.");
-    BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID);
-    BlockData someKey1 = new BlockData(blockID1);
-    someKey1.setChunks(new LinkedList<>());
-    blockManager.putBlock(container, someKey1);
+    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
+    BlockData someKey = new BlockData(blockID);
+    someKey.setChunks(new LinkedList<>());
+    blockManager.putBlock(container, someKey);
   }
 
   @Test
@@ -302,18 +302,15 @@ public class TestContainerPersistence {
         .containsKey(testContainerID));
 
     // Deleting a non-empty container should fail.
-    BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID);
-    BlockData someKey2 = new BlockData(blockID2);
-    someKey2.setChunks(new LinkedList<>());
-    blockManager.putBlock(container, someKey2);
+    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
+    BlockData someKey = new BlockData(blockID);
+    someKey.setChunks(new LinkedList<>());
+    blockManager.putBlock(container, someKey);
 
     // KeyValueHandler setup
     String datanodeId = UUID.randomUUID().toString();
 
-    int[] interval = new int[1];
-    interval[0] = 2;
-    ContainerMetrics metrics = new ContainerMetrics(interval);
-
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
     AtomicInteger icrReceived = new AtomicInteger(0);
 
     KeyValueHandler kvHandler = new KeyValueHandler(conf,
