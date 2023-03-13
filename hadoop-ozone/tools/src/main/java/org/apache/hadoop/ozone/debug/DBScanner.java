@@ -94,7 +94,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Key from which to iterate the DB")
   private static String startKey;
 
-  @CommandLine.Option(names = {"--dnSchema", "-d"},
+  @CommandLine.Option(names = {"--dnSchema", "-d", "--dn-schema"},
       description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
