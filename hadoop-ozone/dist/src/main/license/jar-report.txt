@@ -258,6 +258,7 @@ share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax-ex.jar
 share/ozone/lib/txw2.jar
+share/ozone/lib/vault-java-driver.jar
 share/ozone/lib/weld-servlet-shaded.Final.jar
 share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar
