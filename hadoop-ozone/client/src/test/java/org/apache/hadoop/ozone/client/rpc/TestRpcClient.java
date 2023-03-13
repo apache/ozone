@@ -38,7 +38,7 @@ import static org.junit.Assert.assertThrows;
  * Run RPC Client tests.
  */
 @RunWith(Parameterized.class)
-public class RpcClientTest {
+public class TestRpcClient {
   private enum ValidateOmVersionTestCases {
     NULL_EXPECTED_NO_OM(
         null, // Expected version
@@ -200,7 +200,7 @@ public class RpcClientTest {
 
   private ValidateOmVersionTestCases testCase;
 
-  public RpcClientTest(ValidateOmVersionTestCases testCase) {
+  public TestRpcClient(ValidateOmVersionTestCases testCase) {
     this.testCase = testCase;
   }
 
