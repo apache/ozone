@@ -36,4 +36,11 @@ public interface S3SecretCache {
    * @param txId lifetime identifier.
    */
   void invalidate(String id, long txId);
+
+  /**
+   * Get value from cache.
+   * @param id cache secrect identifier.
+   * @return Secret value or {@code null} if value doesn't exist.
+   */
+  S3SecretValue get(String id);
 }

@@ -48,6 +48,8 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
@@ -292,6 +294,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Map<String, Table> tableMap = new HashMap<>();
   private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
+
+  private TableCache<CacheKey<String>, CacheValue<S3SecretValue>> s3SecretCache;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
@@ -578,6 +582,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     s3SecretTable = this.store.getTable(S3_SECRET_TABLE, String.class,
         S3SecretValue.class);
     checkTableStatus(s3SecretTable, S3_SECRET_TABLE, addCacheMetrics);
+    s3SecretCache = new PartialTableCache<>();
 
     prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
         OmPrefixInfo.class);
@@ -1564,14 +1569,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public void put(String kerberosId, S3SecretValue secretValue, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
+    s3SecretCache.put(new CacheKey<>(kerberosId),
         new CacheValue<>(Optional.of(secretValue), txId));
   }
 
   @Override
   public void invalidate(String id, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(id),
+    s3SecretCache.put(new CacheKey<>(id),
         new CacheValue<>(Optional.absent(), txId));
+  }
+
+  @Override
+  public S3SecretValue get(String id) {
+    return s3SecretCache.get(new CacheKey<>(id)).getCacheValue();
   }
 
   @Override
