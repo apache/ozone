@@ -485,6 +485,15 @@ public class ReplicationManager implements SCMService {
     return Pair.of(sourceWithCmds.get(0).getRight(), cmd);
   }
 
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
+      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
+      throws AllSourcesOverloadedException, NotLeaderException {
+    Pair<DatanodeDetails, SCMCommand<?>> cmdPair =
+        createThrottledReplicationCommand(containerInfo.getContainerID(),
+            sources, target, replicaIndex);
+    sendDatanodeCommand(cmdPair.getRight(), containerInfo, cmdPair.getLeft());
+  }
+
   /**
    * Send a push replication command to the given source datanode, instructing
    * it to copy the given container to the target. The command is sent as a low
