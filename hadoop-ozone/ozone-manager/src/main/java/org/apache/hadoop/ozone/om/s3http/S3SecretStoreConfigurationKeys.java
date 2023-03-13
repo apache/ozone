@@ -23,7 +23,7 @@ package org.apache.hadoop.ozone.om.s3http;
 public final class S3SecretStoreConfigurationKeys {
   public static final String S3_SECRET_STORAGE_TYPE = "ozone.secret.s3.store";
   public static final String DEFAULT_SECRET_STORAGE_TYPE
-      = S3SecretStoreType.ROCKSDB.name();
+      = S3SecretStoreType.ROCKSDB.getName();
 
   //Vault configs
   public static final String PREFIX = "ozone.secret.s3.store.vault.";
