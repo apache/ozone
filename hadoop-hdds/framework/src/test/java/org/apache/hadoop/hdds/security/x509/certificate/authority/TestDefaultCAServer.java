@@ -118,7 +118,9 @@ public class TestDefaultCAServer {
     // Start time doesn't round to MIDNIGHT.
     LocalDateTime roundTime =
         LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
-    assertTrue(!first.getNotBefore().equals(roundTime) ||
+    LocalDateTime startTime = first.getNotBefore().toInstant()
+        .atZone(ZoneId.systemDefault()).toLocalDateTime();
+    assertTrue(!startTime.equals(roundTime) ||
             LocalDateTime.now().equals(roundTime));
   }
 
