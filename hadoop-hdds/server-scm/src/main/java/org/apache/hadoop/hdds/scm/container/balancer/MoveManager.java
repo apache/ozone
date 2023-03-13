@@ -46,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A class which schedules, tracks and completes moves scheduled by the
@@ -125,10 +124,10 @@ public final class MoveManager implements
   private volatile boolean running = false;
 
   public MoveManager(final ReplicationManager replicationManager,
-      final Clock clock, final ContainerManager containerManager) {
+      final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
-    this.clock = clock;
+    this.clock = replicationManager.getClock();
   }
 
   /**
@@ -219,7 +218,7 @@ public final class MoveManager implements
   public CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
-      TimeoutException, ContainerReplicaNotFoundException {
+      ContainerReplicaNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
 
     if (!running) {
