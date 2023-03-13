@@ -113,19 +113,22 @@ public class TestContainerEndpoint {
   private Pipeline pipeline;
   private PipelineID pipelineID;
   private long keyCount = 5L;
-  private static final String FSO_KEY_NAME = "dir1/file7";
+  private static final String FSO_KEY_NAME1 = "dir1/file7";
+  private static final String FSO_KEY_NAME2 = "dir1/file8";
   private static final String BUCKET_NAME = "bucket1";
   private static final String VOLUME_NAME = "vol";
-  private static final String FILE_NAME = "file7";
-  private static final long KEY_LENGTH = 13L;
-  private static final long BLOCK_LENGTH = 4L;
-  private static final long KEY_SEQ_NO = 1L;
-  private static final long MODIFICATION_TIME = 0L;
-  private static final int BLOCK_SIZE = 4097;
+  private static final String FILE_NAME1 = "file7";
+  private static final String FILE_NAME2 = "file8";
+  private static final long FILE_ONE_OBJECT_ID = 13L;
+  private static final long FILE_TWO_OBJECT_ID = 14L;
+  private static final long PARENT_OBJECT_ID = 2L;
+  private static final long BUCKET_OBJECT_ID = 1L;
+  private static final long VOL_OBJECT_ID = 0L;
   private static final long CONTAINER_ID_1 = 20L;
   private static final long CONTAINER_ID_2 = 21L;
   private static final long CONTAINER_ID_3 = 22L;
   private static final long LOCAL_ID = 0L;
+  private static final long KEY_ONE_SIZE = 500L; // 500 bytes
 
   private UUID uuid1;
   private UUID uuid2;
@@ -268,17 +271,31 @@ public class TestContainerEndpoint {
 
     // add the multi-block key to Recon's OM
     writeKeyToOm(reconOMMetadataManager,
-        FSO_KEY_NAME,
+        FSO_KEY_NAME1,
         BUCKET_NAME,
         VOLUME_NAME,
-        FILE_NAME,
-        KEY_LENGTH,
-        BLOCK_LENGTH,
-        KEY_SEQ_NO,
-        MODIFICATION_TIME,
+        FILE_NAME1,
+        FILE_ONE_OBJECT_ID,
+        PARENT_OBJECT_ID,
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        BLOCK_SIZE);
+        KEY_ONE_SIZE);
+
+    // add the multi-block key to Recon's OM
+    writeKeyToOm(reconOMMetadataManager,
+        FSO_KEY_NAME2,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        FILE_NAME2,
+        FILE_TWO_OBJECT_ID,
+        PARENT_OBJECT_ID,
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
@@ -364,8 +381,8 @@ public class TestContainerEndpoint {
     KeysResponse data = (KeysResponse) response.getEntity();
     Collection<KeyMetadata> keyMetadataList = data.getKeys();
 
-    assertEquals(1, data.getTotalCount());
-    assertEquals(1, keyMetadataList.size());
+    assertEquals(2, data.getTotalCount());
+    assertEquals(2, keyMetadataList.size());
 
     // Retrieve the first key from the list and verify its metadata
     Iterator<KeyMetadata> iterator = keyMetadataList.iterator();
@@ -375,6 +392,13 @@ public class TestContainerEndpoint {
     assertEquals(1, keyMetadata.getBlockIds().size());
     Map<Long, List<KeyMetadata.ContainerBlockMetadata>> blockIds =
         keyMetadata.getBlockIds();
+    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
+
+    keyMetadata = iterator.next();
+    assertEquals("dir1/file8", keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+    blockIds = keyMetadata.getBlockIds();
     assertEquals(0, blockIds.get(0L).get(0).getLocalID());
   }
 
