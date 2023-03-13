@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -157,6 +158,26 @@ public final class KeyValueContainerUtil {
 
     //Delete Container directory
     FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
+  }
+
+  /**
+   * Returns if there are no blocks in the container.
+   * @param containerData Container to check
+   * @param conf configuration
+   * @return true if the directory containing blocks is empty
+   * @throws IOException
+   */
+  public static boolean noBlocksInContainer(KeyValueContainerData
+                                                containerData)
+      throws IOException {
+    Preconditions.checkNotNull(containerData);
+    File chunksPath = new File(containerData.getChunksPath());
+    Preconditions.checkArgument(chunksPath.isDirectory());
+
+    try (DirectoryStream<Path> dir
+             = Files.newDirectoryStream(chunksPath.toPath())) {
+      return !dir.iterator().hasNext();
+    }
   }
 
   /**
