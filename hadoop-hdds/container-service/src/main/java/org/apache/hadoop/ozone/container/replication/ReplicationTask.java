@@ -30,6 +30,7 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
+  private final String debugString;
 
   /**
    * Counter for the transferred bytes.
@@ -49,6 +50,7 @@ public class ReplicationTask extends AbstractReplicationTask {
       // run.
       setShouldOnlyRunOnInServiceDatanodes(false);
     }
+    debugString = cmd.toString();
   }
 
   /**
@@ -90,12 +92,17 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   @Override
+  protected Object getCommandForDebug() {
+    return debugString;
+  }
+
+  @Override
   public String toString() {
-    return "ReplicationTask{" +
-        "status=" + getStatus() +
-        ", cmd={" + cmd + "}" +
-        ", queued=" + getQueued() +
-        '}';
+    String str = super.toString();
+    if (transferredBytes > 0) {
+      str += ", transferred " + transferredBytes + " bytes";
+    }
+    return str;
   }
 
   public long getTransferredBytes() {
@@ -108,10 +115,6 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
-  }
-
-  ReplicateContainerCommand getCommand() {
-    return cmd;
   }
 
   @Override

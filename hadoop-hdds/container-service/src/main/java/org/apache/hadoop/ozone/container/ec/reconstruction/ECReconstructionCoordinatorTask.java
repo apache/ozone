@@ -33,6 +33,7 @@ public class ECReconstructionCoordinatorTask
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
+  private final String debugString;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
@@ -42,6 +43,7 @@ public class ECReconstructionCoordinatorTask
         reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
+    debugString = reconstructionCommandInfo.toString();
   }
 
   @Override
@@ -81,8 +83,8 @@ public class ECReconstructionCoordinatorTask
   }
 
   @Override
-  public String toString() {
-    return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
+  protected Object getCommandForDebug() {
+    return debugString;
   }
 
   @Override

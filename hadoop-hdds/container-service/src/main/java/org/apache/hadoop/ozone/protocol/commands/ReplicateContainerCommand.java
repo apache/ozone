@@ -164,14 +164,14 @@ public final class ReplicateContainerCommand
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType());
-    sb.append(": containerId: ").append(getContainerID());
-    sb.append(", replicaIndex: ").append(getReplicaIndex());
+    sb.append(": containerId=").append(getContainerID());
+    sb.append(", replicaIndex=").append(getReplicaIndex());
     if (targetDatanode != null) {
-      sb.append(", targetNode: ").append(targetDatanode);
+      sb.append(", targetNode=").append(targetDatanode);
     } else {
-      sb.append(", sourceNodes: ").append(sourceDatanodes);
+      sb.append(", sourceNodes=").append(sourceDatanodes);
     }
-    sb.append(", priority: ").append(priority);
+    sb.append(", priority=").append(priority);
     return sb.toString();
   }
 }
