@@ -486,22 +486,24 @@ public class MutableVolumeSet implements VolumeSet {
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
         VolumeInfo volumeInfo = volume.getVolumeInfo();
-        long scmUsed;
-        long remaining;
-        long capacity;
-        failed = false;
-        try {
-          scmUsed = volumeInfo.getScmUsed();
-          remaining = volumeInfo.getAvailable();
-          capacity = volumeInfo.getCapacity();
-        } catch (UncheckedIOException ex) {
-          LOG.warn("Failed to get scmUsed and remaining for container " +
-              "storage location {}", volumeInfo.getRootDir(), ex);
-          // reset scmUsed and remaining if df/du failed.
-          scmUsed = 0;
-          remaining = 0;
-          capacity = 0;
-          failed = true;
+        long scmUsed = 0;
+        long remaining = 0;
+        long capacity = 0;
+        failed = true;
+        if (volumeInfo != null) {
+          try {
+            scmUsed = volumeInfo.getScmUsed();
+            remaining = volumeInfo.getAvailable();
+            capacity = volumeInfo.getCapacity();
+            failed = false;
+          } catch (UncheckedIOException ex) {
+            LOG.warn("Failed to get scmUsed and remaining for container " +
+                    "storage location {}", volumeInfo.getRootDir(), ex);
+            // reset scmUsed and remaining if df/du failed.
+            scmUsed = 0;
+            remaining = 0;
+            capacity = 0;
+          }
         }
 
         StorageLocationReport.Builder builder =

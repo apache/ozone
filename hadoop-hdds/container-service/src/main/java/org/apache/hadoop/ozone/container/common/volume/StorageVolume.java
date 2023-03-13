@@ -393,7 +393,9 @@ public abstract class StorageVolume
   }
 
   public void refreshVolumeInfo() {
-    volumeInfo.refreshNow();
+    if (volumeInfo != null) {
+      volumeInfo.refreshNow();
+    }
   }
 
   public VolumeInfo getVolumeInfo() {
