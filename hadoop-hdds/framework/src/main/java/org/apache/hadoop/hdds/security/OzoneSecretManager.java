@@ -183,7 +183,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     return newKey;
   }
 
-  public void notifyCertificateRenewed(CertificateClient certClient,
+  public void notifyCertificateRenewed(CertificateClient client,
       String oldCertId, String newCertId) {
     if (!oldCertId.equals(getCertSerialId())) {
       logger.info("Old certificate Id doesn't match. Holding {}, oldCertId {}",
