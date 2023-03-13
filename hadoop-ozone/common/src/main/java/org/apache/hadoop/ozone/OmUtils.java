@@ -799,7 +799,8 @@ public final class OmUtils {
    * it is treated as a hostname. Check if this hostname can be resolved
    * and if it's reachable.
    */
-  public static void resolveOmHost(String omHost, int omPort) {
+  public static void resolveOmHost(String omHost, int omPort)
+      throws IOException {
     InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
     if (omHostAddress.isUnresolved()) {
       throw new IllegalArgumentException(
@@ -812,7 +813,8 @@ public final class OmUtils {
             "OM host " + omHost + " unreachable in the URI");
       }
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      LOG.error("Failure in resolving OM host address", e);
+      throw e;
     }
   }
 }
