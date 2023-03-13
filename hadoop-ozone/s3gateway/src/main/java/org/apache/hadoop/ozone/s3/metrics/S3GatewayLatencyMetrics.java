@@ -44,22 +44,27 @@ public final class S3GatewayLatencyMetrics implements MetricsSource {
 
   // ObjectEndpoint
 
-  @Metric(about = "Latency for initiating a multipart upload for an S3 object in nanoseconds")
+  @Metric(about = "Latency for initiating a multipart upload for an S3 " +
+      "object in nanoseconds")
   private MutableRate initMultipartUploadLatencyNs;
 
-  @Metric(about = "Latency for creating a multipart key for an S3 object in nanoseconds")
+  @Metric(about = "Latency for creating a multipart key for an S3 object " +
+      "in nanoseconds")
   private MutableRate createMultipartKeyLatencyNs;
 
-  @Metric(about = "Latency for completing a multipart upload for an S3 object in nanoseconds")
+  @Metric(about = "Latency for completing a multipart upload for an S3 " +
+      "object in nanoseconds")
   private MutableRate completeMultipartUploadLatencyNs;
 
-  @Metric(about = "Latency for aborting a multipart upload for an S3 object in nanoseconds")
+  @Metric(about = "Latency for aborting a multipart upload for an S3 object " +
+      "in nanoseconds")
   private MutableRate abortMultipartUploadLatencyNs;
 
   @Metric(about = "Latency for copying an S3 object in nanoseconds")
   private MutableRate copyObjectLatencyNs;
 
-  @Metric(about = "Latency for listing parts of a multipart upload for an S3 object in nanoseconds")
+  @Metric(about = "Latency for listing parts of a multipart upload for an S3 " +
+      "object in nanoseconds")
   private MutableRate listPartsLatencyNs;
 
   @Metric(about = "Latency for creating a key for an S3 object in nanoseconds")
@@ -68,7 +73,8 @@ public final class S3GatewayLatencyMetrics implements MetricsSource {
   @Metric(about = "Latency for getting an S3 object in nanoseconds")
   private MutableRate getKeyLatencyNs;
 
-  @Metric(about = "Latency for checking the existence of an S3 object in nanoseconds")
+  @Metric(about = "Latency for checking the existence of an S3 object in " +
+      "nanoseconds")
   private MutableRate headKeyLatencyNs;
 
   @Metric(about = "Latency for deleting an S3 object in nanoseconds")
@@ -76,10 +82,12 @@ public final class S3GatewayLatencyMetrics implements MetricsSource {
 
   // BucketEndpoint
 
-  @Metric(about = "Latency for getting an access control list (ACL) for an S3 bucket in nanoseconds")
+  @Metric(about = "Latency for getting an access control list (ACL) for an " +
+      "S3 bucket in nanoseconds")
   private MutableRate getAclLatencyNs;
 
-  @Metric(about = "Latency for putting an access control list (ACL) for an S3 bucket in nanoseconds")
+  @Metric(about = "Latency for putting an access control list (ACL) for an " +
+      "S3 bucket in nanoseconds")
   private MutableRate putAclLatencyNs;
 
   @Metric(about = "Latency for creating an S3 bucket in nanoseconds")
@@ -88,13 +96,15 @@ public final class S3GatewayLatencyMetrics implements MetricsSource {
   @Metric(about = "Latency for getting an S3 bucket in nanoseconds")
   private MutableRate getBucketLatencyNs;
 
-  @Metric(about = "Latency for checking the existence of an S3 bucket in nanoseconds")
+  @Metric(about = "Latency for checking the existence of an S3 bucket in " +
+      "nanoseconds")
   private MutableRate headBucketLatencyNs;
 
   @Metric(about = "Latency for deleting an S3 bucket in nanoseconds")
   private MutableRate deleteBucketLatencyNs;
 
-  @Metric(about = "Latency for listing multipart uploads for an S3 object in nanoseconds")
+  @Metric(about = "Latency for listing multipart uploads for an S3 object in " +
+      "nanoseconds")
   private MutableRate listMultipartUploadsLatencyNs;
 
   // RootEndpoint

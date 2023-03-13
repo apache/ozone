@@ -984,7 +984,8 @@ public class ObjectEndpoint extends EndpointBase {
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
-      getLatencyMetrics().addCopyObjectLatencyNs(Time.monotonicNowNanos() - start);
+      getLatencyMetrics().addCopyObjectLatencyNs(
+          Time.monotonicNowNanos() - start);
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {

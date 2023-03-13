@@ -402,14 +402,13 @@ public class BucketEndpoint extends EndpointBase {
 
     try {
       captureLatencyNs(getLatencyMetrics().getDeleteBucketLatencyNs(), () -> {
-            try {
-              deleteS3Bucket(bucketName);
-            } catch (OS3Exception ex) {
-              ex.printStackTrace();
-            }
-          });
-    }
-    catch (OMException ex) {
+        try {
+          deleteS3Bucket(bucketName);
+        } catch (OS3Exception ex) {
+          ex.printStackTrace();
+        }
+      });
+    } catch (OMException ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incDeleteBucketFailure();
