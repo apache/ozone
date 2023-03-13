@@ -87,6 +87,13 @@ public class DatanodeConfiguration {
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
 
+  public static final String
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE =
+      "hdds.datanode.check.empty.container.delete";
+  public static final Boolean
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT =
+      true;
+
   /**
    * Number of threads per volume that Datanode will use for chunk read.
    */

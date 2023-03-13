@@ -378,9 +378,7 @@ public class TestKeyValueHandler {
 
       assertTrue(hddsVolumeList.size() == 1);
 
-      final int[] interval = new int[1];
-      interval[0] = 2;
-      final ContainerMetrics metrics = new ContainerMetrics(interval);
+      final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
