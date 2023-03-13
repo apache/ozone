@@ -39,6 +39,17 @@ public final class MetricUtil {
     }
   }
 
+  public static <T, E extends Exception> T captureLatencyNs(
+      MutableRate metric,
+      GenericCheckedSupplier<T, E> block) throws E {
+    long start = Time.monotonicNowNanos();
+    try {
+      return block.get();
+    } finally {
+      metric.add(Time.monotonicNowNanos() - start);
+    }
+  }
+
   public static <E extends IOException> void captureLatencyNs(
       MutableRate metric,
       CheckedRunnable<E> block) throws IOException {

@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.CheckedSupplier;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -136,9 +137,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
     long start = Time.monotonicNowNanos();
-    ResolvedBucket bucket = captureLatencyNs(
-        perfMetrics.getLookupResolveBucketLatencyNs(),
-        () -> ozoneManager.resolveBucketLink(args));
+    ResolvedBucket bucket =
+        captureLatencyNs(perfMetrics.getLookupResolveBucketLatencyNs(),
+            (CheckedSupplier<ResolvedBucket, IOException>) () -> ozoneManager
+                .resolveBucketLink(args));
     boolean auditSuccess = true;
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
@@ -190,9 +192,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       resolvedVolumeArgs = args;
     }
 
-    final ResolvedBucket bucket = captureLatencyNs(
-        perfMetrics.getGetKeyInfoResolveBucketLatencyNs(),
-        () -> ozoneManager.resolveBucketLink(resolvedVolumeArgs));
+    final ResolvedBucket bucket =
+        captureLatencyNs(perfMetrics.getGetKeyInfoResolveBucketLatencyNs(),
+            (CheckedSupplier<ResolvedBucket, IOException>) () -> ozoneManager
+                .resolveBucketLink(resolvedVolumeArgs));
 
     boolean auditSuccess = true;
     OmKeyArgs resolvedArgs = bucket.update(resolvedVolumeArgs);

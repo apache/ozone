@@ -91,6 +91,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.CheckedSupplier;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -329,7 +330,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args));
+        (CheckedSupplier<OmKeyInfo, IOException>) () -> readKeyInfo(args));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.
@@ -1892,7 +1893,7 @@ public class KeyManagerImpl implements KeyManager {
 
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args));
+        (CheckedSupplier<OmKeyInfo, IOException>) () -> readKeyInfo(args));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.
