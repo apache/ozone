@@ -205,15 +205,11 @@ public final class ContainerTestUtils {
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setSchemaVersion(schemaVersion);
-    keyValueContainerData.setState(ContainerProtos
-        .ContainerDataProto.State.DELETED);
 
     KeyValueContainer container =
         new KeyValueContainer(keyValueContainerData, conf);
     container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
 
-    KeyValueContainerUtil
-        .parseKVContainerData(keyValueContainerData, conf);
     container.close();
 
     // For testing, we are moving the container

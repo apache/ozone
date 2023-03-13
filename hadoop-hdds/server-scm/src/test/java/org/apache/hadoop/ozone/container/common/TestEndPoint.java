@@ -187,17 +187,16 @@ public class TestEndPoint {
 
       String clusterId = scmServerImpl.getClusterId();
 
-      // VolumeSet for this test, contains only 1 volume
       MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+      ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
+          clusterId, clusterId, conf);
+      // VolumeSet for this test, contains only 1 volume
       Assertions.assertEquals(1, volumeSet.getVolumesList().size());
       StorageVolume volume = volumeSet.getVolumesList().get(0);
 
       // Check instanceof and typecast
       Assertions.assertTrue(volume instanceof HddsVolume);
       HddsVolume hddsVolume = (HddsVolume) volume;
-
-      StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
-          clusterId, conf, null, null);
 
       // Write some data before calling versionTask.call()
       // Create a container and move it under the tmp delete dir.
