@@ -148,6 +148,7 @@ public class SstFilteringService extends BackgroundService {
                   dbName, true);
           RocksDatabase db = rdbStore.getDb();
           db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          rdbStore.close();
 
           // mark the snapshot as filtered by writing to the file
           String content = snapshotInfo.getSnapshotID() + "\n";

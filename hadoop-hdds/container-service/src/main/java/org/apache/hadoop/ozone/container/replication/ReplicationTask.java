@@ -42,6 +42,13 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
+    if (cmd.getTargetDatanode() != null) {
+      // Only push replication will have a target datanode set, and it must be
+      // sent to the source datanode to be executed. It is possible the source
+      // is out of service, so we need to set the flag to allow the command to
+      // run.
+      setShouldOnlyRunOnInServiceDatanodes(false);
+    }
   }
 
   /**

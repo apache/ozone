@@ -81,6 +81,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 
 /**
  * Tests for the ReplicationManager.
@@ -845,6 +846,55 @@ public class TestReplicationManager {
     Assertions.assertEquals(src.getUuid(), sentCommand.getDatanodeId());
     Assertions.assertEquals(target,
         replicateContainerCommand.getTargetDatanode());
+  }
+
+  @Test
+  public void testCreateThrottledReplicateContainerCommand()
+      throws AllSourcesOverloadedException, NodeNotFoundException {
+    Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
+    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    sourceNodes.put(cmdTarget, 0);
+    for (int i = 1; i < 3; i++) {
+      sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), i * 5);
+    }
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          return sourceNodes.get(dn);
+        });
+
+    DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = replicationManager
+        .createThrottledReplicationCommand(
+            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+    Assertions.assertEquals(cmdTarget, cmd.getLeft());
+    Assertions.assertEquals(destination,
+        ((ReplicateContainerCommand) cmd.getRight()).getTargetDatanode());
+    Assertions.assertEquals(0,
+        ((ReplicateContainerCommand) cmd.getRight()).getReplicaIndex());
+  }
+
+  @Test(expected = AllSourcesOverloadedException.class)
+  public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
+      throws AllSourcesOverloadedException, NodeNotFoundException {
+    int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
+    Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
+    for (int i = 0; i < 3; i++) {
+      sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), limit + 1);
+    }
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          return sourceNodes.get(dn);
+        });
+
+    DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
+    replicationManager.createThrottledReplicationCommand(
+            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
   }
 
   @SafeVarargs

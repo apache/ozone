@@ -34,7 +34,7 @@ import org.apache.hadoop.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
+import static org.apache.hadoop.hdds.conf.OzoneConfiguration.OZONE_TAGS_SYSTEM_KEY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
