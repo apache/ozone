@@ -803,13 +803,13 @@ public final class OmUtils {
       throws IOException {
     InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
     if (omHostAddress.isUnresolved()) {
-      throw new IllegalArgumentException(
+      throw new IOException(
           "Cannot resolve OM host " + omHost + " in the URI",
           new UnknownHostException());
     }
     try {
       if (!omHostAddress.getAddress().isReachable(5000)) {
-        throw new IllegalArgumentException(
+        throw new IOException(
             "OM host " + omHost + " unreachable in the URI");
       }
     } catch (IOException e) {
