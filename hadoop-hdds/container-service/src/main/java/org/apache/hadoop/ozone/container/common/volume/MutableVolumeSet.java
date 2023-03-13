@@ -489,9 +489,11 @@ public class MutableVolumeSet implements VolumeSet {
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
+        String rootDir = "";
         failed = true;
         if (volumeInfo != null) {
           try {
+            rootDir = volumeInfo.getRootDir();
             scmUsed = volumeInfo.getScmUsed();
             remaining = volumeInfo.getAvailable();
             capacity = volumeInfo.getCapacity();
@@ -508,7 +510,7 @@ public class MutableVolumeSet implements VolumeSet {
 
         StorageLocationReport.Builder builder =
             StorageLocationReport.newBuilder();
-        builder.setStorageLocation(volumeInfo.getRootDir())
+        builder.setStorageLocation(rootDir)
             .setId(volume.getStorageID())
             .setFailed(failed)
             .setCapacity(capacity)
