@@ -64,10 +64,6 @@ public class TestPemFileBasedKeyStoresFactory {
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
     caClient = new CertificateClientTestImpl(conf);
     secConf = new SecurityConfig(conf);
   }

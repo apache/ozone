@@ -147,6 +147,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
         x509Certificate);
 
+    notificationReceivers = new HashSet<>();
     serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
         securityConfig, this, true);
     clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
@@ -167,7 +168,6 @@ public class CertificateClientTestImpl implements CertificateClient {
       this.executorService.schedule(new RenewCertTask(),
           delay.toMillis(), TimeUnit.MILLISECONDS);
     }
-    notificationReceivers = new HashSet<>();
   }
 
   @Override
@@ -333,7 +333,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     System.out.println(new Date() + " certificated is renewed");
 
     // notify notification receivers
-    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(this,
         oldCert.getSerialNumber().toString(),
         x509Certificate.getSerialNumber().toString()));
   }
