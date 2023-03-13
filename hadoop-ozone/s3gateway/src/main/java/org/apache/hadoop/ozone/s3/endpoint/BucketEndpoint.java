@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
  * Bucket level rest endpoints.
@@ -110,7 +112,15 @@ public class BucketEndpoint extends EndpointBase {
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
-        S3BucketAcl result = getAcl(bucketName);
+        S3BucketAcl result =
+            captureLatencyNs(getLatencyMetrics().getGetAclLatencyNs(), () -> {
+              try {
+                return getAcl(bucketName);
+              } catch (OS3Exception ex) {
+                ex.printStackTrace();
+              }
+              return null;
+            });
         getMetrics().incGetAclSuccess();
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
@@ -130,8 +140,16 @@ public class BucketEndpoint extends EndpointBase {
       if (startAfter == null && marker != null) {
         startAfter = marker;
       }
-      
-      OzoneBucket bucket = getBucket(bucketName);
+
+      OzoneBucket bucket =
+          captureLatencyNs(getLatencyMetrics().getGetBucketLatencyNs(), () -> {
+            try {
+              return getBucket(bucketName);
+            } catch (OS3Exception ex) {
+              ex.printStackTrace();
+            }
+            return null;
+          });
       if (startAfter != null && continueToken != null) {
         // If continuation token and start after both are provided, then we
         // ignore start After
@@ -268,7 +286,16 @@ public class BucketEndpoint extends EndpointBase {
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
         return response;
       }
-      String location = createS3Bucket(bucketName);
+      String location =
+          captureLatencyNs(getLatencyMetrics().getCreateBucketLatencyNs(),
+              () -> {
+                try {
+                  return createS3Bucket(bucketName);
+                } catch (OS3Exception ex) {
+                  ex.printStackTrace();
+                }
+                return null;
+              });
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incCreateBucketSuccess();
@@ -292,6 +319,7 @@ public class BucketEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @QueryParam("prefix") String prefix)
       throws OS3Exception, IOException {
+    long start = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
 
     OzoneBucket bucket = getBucket(bucketName);
@@ -313,6 +341,8 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
           getAuditParameters()));
       getMetrics().incListMultipartUploadsSuccess();
+      getLatencyMetrics().addListMultipartUploadsLatencyNs(
+          Time.monotonicNowNanos() - start);
       return Response.ok(result).build();
     } catch (OMException exception) {
       AUDIT.logReadFailure(
@@ -341,7 +371,13 @@ public class BucketEndpoint extends EndpointBase {
       throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      getBucket(bucketName);
+      captureLatencyNs(getLatencyMetrics().getHeadBucketLatencyNs(), () -> {
+        try {
+          getBucket(bucketName);
+        } catch (OS3Exception ex) {
+          ex.printStackTrace();
+        }
+      });
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incHeadBucketSuccess();
@@ -365,8 +401,15 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
-      deleteS3Bucket(bucketName);
-    } catch (OMException ex) {
+      captureLatencyNs(getLatencyMetrics().getDeleteBucketLatencyNs(), () -> {
+            try {
+              deleteS3Bucket(bucketName);
+            } catch (OS3Exception ex) {
+              ex.printStackTrace();
+            }
+          });
+    }
+    catch (OMException ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incDeleteBucketFailure();
@@ -500,6 +543,7 @@ public class BucketEndpoint extends EndpointBase {
    */
   public Response putAcl(String bucketName, HttpHeaders httpHeaders,
                          InputStream body) throws IOException, OS3Exception {
+    long start = Time.monotonicNowNanos();
     String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
     String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
@@ -579,6 +623,7 @@ public class BucketEndpoint extends EndpointBase {
       for (OzoneAcl acl : ozoneAclListOnVolume) {
         volume.addAcl(acl);
       }
+      getLatencyMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
     } catch (OMException exception) {
       getMetrics().incPutAclFailure();
       auditWriteFailure(S3GAction.PUT_ACL, exception);
