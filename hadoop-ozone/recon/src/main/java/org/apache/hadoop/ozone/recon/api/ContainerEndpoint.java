@@ -42,10 +42,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
@@ -62,15 +64,20 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BATCH_PARAM;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
 
 
 /**
@@ -89,13 +96,20 @@ public class ContainerEndpoint {
 
   private final ReconContainerManager containerManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final OzoneStorageContainerManager reconSCM;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerEndpoint.class);
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-      ContainerHealthSchemaManager containerHealthSchemaManager) {
+               ContainerHealthSchemaManager containerHealthSchemaManager,
+               ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconSCM = reconSCM;
   }
 
   /**
@@ -162,6 +176,7 @@ public class ContainerEndpoint {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
     long totalCount;
     try {
+      prevKeyPrefix = buildObjectPathForFileSystemBucket(prevKeyPrefix);
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
           reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
@@ -402,6 +417,83 @@ public class ContainerEndpoint {
       }
     }
     return blockIds;
+  }
+
+  /**
+   * Builds an object path for a file system optimized bucket.
+   *
+   * @param prevKeyPrefix the previous key prefix of the object path
+   * @return the object path for the file system optimized bucket
+   * @throws IOException if an IO error occurs
+   */
+  private String buildObjectPathForFileSystemBucket(String prevKeyPrefix)
+      throws IOException {
+    if (StringUtils.isEmpty(prevKeyPrefix)) {
+      return "";
+    }
+    // Normalize the path to remove duplicate slashes & make it easier to parse.
+    String normalizedPath = normalizePath(prevKeyPrefix);
+    String[] names = parseRequestPath(normalizedPath);
+
+    if (names.length < 3) {
+      LOG.error("Invalid path: {} path should contain a directory",
+          prevKeyPrefix);
+      return prevKeyPrefix;
+    }
+    // Extract the volume, bucket, and key names from the path.
+    String volumeName = names[0];
+    String bucketName = names[1];
+    String keyName = names[names.length - 1];
+
+    // Get the bucket handler for the given volume and bucket.
+    BucketHandler handler =
+        getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
+            reconSCM, volumeName, bucketName);
+
+    // Only keyPaths for FSO bucket need to be converted to
+    // their respective objectId's
+    if (handler.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      return prevKeyPrefix;
+    }
+
+    // Get the object IDs for the bucket, volume, and parent directory.
+    long bucketId, volumeId, parentId;
+    bucketId = handler.getBucketObjectId(names);
+    volumeId = handler.getVolumeObjectId(names);
+    parentId = handler.getDirObjectId(names, names.length - 1);
+
+    // Build the object path by concatenating the object IDs with the key name.
+    StringBuilder objectPathBuilder = new StringBuilder();
+    objectPathBuilder.append(OM_KEY_PREFIX).append(volumeId)
+        .append(OM_KEY_PREFIX).append(bucketId)
+        .append(OM_KEY_PREFIX).append(parentId)
+        .append(OM_KEY_PREFIX).append(keyName);
+
+    return objectPathBuilder.toString();
+  }
+
+  /**
+   * Normalizes a key path by adding the OM_KEY_PREFIX at the beginning
+   * and removing duplicate slashes.
+   *
+   * @param path the key path
+   * @return the normalized key path
+   */
+  public static String normalizePath(String path) {
+    return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
+  }
+
+  /**
+   * Parses a key path into its component names.
+   *
+   * @param path the key path
+   * @return an array of names
+   */
+  public static String[] parseRequestPath(String path) {
+    if (path.startsWith(OM_KEY_PREFIX)) {
+      path = path.substring(1);
+    }
+    return path.split(OM_KEY_PREFIX);
   }
 
 }
