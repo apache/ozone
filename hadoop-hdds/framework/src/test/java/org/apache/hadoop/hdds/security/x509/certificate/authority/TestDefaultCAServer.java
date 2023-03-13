@@ -60,6 +60,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -113,6 +114,12 @@ public class TestDefaultCAServer {
     testCA.init(securityConfig, CAType.ROOT);
     X509CertificateHolder second = testCA.getCACertificate();
     assertEquals(first, second);
+
+    // Start time doesn't round to MIDNIGHT.
+    LocalDateTime roundTime =
+        LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
+    assertTrue(!first.getNotBefore().equals(roundTime) ||
+            LocalDateTime.now().equals(roundTime));
   }
 
   @Test
