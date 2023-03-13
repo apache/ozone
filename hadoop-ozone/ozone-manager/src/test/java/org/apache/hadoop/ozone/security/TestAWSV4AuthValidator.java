@@ -70,6 +70,55 @@ public class TestAWSV4AuthValidator {
             "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
             true
         },
+        // Invalid Algorithm
+        {
+            "AWS4-ZAVC-HJUA123\n" +
+                "20150830T123600Z\n" +
+                "20150830/us-east-1/iam/aws4_request\n" +
+                "f536975d06c0309214f805bb90ccff089219ecd68b2" +
+                "577efef23edd43b7e1a59",
+            "5d672d79c15b13162d9279b0855cfba" +
+                "6789a8edb4c82c400e06b5924a6f2b5d7",
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            false
+        },
+        // Invalid timestamp or non-ISO timestamp format
+        {
+            "AWS4-HMAC-SHA256\n" +
+                "Thu, 21 Feb 2019 00:20:37 -0800\n" +
+                "20190221/us-west-1/s3/aws4_request\n" +
+                "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d" +
+                "91851294efc47d",
+            "56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf" +
+                "4765f46a14cd745ad",
+            "dbaksbzljandlkandlsd",
+            false
+        },
+        // Invalid scope. Uppercase letters in AWS service.
+        {
+            "AWS4-HMAC-SHA256\n" +
+                "20190221T002037Z\n" +
+                "20190221/us-west-1/S3/aws4_request\n" +
+                "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d" +
+                "91851294efc47d",
+            "56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf" +
+                "4765f46a14cd745ad",
+            "dbaksbzljandlkandlsd",
+            false
+        },
+        // Invalid hex of canonical request. Less than 64 hex characters.
+        {
+            "AWS4-HMAC-SHA256\n" +
+                "20190221T002037Z\n" +
+                "20190221/us-west-1/s3/aws4_request\n" +
+                "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d" +
+                "91851294efc47d",
+            "56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf" +
+                "4765f46a14cd745a",
+            "dbaksbzljandlkandlsd",
+            false
+        },
+        // AWS V2 request
         {
             "PUT\n" +
                 "\n" +
