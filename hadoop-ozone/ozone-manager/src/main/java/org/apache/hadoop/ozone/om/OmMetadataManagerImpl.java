@@ -1581,7 +1581,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public S3SecretValue get(String id) {
-    return s3SecretCache.get(new CacheKey<>(id)).getCacheValue();
+    CacheValue<S3SecretValue> cacheValue = s3SecretCache.get(new CacheKey<>(id));
+    return cacheValue == null ? null : cacheValue.getCacheValue();
   }
 
   @Override
