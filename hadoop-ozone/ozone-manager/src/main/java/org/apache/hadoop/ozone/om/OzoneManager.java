@@ -1063,8 +1063,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * For testing purpose only.
    */
   @VisibleForTesting
-  public void setCertClient(CertificateClient certClient) {
+  public void setCertClient(CertificateClient certClient) throws IOException {
     // TODO: Initialize it in constructor with implementation for certClient.
+    if (certClient != null) {
+      certClient.close();
+    }
     this.certClient = certClient;
   }
 

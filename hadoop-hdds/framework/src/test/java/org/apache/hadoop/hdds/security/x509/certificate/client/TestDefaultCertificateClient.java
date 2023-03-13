@@ -545,6 +545,20 @@ public class TestDefaultCertificateClient {
     dnCertClient.renewAndStoreKeyAndCertificate(true);
   }
 
+  /**
+   * This test aims to test the side effects of having an executor in the
+   * background that renews the component certificate if needed.
+   * During close, we need to shut down this executor in order to ensure that
+   * there are no racing threads that are renewing the same set of certificates.
+   *
+   * The test checks if at instantiation the thread is created and there
+   * is only one thread that are being created, while it also checks that after
+   * close the thread is closed, and is not there anymore.
+   *
+   * @param metaDir the temporary folder for metadata persistence.
+   *
+   * @throws Exception in case an unexpected error happens.
+   */
   @Test
   public void testCloseCertificateClient(@TempDir File metaDir)
       throws Exception {

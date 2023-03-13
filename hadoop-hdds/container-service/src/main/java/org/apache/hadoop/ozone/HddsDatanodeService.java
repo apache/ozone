@@ -583,7 +583,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
   }
 
