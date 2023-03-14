@@ -16,80 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.TableCacheMetrics;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
-import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
-import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
-import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
-import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.ExitUtils;
-import org.eclipse.jetty.util.StringUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -107,14 +33,90 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBAccessIdInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
+import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
+import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
+import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
+import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
+import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
+import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.storage.proto
+    .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.ExitUtils;
+import org.eclipse.jetty.util.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone metadata manager interface.
@@ -674,7 +676,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @Override
   public String getVolumeKey(String volume) {
-    return OM_KEY_PREFIX + volume;
+    return OzoneConsts.OM_KEY_PREFIX + volume;
   }
 
   /**
@@ -987,13 +989,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     List<OmBucketInfo> result = new ArrayList<>();
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     String volumeNameBytes = getVolumeKey(volumeName);
     if (volumeTable.get(volumeNameBytes) == null) {
       throw new OMException("Volume " + volumeName + " not found.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     String startKey;
@@ -1074,18 +1076,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.",
-          VOLUME_NOT_FOUND);
+          ResultCodes.VOLUME_NOT_FOUND);
     }
 
     if (Strings.isNullOrEmpty(bucketName)) {
       throw new OMException("Bucket name is required.",
-          BUCKET_NOT_FOUND);
+          ResultCodes.BUCKET_NOT_FOUND);
     }
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
     if (getBucketTable().get(bucketNameBytes) == null) {
       throw new OMException("Bucket " + bucketName + " not found.",
-          BUCKET_NOT_FOUND);
+          ResultCodes.BUCKET_NOT_FOUND);
     }
 
     String seekKey;
@@ -1293,7 +1295,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     int index = 0;
     if (!Strings.isNullOrEmpty(startKey)) {
       index = volumes.indexOf(
-          startKey.startsWith(OM_KEY_PREFIX) ?
+          startKey.startsWith(OzoneConsts.OM_KEY_PREFIX) ?
           startKey.substring(1) :
           startKey);
 
@@ -1313,7 +1315,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // this probably means om db is corrupted or some entries are
           // accidentally removed.
           throw new OMException("Volume info not found for " + volumeName,
-              VOLUME_NOT_FOUND);
+              ResultCodes.VOLUME_NOT_FOUND);
         }
         result.add(volumeArgs);
       }
