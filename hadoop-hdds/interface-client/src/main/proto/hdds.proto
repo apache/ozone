@@ -265,6 +265,17 @@ message AddScmResponseProto {
     optional string scmId = 2;
 }
 
+message RemoveScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message RemoveScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
+
 enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
