@@ -24,8 +24,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -49,12 +49,12 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   public static final Logger LOG =
       LoggerFactory.getLogger(ECOverReplicationHandler.class);
 
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
 
   public ECOverReplicationHandler(PlacementPolicy placementPolicy,
-      NodeManager nodeManager) {
+      ReplicationManager replicationManager) {
     super(placementPolicy);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
 
   }
 
@@ -90,10 +90,14 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     // second lookup of the NodeStatus
     Set<ContainerReplica> healthyReplicas = replicas.stream()
         .filter(r -> {
-          NodeStatus ns = ReplicationManager.getNodeStatus(
-              r.getDatanodeDetails(), nodeManager);
-          return ns.isHealthy() && ns.getOperationalState() ==
-              HddsProtos.NodeOperationalState.IN_SERVICE;
+          try {
+            NodeStatus ns = replicationManager.getNodeStatus(
+                r.getDatanodeDetails());
+            return ns.isHealthy() && ns.getOperationalState() ==
+                HddsProtos.NodeOperationalState.IN_SERVICE;
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
         })
         .collect(Collectors.toSet());
 

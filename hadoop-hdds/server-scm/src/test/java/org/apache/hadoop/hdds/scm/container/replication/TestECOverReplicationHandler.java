@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests the ECOverReplicationHandling functionality.
@@ -65,23 +66,28 @@ public class TestECOverReplicationHandler {
   private ECReplicationConfig repConfig;
   private ContainerInfo container;
   private NodeManager nodeManager;
+  private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private DatanodeDetails staleNode;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws NodeNotFoundException {
     staleNode = null;
-    nodeManager = new MockNodeManager(true, 10) {
-      @Override
-      public NodeStatus getNodeStatus(DatanodeDetails dd)
-          throws NodeNotFoundException {
-        if (staleNode != null && dd.equals(staleNode)) {
-          return NodeStatus.inServiceStale();
-        }
-        return NodeStatus.inServiceHealthy();
-      }
-    };
+
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          if (staleNode != null && staleNode.equals(dd)) {
+            return new NodeStatus(dd.getPersistedOpState(),
+                HddsProtos.NodeState.STALE, 0);
+          }
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY, 0);
+        });
+
+    nodeManager = new MockNodeManager(true, 10);
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
@@ -235,7 +241,7 @@ public class TestECOverReplicationHandler {
             container, 1, false, false, false);
 
     ECOverReplicationHandler ecORH =
-        new ECOverReplicationHandler(policy, nodeManager);
+        new ECOverReplicationHandler(policy, replicationManager);
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = ecORH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
@@ -251,7 +257,7 @@ public class TestECOverReplicationHandler {
       Map<Integer, Integer> index2excessNum,
       List<ContainerReplicaOp> pendingOps) {
     ECOverReplicationHandler ecORH =
-        new ECOverReplicationHandler(policy, nodeManager);
+        new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
