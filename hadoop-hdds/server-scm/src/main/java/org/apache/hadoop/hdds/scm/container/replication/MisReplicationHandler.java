@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -206,7 +205,7 @@ public abstract class MisReplicationHandler implements
               container.getContainerID(), replicasToBeReplicated.size(),
               usedDns);
     }
-    int commandsSent = sendReplicateCommands(container, replicasToBeReplicated,
+    sendReplicateCommands(container, replicasToBeReplicated,
         targetDatanodes);
     return Collections.emptySet();
   }

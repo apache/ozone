@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,8 +121,8 @@ public class RatisUnderReplicationHandler
       return Collections.emptySet();
     }
 
-    return createReplicationCommands(containerInfo.getContainerID(),
-        sourceDatanodes, targetDatanodes);
+    sendReplicationCommands(containerInfo, sourceDatanodes, targetDatanodes);
+    return Collections.emptySet();
   }
 
   /**
@@ -246,24 +247,28 @@ public class RatisUnderReplicationHandler
         replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
   }
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
-      long containerID, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) throws AllSourcesOverloadedException {
+  private int sendReplicationCommands(
+      ContainerInfo containerInfo, List<DatanodeDetails> sources,
+      List<DatanodeDetails> targets) throws AllSourcesOverloadedException,
+      NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    int commandsSent = 0;
 
     if (push) {
       for (DatanodeDetails target : targets) {
-        commands.add(replicationManager.createThrottledReplicationCommand(
-            containerID, sources, target, 0));
+        replicationManager.sendThrottledReplicationCommand(
+            containerInfo, sources, target, 0);
+        commandsSent++;
       }
     } else {
       for (DatanodeDetails target : targets) {
         ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(containerID, sources);
-        commands.add(Pair.of(target, command));
+            ReplicateContainerCommand.fromSources(
+                containerInfo.getContainerID(), sources);
+        replicationManager.sendDatanodeCommand(command, containerInfo, target);
+        commandsSent++;
       }
     }
-    return commands;
+    return commandsSent;
   }
 }
