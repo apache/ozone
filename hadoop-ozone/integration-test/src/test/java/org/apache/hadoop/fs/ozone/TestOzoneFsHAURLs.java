@@ -386,7 +386,7 @@ public class TestOzoneFsHAURLs {
           GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell,
             new String[] {"-ls", ofsPathWithIncorrectSvcId });
-        Assert.assertEquals(-1, res);
+        Assert.assertEquals(1, res);
         Assert.assertTrue(
             capture.getOutput().contains("Cannot resolve OM host"));
       }
@@ -395,7 +395,7 @@ public class TestOzoneFsHAURLs {
           GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell,
             new String[] {"-ls", o3fsPathWithInCorrectSvcId });
-        Assert.assertEquals(-1, res);
+        Assert.assertEquals(1, res);
         Assert.assertTrue(
             capture.getOutput().contains("Cannot resolve OM host"));
       }
