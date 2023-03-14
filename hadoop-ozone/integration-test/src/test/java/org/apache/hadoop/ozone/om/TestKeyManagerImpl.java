@@ -607,6 +607,10 @@ public class TestKeyManagerImpl {
       }
     }
     assertEquals(2, matchEntries);
+    // cleanup
+    writeClient.removeAcl(ozPrefix1, ozAcl1);
+    writeClient.removeAcl(ozPrefix1, ozAcl2);
+    writeClient.removeAcl(ozPrefix1, ozAcl3);
   }
 
   @Test
