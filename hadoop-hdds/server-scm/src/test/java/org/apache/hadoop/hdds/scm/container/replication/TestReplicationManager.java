@@ -313,8 +313,8 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
@@ -354,8 +354,8 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());

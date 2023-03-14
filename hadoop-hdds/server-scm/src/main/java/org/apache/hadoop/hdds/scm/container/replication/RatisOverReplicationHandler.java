@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
@@ -54,12 +54,12 @@ public class RatisOverReplicationHandler
   public static final Logger LOG =
       LoggerFactory.getLogger(RatisOverReplicationHandler.class);
 
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
 
   public RatisOverReplicationHandler(PlacementPolicy placementPolicy,
-      NodeManager nodeManager) {
+      ReplicationManager replicationManager) {
     super(placementPolicy);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
   }
 
   /**
@@ -94,9 +94,15 @@ public class RatisOverReplicationHandler
     // HEALTHY one, and then the STALE ones goes away, we will lose them both.
     // To avoid this, we will filter out any non-healthy replicas first.
     Set<ContainerReplica> healthyReplicas = replicas.stream()
-        .filter(r -> ReplicationManager.getNodeStatus(
-            r.getDatanodeDetails(), nodeManager).isHealthy()
-        ).collect(Collectors.toSet());
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
+        .collect(Collectors.toSet());
 
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(containerInfo, healthyReplicas,
