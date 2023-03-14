@@ -80,7 +80,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         nextSnapshotStore.commitBatchOperation(writeBatch);
       }
     } else {
-      // Handle case when there is no next Snapshot
+      // Handle the case where there is no next Snapshot.
       processKeys(batchOperation, omMetadataManager, nextDBKeysList);
     }
 
