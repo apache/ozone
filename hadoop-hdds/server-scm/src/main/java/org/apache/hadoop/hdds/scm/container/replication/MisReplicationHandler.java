@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,12 +121,12 @@ public abstract class MisReplicationHandler implements
   protected abstract ReplicateContainerCommand updateReplicateCommand(
           ReplicateContainerCommand command, ContainerReplica replica);
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> getReplicateCommands(
+  private int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
       List<DatanodeDetails> targetDns)
-      throws AllSourcesOverloadedException {
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commandMap = new HashSet<>();
+      throws AllSourcesOverloadedException, NotLeaderException {
+    int commandsSent = 0;
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
       if (datanodeIdx == targetDns.size()) {
@@ -135,19 +136,19 @@ public abstract class MisReplicationHandler implements
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
       if (push) {
-        commandMap.add(replicationManager.createThrottledReplicationCommand(
-            containerID, Collections.singletonList(source),
-            target, replica.getReplicaIndex()));
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            Collections.singletonList(source), target,
+            replica.getReplicaIndex());
       } else {
         ReplicateContainerCommand cmd = ReplicateContainerCommand
             .fromSources(containerID, Collections.singletonList(source));
         updateReplicateCommand(cmd, replica);
-        commandMap.add(Pair.of(target, cmd));
+        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
       }
+      commandsSent++;
       datanodeIdx += 1;
     }
-    return commandMap;
-
+    return commandsSent;
   }
   @Override
   public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
@@ -205,7 +206,8 @@ public abstract class MisReplicationHandler implements
               container.getContainerID(), replicasToBeReplicated.size(),
               usedDns);
     }
-    return getReplicateCommands(container, replicasToBeReplicated,
-            targetDatanodes);
+    int commandsSent = sendReplicateCommands(container, replicasToBeReplicated,
+        targetDatanodes);
+    return Collections.emptySet();
   }
 }

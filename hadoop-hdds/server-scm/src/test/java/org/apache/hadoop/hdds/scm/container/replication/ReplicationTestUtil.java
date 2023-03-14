@@ -33,6 +33,11 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -43,6 +48,8 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Helper class to provide common methods used to test ReplicationManager.
@@ -306,5 +313,50 @@ public final class ReplicationTestUtil {
         return null;
       }
     };
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * SendThrottledReplicationCommand method so that it adds the command created
+   * to the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   * @throws AllSourcesOverloadedException
+   */
+  public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, AllSourcesOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      ReplicateContainerCommand command = ReplicateContainerCommand
+          .toTarget(containerInfo.getContainerID(),
+              invocationOnMock.getArgument(2));
+      command.setReplicaIndex(invocationOnMock.getArgument(3));
+      commandsSent.add(Pair.of(sources.get(0), command));
+      return null;
+    }).when(mock).sendThrottledReplicationCommand(
+        Mockito.any(ContainerInfo.class), Mockito.anyList(),
+        Mockito.any(DatanodeDetails.class), Mockito.anyInt());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendDatanodeCommand method so that it adds the command created to the
+   * commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   */
+  public static void mockRMSendDatanodeCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      SCMCommand<?> command = invocationOnMock.getArgument(0);
+      commandsSent.add(Pair.of(target, command));
+      return null;
+    }).when(mock).sendDatanodeCommand(any(), any(), any());
   }
 }

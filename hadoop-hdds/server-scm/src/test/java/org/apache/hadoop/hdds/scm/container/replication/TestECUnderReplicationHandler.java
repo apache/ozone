@@ -117,25 +117,10 @@ public class TestECUnderReplicationHandler {
         });
 
     commandsSent = new HashSet<>();
-    doAnswer((Answer<Void>) invocationOnMock -> {
-      DatanodeDetails target = invocationOnMock.getArgument(2);
-      SCMCommand<?> command = invocationOnMock.getArgument(0);
-      commandsSent.add(Pair.of(target, command));
-      return null;
-    }).when(replicationManager).sendDatanodeCommand(any(), any(), any());
-
-    doAnswer((Answer<Void>) invocationOnMock -> {
-      List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
-      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
-      ReplicateContainerCommand command = ReplicateContainerCommand
-          .toTarget(containerInfo.getContainerID(),
-              invocationOnMock.getArgument(2));
-      command.setReplicaIndex(invocationOnMock.getArgument(3));
-      commandsSent.add(Pair.of(sources.get(0), command));
-      return null;
-    }).when(replicationManager).sendThrottledReplicationCommand(
-        Mockito.any(ContainerInfo.class), Mockito.anyList(),
-        Mockito.any(DatanodeDetails.class), Mockito.anyInt());
+    ReplicationTestUtil.mockRMSendDatanodeCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
 
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(DATA, PARITY);

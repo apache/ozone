@@ -35,10 +35,13 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,6 +59,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Tests the MisReplicationHandling functionalities to test implementations.
@@ -65,9 +69,11 @@ public abstract class TestMisReplicationHandler {
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   protected void setup(ReplicationConfig repConfig)
-      throws NodeNotFoundException, AllSourcesOverloadedException {
+      throws NodeNotFoundException, AllSourcesOverloadedException,
+      NotLeaderException {
 
     replicationManager = Mockito.mock(ReplicationManager.class);
     Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
@@ -77,17 +83,11 @@ public abstract class TestMisReplicationHandler {
               HddsProtos.NodeState.HEALTHY, 0);
         });
 
-    Mockito.when(replicationManager.createThrottledReplicationCommand(
-            Mockito.anyLong(), Mockito.anyList(),
-            Mockito.any(DatanodeDetails.class), Mockito.anyInt()))
-        .thenAnswer(invocationOnMock -> {
-          List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
-          ReplicateContainerCommand command = ReplicateContainerCommand
-              .toTarget(invocationOnMock.getArgument(0),
-                  invocationOnMock.getArgument(2));
-          command.setReplicaIndex(invocationOnMock.getArgument(3));
-          return Pair.of(sources.get(0), command);
-        });
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendDatanodeCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
 
     conf = SCMTestUtils.getConf();
     container = ReplicationTestUtil
@@ -176,11 +176,10 @@ public abstract class TestMisReplicationHandler {
     Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-            misReplicationHandler.processAndCreateCommands(availableReplicas,
+    misReplicationHandler.processAndCreateCommands(availableReplicas,
                     pendingOp, result, maintenanceCnt);
-    Assertions.assertEquals(expectedNumberOfNodes, commands.size());
-    for (Pair<DatanodeDetails, SCMCommand<?>> pair : commands) {
+    Assertions.assertEquals(expectedNumberOfNodes, commandsSent.size());
+    for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
       SCMCommand<?> command = pair.getValue();
       Assertions.assertTrue(command.getType() == replicateContainerCommand);
       ReplicateContainerCommand replicateContainerCommand =
