@@ -1925,8 +1925,8 @@ public class KeyManagerImpl implements KeyManager {
       extractContainerIDs(keyInfo).forEach(containerIds::add);
     }
 
-    // List API never force cache refresh. If a client detects a block location is outdated
-    // location out-dated, they'll call getKeyInfo with cacheRefresh=true
+    // List API never force cache refresh. If a client detects a block
+    // location is outdated, it'll call getKeyInfo with cacheRefresh=true
     // to request cache refresh on individual container.
     Map<Long, Pipeline> containerLocations =
         scmClient.getContainerLocations(containerIds, false);
