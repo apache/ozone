@@ -49,7 +49,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -113,14 +117,14 @@ public class TestHddsDatanodeService {
   public void testStartup() {
     service.start(conf);
 
-    Assertions.assertNotNull(service.getDatanodeDetails());
-    Assertions.assertNotNull(service.getDatanodeDetails().getHostName());
-    Assertions.assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
-    Assertions.assertNotNull(service.getCRLStore());
+    assertNotNull(service.getDatanodeDetails());
+    assertNotNull(service.getDatanodeDetails().getHostName());
+    assertFalse(service.getDatanodeStateMachine().isDaemonStopped());
+    assertNotNull(service.getCRLStore());
 
     service.stop();
     // CRL store must be stopped when the service stops
-    Assertions.assertNull(service.getCRLStore().getStore());
+    assertNull(service.getCRLStore().getStore());
     service.join();
     service.close();
   }
@@ -140,11 +144,11 @@ public class TestHddsDatanodeService {
         .getDatanodeStateMachine().getContainer().getVolumeSet();
 
     // VolumeSet for this test, contains only 1 volume
-    Assertions.assertEquals(1, volumeSet.getVolumesList().size());
+    assertEquals(1, volumeSet.getVolumesList().size());
     StorageVolume volume = volumeSet.getVolumesList().get(0);
 
     // Check instanceof and typecast
-    Assertions.assertTrue(volume instanceof HddsVolume);
+    assertTrue(volume instanceof HddsVolume);
     HddsVolume hddsVolume = (HddsVolume) volume;
 
     StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
@@ -153,8 +157,8 @@ public class TestHddsDatanodeService {
     KeyValueContainer container = ContainerTestUtils
         .setUpTestContainerUnderTmpDir(
             hddsVolume, clusterId, conf, schemaVersion);
-    Assertions.assertTrue(container.getContainerFile().exists());
-    Assertions.assertTrue(container.getContainerDBFile().exists());
+    assertTrue(container.getContainerFile().exists());
+    assertTrue(container.getContainerDBFile().exists());
 
     service.stop();
     service.join();
@@ -162,7 +166,7 @@ public class TestHddsDatanodeService {
 
     ListIterator<File> deleteLeftoverIt = KeyValueContainerUtil
         .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
-    Assertions.assertFalse(deleteLeftoverIt.hasNext());
+    assertFalse(deleteLeftoverIt.hasNext());
 
     volumeSet.shutdown();
   }
