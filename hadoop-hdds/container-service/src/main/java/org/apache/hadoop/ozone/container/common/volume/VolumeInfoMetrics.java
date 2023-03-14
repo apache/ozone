@@ -104,8 +104,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Returns the Used space")
   public long getUsed() {
-    return volume.getVolumeInfo() != null ?
-            volume.getVolumeInfo().getScmUsed() : 0;
+    return volume.getVolumeInfo().map(VolumeInfo::getScmUsed)
+            .orElse(0L);
   }
 
   /**
@@ -113,8 +113,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Returns the Available space")
   public long getAvailable() {
-    return volume.getVolumeInfo() != null ?
-            volume.getVolumeInfo().getAvailable() : 0;
+    return volume.getVolumeInfo().map(VolumeInfo::getAvailable)
+            .orElse(0L);
   }
 
   /**
@@ -122,8 +122,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Fetches the Reserved Space")
   public long getReserved() {
-    return volume.getVolumeInfo() != null ?
-            volume.getVolumeInfo().getReservedInBytes() : 0;
+    return volume.getVolumeInfo().map(VolumeInfo::getReservedInBytes)
+            .orElse(0L);
   }
 
   /**

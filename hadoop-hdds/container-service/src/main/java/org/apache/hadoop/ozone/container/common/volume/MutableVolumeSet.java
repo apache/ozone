@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -485,22 +486,22 @@ public class MutableVolumeSet implements VolumeSet {
       StorageVolume volume;
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
-        VolumeInfo volumeInfo = volume.getVolumeInfo();
+        Optional<VolumeInfo> volumeInfo = volume.getVolumeInfo();
         long scmUsed = 0;
         long remaining = 0;
         long capacity = 0;
         String rootDir = "";
         failed = true;
-        if (volumeInfo != null) {
+        if (volumeInfo.isPresent()) {
           try {
-            rootDir = volumeInfo.getRootDir();
-            scmUsed = volumeInfo.getScmUsed();
-            remaining = volumeInfo.getAvailable();
-            capacity = volumeInfo.getCapacity();
+            rootDir = volumeInfo.get().getRootDir();
+            scmUsed = volumeInfo.get().getScmUsed();
+            remaining = volumeInfo.get().getAvailable();
+            capacity = volumeInfo.get().getCapacity();
             failed = false;
           } catch (UncheckedIOException ex) {
             LOG.warn("Failed to get scmUsed and remaining for container " +
-                    "storage location {}", volumeInfo.getRootDir(), ex);
+                    "storage location {}", volumeInfo.get().getRootDir(), ex);
             // reset scmUsed and remaining if df/du failed.
             scmUsed = 0;
             remaining = 0;
