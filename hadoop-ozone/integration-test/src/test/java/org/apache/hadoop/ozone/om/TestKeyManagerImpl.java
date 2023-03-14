@@ -647,8 +647,8 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    ex = assertThrows(OMException.class,
-        () -> prefixManager.getAcl(ozInvalidPrefix));
+    ex = assertThrows(OMException.class, () ->
+        prefixManager.getAcl(ozInvalidPrefix));
     assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // set acl with invalid prefix name
