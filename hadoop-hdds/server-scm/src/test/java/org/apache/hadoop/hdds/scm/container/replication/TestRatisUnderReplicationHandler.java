@@ -205,7 +205,7 @@ public class TestRatisUnderReplicationHandler {
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
 
     Assert.assertThrows(IOException.class,
-        () -> handler.processAndCreateCommands(replicas,
+        () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
   }
 
@@ -261,7 +261,7 @@ public class TestRatisUnderReplicationHandler {
     RatisUnderReplicationHandler handler =
         new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
-    handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndSendCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
     Assert.assertEquals(expectNumCommands, commandsSent.size());
     return commandsSent;

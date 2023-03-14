@@ -259,7 +259,7 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
 
-    ecORH.processAndCreateCommands(availableReplicas, ImmutableList.of(),
+    ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
         health, 1);
 
     Assert.assertEquals(1, commandsSent.size());
@@ -277,7 +277,7 @@ public class TestECOverReplicationHandler {
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    ecORH.processAndCreateCommands(availableReplicas, pendingOps,
+    ecORH.processAndSendCommands(availableReplicas, pendingOps,
             result, 1);
 
     // total commands send out should be equal to the sum of all

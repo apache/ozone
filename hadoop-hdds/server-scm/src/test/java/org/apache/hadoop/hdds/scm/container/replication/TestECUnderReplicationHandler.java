@@ -343,7 +343,7 @@ public class TestECUnderReplicationHandler {
       }
 
       Assert.assertThrows(SCMException.class,
-          () -> ecURH.processAndCreateCommands(availableReplicas,
+          () -> ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2));
 
       // Now adjust replicas so it is also over replicated. This time rather
@@ -357,13 +357,16 @@ public class TestECUnderReplicationHandler {
           createDeleteContainerCommand(container, overRepReplica)));
 
       Mockito.when(replicationManager.processOverReplicatedContainer(
-          underRep)).thenReturn(expectedDelete);
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-          ecURH.processAndCreateCommands(availableReplicas,
+          underRep)).thenAnswer(invocationOnMock -> {
+            commandsSent.addAll(expectedDelete);
+            return expectedDelete.size();
+          });
+      commandsSent.clear();
+      ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2);
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(true, expectedDelete.equals(commands));
+      Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
     }
   }
 
@@ -409,7 +412,7 @@ public class TestECUnderReplicationHandler {
         availableReplicas.add(toAdd);
       }
 
-      ecURH.processAndCreateCommands(availableReplicas, Collections.emptyList(),
+      ecURH.processAndSendCommands(availableReplicas, Collections.emptyList(),
           underRep, 2);
 
       Mockito.verify(replicationManager, times(0))
@@ -447,7 +450,7 @@ public class TestECUnderReplicationHandler {
             1, true, false, false);
 
     Assert.assertThrows(SCMException.class,
-        () -> ecURH.processAndCreateCommands(availableReplicas,
+        () -> ecURH.processAndSendCommands(availableReplicas,
             Collections.emptyList(), underRep, 1));
 
     // Now adjust replicas so it is also over replicated. This time rather than
@@ -463,13 +466,15 @@ public class TestECUnderReplicationHandler {
         createDeleteContainerCommand(container, overRepReplica)));
 
     Mockito.when(replicationManager.processOverReplicatedContainer(
-        underRep)).thenReturn(expectedDelete);
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        ecURH.processAndCreateCommands(availableReplicas,
+        underRep)).thenAnswer(invocationOnMock -> {
+          commandsSent.addAll(expectedDelete);
+          return expectedDelete.size();
+        });
+    ecURH.processAndSendCommands(availableReplicas,
             Collections.emptyList(), underRep, 1);
     Mockito.verify(replicationManager, times(1))
         .processOverReplicatedContainer(underRep);
-    Assertions.assertEquals(true, expectedDelete.equals(commands));
+    Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
   }
 
   @Test
@@ -552,7 +557,7 @@ public class TestECUnderReplicationHandler {
     ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
         ecPlacementPolicy, conf, replicationManager);
 
-    handler.processAndCreateCommands(availableReplicas,
+    handler.processAndSendCommands(availableReplicas,
         Collections.emptyList(), result, 1);
     Assertions.assertEquals(1, commandsSent.size());
     Mockito.verify(ecPlacementPolicy, times(0))
@@ -600,7 +605,7 @@ public class TestECUnderReplicationHandler {
     ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
         ecPlacementPolicy, conf, replicationManager);
 
-    handler.processAndCreateCommands(availableReplicas, pendingOps, result, 1);
+    handler.processAndSendCommands(availableReplicas, pendingOps, result, 1);
     Assertions.assertEquals(1, commandsSent.size());
     Assertions.assertNotEquals(dn, commandsSent.iterator().next().getKey());
   }
@@ -662,7 +667,7 @@ public class TestECUnderReplicationHandler {
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    ecURH.processAndCreateCommands(availableReplicas, ImmutableList.of(),
+    ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
         result, remainingMaintenanceRedundancy);
     int replicateCommand = 0;
     int reconstructCommand = 0;

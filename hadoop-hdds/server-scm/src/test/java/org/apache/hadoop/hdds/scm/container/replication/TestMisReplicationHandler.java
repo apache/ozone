@@ -174,7 +174,7 @@ public abstract class TestMisReplicationHandler {
     Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    misReplicationHandler.processAndCreateCommands(availableReplicas,
+    misReplicationHandler.processAndSendCommands(availableReplicas,
                     pendingOp, result, maintenanceCnt);
     Assertions.assertEquals(expectedNumberOfNodes, commandsSent.size());
     for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {

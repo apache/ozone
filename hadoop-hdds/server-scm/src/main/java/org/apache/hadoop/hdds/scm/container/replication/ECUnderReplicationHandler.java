@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptySet;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
@@ -105,14 +103,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param result - Health check result.
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
    *                                      into maintenance.
-   * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself. If an empty list is returned, it indicates
-   * the container is no longer unhealthy and can be removed from the unhealthy
-   * queue. Any exception indicates that the container is still unhealthy and
-   * should be retried later.
+   * @return The number of commands sent.
    */
   @Override
-  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
+  public int processAndSendCommands(
       final Set<ContainerReplica> replicas,
       final List<ContainerReplicaOp> pendingOps,
       final ContainerHealthResult result,
@@ -126,13 +120,13 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     if (replicaCount.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not in under"
               + " replication any more.", container.getContainerID());
-      return emptySet();
+      return 0;
     }
     if (replicaCount.isSufficientlyReplicated(true)) {
       LOG.info("The container {} with replicas {} will be sufficiently " +
           "replicated after pending replicas are created",
           container.getContainerID(), replicaCount.getReplicas());
-      return emptySet();
+      return 0;
     }
 
     // don't place reconstructed replicas on exclude nodes, since they already
@@ -197,7 +191,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         if (commandsSent > 0) {
           LOG.debug("Some commands have already been created, so returning " +
               "with them only");
-          return Collections.emptySet();
+          return commandsSent;
         }
         if (replicaCount.isOverReplicated()) {
           LOG.debug("Container {} is both under and over replicated. Cannot " +
@@ -218,7 +212,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       LOG.warn("Container {} is under replicated, but no commands were " +
           "created to correct it", id);
     }
-    return Collections.emptySet();
+    return commandsSent;
   }
 
   private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
