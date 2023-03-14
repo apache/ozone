@@ -487,8 +487,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
     if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
       LOG.info(String.format("Delete blocks for containerId: %d"
-              + " is outdated, either received out of order or retried,"
-              + " %d < %d", containerId, delTX.getTxID(),
+              + " is either received out of order or retried,"
+              + " %d <= %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     }
   }
