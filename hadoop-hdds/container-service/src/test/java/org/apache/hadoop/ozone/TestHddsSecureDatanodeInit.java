@@ -128,7 +128,7 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @BeforeEach
-  public void setUpDNCertClient() {
+  public void setUpDNCertClient() throws IOException {
 
     FileUtils.deleteQuietly(Paths.get(
         securityConfig.getKeyLocation(DN_COMPONENT).toString(),
