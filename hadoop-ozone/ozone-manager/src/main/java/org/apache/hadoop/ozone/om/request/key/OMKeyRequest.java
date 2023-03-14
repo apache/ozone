@@ -838,6 +838,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // This is a special marker to indicate that SnapshotDeletingService
+    // can reclaim this key's blocks unconditionally.
     pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();

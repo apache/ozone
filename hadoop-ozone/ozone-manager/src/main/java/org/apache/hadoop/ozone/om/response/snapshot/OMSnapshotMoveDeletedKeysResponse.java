@@ -45,7 +45,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private OmSnapshot fromSnapshot;
   private OmSnapshot nextSnapshot;
   private List<SnapshotMoveKeyInfos> nextDBKeysList;
-  private List<SnapshotMoveKeyInfos> reclaimKeyList;
+  private List<SnapshotMoveKeyInfos> reclaimKeysList;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
        @Nonnull OmSnapshot omFromSnapshot, OmSnapshot omNextSnapshot,
@@ -55,7 +55,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     this.fromSnapshot = omFromSnapshot;
     this.nextSnapshot = omNextSnapshot;
     this.nextDBKeysList = nextDBKeysList;
-    this.reclaimKeyList = reclaimKeysList;
+    this.reclaimKeysList = reclaimKeysList;
   }
 
   /**
@@ -89,7 +89,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     try (BatchOperation fromSnapshotBatchOp =
              fromSnapshotStore.initBatchOperation()) {
       processKeys(fromSnapshotBatchOp, fromSnapshot.getMetadataManager(),
-          reclaimKeyList);
+          reclaimKeysList);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
     }
   }
