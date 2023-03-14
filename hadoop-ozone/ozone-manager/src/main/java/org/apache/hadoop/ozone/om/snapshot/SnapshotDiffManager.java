@@ -137,7 +137,8 @@ public class SnapshotDiffManager {
                                                   final OmSnapshot fromSnapshot,
                                                   final OmSnapshot toSnapshot,
                                                   final SnapshotInfo fsInfo,
-                                                  final SnapshotInfo tsInfo)
+                                                  final SnapshotInfo tsInfo,
+                                                  final boolean fullDiff)
       throws IOException, RocksDBException {
 
     final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
@@ -214,6 +215,9 @@ public class SnapshotDiffManager {
       boolean useFullDiff = configuration.getBoolean(
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
+      if (fullDiff) {
+        useFullDiff = true;
+      }
 
       Map<String, String> tablePrefixes =
           getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
@@ -389,11 +393,13 @@ public class SnapshotDiffManager {
       // End of Workaround
     }
 
-    if (deltaFiles.isEmpty()) {
+    if (useFullDiff || deltaFiles.isEmpty()) {
       // If compaction DAG is not available (already cleaned up), fall back to
       //  the slower approach.
-      LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
-          " slow path");
+      if (!useFullDiff) {
+        LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
+                " slow path");
+      }
 
       Set<String> fromSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(

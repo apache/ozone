@@ -713,7 +713,8 @@ public interface OzoneManagerProtocol
                                             String fromSnapshot,
                                             String toSnapshot,
                                             String token,
-                                            int pageSize)
+                                            int pageSize,
+                                            boolean fullDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

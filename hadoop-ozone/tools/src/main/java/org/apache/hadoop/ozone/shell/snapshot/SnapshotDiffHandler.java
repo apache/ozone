@@ -54,6 +54,11 @@ public class SnapshotDiffHandler extends Handler {
           " (optional)")
   private int pageSize;
 
+  @CommandLine.Option(names = {"-fd", "--use-full-diff"},
+      description = "perform full diff of snapshot without using" +
+          " optimised DAG based pruning approach (optional)")
+  private boolean fullDiff;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -71,7 +76,7 @@ public class SnapshotDiffHandler extends Handler {
     try (PrintStream stream = out()) {
       stream.print(client.getObjectStore()
           .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-              token, pageSize));
+              token, pageSize, fullDiff));
     }
   }
 }

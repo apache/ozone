@@ -569,6 +569,7 @@ public class ObjectStore {
    * @param toSnapshot The name of the ending snapshot
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
+   * @param fullDiff perform full diff without using the optimised DAG approach
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -577,9 +578,10 @@ public class ObjectStore {
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize)
+                                           int pageSize,
+                                           boolean fullDiff)
       throws IOException {
     return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize);
+        token, pageSize, fullDiff);
   }
 }

@@ -1694,6 +1694,7 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool fullDiff = 7;
 }
 
 message DeleteSnapshotRequest {
