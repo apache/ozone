@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,7 +138,8 @@ public class RatisOverReplicationHandler
 
     // get number of excess replicas
     int excess = replicaCount.getExcessRedundancy(true);
-    return createCommands(containerInfo, eligibleReplicas, excess);
+    createCommands(containerInfo, eligibleReplicas, excess);
+    return Collections.emptySet();
   }
 
   private boolean verifyOverReplication(
@@ -249,25 +251,26 @@ public class RatisOverReplicationHandler
         .collect(Collectors.toList());
   }
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createCommands(
+  private int createCommands(
       ContainerInfo containerInfo, List<ContainerReplica> replicas,
-      int excess) {
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+      int excess) throws NotLeaderException {
 
     /*
     Being in the over replication queue means we have enough replicas that
     match the container's state, so unhealthy or mismatched replicas can be
     deleted. This might make the container violate placement policy.
      */
+    int commandsSent = 0;
     List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commands;
+        return commandsSent;
       }
       if (!ReplicationManager.compareState(
           containerInfo.getState(), replica.getState())) {
-        commands.add(Pair.of(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo)));
+        replicationManager.sendDeleteCommand(containerInfo,
+            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+        commandsSent++;
         replicasRemoved.add(replica);
         excess--;
       }
@@ -283,17 +286,18 @@ public class RatisOverReplicationHandler
     // iterate through replicas in deterministic order
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commands;
+        return commandsSent;
       }
 
       if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
-        commands.add(Pair.of(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo)));
+        replicationManager.sendDeleteCommand(containerInfo,
+            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+        commandsSent++;
         excess--;
       }
     }
-    return commands;
+    return commandsSent;
   }
 
   private DeleteContainerCommand createDeleteCommand(ContainerInfo container) {

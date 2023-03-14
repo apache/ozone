@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,6 +42,7 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -60,9 +62,10 @@ public class TestRatisOverReplicationHandler {
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @Before
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException, NotLeaderException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
         RATIS_REPLICATION_CONFIG);
 
@@ -78,6 +81,10 @@ public class TestRatisOverReplicationHandler {
           return new NodeStatus(dd.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY, 0);
         });
+
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
+        commandsSent);
 
     GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
   }
@@ -281,12 +288,11 @@ public class TestRatisOverReplicationHandler {
     RatisOverReplicationHandler handler =
         new RatisOverReplicationHandler(policy, replicationManager);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndCreateCommands(replicas, pendingOps,
             healthResult, 2);
-    Assert.assertEquals(expectNumCommands, commands.size());
+    Assert.assertEquals(expectNumCommands, commandsSent.size());
 
-    return commands;
+    return commandsSent;
   }
 
   private ContainerHealthResult.OverReplicatedHealthResult
