@@ -338,7 +338,7 @@ public class SnapshotDiffManager {
           objectIdToKeyNameMapForFromSnapshot,
           objectIdToKeyNameMapForToSnapshot);
     } catch (IOException | RocksDBException exception) {
-      // TODO: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     } finally {
       // Clean up: drop the intermediate column family and close them.
@@ -403,7 +403,8 @@ public class SnapshotDiffManager {
         }
       });
     } catch (RocksDBException rocksDBException) {
-      // TODO: Gracefully handle exception e.g. when input files do not exist
+      // TODO: [SNAPSHOT] Gracefully handle exception
+      //  e.g. when input files do not exist
       throw new RuntimeException(rocksDBException);
     }
   }
@@ -425,7 +426,7 @@ public class SnapshotDiffManager {
       SnapshotInfo fsInfo, SnapshotInfo tsInfo,
       boolean useFullDiff, Map<String, String> tablePrefixes)
       throws RocksDBException, IOException {
-    // TODO: Refactor the parameter list
+    // TODO: [SNAPSHOT] Refactor the parameter list
 
     final Set<String> deltaFiles = new HashSet<>();
 
@@ -444,8 +445,8 @@ public class SnapshotDiffManager {
           differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
       deltaFiles.addAll(sstDiffList);
 
-      // TODO: Remove the workaround below when the SnapDiff logic can read
-      //  tombstones in SST files.
+      // TODO: [SNAPSHOT] Remove the workaround below when the SnapDiff logic
+      //  can read tombstones in SST files.
       // Workaround: Append "From DB" SST files to the deltaFiles list so that
       //  the current SnapDiff logic correctly handles deleted keys.
       if (!deltaFiles.isEmpty()) {
@@ -603,7 +604,7 @@ public class SnapshotDiffManager {
       index = addToReport(jobId, index, createDiffs);
       addToReport(jobId, index, modifyDiffs);
     } catch (IOException e) {
-      // TODO: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e);
     } finally {
       if (deleteDiffColumnFamily != null) {

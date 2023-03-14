@@ -83,13 +83,23 @@ public final class OmSnapshotManager implements AutoCloseable {
    * Contains all the snap diff job which are either queued, in_progress or
    * done. This table is used to make sure that there is only single job for
    * similar type of request at any point of time.
+   * |----------------------------------------------|
+   * |  KEY                         |  VALUE        |
+   * |----------------------------------------------|
+   * |  fromSnapshotId-toSnapshotId | snapDiffJodId |
+   * |----------------------------------------------|
    */
   private static final String SNAP_DIFF_JOB_TABLE_NAME =
       "snap-diff-job-table";
 
   /**
-   * Global table to keep the diff report. Each key is prefixed by the jobID
-   * to improve look up and clean up.
+   * Global table to keep the diff report. Each key is prefixed by the jobId
+   * to improve look up and clean up. JodId comes from snap-diff-job-table.
+   * |--------------------------------|
+   * |  KEY         |  VALUE          |
+   * |--------------------------------|
+   * |  jodId-index | DiffReportEntry |
+   * |--------------------------------|
    */
   private static final String SNAP_DIFF_REPORT_TABLE_NAME =
       "snap-diff-report-table";
@@ -97,7 +107,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
 
-  // TODO: create config for max allowed page size.
+  // TODO: [SNAPSHOT] create config for max allowed page size.
   private final int maxPageSize = 1000;
 
   OmSnapshotManager(OzoneManager ozoneManager) {
@@ -356,7 +366,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       throws IOException {
     if ((fromSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) ||
         (toSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE)) {
-      // TODO: throw custom snapshot exception.
+      // TODO: [SNAPSHOT] Throw custom snapshot exception.
       throw new IOException("Cannot generate snapshot diff for non-active " +
           "snapshots.");
     }
@@ -376,8 +386,8 @@ public final class OmSnapshotManager implements AutoCloseable {
     try {
       int index = Integer.parseInt(token);
       if (index < 0) {
-        // Throws NFE which will be transformed to IOException later.
-        throw new NumberFormatException();
+        throw new IOException("Passed token is invalid. Resend the request " +
+            "with valid token returned in previous request.");
       }
       return index;
     } catch (NumberFormatException exception) {
@@ -397,7 +407,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           familyDescriptors,
           familyHandles);
     } catch (RocksDBException exception) {
-      // TODO: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -418,7 +428,7 @@ public final class OmSnapshotManager implements AutoCloseable {
               columnFamilyName, columnFamilyOptions))
           .collect(Collectors.toList());
     } catch (RocksDBException exception) {
-      // TODO: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -456,7 +466,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       familyDescriptors.add(columnFamilyDescriptor);
       return columnFamily;
     } catch (RocksDBException exception) {
-      // TODO: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }

@@ -53,7 +53,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, valueType);
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -65,7 +65,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawValue = codecRegistry.asRawData(value);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -76,7 +76,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawKey = codecRegistry.asRawData(key);
       db.get().delete(columnFamilyHandle, rawKey);
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
