@@ -93,16 +93,16 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
-  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
+  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "60m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
           "from source to target.")
-  private long moveTimeout = Duration.ofMinutes(30).toMillis();
+  private long moveTimeout = Duration.ofMinutes(60).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
+      defaultValue = "130m", tags = {ConfigTag.BALANCER}, description =
       "The interval period between each iteration of Container Balancer.")
-  private long balancingInterval = Duration.ofMinutes(70).toMillis();
+  private long balancingInterval = Duration.ofMinutes(130).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +

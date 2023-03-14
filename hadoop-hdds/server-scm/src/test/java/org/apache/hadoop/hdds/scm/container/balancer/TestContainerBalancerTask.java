@@ -218,7 +218,7 @@ public class TestContainerBalancerTask {
         .register(Mockito.any(SCMService.class));
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), null);
+        sb.getMetrics(), balancerConfiguration);
 
     containerBalancerTask.setMoveManager(moveManager);
     Mockito.when(moveManager.move(any(ContainerID.class),
@@ -914,15 +914,15 @@ public class TestContainerBalancerTask {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"),
-            new NodeNotFoundException("Test Node not found"))
-        .thenReturn(future).thenReturn(CompletableFuture.supplyAsync(() -> {
+        .thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
-            Thread.sleep(200);
-          } catch (Exception ex) {
+            Thread.sleep(1);
+          } catch (Exception ignored) {
           }
-          throw new RuntimeException("Throw");
-        }));
+          throw new RuntimeException("Runtime Exception after doing work");
+        }))
+        .thenThrow(new ContainerNotFoundException("Test Container not found"))
+        .thenReturn(future);
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
@@ -938,7 +938,7 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getIterationResult());
     Assertions.assertTrue(
         containerBalancerTask.getMetrics()
-            .getNumContainerMovesFailed() >= 4);
+            .getNumContainerMovesFailed() >= 3);
     stopBalancer();
 
     /*
@@ -947,15 +947,15 @@ public class TestContainerBalancerTask {
     Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"),
-            new NodeNotFoundException("Test Node not found"))
-        .thenReturn(future).thenReturn(CompletableFuture.supplyAsync(() -> {
+        .thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
-            Thread.sleep(200);
+            Thread.sleep(1);
           } catch (Exception ignored) {
           }
-          throw new RuntimeException("Exception after sleeping");
-        }));
+          throw new RuntimeException("Runtime Exception after doing work");
+        }))
+        .thenThrow(new ContainerNotFoundException("Test Container not found"))
+        .thenReturn(future);
 
     startBalancer(balancerConfiguration);
     Assertions.assertEquals(
@@ -963,7 +963,7 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getIterationResult());
     Assertions.assertTrue(
         containerBalancerTask.getMetrics()
-            .getNumContainerMovesFailed() >= 4);
+            .getNumContainerMovesFailed() >= 3);
     stopBalancer();
   }
 

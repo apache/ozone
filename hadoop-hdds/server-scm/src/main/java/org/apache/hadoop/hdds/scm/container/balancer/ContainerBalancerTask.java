@@ -134,7 +134,8 @@ public class ContainerBalancerTask implements Runnable {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
-    this.moveManager = new MoveManager(replicationManager, containerManager);
+    this.moveManager = new MoveManager(replicationManager, containerManager,
+        config.getMoveTimeout());
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;
@@ -786,14 +787,12 @@ public class ContainerBalancerTask implements Runnable {
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
 
-      ReplicationManager.ReplicationManagerConfiguration rmConf =
-          ozoneConfiguration.getObject(
-              ReplicationManager.ReplicationManagerConfiguration.class);
       /*
       If LegacyReplicationManager is enabled, ReplicationManager will
       redirect to it. Otherwise, use MoveManager.
        */
-      if (rmConf.isLegacyEnabled()) {
+      if (ozoneConfiguration.getBoolean("hdds.scm.replication.enable.legacy",
+          true)) {
         future = replicationManager
             .move(containerID, source, moveSelection.getTargetNode());
       } else {
@@ -814,12 +813,10 @@ public class ContainerBalancerTask implements Runnable {
           if (result == MoveManager.MoveResult.COMPLETED) {
             sizeActuallyMovedInLatestIteration +=
                 containerInfo.getUsedBytes();
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Container move completed for container {} from " +
-                      "source {} to target {}", containerID,
-                  source.getUuidString(),
-                  moveSelection.getTargetNode().getUuidString());
-            }
+            LOG.debug("Container move completed for container {} from " +
+                    "source {} to target {}", containerID,
+                source.getUuidString(),
+                moveSelection.getTargetNode().getUuidString());
           } else {
             LOG.warn(
                 "Container move for container {} from source {} to target" +

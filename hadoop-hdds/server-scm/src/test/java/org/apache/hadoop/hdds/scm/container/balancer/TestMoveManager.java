@@ -42,6 +42,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -109,7 +110,8 @@ public class TestMoveManager {
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
     Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
-    moveManager = new MoveManager(replicationManager, containerManager);
+    moveManager = new MoveManager(replicationManager, containerManager,
+        Duration.ofMinutes(60));
     moveManager.onLeaderReady();
   }
 
