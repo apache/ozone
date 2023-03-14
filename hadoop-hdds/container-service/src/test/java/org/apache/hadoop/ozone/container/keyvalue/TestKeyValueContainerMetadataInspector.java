@@ -123,7 +123,7 @@ public class TestKeyValueContainerMetadataInspector
     KeyValueContainer container = createClosedContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
-        createBlocks, setBlocks, setBytes, 0, 0, true);
+        createBlocks, setBlocks, setBytes, 0, 0);
   }
 
   @Test
@@ -136,7 +136,7 @@ public class TestKeyValueContainerMetadataInspector
     KeyValueContainer container = createOpenContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
-        createBlocks, setBlocks, setBytes, 0, 0, true);
+        createBlocks, setBlocks, setBytes, 0, 0);
   }
 
   @Test
@@ -225,7 +225,7 @@ public class TestKeyValueContainerMetadataInspector
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
         createBlocks, createBlocks, setBytes,
-        deleteCount, numDeletedLocalIds, numDeletedLocalIds == 0);
+        deleteCount, numDeletedLocalIds);
   }
 
   @Test
@@ -245,7 +245,7 @@ public class TestKeyValueContainerMetadataInspector
         setBytes, deleteCount, deleteTransactions);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
         createBlocks, createBlocks, setBytes,
-        deleteCount, numDeletedLocalIds, numDeletedLocalIds == 0);
+        deleteCount, numDeletedLocalIds);
   }
 
   public void inspectThenRepairOnCorrectContainer(
@@ -269,8 +269,8 @@ public class TestKeyValueContainerMetadataInspector
    */
   public void inspectThenRepairOnIncorrectContainer(
       KeyValueContainerData containerData, int createdBlocks, int setBlocks,
-      int setBytes, int deleteCount, long numDeletedLocalIds,
-      boolean shouldRepair) throws Exception {
+      int setBytes, int deleteCount, long numDeletedLocalIds)
+      throws Exception {
     int createdBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createdBlocks;
     int createdFiles = 0;
     switch (getChunkLayout()) {
@@ -301,7 +301,7 @@ public class TestKeyValueContainerMetadataInspector
         KeyValueContainerMetadataInspector.Mode.REPAIR);
     checkJsonReportForIncorrectContainer(repairJson,
         containerState, createdBlocks, setBlocks, createdBytes, setBytes,
-        createdFiles, deleteCount, numDeletedLocalIds, shouldRepair);
+        createdFiles, deleteCount, numDeletedLocalIds, true);
     // Metadata keys should have been fixed.
     checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
   }
@@ -310,7 +310,7 @@ public class TestKeyValueContainerMetadataInspector
   private void checkJsonReportForIncorrectContainer(JsonObject inspectJson,
       String expectedContainerState, long createdBlocks,
       long setBlocks, long createdBytes, long setBytes, long createdFiles,
-      long deleteCount, long deleteTransactions,
+      long setPendingDeleteCount, long createdPendingDeleteCount,
       boolean shouldRepair) {
     // Check main container properties.
     Assert.assertEquals(inspectJson.get("containerID").getAsLong(),
@@ -331,7 +331,7 @@ public class TestKeyValueContainerMetadataInspector
         jsonAggregates.get("blockCount").getAsLong());
     Assert.assertEquals(createdBytes,
         jsonAggregates.get("usedBytes").getAsLong());
-    Assert.assertEquals(deleteTransactions,
+    Assert.assertEquals(createdPendingDeleteCount,
         jsonAggregates.get("pendingDeleteBlocks").getAsLong());
 
     // Check chunks directory.
@@ -346,7 +346,7 @@ public class TestKeyValueContainerMetadataInspector
     checkJsonErrorsReport(inspectJson, "dBMetadata.#BYTESUSED",
         createdBytes, setBytes, shouldRepair);
     checkJsonErrorsReport(inspectJson, "dBMetadata.#PENDINGDELETEBLOCKCOUNT",
-        deleteCount, deleteTransactions, shouldRepair);
+        createdPendingDeleteCount, setPendingDeleteCount, shouldRepair);
   }
 
   private void checkJsonErrorsReport(

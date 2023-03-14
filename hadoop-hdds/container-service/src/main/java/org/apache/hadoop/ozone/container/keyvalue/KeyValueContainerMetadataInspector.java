@@ -413,33 +413,31 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // check and repair if db delete count mismatches delete transaction count.
-    final JsonElement dbDeleteCountJson = dBMetadata.get(
+    final JsonElement pendingDeleteCountDB = dBMetadata.get(
         OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
-    final long dbDeleteCount = jsonToLong(dbDeleteCountJson);
-    final JsonElement deleteTxCountJson = aggregates.get(PendingDelete.COUNT);
-    final long deleteTransactionCount = jsonToLong(deleteTxCountJson);
+    final long dbDeleteCount = jsonToLong(pendingDeleteCountDB);
+    final JsonElement pendingDeleteCountAggregate
+        = aggregates.get(PendingDelete.COUNT);
+    final long deleteTransactionCount = jsonToLong(pendingDeleteCountAggregate);
     if (dbDeleteCount != deleteTransactionCount) {
       passed = false;
 
       final BooleanSupplier deleteCountRepairAction = () -> {
-        if (deleteTransactionCount == 0) {
-          // repair only when delete transaction count is 0
-          final String key = containerData.getPendingDeleteBlockCountKey();
-          try {
-            // reset delete block count to 0 in metadata table
-            metadataTable.put(key, 0L);
-            return true;
-          } catch (IOException ex) {
-            LOG.error("Failed to reset {} for container {}.",
-                key, containerData.getContainerID(), ex);
-          }
+        final String key = containerData.getPendingDeleteBlockCountKey();
+        try {
+          // reset delete block count to 0 in metadata table
+          metadataTable.put(key, 0L);
+          return true;
+        } catch (IOException ex) {
+          LOG.error("Failed to reset {} for container {}.",
+              key, containerData.getContainerID(), ex);
         }
         return false;
       };
 
       final JsonObject deleteCountError = buildErrorAndRepair(
           "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
-          dbDeleteCountJson, deleteTxCountJson,
+          pendingDeleteCountAggregate, pendingDeleteCountDB,
           deleteCountRepairAction);
       errors.add(deleteCountError);
     }
