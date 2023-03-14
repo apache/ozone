@@ -237,7 +237,10 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
-  public static final long OBJECT_ID_DEFAULT = 0L;
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
 
 
   /**

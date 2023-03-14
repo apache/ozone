@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
+
 /**
  * Mixin class to handle ObjectID and UpdateID.
  */
@@ -61,6 +63,10 @@ public class WithObjectID extends WithMetadata {
    * @param obId - long
    */
   public void setObjectID(long obId) {
+    if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
+      throw new UnsupportedOperationException("Attempt to modify object ID " +
+          "which is not zero. Current Object ID is " + this.objectID);
+    }
     this.objectID = obId;
   }
 

@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -277,7 +277,7 @@ public class SnapshotDeletingService extends BackgroundService {
       }
 
       // These are uncommitted blocks wrapped into a pseudo KeyInfo
-      if (deletedKeyInfo.getObjectID() == OBJECT_ID_DEFAULT) {
+      if (deletedKeyInfo.getObjectID() == OBJECT_ID_RECLAIM_BLOCKS) {
         return false;
       }
 
