@@ -327,6 +327,20 @@ public final class DBStoreBuilder {
   }
 
   /**
+   * Pass true to disable auto compaction for Column Family by default.
+   * Sets Disable auto compaction flag for Default Column Family option
+   * @param defaultCFAutoCompaction
+   */
+  public DBStoreBuilder disableDefaultCFAutoCompaction(
+          boolean defaultCFAutoCompaction) {
+    ManagedColumnFamilyOptions defaultCFOptions =
+            getDefaultCfOptions();
+    defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
+    setDefaultCFOptions(defaultCFOptions);
+    return this;
+  }
+
+  /**
    * Get default column family options, but with column family write buffer
    * size limit overridden.
    * @param writeBufferSize Specify column family write buffer size.

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -856,7 +857,6 @@ public class TestOmSnapshot {
 
     String snapshotName = UUID.randomUUID().toString();
     store.createSnapshot(volumeName, bucketName, snapshotName);
-
     List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
         .getOzoneManagersList();
     List<String> snapshotIds = new ArrayList<>();
@@ -888,4 +888,20 @@ public class TestOmSnapshot {
 
     assertEquals(1, snapshotIds.stream().distinct().count());
   }
+
+  @Test
+  public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    String snapPrefix = createSnapshot(volumeName, bucketName);
+    RDBStore snapshotDBStore = (RDBStore)
+            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            .getMetadataManager().getStore();
+
+    for(String table : snapshotDBStore.getTableNames().values()) {
+      Assertions.assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
+              .getHandle().getDescriptor()
+              .getOptions().disableAutoCompactions());
+    }
+  }
+
 }
