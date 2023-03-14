@@ -26,14 +26,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -73,7 +73,8 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   @Override
   public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
-      ContainerHealthResult result, int remainingMaintenanceRedundancy) {
+      ContainerHealthResult result, int remainingMaintenanceRedundancy)
+      throws NotLeaderException {
     ContainerInfo container = result.getContainerInfo();
 
     // We are going to check for over replication, so we should filter out any
@@ -150,7 +151,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       return emptySet();
     }
 
-    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    int commandsSent = 0;
     // As a sanity check, sum up the current counts of each replica index. When
     // processing replicasToRemove, ensure that removing the replica would not
     // drop the count of that index to zero.
@@ -168,16 +169,15 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
         continue;
       }
       replicaIndexCounts.put(r.getReplicaIndex(), currentCount - 1);
-      DeleteContainerCommand deleteCommand =
-          new DeleteContainerCommand(container.getContainerID(), true);
-      deleteCommand.setReplicaIndex(r.getReplicaIndex());
-      commands.add(Pair.of(r.getDatanodeDetails(), deleteCommand));
+      replicationManager.sendDeleteCommand(container, r.getReplicaIndex(),
+          r.getDatanodeDetails(), true);
+      commandsSent++;
     }
 
-    if (commands.size() == 0) {
+    if (commandsSent == 0) {
       LOG.warn("With the current state of available replicas {}, no" +
           " commands were created to remove excess replicas.", replicas);
     }
-    return commands;
+    return Collections.emptySet();
   }
 }
