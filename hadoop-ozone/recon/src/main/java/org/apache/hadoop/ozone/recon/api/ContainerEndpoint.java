@@ -100,6 +100,7 @@ public class ContainerEndpoint {
   private final OzoneStorageContainerManager reconSCM;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
+  private BucketLayout layout = BucketLayout.DEFAULT;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
@@ -176,7 +177,7 @@ public class ContainerEndpoint {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
     long totalCount;
     try {
-      prevKeyPrefix = buildObjectPathForFileSystemBucket(prevKeyPrefix);
+      prevKeyPrefix = correctPathForLayout(prevKeyPrefix);
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
           reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
@@ -420,67 +421,64 @@ public class ContainerEndpoint {
   }
 
   /**
-   * Builds an object path for a file system optimized bucket.
+   * Builds an object path for a file system optimized bucket. For other buckets
+   * it just returns the same path it receives as input.
    *
    * @param prevKeyPrefix the previous key prefix of the object path
    * @return the object path for the file system optimized bucket
    * @throws IOException if an IO error occurs
    */
-  private String buildObjectPathForFileSystemBucket(String prevKeyPrefix)
+  private String correctPathForLayout(String prevKeyPrefix)
       throws IOException {
     if (StringUtils.isEmpty(prevKeyPrefix)) {
       return "";
     }
-    // Normalize the path to remove duplicate slashes & make it easier to parse.
-    String normalizedPath = normalizePath(prevKeyPrefix);
-    String[] names = parseRequestPath(normalizedPath);
 
-    if (names.length < 3) {
-      LOG.error("Invalid path: {} path should contain a directory",
-          prevKeyPrefix);
-      return prevKeyPrefix;
+    try {
+      // Normalize the path to remove duplicate slashes & make it easier to parse.
+      String[] names = parseRequestPath(prevKeyPrefix);
+
+      if (names.length < 3) {
+        LOG.error("Invalid path: {} path should contain a directory",
+            prevKeyPrefix);
+        return prevKeyPrefix;
+      }
+
+      // Extract the volume, bucket, and key names from the path.
+      String volumeName = names[0];
+      String bucketName = names[1];
+      String keyName = names[names.length - 1];
+
+      // Get the bucket handler for the given volume and bucket.
+      BucketHandler handler =
+          getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
+              reconSCM, volumeName, bucketName);
+
+      // Only keyPaths for FSO bucket need to be converted to
+      // their respective objectId's
+      this.layout = handler.getBucketLayout();
+      if (handler.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        return prevKeyPrefix;
+      }
+
+      // Get the object IDs for the bucket, volume, and parent directory.
+      long bucketId, volumeId, parentId;
+      bucketId = handler.getBucketObjectId(names);
+      volumeId = handler.getVolumeObjectId(names);
+      parentId = handler.getDirObjectId(names, names.length - 1);
+
+      // Build the object path by concatenating the object IDs with the key name.
+      StringBuilder objectPathBuilder = new StringBuilder();
+      objectPathBuilder.append(OM_KEY_PREFIX).append(volumeId)
+          .append(OM_KEY_PREFIX).append(bucketId)
+          .append(OM_KEY_PREFIX).append(parentId)
+          .append(OM_KEY_PREFIX).append(keyName);
+
+      return objectPathBuilder.toString();
+    } catch (Exception e) {
+      throw new IOException("Error in correctPathForLayout: " + e.getMessage(),
+          e);
     }
-    // Extract the volume, bucket, and key names from the path.
-    String volumeName = names[0];
-    String bucketName = names[1];
-    String keyName = names[names.length - 1];
-
-    // Get the bucket handler for the given volume and bucket.
-    BucketHandler handler =
-        getBucketHandler(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, volumeName, bucketName);
-
-    // Only keyPaths for FSO bucket need to be converted to
-    // their respective objectId's
-    if (handler.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      return prevKeyPrefix;
-    }
-
-    // Get the object IDs for the bucket, volume, and parent directory.
-    long bucketId, volumeId, parentId;
-    bucketId = handler.getBucketObjectId(names);
-    volumeId = handler.getVolumeObjectId(names);
-    parentId = handler.getDirObjectId(names, names.length - 1);
-
-    // Build the object path by concatenating the object IDs with the key name.
-    StringBuilder objectPathBuilder = new StringBuilder();
-    objectPathBuilder.append(OM_KEY_PREFIX).append(volumeId)
-        .append(OM_KEY_PREFIX).append(bucketId)
-        .append(OM_KEY_PREFIX).append(parentId)
-        .append(OM_KEY_PREFIX).append(keyName);
-
-    return objectPathBuilder.toString();
-  }
-
-  /**
-   * Normalizes a key path by adding the OM_KEY_PREFIX at the beginning
-   * and removing duplicate slashes.
-   *
-   * @param path the key path
-   * @return the normalized key path
-   */
-  public static String normalizePath(String path) {
-    return OM_KEY_PREFIX + OmUtils.normalizeKey(path, false);
   }
 
   /**
