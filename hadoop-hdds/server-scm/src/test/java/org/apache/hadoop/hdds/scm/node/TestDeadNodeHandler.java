@@ -64,7 +64,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
@@ -246,7 +245,6 @@ public class TestDeadNodeHandler {
             .getContainerReplicas(
                 ContainerID.valueOf(container3.getContainerID()));
     Assertions.assertEquals(1, container3Replicas.size());
-
 
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed

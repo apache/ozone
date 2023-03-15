@@ -448,7 +448,8 @@ public class TestDeletedBlockLog {
     addTransactions(deletedBlocks, true);
     Map<UUID, DatanodeDetails> dnuuidMap = dnList.subList(0, 1).stream()
         .collect(Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
-    DatanodeDeletedBlockTransactions transactions = deletedBlockLog.getTransactions(
+    DatanodeDeletedBlockTransactions transactions
+        = deletedBlockLog.getTransactions(
         30 * BLOCKS_PER_TXN * THREE, dnuuidMap);
     Assertions.assertEquals(1, transactions.getDatanodeTransactionMap().size());
   }
