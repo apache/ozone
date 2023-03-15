@@ -86,7 +86,7 @@ public class TestOzoneFileSystemWithStreaming {
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);

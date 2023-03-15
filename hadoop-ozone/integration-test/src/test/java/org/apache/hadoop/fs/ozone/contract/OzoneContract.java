@@ -126,7 +126,7 @@ class OzoneContract extends AbstractFSContract {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
               180000);
-      client = cluster.getClient();
+      client = cluster.newClient();
     } catch (Exception e) {
       throw new IOException(e);
     }

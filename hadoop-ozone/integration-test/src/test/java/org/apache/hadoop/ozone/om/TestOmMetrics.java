@@ -108,7 +108,7 @@ public class TestOmMetrics {
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    client = cluster.getClient();
+    client = cluster.newClient();
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
   }

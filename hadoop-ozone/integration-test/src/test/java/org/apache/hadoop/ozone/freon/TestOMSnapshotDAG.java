@@ -103,7 +103,7 @@ public class TestOMSnapshotDAG {
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
 
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.INFO);

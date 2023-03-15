@@ -94,7 +94,7 @@ public class TestOzoneFSWithObjectStoreCreate {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   @AfterClass

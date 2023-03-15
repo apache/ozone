@@ -111,7 +111,7 @@ public class TestObjectStoreWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);

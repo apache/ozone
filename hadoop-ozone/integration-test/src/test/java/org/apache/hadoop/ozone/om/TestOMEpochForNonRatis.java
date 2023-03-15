@@ -77,7 +77,7 @@ public class TestOMEpochForNonRatis {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   /**

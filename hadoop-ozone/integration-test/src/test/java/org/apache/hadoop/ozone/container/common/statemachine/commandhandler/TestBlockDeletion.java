@@ -154,7 +154,7 @@ public class TestBlockDeletion {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
     om = cluster.getOzoneManager();
     writeClient = store

@@ -153,7 +153,7 @@ public class TestStorageContainerManagerHA {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       ObjectStore store = client.getObjectStore();
       String value = "sample value";
       store.createVolume(volumeName);

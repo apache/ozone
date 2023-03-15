@@ -67,7 +67,7 @@ public class TestSCMContainerManagerMetrics {
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     scm = cluster.getStorageContainerManager();
   }
 

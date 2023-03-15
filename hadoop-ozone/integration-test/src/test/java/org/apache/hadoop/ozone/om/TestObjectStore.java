@@ -65,7 +65,7 @@ public class TestObjectStore {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   /**

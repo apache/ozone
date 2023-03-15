@@ -177,7 +177,7 @@ public class TestOzoneFileInterfaces {
     OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
           getBucketLayout());
     }
@@ -554,7 +554,7 @@ public class TestOzoneFileInterfaces {
   public void testFileSystemWithObjectStoreLayout() throws IOException {
     String obsVolume = UUID.randomUUID().toString();
 
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       ObjectStore store = client.getObjectStore();
 
       // Create volume and bucket

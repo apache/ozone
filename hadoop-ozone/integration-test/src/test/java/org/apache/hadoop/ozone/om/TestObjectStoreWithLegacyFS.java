@@ -90,7 +90,7 @@ public class TestObjectStoreWithLegacyFS {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   /**

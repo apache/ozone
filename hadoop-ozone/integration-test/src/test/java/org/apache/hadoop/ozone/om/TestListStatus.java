@@ -74,7 +74,7 @@ public class TestListStatus {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     // create a volume and a LEGACY bucket
     fsoOzoneBucket = TestDataUtil

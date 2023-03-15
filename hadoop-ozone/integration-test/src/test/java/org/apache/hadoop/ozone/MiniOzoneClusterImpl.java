@@ -317,7 +317,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
-  public OzoneClient getClient() throws IOException {
+  public OzoneClient newClient() throws IOException {
     return OzoneClientFactory.getRpcClient(conf);
   }
 

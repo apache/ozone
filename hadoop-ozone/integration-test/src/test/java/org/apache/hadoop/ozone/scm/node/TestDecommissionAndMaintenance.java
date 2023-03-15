@@ -159,7 +159,7 @@ public class TestDecommissionAndMaintenance {
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
-    client = cluster.getClient();
+    client = cluster.newClient();
     bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }

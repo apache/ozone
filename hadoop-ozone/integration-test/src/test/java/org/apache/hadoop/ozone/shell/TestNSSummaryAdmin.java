@@ -62,7 +62,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes().includeRecon(true).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
 
     // Client uses server conf for this test

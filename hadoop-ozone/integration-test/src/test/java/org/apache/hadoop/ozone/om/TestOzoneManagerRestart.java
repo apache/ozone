@@ -96,7 +96,7 @@ public class TestOzoneManagerRestart {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   /**

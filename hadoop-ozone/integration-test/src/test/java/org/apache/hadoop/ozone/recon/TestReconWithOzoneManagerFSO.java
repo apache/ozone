@@ -78,7 +78,7 @@ public class TestReconWithOzoneManagerFSO {
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-    client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
   }
 

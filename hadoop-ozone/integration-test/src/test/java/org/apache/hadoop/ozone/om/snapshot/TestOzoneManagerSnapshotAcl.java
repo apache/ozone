@@ -130,7 +130,7 @@ public class TestOzoneManagerSnapshotAcl {
         new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils

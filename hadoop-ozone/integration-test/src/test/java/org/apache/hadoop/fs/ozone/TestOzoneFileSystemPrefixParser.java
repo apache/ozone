@@ -70,7 +70,7 @@ public class TestOzoneFileSystemPrefixParser {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
     }

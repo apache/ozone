@@ -260,7 +260,7 @@ public class TestRootedOzoneFileSystem {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     rootPath = String.format("%s://%s/",

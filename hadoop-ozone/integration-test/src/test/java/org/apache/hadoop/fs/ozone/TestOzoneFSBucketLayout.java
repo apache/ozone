@@ -118,7 +118,7 @@ public class TestOzoneFSBucketLayout {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));

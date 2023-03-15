@@ -62,7 +62,7 @@ public class TestOzoneFileSystemMissingParent {
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 

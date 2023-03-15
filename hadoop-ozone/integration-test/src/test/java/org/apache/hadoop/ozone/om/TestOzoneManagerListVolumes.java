@@ -109,7 +109,7 @@ public class TestOzoneManagerListVolumes {
     cluster.waitForClusterToBeReady();
 
     // Create volumes with non-default owners and ACLs
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
 
       /* r = READ, w = WRITE, c = CREATE, d = DELETE
@@ -187,7 +187,7 @@ public class TestOzoneManagerListVolumes {
   private void checkUser(UserGroupInformation user,
       List<String> expectVol, boolean expectListAllSuccess,
                          boolean expectListByUserSuccess) throws IOException {
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       checkUser(client, user,
           expectVol, expectListAllSuccess, expectListByUserSuccess);
     }

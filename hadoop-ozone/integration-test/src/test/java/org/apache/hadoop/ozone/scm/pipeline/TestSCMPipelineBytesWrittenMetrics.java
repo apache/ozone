@@ -78,7 +78,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   private void writeNumBytes(int numBytes) throws Exception {

@@ -77,7 +77,7 @@ public class TestMultiTenantVolume {
         .withoutDatanodes()
         .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     cluster = builder.build();
-    client = cluster.getClient();
+    client = cluster.newClient();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
 
     preFinalizationChecks(getStoreForAccessID(ACCESS_ID));

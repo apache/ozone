@@ -114,7 +114,7 @@ public class TestOzoneSnapshotRestore {
     clientConf = new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
 
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils

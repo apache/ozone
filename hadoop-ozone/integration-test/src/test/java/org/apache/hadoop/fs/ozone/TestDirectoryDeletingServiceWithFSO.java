@@ -91,7 +91,7 @@ public class TestDirectoryDeletingServiceWithFSO {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,

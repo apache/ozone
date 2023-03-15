@@ -52,7 +52,7 @@ public class TestOMStartupWithBucketLayout {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   public static void restartCluster()

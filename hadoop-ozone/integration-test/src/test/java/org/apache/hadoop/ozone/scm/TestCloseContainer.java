@@ -89,7 +89,7 @@ public class TestCloseContainer {
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
   }

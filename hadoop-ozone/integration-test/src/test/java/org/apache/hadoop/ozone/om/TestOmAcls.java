@@ -97,7 +97,7 @@ public class TestOmAcls {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
   }

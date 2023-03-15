@@ -82,7 +82,7 @@ public class TestBucketOwner {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
             .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
        l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
@@ -90,7 +90,7 @@ public class TestBucketOwner {
       createVolumeWithOwnerAndAcl(objectStore, "volume1", "user2", aclWorldAll);
     }
     UserGroupInformation.setLoginUser(user1);
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
       OzoneVolume volume = objectStore.getVolume("volume1");
       BucketArgs omBucketArgs = BucketArgs.newBuilder()
@@ -112,7 +112,7 @@ public class TestBucketOwner {
   public void testBucketOwner() throws Exception {
     // Test Key Operations as Bucket Owner,  Non-Volume Owner
     UserGroupInformation.setLoginUser(user1);
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
           .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -139,7 +139,7 @@ public class TestBucketOwner {
     // Test Key Operations Non-Bucket Owner, Non-Volume Owner
     //Key Create
     UserGroupInformation.setLoginUser(user3);
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -149,7 +149,7 @@ public class TestBucketOwner {
       LOG.info(ex.getMessage());
     }
     //Key Delete - should fail
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -159,7 +159,7 @@ public class TestBucketOwner {
       LOG.info(ex.getMessage());
     }
     //Key Rename - should fail
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -169,7 +169,7 @@ public class TestBucketOwner {
       LOG.info(ex.getMessage());
     }
     //List Keys - should fail
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -179,7 +179,7 @@ public class TestBucketOwner {
       LOG.info(ex.getMessage());
     }
     //Get Acls - should fail
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -189,7 +189,7 @@ public class TestBucketOwner {
       LOG.info(ex.getMessage());
     }
     //Add Acls - should fail
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
@@ -206,7 +206,7 @@ public class TestBucketOwner {
   public void testVolumeOwner() throws Exception {
     //Test Key Operations for Volume Owner
     UserGroupInformation.setLoginUser(user2);
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneVolume volume = client.getObjectStore().getVolume("volume1");
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       //Key Create

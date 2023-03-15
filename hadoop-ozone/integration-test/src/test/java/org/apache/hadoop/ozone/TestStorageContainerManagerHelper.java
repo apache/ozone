@@ -75,7 +75,7 @@ public class TestStorageContainerManagerHelper {
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
-    try (OzoneClient client = cluster.getClient()) {
+    try (OzoneClient client = cluster.newClient()) {
       OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
       // Write 20 keys in bucketName.
       Set<String> keyNames = Sets.newHashSet();

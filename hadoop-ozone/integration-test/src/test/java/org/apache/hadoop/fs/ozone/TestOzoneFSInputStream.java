@@ -95,7 +95,7 @@ public class TestOzoneFSInputStream {
         .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);

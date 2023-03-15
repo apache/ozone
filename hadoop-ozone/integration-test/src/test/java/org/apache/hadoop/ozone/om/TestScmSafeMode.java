@@ -108,7 +108,7 @@ public class TestScmSafeMode {
     cluster = builder.build();
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     om = cluster.getOzoneManager();
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();

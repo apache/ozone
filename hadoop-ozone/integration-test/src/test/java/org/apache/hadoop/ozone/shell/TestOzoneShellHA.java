@@ -165,7 +165,7 @@ public class TestOzoneShellHA {
         .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
   }
 
   /**

@@ -78,7 +78,7 @@ public class TestOmBlockVersioning {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     ozoneManager = cluster.getOzoneManager();
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
