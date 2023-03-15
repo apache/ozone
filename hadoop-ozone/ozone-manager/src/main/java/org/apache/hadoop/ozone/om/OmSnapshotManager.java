@@ -82,11 +82,11 @@ public final class OmSnapshotManager implements AutoCloseable {
   /**
    * Contains all the snap diff job which are either queued, in_progress or
    * done. This table is used to make sure that there is only single job for
-   * similar type of request at any point of time.
+   * requests with the same snapshot pair at any point of time.
    * |----------------------------------------------|
    * |  KEY                         |  VALUE        |
    * |----------------------------------------------|
-   * |  fromSnapshotId-toSnapshotId | snapDiffJodId |
+   * |  fromSnapshotId-toSnapshotId | snapDiffJobId |
    * |----------------------------------------------|
    */
   private static final String SNAP_DIFF_JOB_TABLE_NAME =
@@ -94,11 +94,11 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobId
-   * to improve look up and clean up. JodId comes from snap-diff-job-table.
+   * to improve look up and clean up. JobId comes from snap-diff-job-table.
    * |--------------------------------|
    * |  KEY         |  VALUE          |
    * |--------------------------------|
-   * |  jodId-index | DiffReportEntry |
+   * |  jobId-index | DiffReportEntry |
    * |--------------------------------|
    */
   private static final String SNAP_DIFF_REPORT_TABLE_NAME =
