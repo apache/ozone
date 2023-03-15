@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -35,6 +36,8 @@ public interface SecretKeyState {
    * @return the current active key, or null if the state is not initialized.
    */
   ManagedSecretKey getCurrentKey();
+
+  ManagedSecretKey getKey(UUID id);
 
   /**
    * Get the keys that managed by this manager.

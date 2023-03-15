@@ -129,6 +129,18 @@ public class SecretKeyManager {
     return false;
   }
 
+  public ManagedSecretKey getCurrentKey() {
+    return state.getCurrentKey();
+  }
+
+  public ManagedSecretKey getKey(UUID id) {
+    return state.getKey(id);
+  }
+
+  public List<ManagedSecretKey> getSortedKeys() {
+    return state.getSortedKeys();
+  }
+
   private boolean shouldRotate(ManagedSecretKey currentKey) {
     Duration established = between(currentKey.getCreationTime(), Instant.now());
     return established.compareTo(rotationDuration) >= 0;

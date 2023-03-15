@@ -383,7 +383,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     // StorageContainerManager constructors respectively).  So we need to manage
     // them separately, see initOMHAConfig() and initSCMHAConfig().
     private final ReservedPorts omPorts = new ReservedPorts(3);
-    private final ReservedPorts scmPorts = new ReservedPorts(3);
+    private final ReservedPorts scmPorts = new ReservedPorts(4);
 
     /**
      * Creates a new Builder.
@@ -673,12 +673,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmServiceId, scmNodeId);
         String scmGrpcPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
+        String scmSecurityAddrKey = ConfUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId,
+            scmNodeId);
 
         PrimitiveIterator.OfInt nodePorts = scmPorts.assign(scmNodeId);
         PrimitiveIterator.OfInt rpcPorts = scmRpcPorts.assign(scmNodeId);
         conf.set(scmAddrKey, "127.0.0.1");
         conf.set(scmHttpAddrKey, "127.0.0.1:" + nodePorts.nextInt());
         conf.set(scmHttpsAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set(scmSecurityAddrKey, "127.0.0.1:" + nodePorts.nextInt());
+        conf.set("ozone.scm.update.service.port", "0");
 
         int ratisPort = nodePorts.nextInt();
         conf.setInt(scmRatisPortKey, ratisPort);
