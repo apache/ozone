@@ -80,6 +80,7 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -1084,7 +1085,7 @@ public class KeyValueHandler extends Handler {
         try {
           container.markContainerUnhealthy();
         } catch (IOException ex) {
-          // explicitly catch IOException here since the this operation
+          // explicitly catch IOException here since this operation
           // will fail if the Rocksdb metadata is corrupted.
           long id = container.getContainerData().getContainerID();
           LOG.warn("Unexpected error while marking container " + id
@@ -1356,6 +1357,31 @@ public class KeyValueHandler extends Handler {
         }
       } else {
         metrics.incContainersForceDelete();
+      }
+      if (container.getContainerData() instanceof KeyValueContainerData) {
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) container.getContainerData();
+        HddsVolume hddsVolume = keyValueContainerData.getVolume();
+
+        // Rename container location
+        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
+            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
+
+        if (!success) {
+          LOG.error("Failed to move container under " +
+              hddsVolume.getDeleteServiceDirPath());
+          throw new StorageContainerException("Moving container failed",
+              CONTAINER_INTERNAL_ERROR);
+        }
+
+        if (LOG.isDebugEnabled()) {
+          String containerPath = keyValueContainerData
+              .getContainerPath();
+          File containerDir = new File(containerPath);
+
+          LOG.debug("Container {} has been successfuly moved under {}",
+              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+        }
       }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);
