@@ -130,8 +130,9 @@ enum Type {
   ListSnapshot = 113;
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
+  SnapshotMoveDeletedKeys = 116;
 
-  TransferLeadership = 116;
+  TransferLeadership = 117;
 }
 
 message OMRequest {
@@ -244,8 +245,9 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
-  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 116;
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
 
 }
 
@@ -352,8 +354,9 @@ message OMResponse {
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
   optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
-  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 116;
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
 }
 
 enum Status {
@@ -1703,6 +1706,17 @@ message DeleteSnapshotRequest {
   optional uint64 deletionTime = 4;
 }
 
+message SnapshotMoveDeletedKeysRequest {
+  optional SnapshotInfo fromSnapshot = 1;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 2;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+}
+
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1762,6 +1776,10 @@ message SnapshotDiffResponse {
 }
 
 message DeleteSnapshotResponse {
+
+}
+
+message SnapshotMoveDeletedKeysResponse {
 
 }
 

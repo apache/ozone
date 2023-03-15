@@ -230,7 +230,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         bucketName, snapshotName));
   }
 
-  private SnapshotInfo getSnapshotInfo(String key) throws IOException {
+  public SnapshotInfo getSnapshotInfo(String key) throws IOException {
     SnapshotInfo snapshotInfo;
     try {
       snapshotInfo = ozoneManager.getMetadataManager()
