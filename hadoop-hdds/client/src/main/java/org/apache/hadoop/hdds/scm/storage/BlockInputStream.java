@@ -31,6 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -234,7 +235,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
           .build();
     }
     acquireClient();
-    List<ChunkInfo> chunks;
     try {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
@@ -251,14 +251,32 @@ public class BlockInputStream extends BlockExtendedInputStream {
         blkIDBuilder.setReplicaIndex(replicaIndex);
       }
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, blkIDBuilder.build(), token);
+          .getBlock(xceiverClient, VALIDATORS, blkIDBuilder.build(), token);
 
-      chunks = response.getBlockData().getChunksList();
+      return response.getBlockData().getChunksList();
     } finally {
       releaseClient();
     }
+  }
 
-    return chunks;
+  private static final List<CheckedBiFunction> VALIDATORS
+      = ContainerProtocolCalls.toValidatorList(
+          (request, response) -> validate(response));
+
+  static void validate(ContainerCommandResponseProto response)
+      throws IOException {
+    if (!response.hasGetBlock()) {
+      throw new IllegalArgumentException("Not GetBlock: response=" + response);
+    }
+    final GetBlockResponseProto b = response.getGetBlock();
+    final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
+    for (int i = 0; i < chunks.size(); i++) {
+      final ChunkInfo c = chunks.get(i);
+      if (c.getLen() <= 0) {
+        throw new IOException("Failed to get chunkInfo["
+            + i + "]: len == " + c.getLen());
+      }
+    }
   }
 
   protected void acquireClient() throws IOException {
