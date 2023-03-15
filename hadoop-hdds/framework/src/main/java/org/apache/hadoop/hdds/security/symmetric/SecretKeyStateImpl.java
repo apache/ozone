@@ -23,12 +23,16 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Default implementation of {@link SecretKeyState}.
@@ -41,6 +45,7 @@ public final class SecretKeyStateImpl implements SecretKeyState {
 
   private List<ManagedSecretKey> sortedKeys;
   private ManagedSecretKey currentKey;
+  private Map<UUID, ManagedSecretKey> keyById;
 
   private final SecretKeyStore keyStore;
 
@@ -61,6 +66,20 @@ public final class SecretKeyStateImpl implements SecretKeyState {
     lock.readLock().lock();
     try {
       return currentKey;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public ManagedSecretKey getKey(UUID id) {
+    lock.readLock().lock();
+    try {
+      // Return null if not initialized yet.
+      if (keyById == null) {
+        return null;
+      }
+      return keyById.get(id);
     } finally {
       lock.readLock().unlock();
     }
@@ -98,6 +117,10 @@ public final class SecretKeyStateImpl implements SecretKeyState {
               .collect(toList())
       );
       currentKey = sortedKeys.get(0);
+      keyById = newKeys.stream().collect(toMap(
+          ManagedSecretKey::getId,
+          Function.identity()
+      ));
       LOG.info("Current key updated {}", currentKey);
       keyStore.save(sortedKeys);
     } finally {
