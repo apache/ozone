@@ -39,6 +39,8 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -134,6 +136,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1520,7 +1523,8 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    refreshPipeline(keyInfoList);
+
+    refreshPipelineFromCache(keyInfoList);
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1652,7 +1656,7 @@ public class KeyManagerImpl implements KeyManager {
     // refreshPipeline flag check has been removed as part of
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
-    refreshPipeline(keyInfoList);
+    refreshPipelineFromCache(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1914,18 +1918,39 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
+  private void refreshPipelineFromCache(Iterable<OmKeyInfo> keyInfos)
+      throws IOException {
+    Set<Long> containerIds = new HashSet<>();
+    for (OmKeyInfo keyInfo : keyInfos) {
+      extractContainerIDs(keyInfo).forEach(containerIds::add);
+    }
+
+    // List API never force cache refresh. If a client detects a block
+    // location is outdated, it'll call getKeyInfo with cacheRefresh=true
+    // to request cache refresh on individual container.
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, false);
+
+    for (OmKeyInfo keyInfo : keyInfos) {
+      setUpdatedContainerLocation(keyInfo, containerLocations);
+    }
+  }
+
   protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
                                           boolean forceRefresh)
       throws IOException {
-    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
-        .flatMap(v -> v.getLocationList().stream())
-        .map(BlockLocationInfo::getContainerID)
+    Set<Long> containerIds = extractContainerIDs(keyInfo)
         .collect(Collectors.toSet());
 
     metrics.setForceContainerCacheRefresh(forceRefresh);
     Map<Long, Pipeline> containerLocations =
         scmClient.getContainerLocations(containerIds, forceRefresh);
 
+    setUpdatedContainerLocation(keyInfo, containerLocations);
+  }
+
+  private void setUpdatedContainerLocation(OmKeyInfo keyInfo,
+                         Map<Long, Pipeline> containerLocations) {
     for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
       for (List<OmKeyLocationInfo> omKeyLocationInfoList :
           key.getLocationLists()) {
@@ -1939,5 +1964,12 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
+  }
+
+  @NotNull
+  private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
+    return keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID);
   }
 }
