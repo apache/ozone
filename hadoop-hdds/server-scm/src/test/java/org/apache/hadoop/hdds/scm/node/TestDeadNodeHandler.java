@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +64,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
@@ -247,6 +250,8 @@ public class TestDeadNodeHandler {
 
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
+    DeleteBlocksCommand cmd = new DeleteBlocksCommand(Collections.emptyList());
+    nodeManager.addDatanodeCommand(datanode1.getUuid(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     deadNodeHandler.onMessage(datanode1, publisher);
@@ -254,6 +259,8 @@ public class TestDeadNodeHandler {
     //deadNodeHandler.onMessage call will not change this
     Assertions.assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
+    Assertions.assertEquals(0, 
+        nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

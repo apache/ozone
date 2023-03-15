@@ -135,15 +135,16 @@ public class SCMBlockDeletingService extends BackgroundService
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running DeletedBlockTransactionScanner");
       }
-      // When DN node is healthy and in-service, and previous commands 
-      // are handled for deleteBlocks Type, then it will be considered
       List<DatanodeDetails> datanodes =
           nodeManager.getNodes(NodeStatus.inServiceHealthy());
-      Map<UUID, DatanodeDetails> dnUUIDMap = datanodes.stream().filter(
-          dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
-              Type.deleteBlocksCommand) <= 0).collect(
-          Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
       if (datanodes != null) {
+        // When DN node is healthy and in-service, and previous commands 
+        // are handled for deleteBlocks Type, then it will be considered
+        // in this iteration
+        Map<UUID, DatanodeDetails> dnUUIDMap = datanodes.stream().filter(
+            dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
+                Type.deleteBlocksCommand) == 0).collect(
+            Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
         try {
           DatanodeDeletedBlockTransactions transactions =
               deletedBlockLog.getTransactions(blockDeleteLimitSize, dnUUIDMap);
@@ -177,7 +178,6 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
-          // TODO: Fix ME!!!
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),

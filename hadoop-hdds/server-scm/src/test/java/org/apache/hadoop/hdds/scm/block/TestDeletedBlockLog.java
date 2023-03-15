@@ -443,6 +443,17 @@ public class TestDeletedBlockLog {
   }
 
   @Test
+  public void testDNOnlyOneNodeHealthy() throws Exception {
+    Map<Long, List<Long>> deletedBlocks = generateData(50);
+    addTransactions(deletedBlocks, true);
+    Map<UUID, DatanodeDetails> dnuuidMap = dnList.subList(0, 1).stream()
+        .collect(Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
+    DatanodeDeletedBlockTransactions transactions = deletedBlockLog.getTransactions(
+        30 * BLOCKS_PER_TXN * THREE, dnuuidMap);
+    Assertions.assertEquals(1, transactions.getDatanodeTransactionMap().size());
+  }
+
+  @Test
   public void testInadequateReplicaCommit() throws Exception {
     Map<Long, List<Long>> deletedBlocks = generateData(50);
     addTransactions(deletedBlocks, true);
