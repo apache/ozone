@@ -49,6 +49,7 @@ public class SnapshotChainManager {
       snapshotChainPath;
   private Map<String, String> latestPathSnapshotID;
   private String latestGlobalSnapshotID;
+  private Map<String, String> snapshotPathToTableKey;
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);
 
@@ -57,10 +58,14 @@ public class SnapshotChainManager {
     snapshotChainGlobal = new LinkedHashMap<>();
     snapshotChainPath = new HashMap<>();
     latestPathSnapshotID = new HashMap<>();
+    snapshotPathToTableKey = new HashMap<>();
     latestGlobalSnapshotID = null;
     loadFromSnapshotInfoTable(metadataManager);
   }
 
+  /**
+   * Add snapshot to global snapshot chain.
+   */
   private void addSnapshotGlobal(String snapshotID,
                                  String prevGlobalID) throws IOException {
     // set previous snapshotID to null if it is "" for
@@ -90,9 +95,13 @@ public class SnapshotChainManager {
     latestGlobalSnapshotID = snapshotID;
   };
 
+  /**
+   * Add snapshot to bucket snapshot chain(path based).
+   */
   private void addSnapshotPath(String snapshotPath,
                                String snapshotID,
-                               String prevPathID) throws IOException {
+                               String prevPathID,
+                               String snapTableKey) throws IOException {
     // set previous snapshotID to null if it is "" for
     // internal in-mem structure
     if (prevPathID != null && prevPathID.isEmpty()) {
@@ -130,6 +139,8 @@ public class SnapshotChainManager {
         .put(snapshotID,
             new SnapshotChainInfo(snapshotID, prevPathID, null));
 
+    // store snapshot ID to snapshot DB table key in the map
+    snapshotPathToTableKey.put(snapshotID, snapTableKey);
     // set state variable latestPath snapshot entry to this snapshotID
     latestPathSnapshotID.put(snapshotPath, snapshotID);
   };
@@ -246,6 +257,10 @@ public class SnapshotChainManager {
     return status;
   }
 
+  /**
+   * Loads the snapshot chain from SnapshotInfo table.
+   * @param metadataManager OMMetadataManager
+   */
   private void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
           throws IOException {
     // read from snapshotInfo table to populate
@@ -256,6 +271,8 @@ public class SnapshotChainManager {
     Table.KeyValue< String, SnapshotInfo > kv;
     snapshotChainGlobal.clear();
     snapshotChainPath.clear();
+    latestPathSnapshotID.clear();
+    snapshotPathToTableKey.clear();
 
     while (keyIter.hasNext()) {
       kv = keyIter.next();
@@ -275,7 +292,8 @@ public class SnapshotChainManager {
         sinfo.getGlobalPreviousSnapshotID());
     addSnapshotPath(sinfo.getSnapshotPath(),
         sinfo.getSnapshotID(),
-        sinfo.getPathPreviousSnapshotID());
+        sinfo.getPathPreviousSnapshotID(),
+        sinfo.getTableKey());
   }
 
   /**
@@ -501,6 +519,10 @@ public class SnapshotChainManager {
         .get(snapshotPath)
         .get(snapshotID)
         .getPreviousSnapshotID();
+  }
+
+  public String getTableKey(String snapshotPath) {
+    return snapshotPathToTableKey.get(snapshotPath);
   }
 
   @VisibleForTesting
