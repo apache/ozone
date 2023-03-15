@@ -46,6 +46,7 @@ import javax.ws.rs.core.Response;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -118,6 +119,9 @@ public class ClusterStateEndpoint {
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
     GlobalStats fileRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(FILE_TABLE));
+    // Keys from the DeletedTable
+    GlobalStats deletedKeyRecord = globalStatsDao.findById(
+        TableCountTask.getRowKeyFromTable(DELETED_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
@@ -127,13 +131,19 @@ public class ClusterStateEndpoint {
     }
 
     Long totalKeys = 0L;
+    Long deletedKeys = 0L;
+
     if (keyRecord != null) {
       totalKeys += keyRecord.getValue();
     }
     if (fileRecord != null) {
       totalKeys += fileRecord.getValue();
     }
+    if (deletedKeyRecord != null) {
+      deletedKeys += deletedKeyRecord.getValue();
+    }
     builder.setKeys(totalKeys);
+    builder.setDeletedKeys(deletedKeys);
 
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)

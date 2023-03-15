@@ -93,6 +93,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,6 +116,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -366,25 +368,19 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     } catch (Exception ex) {
       Assertions.fail(ex.getMessage());
     }
-
     // Write Data to OM
-
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
     // Create a new volume and bucket and then write keys to the bucket.
     String volumeKey = reconOMMetadataManager.getVolumeKey("sampleVol2");
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
-            .setVolume("sampleVol2")
-            .setAdminName("TestUser")
-            .setOwnerName("TestUser")
-            .build();
+            .setVolume("sampleVol2").setAdminName("TestUser")
+            .setOwnerName("TestUser").build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName("sampleVol2")
-        .setBucketName("bucketOne")
-        .build();
+        .setVolumeName("sampleVol2").setBucketName("bucketOne").build();
 
     String bucketKey = reconOMMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
@@ -393,12 +389,21 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
-
     // key = key_two
     writeDataToOm(reconOMMetadataManager, "key_two");
-
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
+
+    // Populate the deletedKeys table in OM DB
+    List<String> deletedKeysList1 = Arrays.asList("key1");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList1, "Bucket1", "Volume1");
+    List<String> deletedKeysList2 = Arrays.asList("key2", "key2");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList2, "Bucket2", "Volume2");
+    List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList3, "Bucket3", "Volume3");
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -612,6 +617,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
   }
 
   @Test
