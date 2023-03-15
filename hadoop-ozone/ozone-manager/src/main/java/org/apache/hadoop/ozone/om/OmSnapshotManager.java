@@ -478,9 +478,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       final List<ColumnFamilyHandle> columnFamilyHandles,
       final ManagedRocksDB managedRocksDB) {
 
-    if (managedDBOptions != null) {
-      managedDBOptions.close();
-    }
     if (managedColumnFamilyOptions != null) {
       closeColumnFamilyOptions(managedColumnFamilyOptions);
     }
@@ -495,6 +492,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (managedRocksDB != null) {
       managedRocksDB.close();
     }
+    if (managedDBOptions != null) {
+      managedDBOptions.close();
+    }
   }
 
   private void closeColumnFamilyOptions(
@@ -507,15 +507,15 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (options != null) {
-      options.close();
-    }
     if (columnFamilyOptions != null) {
       closeColumnFamilyOptions(columnFamilyOptions);
     }
 
     if (snapshotDiffDb != null) {
       snapshotDiffDb.close();
+    }
+    if (options != null) {
+      options.close();
     }
   }
 }
