@@ -282,8 +282,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
 
-  // Table-level locks that protects table read/write access.
-  // This is intended to be a finer-grained lock than OzoneManagerLock.
+  // Table-level locks that protects table read/write access. Note:
+  // Don't use this lock for tables other than deletedTable and deletedDirTable.
+  // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
   private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
 
   @Override
