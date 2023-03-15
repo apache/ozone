@@ -134,8 +134,7 @@ public class ContainerBalancerTask implements Runnable {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
-    this.moveManager = new MoveManager(replicationManager, containerManager,
-        config.getMoveTimeout());
+    this.moveManager = new MoveManager(replicationManager, containerManager);
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;
@@ -998,6 +997,7 @@ public class ContainerBalancerTask implements Runnable {
    * Resets some variables and metrics for this iteration.
    */
   private void resetState() {
+    moveManager.resetState();
     this.clusterCapacity = 0L;
     this.clusterRemaining = 0L;
     this.overUtilizedNodes.clear();

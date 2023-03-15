@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -111,7 +110,7 @@ public final class MoveManager implements
   //        delete after the move, but before anything else can, eg RM?
 
   // TODO - these need to be config defined somewhere, probably in the balancer
-  private final long moveDeadline;
+  private static final long MOVE_DEADLINE = 1000 * 60 * 60; // 1 hour
   private static final double MOVE_DEADLINE_FACTOR = 0.95;
 
   private final ReplicationManager replicationManager;
@@ -125,11 +124,10 @@ public final class MoveManager implements
   private volatile boolean running = false;
 
   public MoveManager(final ReplicationManager replicationManager,
-      final ContainerManager containerManager, final Duration moveDeadline) {
+      final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.clock = replicationManager.getClock();
-    this.moveDeadline = moveDeadline.toMillis();
   }
 
   /**
@@ -138,6 +136,10 @@ public final class MoveManager implements
   public Map<ContainerID,
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> getPendingMove() {
     return pendingMoves;
+  }
+
+  void resetState() {
+    pendingMoves.clear();
   }
 
   /**
@@ -471,8 +473,8 @@ public final class MoveManager implements
         containerInfo.containerID(), src);
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + moveDeadline,
-        now + Math.round(moveDeadline * MOVE_DEADLINE_FACTOR));
+        replicaIndex, src, tgt, now + MOVE_DEADLINE,
+        now + Math.round(MOVE_DEADLINE * MOVE_DEADLINE_FACTOR));
   }
 
   /**
