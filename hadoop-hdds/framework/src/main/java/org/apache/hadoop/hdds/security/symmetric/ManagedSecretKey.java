@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -92,13 +92,8 @@ public final class ManagedSecretKey implements Serializable {
    * @return the protobuf message to deserialize this object.
    */
   public SCMSecurityProtocolProtos.ManagedSecretKey toProtobuf() {
-    HddsProtos.UUID uuid = HddsProtos.UUID.newBuilder()
-        .setMostSigBits(this.id.getMostSignificantBits())
-        .setLeastSigBits(this.id.getLeastSignificantBits())
-        .build();
-
     return SCMSecurityProtocolProtos.ManagedSecretKey.newBuilder()
-        .setId(uuid)
+        .setId(ProtobufUtils.toProtobuf(id))
         .setCreationTime(this.creationTime.toEpochMilli())
         .setExpiryTime(this.expiryTime.toEpochMilli())
         .setAlgorithm(this.secretKey.getAlgorithm())
@@ -111,8 +106,7 @@ public final class ManagedSecretKey implements Serializable {
    */
   public static ManagedSecretKey fromProtobuf(
       SCMSecurityProtocolProtos.ManagedSecretKey message) {
-    UUID id = new UUID(message.getId().getMostSigBits(),
-        message.getId().getLeastSigBits());
+    UUID id = ProtobufUtils.fromProtobuf(message.getId());
     Instant creationTime = Instant.ofEpochMilli(message.getCreationTime());
     Instant expiryTime = Instant.ofEpochMilli(message.getExpiryTime());
     SecretKey secretKey = new SecretKeySpec(message.getEncoded().toByteArray(),

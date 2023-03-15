@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
@@ -26,16 +27,20 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrlsResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSecretKeyRequest;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecretKeysListResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -43,6 +48,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -50,6 +56,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +158,21 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             getCertificate(request.getGetCertRequest()))
             .build();
 
+      case GetCurrentSecretKey:
+        return scmSecurityResponse
+            .setCurrentSecretKeyResponseProto(getCurrentSecretKey())
+            .build();
+
+      case GetSecretKey:
+        return scmSecurityResponse.setGetSecretKeyResponseProto(
+                getSecretKey(request.getGetSecretKeyRequest()))
+            .build();
+
+      case GetAllSecretKeys:
+        return scmSecurityResponse
+            .setSecretKeysListResponseProto(getAllSecretKeys())
+            .build();
+
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -171,6 +193,34 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       }
       return scmSecurityResponse.build();
     }
+  }
+
+  private SCMSecretKeysListResponse getAllSecretKeys() throws IOException {
+    SCMSecretKeysListResponse.Builder builder =
+        SCMSecretKeysListResponse.newBuilder();
+    impl.getAllSecretKeys()
+        .stream().map(ManagedSecretKey::toProtobuf)
+        .forEach(builder::addSecretKeys);
+    return builder.build();
+  }
+
+  private SCMGetSecretKeyResponse getSecretKey(
+      SCMGetSecretKeyRequest getSecretKeyRequest) throws IOException {
+    SCMGetSecretKeyResponse.Builder builder =
+        SCMGetSecretKeyResponse.newBuilder();
+    UUID id = ProtobufUtils.fromProtobuf(getSecretKeyRequest.getSecretKeyId());
+    ManagedSecretKey secretKey = impl.getSecretKey(id);
+    if (secretKey != null) {
+      builder.setSecretKey(secretKey.toProtobuf());
+    }
+    return builder.build();
+  }
+
+  private SCMGetCurrentSecretKeyResponse getCurrentSecretKey()
+      throws IOException {
+    return SCMGetCurrentSecretKeyResponse.newBuilder()
+        .setSecretKey(impl.getCurrentSecretKey().toProtobuf())
+        .build();
   }
 
   /**

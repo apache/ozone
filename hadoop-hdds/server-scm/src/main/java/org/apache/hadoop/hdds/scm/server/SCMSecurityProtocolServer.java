@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -44,12 +45,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -67,6 +72,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
@@ -92,15 +99,21 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final ProtocolMessageMetrics metrics;
   private final StorageContainerManager storageContainerManager;
 
+  // SecretKey may not be enabled when neither block token nor container
+  // token is enabled.
+  private final SecretKeyManager secretKeyManager;
+
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      X509Certificate rootCACert, StorageContainerManager scm)
+      X509Certificate rootCACert, StorageContainerManager scm,
+      @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
     this.rootCACertificate = rootCACert;
+    this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -160,6 +173,37 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
     return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
+  }
+
+  @Override
+  public ManagedSecretKey getCurrentSecretKey() throws SCMSecurityException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getCurrentKey();
+  }
+
+  @Override
+  public ManagedSecretKey getSecretKey(UUID id) throws SCMSecurityException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getKey(id);
+  }
+
+  @Override
+  public List<ManagedSecretKey> getAllSecretKeys() throws SCMSecurityException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getSortedKeys();
+  }
+
+  private void validateSecretKeyStatus() throws SCMSecurityException {
+    if (secretKeyManager == null) {
+      throw new SCMSecurityException("Secret keys are not enabled.",
+          ErrorCode.SECRET_KEY_NOT_ENABLED);
+    }
+
+    if (!secretKeyManager.isInitialized()) {
+      throw new SCMSecurityException(
+          "Secret key initialization is not finished yet.",
+          ErrorCode.SECRET_KEY_NOT_INITIALIZED);
+    }
   }
 
   /**
@@ -368,7 +412,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     } catch (InterruptedException | ExecutionException e) {
       Thread.currentThread().interrupt();
       throw new SCMException("Fail to revoke certs",
-          SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
+          ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
     }
   }
 

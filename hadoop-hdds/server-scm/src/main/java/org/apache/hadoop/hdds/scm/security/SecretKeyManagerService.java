@@ -147,6 +147,10 @@ public class SecretKeyManagerService implements SCMService, Runnable {
         TimeUnit.MILLISECONDS);
   }
 
+  public SecretKeyManager getSecretKeyManager() {
+    return secretKeyManager;
+  }
+
   @Override
   public void stop() {
     scheduler.shutdownNow();
