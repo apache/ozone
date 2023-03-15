@@ -87,6 +87,9 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
         removeContainerReplicas(datanodeDetails);
       }
+      
+      // remove commands in command queue for the DN
+      nodeManager.getCommandQueue(datanodeDetails.getUuid());
 
       //move dead datanode out of ClusterNetworkTopology
       NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();

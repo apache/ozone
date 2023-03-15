@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.block;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
@@ -43,11 +44,14 @@ public interface DeletedBlockLog extends Closeable {
    * Scan entire log once and returns TXs to DatanodeDeletedBlockTransactions.
    * Once DatanodeDeletedBlockTransactions is full, the scan behavior will
    * stop.
+   *
    * @param blockDeletionLimit Maximum number of blocks to fetch
+   * @param dnUUIDMap map of uuid and DN details
    * @return Mapping from containerId to latest transactionId for the container.
    * @throws IOException
    */
-  DatanodeDeletedBlockTransactions getTransactions(int blockDeletionLimit)
+  DatanodeDeletedBlockTransactions getTransactions(
+      int blockDeletionLimit, Map<UUID, DatanodeDetails> dnUUIDMap)
       throws IOException, TimeoutException;
 
   /**

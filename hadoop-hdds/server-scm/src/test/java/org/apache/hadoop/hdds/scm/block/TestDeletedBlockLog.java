@@ -295,8 +295,10 @@ public class TestDeletedBlockLog {
 
   private List<DeletedBlocksTransaction> getTransactions(
       int maximumAllowedBlocksNum) throws IOException, TimeoutException {
+    Map<UUID, DatanodeDetails> dnuuidMap = dnList.stream().collect(
+        Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
     DatanodeDeletedBlockTransactions transactions =
-        deletedBlockLog.getTransactions(maximumAllowedBlocksNum);
+        deletedBlockLog.getTransactions(maximumAllowedBlocksNum, dnuuidMap);
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
     for (DatanodeDetails dn : dnList) {
       txns.addAll(Optional.ofNullable(
@@ -460,8 +462,10 @@ public class TestDeletedBlockLog {
     // For the first 30 txn, deletedBlockLog only has the txn from dn1 and dn2
     // For the rest txn, txn will be got from all dns.
     // Committed txn will be: 1-40. 1-40. 31-40
+    Map<UUID, DatanodeDetails> dnuuidMap = dnList.stream().collect(
+        Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
     commitTransactions(deletedBlockLog.getTransactions(
-        30 * BLOCKS_PER_TXN * THREE));
+        30 * BLOCKS_PER_TXN * THREE, dnuuidMap));
 
     // The rest txn shall be: 41-50. 41-50. 41-50
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
