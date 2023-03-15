@@ -156,7 +156,7 @@ public class CertificateClientTestImpl implements CertificateClient {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();
       Date expireDate = x509Certificate.getNotAfter();
       LocalDateTime gracePeriodStart = expireDate.toInstant()
-          .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+          .minus(gracePeriod).atZone(ZoneId.systemDefault()).toLocalDateTime();
       LocalDateTime currentTime = LocalDateTime.now();
       Duration delay = gracePeriodStart.isBefore(currentTime) ? Duration.ZERO :
           Duration.between(currentTime, gracePeriodStart);

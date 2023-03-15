@@ -1195,6 +1195,9 @@ public class ReplicationManager implements SCMService {
     return rmConf;
   }
 
+  public Clock getClock() {
+    return clock;
+  }
 
   /**
   * following functions will be refactored in a separate jira.
@@ -1230,8 +1233,12 @@ public class ReplicationManager implements SCMService {
   }
 
   public boolean isContainerReplicatingOrDeleting(ContainerID containerID) {
-    return legacyReplicationManager
-        .isContainerReplicatingOrDeleting(containerID);
+    if (rmConf.isLegacyEnabled()) {
+      return legacyReplicationManager
+          .isContainerReplicatingOrDeleting(containerID);
+    } else {
+      return !getPendingReplicationOps(containerID).isEmpty();
+    }
   }
 
   private ECContainerReplicaCount getECContainerReplicaCount(

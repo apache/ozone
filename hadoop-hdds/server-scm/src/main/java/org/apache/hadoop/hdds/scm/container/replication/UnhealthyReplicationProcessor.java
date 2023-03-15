@@ -110,8 +110,10 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     failedOnes.forEach(result ->
         requeueHealthResultFromQueue(replicationManager, result));
 
-    LOG.info("Processed {} containers with health state counts {}," +
-             "failed processing {}", processed, healthStateCntMap, failed);
+    if (processed > 0 || failed > 0) {
+      LOG.info("Processed {} containers with health state counts {}, " +
+          "failed processing {}", processed, healthStateCntMap, failed);
+    }
   }
 
   /**

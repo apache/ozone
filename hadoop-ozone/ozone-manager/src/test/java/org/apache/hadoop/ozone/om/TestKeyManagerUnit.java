@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +85,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -574,7 +576,7 @@ public class TestKeyManagerUnit {
         .map(DatanodeDetails::getUuidString)
         .collect(toList());
 
-    List<Long> containerIDs = new ArrayList<>();
+    Set<Long> containerIDs = new HashSet<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
     for (long i = 1; i <= 10; i++) {
       final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
@@ -622,6 +624,12 @@ public class TestKeyManagerUnit {
     Assert.assertEquals(10, fileStatusList.size());
     verify(containerClient).getContainerWithPipelineBatch(containerIDs);
     verify(blockClient).sortDatanodes(nodes, client);
+
+    // call list status the second time, and verify no more calls to
+    // SCM.
+    keyManager.listStatus(builder.build(), false,
+        null, Long.MAX_VALUE, client);
+    verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
   }
 
   @Test

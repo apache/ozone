@@ -922,7 +922,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     Date expireDate = certificate.getNotAfter();
     LocalDateTime gracePeriodStart = expireDate.toInstant()
-        .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+        .minus(gracePeriod).atZone(ZoneId.systemDefault()).toLocalDateTime();
     LocalDateTime currentTime = LocalDateTime.now();
     if (gracePeriodStart.isBefore(currentTime)) {
       // Cert is already in grace period time.

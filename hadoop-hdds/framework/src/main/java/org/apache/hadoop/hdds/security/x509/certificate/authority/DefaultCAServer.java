@@ -55,9 +55,7 @@ import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
@@ -566,8 +564,7 @@ public class DefaultCAServer implements CertificateServer {
       SecurityConfig securityConfig, KeyPair key)
       throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
-    LocalDateTime beginDate =
-        LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
+    LocalDateTime beginDate = LocalDateTime.now();
     LocalDateTime endDate =
         beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
