@@ -75,6 +75,9 @@ public final class IOUtils {
     }
   }
 
+  /**
+   * Close each argument, swallowing exceptions.
+   */
   public static void closeQuietly(AutoCloseable... closeables) {
     close(null, closeables);
   }
