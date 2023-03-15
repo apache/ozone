@@ -539,7 +539,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   private String getAbsoluteSstFilePath(String filename)
-      throws FileNotFoundException{
+      throws FileNotFoundException {
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
       filename += SST_FILE_EXTENSION;
     }

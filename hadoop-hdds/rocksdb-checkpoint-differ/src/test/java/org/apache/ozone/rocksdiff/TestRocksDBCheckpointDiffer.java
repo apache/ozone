@@ -32,9 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -325,7 +323,8 @@ public class TestRocksDBCheckpointDiffer {
             TimeUnit.DAYS.toMillis(1),
             MINUTES.toMillis(5));
 
-    RocksDB rocksDB = createRocksDBInstanceAndWriteKeys(activeDbDirName, differ);
+    RocksDB rocksDB =
+        createRocksDBInstanceAndWriteKeys(activeDbDirName, differ);
     readRocksDBInstance(activeDbDirName, rocksDB, null, differ);
 
     if (LOG.isDebugEnabled()) {
@@ -1170,8 +1169,8 @@ public class TestRocksDBCheckpointDiffer {
     differ.pruneSstFiles();
 
     Set<String> actualFileSetAfterPruning;
-    try (Stream<Path> pathStream =
-             Files.list(Paths.get(metadataDirName + "/" +sstBackUpDirName))
+    try (Stream<Path> pathStream = Files.list(
+            Paths.get(metadataDirName + "/" + sstBackUpDirName))
         .filter(e -> e.toString().toLowerCase()
             .endsWith(SST_FILE_EXTENSION))
         .sorted()) {
