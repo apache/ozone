@@ -208,8 +208,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
       if (blockLocationInfo == null) {
         LOG.debug("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New block location info for block {}: {}",
-            blockID, blockLocationInfo);
+        LOG.debug("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
         this.pipeline = blockLocationInfo.getPipeline();
         this.token = blockLocationInfo.getToken();
       }
