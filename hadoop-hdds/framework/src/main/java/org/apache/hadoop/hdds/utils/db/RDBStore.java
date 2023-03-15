@@ -103,6 +103,16 @@ public class RDBStore implements DBStore {
         dbJmxBeanNameName;
 
     try {
+      if (enableCompactionLog) {
+        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+            dbLocation.getParent(), dbCompactionSSTBackupDirName,
+            dbCompactionLogDirName, dbLocation.toString(),
+            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
+        rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
+      } else {
+        rocksDBCheckpointDiffer = null;
+      }
+
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
@@ -149,20 +159,12 @@ public class RDBStore implements DBStore {
       }
 
       if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName, dbLocation.toString(),
-            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
-        rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
-
         // Finish the initialization of compaction DAG tracker by setting the
         // sequence number as current compaction log filename.
         rocksDBCheckpointDiffer.setCurrentCompactionLog(
             db.getLatestSequenceNumber());
         // Load all previous compaction logs
         rocksDBCheckpointDiffer.loadAllCompactionLogs();
-      } else {
-        rocksDBCheckpointDiffer = null;
       }
 
       //Initialize checkpoint manager
