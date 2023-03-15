@@ -731,7 +731,7 @@ public final class ContainerProtocolCalls  {
     return Collections.singletonList(validator);
   }
 
-  public static List<CheckedBiFunction> getValidatorList(
+  public static List<CheckedBiFunction> toValidatorList(
       CheckedBiFunction<ContainerCommandRequestProto,
           ContainerCommandResponseProto, IOException> validator) {
     final List<CheckedBiFunction> defaults
