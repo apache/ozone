@@ -54,6 +54,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -182,6 +183,47 @@ public class TestECUnderReplicationHandler {
     ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds
         .iterator().next().getValue();
     Assertions.assertEquals(1, cmd.getReplicaIndex());
+  }
+
+
+  // Test used to reproduce the issue reported in HDDS-8171
+  @Test
+  public void testUnderReplicationWithDecomIndexAndMaintOnSameIndex()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = new LinkedHashSet<>();
+    ContainerReplica deadMaintenance =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, IN_MAINTENANCE, CLOSED);
+    availableReplicas.add(deadMaintenance);
+
+    nodeManager = new MockNodeManager(true, 10) {
+      @Override
+      public NodeStatus getNodeStatus(DatanodeDetails dd) {
+        if (dd.equals(deadMaintenance.getDatanodeDetails())) {
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.DEAD);
+        }
+        return new NodeStatus(
+            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+      }
+    };
+
+    availableReplicas.addAll(ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(IN_MAINTENANCE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5)));
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
+        testUnderReplicationWithMissingIndexes(
+            Lists.emptyList(), availableReplicas, 1, 2, policy);
+    Assertions.assertEquals(2, cmds.size());
+    // Check the replicate command has index 1 set
+    for (Pair<DatanodeDetails, SCMCommand<?>> c : cmds) {
+      // Ensure neither of the commands are for the dead maintenance node
+      Assertions.assertNotEquals(deadMaintenance.getDatanodeDetails(),
+          c.getKey());
+    }
   }
 
   @Test
