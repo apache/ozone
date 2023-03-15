@@ -462,18 +462,26 @@ public class TestECBlockInputStream {
     }
 
     // Create a refreshFunction that returns a hard-coded EC pipeline.
-    Function<BlockID, Pipeline> refreshFunction = blkID -> Pipeline.newBuilder()
-        .setReplicationConfig(repConfig)
-        .setNodes(new ArrayList<>(dnMap.keySet()))
-        .setReplicaIndexes(dnMap)
-        .setState(Pipeline.PipelineState.CLOSED)
-        .setId(PipelineID.randomId())
-        .build();
+    Function<BlockID, BlockLocationInfo> refreshFunction = blkID -> {
+      Pipeline pipeline = Pipeline.newBuilder()
+          .setReplicationConfig(repConfig)
+          .setNodes(new ArrayList<>(dnMap.keySet()))
+          .setReplicaIndexes(dnMap)
+          .setState(Pipeline.PipelineState.CLOSED)
+          .setId(PipelineID.randomId())
+          .build();
+      BlockLocationInfo blockLocation = new BlockLocationInfo.Builder()
+          .setPipeline(pipeline)
+          .build();
+      return blockLocation;
+    };
 
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, true, null, null, streamFactory)) {
       Pipeline pipeline =
-          ecb.ecPipelineRefreshFunction(3, refreshFunction).apply(blockID);
+          ecb.ecPipelineRefreshFunction(3, refreshFunction)
+              .apply(blockID)
+              .getPipeline();
       // Check the pipeline is built with the correct Datanode
       // with right replicaIndex.
       Assertions.assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
@@ -503,7 +511,7 @@ public class TestECBlockInputStream {
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
         boolean verifyChecksum, XceiverClientFactory xceiverFactory,
-        Function<BlockID, Pipeline> refreshFunction) {
+        Function<BlockID, BlockLocationInfo> refreshFunction) {
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
           (byte)blockStreams.size());
