@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
@@ -44,21 +45,26 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -77,6 +83,9 @@ public class TestKeyValueHandler {
 
   @Rule
   public TestRule timeout = Timeout.seconds(300);
+
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
@@ -349,13 +358,14 @@ public class TestKeyValueHandler {
             "-" + UUID.randomUUID().toString());
     try {
       final long containerID = 1L;
+      final String clusterId = UUID.randomUUID().toString();
+      final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
       final ContainerSet containerSet = new ContainerSet(1000);
       final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
 
-      String clusterId = UUID.randomUUID().toString();
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
-          .clusterID(clusterId).datanodeUuid(UUID.randomUUID().toString())
+          .clusterID(clusterId).datanodeUuid(datanodeId)
           .build();
       hddsVolume.format(clusterId);
       hddsVolume.createWorkingDir(clusterId, null);
@@ -363,19 +373,24 @@ public class TestKeyValueHandler {
       Mockito.when(volumeSet.getVolumesList())
           .thenReturn(Collections.singletonList(hddsVolume));
 
+      List<HddsVolume> hddsVolumeList = StorageVolumeUtil
+          .getHddsVolumesList(volumeSet.getVolumesList());
+
+      assertTrue(hddsVolumeList.size() == 1);
+
       final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-          UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
+          datanodeId, containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
-      kvHandler.setClusterID(UUID.randomUUID().toString());
+      kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()
               .setCmdType(ContainerProtos.Type.CreateContainer)
-              .setDatanodeUuid(UUID.randomUUID().toString())
+              .setDatanodeUuid(datanodeId)
               .setCreateContainer(
                   ContainerProtos.CreateContainerRequestProto.newBuilder()
                       .setContainerType(ContainerType.KeyValueContainer)
@@ -391,6 +406,9 @@ public class TestKeyValueHandler {
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
+
+      assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+          .getDeleteLeftovers(hddsVolume).hasNext());
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
