@@ -688,8 +688,8 @@ public class TestOzoneShellHA {
           hostPrefix + "/linkvol"});
       Assert.assertEquals(0, res);
 
-      args = new String[] {"bucket", "link", "/vol1/bucket1",
-              "/linkvol/linkbuck"};
+      args = new String[]{"bucket", "link", "/vol1/bucket1",
+          "/linkvol/linkbuck"};
       execute(ozoneShell, args);
 
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
