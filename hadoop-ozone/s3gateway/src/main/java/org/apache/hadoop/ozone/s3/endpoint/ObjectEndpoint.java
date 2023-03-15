@@ -83,7 +83,6 @@ import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
-import org.apache.hadoop.util.CheckedSupplier;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableMap;
@@ -237,9 +236,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       output = captureLatencyNs(getLatencyMetrics().getCreateKeyLatencyNs(),
-          (CheckedSupplier<? extends OzoneOutputStream, ? extends IOException>)
-              () -> getClientProtocol().createKey(volume.getName(), bucketName,
-                  keyPath, length, replicationConfig, customMetadata));
+          () -> getClientProtocol().createKey(volume.getName(), bucketName,
+          keyPath, length, replicationConfig, customMetadata));
       IOUtils.copy(body, output);
 
       getMetrics().incCreateKeySuccess();
@@ -467,8 +465,7 @@ public class ObjectEndpoint extends EndpointBase {
     OzoneKey key;
     try {
       key = captureLatencyNs(getLatencyMetrics().getHeadKeyLatencyNs(),
-          (CheckedSupplier<OzoneKey, IOException>) () -> getClientProtocol()
-              .headS3Object(bucketName, keyPath));
+          () -> getClientProtocol().headS3Object(bucketName, keyPath));
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(

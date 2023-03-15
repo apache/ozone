@@ -40,7 +40,7 @@ import org.junit.Test;
 public class TestBucketList {
 
   @Test
-  public void listRoot() throws Exception {
+  public void listRoot() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -64,7 +64,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listDir() throws Exception {
+  public void listDir() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -85,7 +85,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listSubDir() throws Exception {
+  public void listSubDir() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -113,7 +113,7 @@ public class TestBucketList {
 
 
   @Test
-  public void listWithPrefixAndDelimiter() throws Exception {
+  public void listWithPrefixAndDelimiter() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -132,7 +132,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter1() throws Exception {
+  public void listWithPrefixAndDelimiter1() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -153,7 +153,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithPrefixAndDelimiter2() throws Exception {
+  public void listWithPrefixAndDelimiter2() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -172,7 +172,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithContinuationToken() throws Exception {
+  public void listWithContinuationToken() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -216,7 +216,7 @@ public class TestBucketList {
 
   @Test
   public void listWithContinuationTokenDirBreak()
-      throws Exception {
+      throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -266,7 +266,7 @@ public class TestBucketList {
    * behavior.
    */
   @Test
-  public void listWithContinuationToken1() throws Exception {
+  public void listWithContinuationToken1() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -307,7 +307,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void listWithContinuationTokenFail() throws Exception {
+  public void listWithContinuationTokenFail() throws IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -330,7 +330,7 @@ public class TestBucketList {
 
 
   @Test
-  public void testStartAfter() throws Exception {
+  public void testStartAfter() throws IOException, OS3Exception {
     BucketEndpoint getBucket = new BucketEndpoint();
 
     OzoneClient ozoneClient =
@@ -368,7 +368,7 @@ public class TestBucketList {
   }
 
   @Test
-  public void testEncodingType() throws Exception {
+  public void testEncodingType() throws IOException, OS3Exception {
     /*
     * OP1 -> Create key "data=1970" and "data==1970" in a bucket
     * OP2 -> List Object, if encodingType == url the result will be like blow:

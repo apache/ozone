@@ -65,9 +65,11 @@ public class TestBucketHead {
   public void testHeadFail() throws Exception {
     try {
       bucketEndpoint.head("unknownbucket");
-    } catch (OS3Exception ex) {
-      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      Assert.assertEquals("NoSuchBucket", ex.getCode());
+    } catch (RuntimeException ex) {
+      Throwable cause = ex.getCause();
+      OS3Exception os3Exception = (OS3Exception) cause;
+      Assert.assertEquals(HTTP_NOT_FOUND, os3Exception.getHttpCode());
+      Assert.assertEquals("NoSuchBucket", os3Exception.getCode());
     }
   }
 }

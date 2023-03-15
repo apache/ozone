@@ -104,7 +104,7 @@ public class TestPermissionCheck {
    *  Bucket Endpoint.
    */
   @Test
-  public void testGetBucket() throws IOException {
+  public void testGetBucket() throws Exception {
     doThrow(exception).when(objectStore).getS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -112,14 +112,15 @@ public class TestPermissionCheck {
     try {
       bucketEndpoint.head("bucketName");
       Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      Assert.assertTrue(cause instanceof OS3Exception);
+      Assert.assertTrue(((OS3Exception) cause).getHttpCode() == HTTP_FORBIDDEN);
     }
   }
 
   @Test
-  public void testCreateBucket() throws IOException {
+  public void testCreateBucket() throws Exception {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     doThrow(exception).when(objectStore).createS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
@@ -128,14 +129,15 @@ public class TestPermissionCheck {
     try {
       bucketEndpoint.put("bucketName", null, null, null);
       Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      Assert.assertTrue(cause instanceof OS3Exception);
+      Assert.assertTrue(((OS3Exception) cause).getHttpCode() == HTTP_FORBIDDEN);
     }
   }
 
   @Test
-  public void testDeleteBucket() throws IOException {
+  public void testDeleteBucket() throws Exception {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -143,9 +145,10 @@ public class TestPermissionCheck {
     try {
       bucketEndpoint.delete("bucketName");
       Assert.fail("Should fail");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof OS3Exception);
-      Assert.assertTrue(((OS3Exception) e).getHttpCode() == HTTP_FORBIDDEN);
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      Assert.assertTrue(cause instanceof OS3Exception);
+      Assert.assertTrue(((OS3Exception) cause).getHttpCode() == HTTP_FORBIDDEN);
     }
   }
   @Test
@@ -221,8 +224,10 @@ public class TestPermissionCheck {
       bucketEndpoint.get("bucketName", null, null, null, 1000,
           null, null, null, null, "acl", null);
       Assert.fail("Expected OS3Exception with FORBIDDEN http code.");
-    } catch (OS3Exception e) {
-      Assert.assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      Assert.assertTrue(cause instanceof OS3Exception);
+      Assert.assertEquals(HTTP_FORBIDDEN, ((OS3Exception) cause).getHttpCode());
     }
   }
 
