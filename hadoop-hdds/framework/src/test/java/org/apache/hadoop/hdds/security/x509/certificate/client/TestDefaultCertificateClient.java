@@ -22,10 +22,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -50,7 +50,6 @@ import java.util.Date;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
 
@@ -175,7 +174,7 @@ public class TestDefaultCertificateClient {
     X509Certificate cert = dnCertClient.getCertificate();
     assertNull(cert);
     dnCertClient.storeCertificate(getPEMEncodedString(x509Certificate),
-        true);
+        CAType.SUBORDINATE);
 
     cert = dnCertClient.getCertificate(
         x509Certificate.getSerialNumber().toString());
@@ -207,11 +206,10 @@ public class TestDefaultCertificateClient {
     // Expect error when there is no private key to sign.
     LambdaTestUtils.intercept(IOException.class, "Error while " +
             "signing the stream",
-        () -> dnCertClient.signDataStream(IOUtils.toInputStream(data, UTF_8)));
+        () -> dnCertClient.signData(data.getBytes(UTF_8)));
 
     generateKeyPairFiles();
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
     validateHash(sign, data.getBytes(UTF_8));
   }
 
@@ -234,21 +232,15 @@ public class TestDefaultCertificateClient {
   @Test
   public void verifySignatureStream() throws Exception {
     String data = RandomStringUtils.random(500);
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
 
   }
 
@@ -263,23 +255,10 @@ public class TestDefaultCertificateClient {
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
-
-  }
-
-  @Test
-  public void queryCertificate() throws Exception {
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Operation not supported",
-        () -> dnCertClient.queryCertificate(""));
   }
 
   @Test
@@ -307,11 +286,11 @@ public class TestDefaultCertificateClient {
         () -> dnCertClient.getCertificate(cert3.getSerialNumber()
             .toString()));
     codec.writeCertificate(certPath, "1.crt",
-        getPEMEncodedString(cert1), true);
+        getPEMEncodedString(cert1));
     codec.writeCertificate(certPath, "2.crt",
-        getPEMEncodedString(cert2), true);
+        getPEMEncodedString(cert2));
     codec.writeCertificate(certPath, "3.crt",
-        getPEMEncodedString(cert3), true);
+        getPEMEncodedString(cert3));
 
     // Re instantiate DN client which will load certificates from filesystem.
     dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
@@ -333,9 +312,9 @@ public class TestDefaultCertificateClient {
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
 
-    dnCertClient.storeCertificate(getPEMEncodedString(cert1), true);
-    dnCertClient.storeCertificate(getPEMEncodedString(cert2), true);
-    dnCertClient.storeCertificate(getPEMEncodedString(cert3), true);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.NONE);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
         .toString()));
@@ -450,13 +429,7 @@ public class TestDefaultCertificateClient {
 
           @Override
           public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certPath)
-              throws CertificateException {
-            return null;
-          }
-
-          @Override
-          public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
+              PKCS10CertificationRequest request, Path certificatePath)
               throws CertificateException {
             return null;
           }
@@ -473,16 +446,18 @@ public class TestDefaultCertificateClient {
     Duration gracePeriod = dnSecurityConfig.getRenewalGracePeriod();
 
     X509Certificate cert = KeyStoreTestUtil.generateCertificate("CN=Test",
-        keyPair, (int)(gracePeriod.toDays()),
+        keyPair, (int) (gracePeriod.toDays()),
         dnSecurityConfig.getSignatureAlgo());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
+    dnCertClient.storeCertificate(
+        getPEMEncodedString(cert), CAType.SUBORDINATE);
     Duration duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.isZero());
 
     cert = KeyStoreTestUtil.generateCertificate("CN=Test",
-        keyPair, (int)(gracePeriod.toDays() + 1),
+        keyPair, (int) (gracePeriod.toDays() + 1),
         dnSecurityConfig.getSignatureAlgo());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true);
+    dnCertClient.storeCertificate(
+        getPEMEncodedString(cert), CAType.SUBORDINATE);
     duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
     Assert.assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
         duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());
@@ -551,7 +526,8 @@ public class TestDefaultCertificateClient {
         "CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
     certCodec = new CertificateCodec(dnSecurityConfig,
         newCertDir.toPath());
-    dnCertClient.storeCertificate(getPEMEncodedString(cert), true, false, false,
+    dnCertClient.storeCertificate(getPEMEncodedString(cert),
+        CAType.NONE,
         certCodec, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);

@@ -80,6 +80,7 @@ public class TestCloseContainerEventHandler {
     containerManager = Mockito.mock(ContainerManager.class);
     pipelineManager = Mockito.mock(PipelineManager.class);
     SCMContext scmContext = Mockito.mock(SCMContext.class);
+    Mockito.when(scmContext.isLeader()).thenReturn(true);
     eventPublisher = Mockito.mock(EventPublisher.class);
     eventHandler = new CloseContainerEventHandler(
         pipelineManager, containerManager, scmContext);

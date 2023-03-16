@@ -33,7 +33,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -115,18 +117,25 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -139,13 +148,8 @@ import static org.mockito.Mockito.when;
 /**
  * Test class for @{@link KeyManagerImpl}.
  */
+@Timeout(300)
 public class TestKeyManagerImpl {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
@@ -159,16 +163,13 @@ public class TestKeyManagerImpl {
   private static long scmBlockSize;
   private static final String KEY_NAME = "key1";
   private static final String BUCKET_NAME = "bucket1";
+  private static final String BUCKET2_NAME = "bucket2";
   private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManagerProtocol writeClient;
   private static OzoneManager om;
 
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
@@ -223,10 +224,11 @@ public class TestKeyManagerImpl {
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
     createBucket(VOLUME_NAME, BUCKET_NAME, false);
+    createBucket(VOLUME_NAME, BUCKET2_NAME, false);
     createBucket(VOLUME_NAME, VERSIONED_BUCKET_NAME, true);
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     scm.stop();
     scm.join();
@@ -234,7 +236,7 @@ public class TestKeyManagerImpl {
     FileUtils.deleteDirectory(dir);
   }
 
-  @After
+  @AfterEach
   public void cleanupTest() throws IOException {
     mockContainerClient();
     List<OzoneFileStatus> fileStatuses = keyManager
@@ -344,7 +346,7 @@ public class TestKeyManagerImpl {
         .build();
     OpenKeySession keySession = writeClient.openKey(keyArgs);
     OmKeyInfo keyInfo = keySession.getKeyInfo();
-    Assert.assertEquals(10,
+    assertEquals(10,
         keyInfo.getLatestVersionLocations().getLocationList().size());
   }
 
@@ -364,7 +366,7 @@ public class TestKeyManagerImpl {
     Path path = Paths.get(keyName);
     while (path != null) {
       // verify parent directories are created
-      Assert.assertTrue(keyManager.getFileStatus(keyArgs).isDirectory());
+      assertTrue(keyManager.getFileStatus(keyArgs).isDirectory());
       path = path.getParent();
     }
 
@@ -379,9 +381,9 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
     try {
       writeClient.createDirectory(keyArgs);
-      Assert.fail("Creation should fail for directory.");
+      fail("Creation should fail for directory.");
     } catch (OMException e) {
-      Assert.assertEquals(e.getResult(),
+      assertEquals(e.getResult(),
           OMException.ResultCodes.FILE_ALREADY_EXISTS);
     }
 
@@ -392,8 +394,8 @@ public class TestKeyManagerImpl {
         .build();
     writeClient.createDirectory(keyArgs);
     OzoneFileStatus fileStatus = keyManager.getFileStatus(keyArgs);
-    Assert.assertTrue(fileStatus.isDirectory());
-    Assert.assertTrue(fileStatus.getKeyInfo().getKeyLocationVersions().get(0)
+    assertTrue(fileStatus.isDirectory());
+    assertTrue(fileStatus.getKeyInfo().getKeyLocationVersions().get(0)
         .getLocationList().isEmpty());
   }
 
@@ -412,7 +414,7 @@ public class TestKeyManagerImpl {
     // try to open created key with overWrite flag set to false
     try {
       writeClient.createFile(keyArgs, false, false);
-      Assert.fail("Open key should fail for non overwrite create");
+      fail("Open key should fail for non overwrite create");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
         throw ex;
@@ -435,7 +437,7 @@ public class TestKeyManagerImpl {
         .build();
     try {
       writeClient.createFile(keyArgs, false, false);
-      Assert.fail("Open file should fail for non recursive write");
+      fail("Open file should fail for non recursive write");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
         throw ex;
@@ -447,7 +449,7 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
-    Assert.assertTrue(keyManager
+    assertTrue(keyManager
         .getFileStatus(keyArgs).isFile());
 
     // try creating a file over a directory
@@ -456,7 +458,7 @@ public class TestKeyManagerImpl {
         .build();
     try {
       writeClient.createFile(keyArgs, true, true);
-      Assert.fail("Open file should fail for non recursive write");
+      fail("Open file should fail for non recursive write");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
         throw ex;
@@ -485,7 +487,7 @@ public class TestKeyManagerImpl {
     boolean access = keyManager.checkAccess(fileKey, context);
 
     // THEN
-    Assert.assertTrue(access);
+    assertTrue(access);
     verify(mockScmContainerClient, never())
         .getContainerWithPipelineBatch(any());
   }
@@ -498,7 +500,7 @@ public class TestKeyManagerImpl {
     OzoneObj nonExistentKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
-    Assert.assertTrue(keyManager.checkAccess(nonExistentKey,
+    assertTrue(keyManager.checkAccess(nonExistentKey,
             currentUserReads()));
   }
 
@@ -512,7 +514,7 @@ public class TestKeyManagerImpl {
     OzoneObj dirKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
-    Assert.assertTrue(keyManager.checkAccess(dirKey, currentUserReads()));
+    assertTrue(keyManager.checkAccess(dirKey, currentUserReads()));
   }
 
   @Test
@@ -534,8 +536,8 @@ public class TestKeyManagerImpl {
     writeClient.addAcl(ozPrefix1, ozAcl1);
 
     List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(1, ozAclGet.size());
-    Assert.assertEquals(ozAcl1, ozAclGet.get(0));
+    assertEquals(1, ozAclGet.size());
+    assertEquals(ozAcl1, ozAclGet.get(0));
 
     List<OzoneAcl> acls = new ArrayList<>();
     OzoneAcl ozAcl2 = new OzoneAcl(ACLIdentityType.USER, "admin",
@@ -562,56 +564,60 @@ public class TestKeyManagerImpl {
 
     writeClient.setAcl(ozPrefix1, acls);
     ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(2, ozAclGet.size());
+    assertEquals(2, ozAclGet.size());
 
     int matchEntries = 0;
     for (OzoneAcl acl : ozAclGet) {
       if (acl.getType() == ACLIdentityType.GROUP) {
-        Assert.assertEquals(ozAcl3, acl);
+        assertEquals(ozAcl3, acl);
         matchEntries++;
       }
       if (acl.getType() == ACLIdentityType.USER) {
-        Assert.assertEquals(ozAcl2, acl);
+        assertEquals(ozAcl2, acl);
         matchEntries++;
       }
     }
-    Assert.assertEquals(2, matchEntries);
+    assertEquals(2, matchEntries);
 
     boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
-    Assert.assertEquals(true, result);
+    assertEquals(true, result);
 
     ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(2, ozAclGet.size());
+    assertEquals(2, ozAclGet.size());
 
     result = writeClient.removeAcl(ozPrefix1, ozAcl3);
-    Assert.assertEquals(true, result);
+    assertEquals(true, result);
     ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(1, ozAclGet.size());
+    assertEquals(1, ozAclGet.size());
 
-    Assert.assertEquals(ozAcl2, ozAclGet.get(0));
+    assertEquals(ozAcl2, ozAclGet.get(0));
 
     // add dev:w
     writeClient.addAcl(ozPrefix1, ozAcl4);
     ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(2, ozAclGet.size());
+    assertEquals(2, ozAclGet.size());
 
     // add dev:r and validate the acl bitset combined
     writeClient.addAcl(ozPrefix1, ozAcl5);
     ozAclGet = writeClient.getAcl(ozPrefix1);
-    Assert.assertEquals(2, ozAclGet.size());
+    assertEquals(2, ozAclGet.size());
 
     matchEntries = 0;
     for (OzoneAcl acl : ozAclGet) {
       if (acl.getType() == ACLIdentityType.GROUP) {
-        Assert.assertEquals(ozAcl3, acl);
+        assertEquals(ozAcl3, acl);
         matchEntries++;
       }
       if (acl.getType() == ACLIdentityType.USER) {
-        Assert.assertEquals(ozAcl2, acl);
+        assertEquals(ozAcl2, acl);
         matchEntries++;
       }
     }
-    Assert.assertEquals(2, matchEntries);
+    assertEquals(2, matchEntries);
+    // cleanup
+    writeClient.removeAcl(ozPrefix1, ozAcl1);
+    writeClient.removeAcl(ozPrefix1, ozAcl2);
+    writeClient.removeAcl(ozPrefix1, ozAcl3);
   }
 
   @Test
@@ -634,9 +640,7 @@ public class TestKeyManagerImpl {
         .build();
 
     // add acl with invalid prefix name
-    exception.expect(OMException.class);
-    exception.expectMessage("Invalid prefix name");
-    prefixManager.addAcl(ozInvalidPrefix, ozAcl1);
+    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -646,27 +650,23 @@ public class TestKeyManagerImpl {
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
 
-    prefixManager.addAcl(ozPrefix1, ozAcl1);
-    List<OzoneAcl> ozAclGet = prefixManager.getAcl(ozPrefix1);
-    Assert.assertEquals(1, ozAclGet.size());
-    Assert.assertEquals(ozAcl1, ozAclGet.get(0));
+    writeClient.addAcl(ozPrefix1, ozAcl1);
+    List<OzoneAcl> ozAclGet = writeClient.getAcl(ozPrefix1);
+    assertEquals(1, ozAclGet.size());
+    assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    exception.expect(OMException.class);
-    exception.expectMessage("Invalid prefix name");
-    prefixManager.getAcl(ozInvalidPrefix);
+    Exception ex = assertThrows(OMException.class,
+        () -> writeClient.getAcl(ozInvalidPrefix));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
-    exception.expect(OMException.class);
-    exception.expectMessage("Invalid prefix name");
-    prefixManager.setAcl(ozInvalidPrefix, ozoneAcls);
+    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
 
     // remove acl with invalid prefix name
-    exception.expect(OMException.class);
-    exception.expectMessage("Invalid prefix name");
-    prefixManager.removeAcl(ozInvalidPrefix, ozAcl1);
+    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
   }
 
   @Test
@@ -687,7 +687,7 @@ public class TestKeyManagerImpl {
 
     OzoneAcl ozAcl1 = new OzoneAcl(ACLIdentityType.USER, "user1",
         ACLType.READ, ACCESS);
-    prefixManager.addAcl(ozPrefix1, ozAcl1);
+    writeClient.addAcl(ozPrefix1, ozAcl1);
 
     OzoneObj ozFile1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -699,7 +699,7 @@ public class TestKeyManagerImpl {
 
     List<OmPrefixInfo> prefixInfos =
         prefixManager.getLongestPrefixPath(ozFile1.getPath());
-    Assert.assertEquals(5, prefixInfos.size());
+    assertEquals(5, prefixInfos.size());
 
     OzoneObj ozFile2 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -711,13 +711,15 @@ public class TestKeyManagerImpl {
 
     prefixInfos =
         prefixManager.getLongestPrefixPath(ozFile2.getPath());
-    Assert.assertEquals(7, prefixInfos.size());
+    assertEquals(7, prefixInfos.size());
     // Only the last node has acl on it
-    Assert.assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
+    assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
     // All other nodes don't have acl value associate with it
     for (int i = 0; i < 6; i++) {
-      Assert.assertEquals(null, prefixInfos.get(i));
+      assertEquals(null, prefixInfos.get(i));
     }
+    // cleanup
+    writeClient.removeAcl(ozPrefix1, ozAcl1);
   }
 
   @Test
@@ -730,7 +732,7 @@ public class TestKeyManagerImpl {
     // lookup for a non-existent file
     try {
       keyManager.lookupFile(keyArgs, null);
-      Assert.fail("Lookup file should fail for non existent file");
+      fail("Lookup file should fail for non existent file");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
         throw ex;
@@ -742,7 +744,7 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
-    Assert.assertEquals(keyManager.lookupFile(keyArgs, null).getKeyName(),
+    assertEquals(keyManager.lookupFile(keyArgs, null).getKeyName(),
         keyName);
 
     // lookup for created file
@@ -751,7 +753,7 @@ public class TestKeyManagerImpl {
         .build();
     try {
       keyManager.lookupFile(keyArgs, null);
-      Assert.fail("Lookup file should fail for a directory");
+      fail("Lookup file should fail for a directory");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
         throw ex;
@@ -774,7 +776,7 @@ public class TestKeyManagerImpl {
     // lookup for a non-existent key
     try {
       keyManager.lookupKey(keyArgs, null);
-      Assert.fail("Lookup key should fail for non existent key");
+      fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
         throw ex;
@@ -791,15 +793,15 @@ public class TestKeyManagerImpl {
         1, null, null, null, null, 0));
     nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
         2, null, null, null, null, 0));
-    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
-    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
+    assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
+    assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
-    Assert.assertEquals(1, locationList.size());
+    assertEquals(1, locationList.size());
     long containerID = locationList.get(0).getContainerID();
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
@@ -816,7 +818,7 @@ public class TestKeyManagerImpl {
         Arrays.asList(containerID))).thenReturn(containerWithPipelines);
 
     OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
-    Assert.assertEquals(key.getKeyName(), keyName);
+    assertEquals(key.getKeyName(), keyName);
     List<OmKeyLocationInfo> keyLocations =
         key.getLatestVersionLocations().getLocationList();
     DatanodeDetails leader =
@@ -825,28 +827,28 @@ public class TestKeyManagerImpl {
         keyLocations.get(0).getPipeline().getNodes().get(1);
     DatanodeDetails follower2 =
         keyLocations.get(0).getPipeline().getNodes().get(2);
-    Assert.assertNotEquals(leader, follower1);
-    Assert.assertNotEquals(follower1, follower2);
+    assertNotEquals(leader, follower1);
+    assertNotEquals(follower1, follower2);
 
     // lookup key, leader as client
     OmKeyInfo key1 = keyManager.lookupKey(keyArgs, leader.getIpAddress());
-    Assert.assertEquals(leader, key1.getLatestVersionLocations()
+    assertEquals(leader, key1.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower1 as client
     OmKeyInfo key2 = keyManager.lookupKey(keyArgs, follower1.getIpAddress());
-    Assert.assertEquals(follower1, key2.getLatestVersionLocations()
+    assertEquals(follower1, key2.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower2 as client
     OmKeyInfo key3 = keyManager.lookupKey(keyArgs, follower2.getIpAddress());
-    Assert.assertEquals(follower2, key3.getLatestVersionLocations()
+    assertEquals(follower2, key3.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs,
         "/d=default-drack/127.0.0.1");
-    Assert.assertEquals(leader, key4.getLatestVersionLocations()
+    assertEquals(leader, key4.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
   }
 
@@ -861,7 +863,7 @@ public class TestKeyManagerImpl {
     // lookup for a non-existent key
     try {
       keyManager.lookupKey(keyArgs, null);
-      Assert.fail("Lookup key should fail for non existent key");
+      fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
         throw ex;
@@ -878,15 +880,15 @@ public class TestKeyManagerImpl {
         1, null, null, null, null, 0));
     nodeList.add((DatanodeDetails)scm.getClusterMap().getNode(
         2, null, null, null, null, 0));
-    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
-    Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
+    assumeFalse(nodeList.get(0).equals(nodeList.get(1)));
+    assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE), nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     List<OmKeyLocationInfo> locationList =
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList();
-    Assert.assertEquals(1, locationList.size());
+    assertEquals(1, locationList.size());
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
             .setBlockID(new BlockID(locationList.get(0).getContainerID(),
@@ -903,30 +905,30 @@ public class TestKeyManagerImpl {
         Arrays.asList(1L))).thenReturn(containerWithPipelines);
 
     OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
-    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+    assertEquals(key.getKeyLocationVersions().size(), 1);
 
     keySession = writeClient.createFile(keyArgs, true, true);
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // Test lookupKey (latestLocationVersion == true)
     key = keyManager.lookupKey(keyArgs, null);
-    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+    assertEquals(key.getKeyLocationVersions().size(), 1);
 
     // Test ListStatus (latestLocationVersion == true)
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(keyArgs, false, "", 1);
-    Assert.assertEquals(fileStatuses.size(), 1);
-    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+    assertEquals(fileStatuses.size(), 1);
+    assertEquals(fileStatuses.get(0).getKeyInfo()
         .getKeyLocationVersions().size(), 1);
 
     // Test GetFileStatus (latestLocationVersion == true)
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
-    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+    assertEquals(ozoneFileStatus.getKeyInfo()
         .getKeyLocationVersions().size(), 1);
 
     // Test LookupFile (latestLocationVersion == true)
     key = keyManager.lookupFile(keyArgs, null);
-    Assert.assertEquals(key.getKeyLocationVersions().size(), 1);
+    assertEquals(key.getKeyLocationVersions().size(), 1);
 
     keyArgs = createBuilder(VERSIONED_BUCKET_NAME)
         .setKeyName(keyName)
@@ -935,28 +937,28 @@ public class TestKeyManagerImpl {
 
     // Test lookupKey (latestLocationVersion == false)
     key = keyManager.lookupKey(keyArgs, null);
-    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+    assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListStatus (latestLocationVersion == false)
     fileStatuses = keyManager.listStatus(keyArgs, false, "", 100);
-    Assert.assertEquals(fileStatuses.size(), 1);
-    Assert.assertEquals(fileStatuses.get(0).getKeyInfo()
+    assertEquals(fileStatuses.size(), 1);
+    assertEquals(fileStatuses.get(0).getKeyInfo()
         .getKeyLocationVersions().size(), 2);
 
     // Test GetFileStatus (latestLocationVersion == false)
     ozoneFileStatus = keyManager.getFileStatus(keyArgs, null);
-    Assert.assertEquals(ozoneFileStatus.getKeyInfo()
+    assertEquals(ozoneFileStatus.getKeyInfo()
         .getKeyLocationVersions().size(), 2);
 
     // Test LookupFile (latestLocationVersion == false)
     key = keyManager.lookupFile(keyArgs, null);
-    Assert.assertEquals(key.getKeyLocationVersions().size(), 2);
+    assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListKeys (latestLocationVersion is always true for ListKeys)
     List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
         keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
-    Assert.assertEquals(keyInfos.size(), 1);
-    Assert.assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
+    assertEquals(keyInfos.size(), 1);
+    assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
   }
 
   @Test
@@ -984,17 +986,17 @@ public class TestKeyManagerImpl {
     // Get entries in both TableCache and DB
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
-    Assert.assertEquals(100, fileStatuses.size());
+    assertEquals(100, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInDB
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
-    Assert.assertEquals(50, fileStatuses.size());
+    assertEquals(50, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInCache
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
-    Assert.assertEquals(100, fileStatuses.size());
+    assertEquals(100, fileStatuses.size());
 
     // Clean up cache by marking those keys in cache as deleted
     for (int i = 1; i <= 100; i += 2) {
@@ -1011,28 +1013,28 @@ public class TestKeyManagerImpl {
     String keyNameDir1 = "dir1";
     OmKeyArgs keyArgsDir1 =
         createBuilder().setKeyName(keyNameDir1).build();
-    writeClient.createDirectory(keyArgsDir1);
+    addDirectory(keyArgsDir1);
 
     String keyNameDir1Subdir1 = "dir1" + OZONE_URI_DELIMITER + "subdir1";
     OmKeyArgs keyArgsDir1Subdir1 =
         createBuilder().setKeyName(keyNameDir1Subdir1).build();
-    writeClient.createDirectory(keyArgsDir1Subdir1);
+    addDirectory(keyArgsDir1Subdir1);
 
     String keyNameDir2 = "dir2";
     OmKeyArgs keyArgsDir2 =
         createBuilder().setKeyName(keyNameDir2).build();
-    writeClient.createDirectory(keyArgsDir2);
+    addDirectory(keyArgsDir2);
 
     OmKeyArgs rootDirArgs = createKeyArgs("");
     // Test listStatus with recursive=false, should only have dirs under root
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, false, "", 1000);
-    Assert.assertEquals(2, fileStatuses.size());
+    assertEquals(2, fileStatuses.size());
 
     // Test listStatus with recursive=true, should have dirs under root and
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
-    Assert.assertEquals(3, fileStatuses.size());
+    assertEquals(3, fileStatuses.size());
 
     // Add a total of 10 key entries to DB and TableCache under dir1
     String prefixKeyInDB = "key-d";
@@ -1056,12 +1058,12 @@ public class TestKeyManagerImpl {
     // Test non-recursive, should return the dir under root
     fileStatuses =
         keyManager.listStatus(rootDirArgs, false, "", 1000);
-    Assert.assertEquals(2, fileStatuses.size());
+    assertEquals(2, fileStatuses.size());
 
     // Test recursive, should return the dir and the keys in it
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
-    Assert.assertEquals(10 + 3, fileStatuses.size());
+    assertEquals(10 + 3, fileStatuses.size());
 
     // Clean up
     for (int i = 1; i <= 10; i += 2) {
@@ -1109,23 +1111,23 @@ public class TestKeyManagerImpl {
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(50, fileStatuses.size());
+    assertEquals(50, fileStatuses.size());
     // Test startKey
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKey, 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(50, fileStatuses.size());
+    assertEquals(50, fileStatuses.size());
     // Verify result
     TreeSet<String> expectedKeys = new TreeSet<>();
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String keyName = fileStatus.getKeyInfo().getKeyName();
       expectedKeys.add(keyName);
-      Assert.assertTrue(keyName.startsWith(prefixKey));
+      assertTrue(keyName.startsWith(prefixKey));
     }
-    Assert.assertEquals(expectedKeys, existKeySet);
+    assertEquals(expectedKeys, existKeySet);
 
     // Sanity check, existKeySet should not intersect with deletedKeySet.
-    Assert.assertEquals(0,
+    assertEquals(0,
         Sets.intersection(existKeySet, deletedKeySet).size());
 
     // Next, mark half of the entries left as deleted
@@ -1147,16 +1149,16 @@ public class TestKeyManagerImpl {
     fileStatuses = keyManager.listStatus(
         rootDirArgs, true, "", 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(50 / 2, fileStatuses.size());
+    assertEquals(50 / 2, fileStatuses.size());
 
     // Verify result
     expectedKeys.clear();
     for (OzoneFileStatus fileStatus : fileStatuses) {
       String keyName = fileStatus.getKeyInfo().getKeyName();
       expectedKeys.add(keyName);
-      Assert.assertTrue(keyName.startsWith(prefixKey));
+      assertTrue(keyName.startsWith(prefixKey));
     }
-    Assert.assertEquals(expectedKeys, existKeySet);
+    assertEquals(expectedKeys, existKeySet);
 
     // Test pagination
     final int batchSize = 5;
@@ -1172,12 +1174,12 @@ public class TestKeyManagerImpl {
       for (OzoneFileStatus fileStatus : fileStatuses) {
         startKey = fileStatus.getKeyInfo().getKeyName();
         expectedKeys.add(startKey);
-        Assert.assertTrue(startKey.startsWith(prefixKey));
+        assertTrue(startKey.startsWith(prefixKey));
       }
       // fileStatuses.size() == batchSize indicates there might be another batch
       // fileStatuses.size() < batchSize indicates it is the last batch
     } while (fileStatuses.size() == batchSize);
-    Assert.assertEquals(expectedKeys, existKeySet);
+    assertEquals(expectedKeys, existKeySet);
 
     // Clean up by marking remaining entries as deleted
     for (String key : existKeySet) {
@@ -1190,7 +1192,7 @@ public class TestKeyManagerImpl {
     }
     // Update existKeySet
     existKeySet.removeAll(deletedKeySet);
-    Assert.assertTrue(existKeySet.isEmpty());
+    assertTrue(existKeySet.isEmpty());
   }
 
   @Test
@@ -1215,18 +1217,18 @@ public class TestKeyManagerImpl {
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 100);
     // verify the number of status returned is same as number of entries
-    Assert.assertEquals(numEntries, fileStatuses.size());
+    assertEquals(numEntries, fileStatuses.size());
 
     fileStatuses = keyManager.listStatus(rootDirArgs, false, "", 100);
     // the number of immediate children of root is 1
-    Assert.assertEquals(1, fileStatuses.size());
+    assertEquals(1, fileStatuses.size());
 
     // if startKey is the first descendant of the root then listStatus should
     // return all the entries.
     String startKey = children.iterator().next();
     fileStatuses = keyManager.listStatus(rootDirArgs, true,
         startKey.substring(0, startKey.length() - 1), 100);
-    Assert.assertEquals(numEntries, fileStatuses.size());
+    assertEquals(numEntries, fileStatuses.size());
 
     for (String directory : directorySet) {
       // verify status list received for each directory with recursive flag set
@@ -1288,7 +1290,7 @@ public class TestKeyManagerImpl {
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
     OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
-    Assert.assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
+    assertEquals(keyName, ozoneFileStatus.getKeyInfo().getFileName());
   }
 
   @Test
@@ -1317,32 +1319,93 @@ public class TestKeyManagerImpl {
 
     // verify key "dir1/key1" and "dir1.key1" can be found in the bucket, and
     // "dir1" can not be found in the bucket
-    Assert.assertNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+    assertNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, parentDir)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+    assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName1)));
-    Assert.assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
+    assertNotNull(metadataManager.getKeyTable(getDefaultBucketLayout())
         .get(metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, keyName2)));
 
     // get a non-existing "dir1", since the key is prefixed "dir1/key1",
     // a fake "/dir1" will be returned
     keyArgs = createBuilder().setKeyName(parentDir).build();
     ozoneFileStatus = keyManager.getFileStatus(keyArgs);
-    Assert.assertEquals(parentDir, ozoneFileStatus.getKeyInfo().getFileName());
-    Assert.assertTrue(ozoneFileStatus.isDirectory());
+    assertEquals(parentDir, ozoneFileStatus.getKeyInfo().getFileName());
+    assertTrue(ozoneFileStatus.isDirectory());
 
     // get a non-existing "dir", since the key is not prefixed "dir1/key1",
     // a `OMException` will be thrown
     keyArgs = createBuilder().setKeyName("dir").build();
     OmKeyArgs finalKeyArgs = keyArgs;
-    Assert.assertThrows(OMException.class, () -> keyManager.getFileStatus(
+    assertThrows(OMException.class, () -> keyManager.getFileStatus(
         finalKeyArgs));
 
     // get a file "dir1/key1"
     keyArgs = createBuilder().setKeyName(keyName1).build();
     ozoneFileStatus = keyManager.getFileStatus(keyArgs);
-    Assert.assertEquals(fileName, ozoneFileStatus.getKeyInfo().getFileName());
-    Assert.assertTrue(ozoneFileStatus.isFile());
+    assertEquals(fileName, ozoneFileStatus.getKeyInfo().getFileName());
+    assertTrue(ozoneFileStatus.isFile());
+  }
+
+  private static Stream<Arguments> fakeDirScenarios() {
+    final String bucket1 = BUCKET_NAME;
+    final String bucket2 = BUCKET2_NAME;
+
+    return Stream.of(
+        Arguments.of(
+            "false positive",
+            Stream.of(
+                Pair.of(bucket1, "dir1/file1"),
+                Pair.of(bucket2, "dir2/file2")
+            ),
+            // positives
+            Stream.of(
+                Pair.of(bucket1, "dir1"),
+                Pair.of(bucket2, "dir2")
+            ),
+            // negatives
+            Stream.of(
+                Pair.of(bucket1, "dir0"),
+                // RocksIterator#seek("volume1/bucket1/dir2/") will position
+                // at the 2nd dbKey "volume1/bucket2/dir2/file2", which is
+                // not belong to bucket1.
+                // This might be a false positive, see HDDS-7871.
+                Pair.of(bucket1, "dir2"),
+                Pair.of(bucket2, "dir0"),
+                Pair.of(bucket2, "dir1"),
+                Pair.of(bucket2, "dir3")
+            )
+        ),
+        Arguments.of(
+            "false negative",
+            Stream.of(
+                Pair.of(bucket1, "dir1/file1"),
+                Pair.of(bucket1, "dir1/file2"),
+                Pair.of(bucket1, "dir1/file3"),
+                Pair.of(bucket2, "dir1/file1"),
+                Pair.of(bucket2, "dir1/file2")
+            ),
+            // positives
+            Stream.of(
+                Pair.of(bucket1, "dir1"),
+                Pair.of(bucket2, "dir1")
+            ),
+            // negatives
+            Stream.empty()
+        )
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("fakeDirScenarios")
+  public void testGetFileStatusWithFakeDirs(
+      String description,
+      Stream<Pair<String, String>> keys,
+      Stream<Pair<String, String>> positives,
+      Stream<Pair<String, String>> negatives) {
+    keys.forEach(f -> createFile(f.getLeft(), f.getRight()));
+    positives.forEach(f -> assertIsDirectory(f.getLeft(), f.getRight()));
+    negatives.forEach(f -> assertFileNotFound(f.getLeft(), f.getRight()));
   }
 
   @Test
@@ -1453,10 +1516,10 @@ public class TestKeyManagerImpl {
 
     try {
       keyManagerImpl.refresh(omKeyInfo);
-      Assert.fail();
+      fail();
     } catch (OMException omEx) {
-      Assert.assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-      Assert.assertTrue(omEx.getMessage().equals(errorMessage));
+      assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+      assertTrue(omEx.getMessage().equals(errorMessage));
     }
   }
 
@@ -1517,17 +1580,15 @@ public class TestKeyManagerImpl {
       if (!recursive) {
         // if recursive is false, verify all the statuses have the input
         // directory as parent
-        Assert.assertEquals(parent, directory);
+        assertEquals(parent, directory);
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        Assert
-            .assertTrue(directorySet + " doesn't contain " + normalizedKeyName,
-                directorySet.contains(normalizedKeyName));
+        assertTrue(directorySet.contains(normalizedKeyName),
+            directorySet + " doesn't contain " + normalizedKeyName);
       } else {
-        Assert
-            .assertTrue(fileSet + " doesn't contain " + normalizedKeyName,
-                fileSet.contains(normalizedKeyName));
+        assertTrue(fileSet.contains(normalizedKeyName),
+            fileSet + " doesn't contain " + normalizedKeyName);
       }
     }
 
@@ -1547,7 +1608,7 @@ public class TestKeyManagerImpl {
       }
     }
     // verify the number of entries match the status list size
-    Assert.assertEquals(fileStatuses.size(), numEntries);
+    assertEquals(fileStatuses.size(), numEntries);
   }
 
   private Set<String> createDirectories(String parent,
@@ -1581,6 +1642,51 @@ public class TestKeyManagerImpl {
     return keyNames;
   }
 
+  private void createFile(String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OpenKeySession keySession = writeClient.openKey(keyArgs);
+      keyArgs.setLocationInfoList(keySession.getKeyInfo()
+          .getLatestVersionLocations().getLocationList());
+      writeClient.commitKey(keyArgs, keySession.getId());
+
+      // verify key exist in table
+      OmKeyInfo keyInfo = metadataManager.getKeyTable(getDefaultBucketLayout())
+          .get(metadataManager.getOzoneKey(VOLUME_NAME, bucketName, keyName));
+      assertNotNull(keyInfo);
+      assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      assertEquals(bucketName, keyInfo.getBucketName());
+      assertEquals(keyName, keyInfo.getKeyName());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void assertFileNotFound(String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OMException ex = assertThrows(OMException.class,
+          () -> keyManager.getFileStatus(keyArgs));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void assertIsDirectory(String bucketName, String keyName) {
+    try {
+      OmKeyArgs keyArgs = createBuilder(bucketName).setKeyName(keyName).build();
+      OzoneFileStatus ozoneFileStatus = keyManager.getFileStatus(keyArgs);
+      OmKeyInfo keyInfo = ozoneFileStatus.getKeyInfo();
+      assertEquals(VOLUME_NAME, keyInfo.getVolumeName());
+      assertEquals(bucketName, keyInfo.getBucketName());
+      assertEquals(keyName, keyInfo.getFileName());
+      assertTrue(ozoneFileStatus.isDirectory());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private OmKeyArgs.Builder createBuilder() throws IOException {
     return createBuilder(BUCKET_NAME);
   }
@@ -1608,5 +1714,21 @@ public class TestKeyManagerImpl {
 
   private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  private static void addDirectory(OmKeyArgs keyArgs) throws Exception {
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName() + "/")
+        .setFileName(OzoneFSUtils.getFileName(keyArgs.getKeyName()))
+        .setOmKeyLocationInfos(null)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setDataSize(0)
+        .setReplicationConfig(keyArgs.getReplicationConfig())
+        .setFileEncryptionInfo(null).build();
+    OMRequestTestUtils.addKeyToTable(false, false, omKeyInfo,
+        1000L, 0L, metadataManager);
   }
 }

@@ -70,7 +70,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   public static final Logger LOG =
       LoggerFactory.getLogger(DBScanner.class);
 
-  @CommandLine.Option(names = {"--column_family"},
+  @CommandLine.Option(names = {"--column_family", "--column-family"},
       required = true,
       description = "Table name")
   private String tableName;
@@ -94,7 +94,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Key from which to iterate the DB")
   private static String startKey;
 
-  @CommandLine.Option(names = {"--dnSchema", "-d"},
+  @CommandLine.Option(names = {"--dnSchema", "-d", "--dn-schema"},
       description = "Datanode DB Schema Version : V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;

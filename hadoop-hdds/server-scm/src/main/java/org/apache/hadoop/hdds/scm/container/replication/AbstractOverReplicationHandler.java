@@ -22,11 +22,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,23 +38,6 @@ public abstract class AbstractOverReplicationHandler
   protected AbstractOverReplicationHandler(PlacementPolicy placementPolicy) {
     this.placementPolicy = placementPolicy;
   }
-
-  /**
-   * Identify a new set of datanode(s) to delete the container
-   * and form the SCM commands to send it to DN.
-   *
-   * @param replicas - Set of available container replicas.
-   * @param pendingOps - Inflight replications and deletion ops.
-   * @param result - Health check result.
-   * @param remainingMaintenanceRedundancy - represents that how many nodes go
-   *                                      into maintenance.
-   * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself.
-   */
-  public abstract Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
-      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
-      ContainerHealthResult result, int remainingMaintenanceRedundancy) throws
-      IOException;
 
   /**
    * Identify whether the placement status is actually equal for a

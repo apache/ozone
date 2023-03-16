@@ -46,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Utility class providing methods useful in EC tests.
@@ -230,7 +229,7 @@ public final class ECStreamTestUtil {
 
     public synchronized
         List<ECStreamTestUtil.TestBlockInputStream> getBlockStreams() {
-      return blockStreams.values().stream().collect(Collectors.toList());
+      return new ArrayList<>(blockStreams.values());
     }
 
     public synchronized Set<Integer> getStreamIndexes() {
@@ -259,7 +258,7 @@ public final class ECStreamTestUtil {
         BlockLocationInfo blockInfo, Pipeline pipeline,
         Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
         XceiverClientFactory xceiverFactory,
-        Function<BlockID, Pipeline> refreshFunction) {
+        Function<BlockID, BlockLocationInfo> refreshFunction) {
 
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(

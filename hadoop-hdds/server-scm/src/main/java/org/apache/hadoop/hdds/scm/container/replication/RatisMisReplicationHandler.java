@@ -23,11 +23,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -39,8 +37,9 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, NodeManager nodeManager) {
-    super(containerPlacement, conf, nodeManager);
+          ConfigurationSource conf, ReplicationManager replicationManager,
+          boolean push) {
+    super(containerPlacement, conf, replicationManager, push);
   }
 
   @Override
@@ -54,25 +53,13 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
               + " %s.Expected Container Replication Type : RATIS",
               containerInfo.getReplicationType().toString()));
     }
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
-    return new RatisContainerReplicaCount(
-            containerInfo, replicas, pendingAdd,
-            pendingDelete, containerInfo.getReplicationFactor().getNumber(),
-            minHealthyForMaintenance);
+    return new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+        minHealthyForMaintenance, true);
   }
 
   @Override
-  protected ReplicateContainerCommand getReplicateCommand(
-          ContainerInfo containerInfo, ContainerReplica replica) {
-    return new ReplicateContainerCommand(containerInfo.getContainerID(),
-            Collections.singletonList(replica.getDatanodeDetails()));
+  protected ReplicateContainerCommand updateReplicateCommand(
+          ReplicateContainerCommand command, ContainerReplica replica) {
+    return command;
   }
 }

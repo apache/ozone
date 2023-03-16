@@ -450,7 +450,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
    *
    * @param out PrintStream
    */
-  private void printStats(PrintStream out) {
+  void printStats(PrintStream out) {
     long endTime = System.nanoTime() - startTime;
     String execTime = DurationFormatUtils
         .formatDuration(TimeUnit.NANOSECONDS.toMillis(endTime),
@@ -484,8 +484,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
     out.println("Number of Volumes created: " + numberOfVolumesCreated);
     out.println("Number of Buckets created: " + numberOfBucketsCreated);
     out.println("Number of Keys added: " + numberOfKeysAdded);
-    out.println("Replication: " + replicationConfig.getReplication());
-    out.println("Replication type: " + replicationConfig.getReplicationType());
+    if (replicationConfig != null) {
+      out.println("Replication: " + replicationConfig);
+    }
     out.println(
         "Average Time spent in volume creation: " + prettyAverageVolumeTime);
     out.println(

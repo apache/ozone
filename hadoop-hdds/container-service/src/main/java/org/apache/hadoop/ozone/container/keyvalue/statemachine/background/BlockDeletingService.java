@@ -177,6 +177,8 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
+            .filter(e -> ((KeyValueContainerData) e.getValue()
+                .getContainerData()).getNumPendingDeletionBlocks() > 0)
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
@@ -478,8 +480,15 @@ public class BlockDeletingService extends BackgroundService {
           delBlocks.add(delTx);
         }
         if (delBlocks.isEmpty()) {
-          LOG.debug("No transaction found in container : {}",
-              containerData.getContainerID());
+          LOG.info("No transaction found in container {} with pending delete " +
+                  "block count {}",
+              containerData.getContainerID(),
+              containerData.getNumPendingDeletionBlocks());
+          // If the container was queued for delete, it had a positive
+          // pending delete block count. After checking the DB there were
+          // actually no delete transactions for the container, so reset the
+          // pending delete block count to the correct value of zero.
+          containerData.resetPendingDeleteBlockCount(meta);
           return crr;
         }
 
@@ -527,7 +536,7 @@ public class BlockDeletingService extends BackgroundService {
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            deletedBlocksCount, Time.monotonicNow() - startTime);
+            deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
         return crr;
       } catch (IOException exception) {

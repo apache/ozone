@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
@@ -150,6 +151,7 @@ public class TestOzoneFileSystem {
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
@@ -177,7 +179,8 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.getRpcClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneBucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
@@ -199,6 +202,7 @@ public class TestOzoneFileSystem {
 
   @AfterClass
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -1443,7 +1447,7 @@ public class TestOzoneFileSystem {
     if (isDirectory) {
       key = key + "/";
     }
-    return cluster.getClient().getObjectStore().getVolume(volumeName)
+    return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(key);
   }
 

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -118,6 +119,9 @@ public class OzoneContainer {
   private DatanodeDetails datanodeDetails;
   private StateContext context;
 
+
+  private final ContainerMetrics metrics;
+
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
   }
@@ -161,7 +165,7 @@ public class OzoneContainer {
     metadataScanner = null;
 
     buildContainerSet();
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
     IncrementalReportSender<Container> icrSender = container -> {
@@ -204,7 +208,9 @@ public class OzoneContainer {
         controller,
         conf.getObject(ReplicationConfig.class),
         secConf,
-        certClient);
+        certClient,
+        new ContainerImporter(conf, containerSet, controller,
+            volumeSet));
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
@@ -517,5 +523,9 @@ public class OzoneContainer {
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
+  }
+
+  public ContainerMetrics getMetrics() {
+    return metrics;
   }
 }

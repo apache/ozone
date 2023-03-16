@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
@@ -59,6 +58,7 @@ import org.junit.runners.Parameterized;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
+import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 
 /**
  * Test the tar/untar for a given container.
@@ -93,8 +93,8 @@ public class TestTarContainerPacker {
   private final String schemaVersion;
   private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(
-      ContainerTestVersionInfo versionInfo, String compression) {
+  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
@@ -109,10 +109,8 @@ public class TestTarContainerPacker {
         ContainerTestVersionInfo.getLayoutList();
     List<Object[]> parameterList = new ArrayList<>();
     for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
-      for (Map.Entry<CopyContainerCompression, String> entry :
-          CopyContainerCompression.getCompressionMapping().entrySet()) {
-        parameterList.add(
-            new Object[]{containerTestVersionInfo, entry.getValue()});
+      for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+        parameterList.add(new Object[]{containerTestVersionInfo, compr});
       }
     }
     return parameterList;
@@ -169,7 +167,7 @@ public class TestTarContainerPacker {
   }
 
   @Test
-  public void pack() throws IOException, CompressorException {
+  public void pack() throws IOException {
     //GIVEN
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
@@ -199,15 +197,18 @@ public class TestTarContainerPacker {
       InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
+      boolean first = true;
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
       while ((entry = tarStream.getNextTarEntry()) != null) {
+        if (first) {
+          Assert.assertEquals(CONTAINER_FILE_NAME, entry.getName());
+          first = false;
+        }
         entries.put(entry.getName(), entry);
       }
 
-      Assert.assertTrue(
-          entries.containsKey("container.yaml"));
-
+      Assert.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
     } finally {
       if (tarStream != null) {
         tarStream.close();

@@ -48,4 +48,15 @@ public class LegacyRatisContainerReplicaCount extends
   protected int healthyReplicaCountAdapter() {
     return -getMisMatchedReplicaCount();
   }
+
+  /**
+   * For LegacyReplicationManager, unhealthy replicas are all replicas that
+   * don't match the container's state. For a CLOSED container with replicas
+   * {CLOSED, CLOSING, UNHEALTHY, OPEN}, unhealthy replica count is 3. 2
+   * mismatches (CLOSING, OPEN) + 1 UNHEALTHY = 3.
+   */
+  @Override
+  public int getUnhealthyReplicaCountAdapter() {
+    return getMisMatchedReplicaCount();
+  }
 }

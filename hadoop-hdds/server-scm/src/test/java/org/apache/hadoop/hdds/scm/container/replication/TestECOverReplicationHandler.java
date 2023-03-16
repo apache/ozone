@@ -237,14 +237,13 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, nodeManager);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = ecORH
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = ecORH
         .processAndCreateCommands(availableReplicas, ImmutableList.of(),
             health, 1);
 
     Assert.assertEquals(1, commands.size());
-    for (SCMCommand<?> cmd : commands.values()) {
-      Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
-    }
+    SCMCommand<?> cmd = commands.iterator().next().getValue();
+    Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
   }
 
   private void testOverReplicationWithIndexes(
@@ -257,7 +256,7 @@ public class TestECOverReplicationHandler {
         Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands = ecORH
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = ecORH
         .processAndCreateCommands(availableReplicas, pendingOps,
             result, 1);
 
@@ -268,8 +267,8 @@ public class TestECOverReplicationHandler {
     Assert.assertEquals(totalDeleteCommandNum, commands.size());
 
     // Each command should have a non-zero replica index
-    commands.forEach((datanode, command) -> Assert.assertNotEquals(0,
-        ((DeleteContainerCommand)command).getReplicaIndex()));
+    commands.forEach(pair -> Assert.assertNotEquals(0,
+        ((DeleteContainerCommand) pair.getValue()).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
     // of this index
@@ -278,8 +277,8 @@ public class TestECOverReplicationHandler {
             ContainerReplica::getDatanodeDetails,
             ContainerReplica::getReplicaIndex));
     Map<Integer, Integer> index2commandNum = new HashMap<>();
-    commands.keySet().forEach(dd ->
-        index2commandNum.merge(datanodeDetails2Index.get(dd), 1, Integer::sum)
+    commands.forEach(pair -> index2commandNum.merge(
+        datanodeDetails2Index.get(pair.getKey()), 1, Integer::sum)
     );
 
     index2commandNum.keySet().forEach(i -> {

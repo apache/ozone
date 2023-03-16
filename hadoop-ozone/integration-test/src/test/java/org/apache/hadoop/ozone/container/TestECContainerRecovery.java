@@ -45,10 +45,9 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
-import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionSupervisor;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -227,6 +226,7 @@ public class TestECContainerRecovery {
         .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -239,6 +239,7 @@ public class TestECContainerRecovery {
     // Let's verify for Over replications now.
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Restart the DN to make the over replication and expect replication to be
     // increased.
@@ -254,7 +255,6 @@ public class TestECContainerRecovery {
     waitForContainerCount(5, container.containerID(), scm);
   }
 
-  @Flaky("HDDS-7617")
   @Test
   public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
     byte[] inputData = getInputBytes(3);
@@ -295,22 +295,23 @@ public class TestECContainerRecovery {
       dn.getDatanodeStateMachine().getContainer()
               .getContainerSet().setRecoveringTimeout(100);
 
-      ECReconstructionSupervisor ecReconstructionSupervisor =
-              GenericTestUtils.getFieldReflection(dn.getDatanodeStateMachine(),
-                      "ecReconstructionSupervisor");
+      ReconstructECContainersCommandHandler handler = GenericTestUtils
+          .getFieldReflection(dn.getDatanodeStateMachine(),
+              "reconstructECContainersCommandHandler");
+
       ECReconstructionCoordinator coordinator = GenericTestUtils
-              .mockFieldReflection(ecReconstructionSupervisor,
-                      "reconstructionCoordinator");
+              .mockFieldReflection(handler,
+                      "coordinator");
 
       Mockito.doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
-                        dn.getDatanodeStateMachine()
-                                .getContainer()
-                                .getContainerSet()
-                                .getContainer(finalContainer.getContainerID())
-                                .getContainerState() ==
-                        ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-                1000, 100000);
+            dn.getDatanodeStateMachine()
+                .getContainer()
+                .getContainerSet()
+                .getContainer(finalContainer.getContainerID())
+                .getContainerState() ==
+                    ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+            1000, 100000);
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;
@@ -328,6 +329,7 @@ public class TestECContainerRecovery {
             .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -402,6 +404,11 @@ public class TestECContainerRecovery {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;
+  }
+
+  private void waitForReplicationManagerStopped(ReplicationManager rm)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
   }
 
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -32,12 +33,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 
 /**
  * Handles the EC Over replication processing and forming the respective SCM
@@ -69,7 +71,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
    * executed and the command itself.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
+  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy) {
     ContainerInfo container = result.getContainerInfo();
@@ -102,13 +104,13 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       LOG.info("The container {} state changed and it is no longer over"
               + " replication. Replica count: {}, healthy replica count: {}",
           container.getContainerID(), replicas.size(), healthyReplicas.size());
-      return emptyMap();
+      return emptySet();
     }
 
     if (!replicaCount.isOverReplicated(true)) {
       LOG.info("The container {} with replicas {} will be corrected " +
           "by the pending delete", container.getContainerID(), replicas);
-      return emptyMap();
+      return emptySet();
     }
 
     List<Integer> overReplicatedIndexes =
@@ -118,7 +120,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       LOG.warn("The container {} with replicas {} was found over replicated "
           + "by EcContainerReplicaCount, but there are no over replicated "
           + "indexes returned", container.getContainerID(), replicas);
-      return emptyMap();
+      return emptySet();
     }
 
     final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
@@ -141,10 +143,10 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       LOG.warn("The container {} is over replicated, but no replicas were "
           + "selected to remove by the placement policy. Replicas: {}",
           container, replicas);
-      return emptyMap();
+      return emptySet();
     }
 
-    final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
     // As a sanity check, sum up the current counts of each replica index. When
     // processing replicasToRemove, ensure that removing the replica would not
     // drop the count of that index to zero.
@@ -165,7 +167,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       DeleteContainerCommand deleteCommand =
           new DeleteContainerCommand(container.getContainerID(), true);
       deleteCommand.setReplicaIndex(r.getReplicaIndex());
-      commands.put(r.getDatanodeDetails(), deleteCommand);
+      commands.add(Pair.of(r.getDatanodeDetails(), deleteCommand));
     }
 
     if (commands.size() == 0) {

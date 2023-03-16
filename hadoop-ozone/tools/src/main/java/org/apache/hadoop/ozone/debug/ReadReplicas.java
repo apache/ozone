@@ -60,7 +60,7 @@ import java.util.Map;
 @MetaInfServices(SubcommandWithParent.class)
 public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
 
-  @CommandLine.Option(names = {"--outputDir", "-o"},
+  @CommandLine.Option(names = {"--outputDir", "-o", "--output-dir"},
       description = "Destination where the directory will be created" +
           " for the downloaded replicas and the manifest file.",
       defaultValue = "/opt/hadoop")

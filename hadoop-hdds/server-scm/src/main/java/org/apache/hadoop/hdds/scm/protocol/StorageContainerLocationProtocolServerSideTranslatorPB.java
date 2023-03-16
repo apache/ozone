@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
@@ -58,6 +60,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -655,6 +659,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
+      case GetFailedDeletedBlocksTransaction:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetFailedDeletedBlocksTxnResponse(getFailedDeletedBlocksTxn(
+                request.getGetFailedDeletedBlocksTxnRequest()
+            ))
+            .build();
       case ResetDeletedBlockRetryCount:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -662,6 +674,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               .setResetDeletedBlockRetryCountResponse(
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
+              .build();
+      case TransferLeadership:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setTransferScmLeadershipResponse(
+                  transferScmLeadership(
+                      request.getTransferScmLeadershipRequest()))
               .build();
       default:
         throw new IllegalArgumentException(
@@ -1166,6 +1186,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
+      GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
+    long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
+    return GetFailedDeletedBlocksTxnResponseProto.newBuilder()
+        .addAllDeletedBlocksTransactions(
+            impl.getFailedDeletedBlockTxn(request.getCount(), startTxId))
+        .build();
+  }
+
   public ResetDeletedBlockRetryCountResponseProto
       getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {
@@ -1173,5 +1202,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setResetCount(impl.resetDeletedBlockRetryCount(
             request.getTransactionIdList()))
         .build();
+  }
+
+  public TransferLeadershipResponseProto transferScmLeadership(
+      TransferLeadershipRequestProto request) throws IOException {
+    String newLeaderId = request.getNewLeaderId();
+    impl.transferLeadership(newLeaderId);
+    return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

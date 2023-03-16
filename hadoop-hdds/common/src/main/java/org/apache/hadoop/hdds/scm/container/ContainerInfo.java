@@ -506,4 +506,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         || state == HddsProtos.LifeCycleState.CLOSING;
   }
 
+  public boolean isDeleted() {
+    return state == HddsProtos.LifeCycleState.DELETED;
+  }
 }

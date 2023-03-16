@@ -30,9 +30,9 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -271,7 +272,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(
-          containerId, sourceDatanodes, null);
+          containerId, sourceDatanodes, null, NO_COMPRESSION);
       downloader.close();
       Assert.assertNull(file);
       Assert.assertTrue(logCapture.getOutput().contains(
@@ -309,7 +310,7 @@ public class TestOzoneContainerWithTLS {
         downloader = new SimpleContainerDownloader(conf, caClient);
         try {
           file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
-                  null);
+                  null, NO_COMPRESSION);
           downloader.close();
           Assert.assertNotNull(file);
         } finally {

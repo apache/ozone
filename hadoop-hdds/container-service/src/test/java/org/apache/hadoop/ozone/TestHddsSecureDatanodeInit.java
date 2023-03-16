@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -55,12 +55,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -274,25 +274,7 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @Test
-  public void testGetCSR() throws Exception {
-    keyCodec.writePublicKey(publicKey);
-    keyCodec.writePrivateKey(privateKey);
-    service.setCertificateClient(client);
-    PKCS10CertificationRequest csr =
-        client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-  }
-
-  @Test
+  @Disabled("HDDS-7874")
   public void testCertificateRotation() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);

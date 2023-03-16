@@ -35,7 +35,9 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -219,6 +221,24 @@ public class OMDBDefinition implements DBDefinition {
 
   // End tables for S3 multi-tenancy
 
+  public static final DBColumnFamilyDefinition<String, SnapshotInfo>
+      SNAPSHOT_INFO_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
+          String.class,  // snapshot path
+          new StringCodec(),
+          SnapshotInfo.class,
+          new OmDBSnapshotInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmKeyRenameInfo>
+      RENAMED_KEY_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.RENAMED_KEY_TABLE,
+          String.class,  // /volumeName/bucketName/objectID
+          new StringCodec(),
+          OmKeyRenameInfo.class, // list of key renames
+          new OmKeyRenameInfoCodec());
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -237,7 +257,8 @@ public class OMDBDefinition implements DBDefinition {
         S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
-        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE};
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
+        SNAPSHOT_INFO_TABLE, RENAMED_KEY_TABLE};
   }
 }
 

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
+import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
@@ -77,8 +78,8 @@ public class TestOpenKeyCleanupService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOpenKeyCleanupService.class);
 
-  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(500);
-  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(1000);
+  private static final Duration SERVICE_INTERVAL = Duration.ofMillis(100);
+  private static final Duration EXPIRE_THRESHOLD = Duration.ofMillis(200);
   private KeyManager keyManager;
   private OMMetadataManager omMetadataManager;
 
@@ -119,13 +120,16 @@ public class TestOpenKeyCleanupService {
    */
   @ParameterizedTest
   @CsvSource({
-      "99, 0",
-      "0, 88",
-      "66, 77"
+      "9, 0, true",
+      "0, 8, true",
+      "6, 7, true",
+      "99, 0, false",
+      "0, 88, false",
+      "66, 77, false"
   })
   @Timeout(300)
-  public void checkIfCleanupServiceIsDeletingExpiredOpenKeys(
-      int numDEFKeys, int numFSOKeys) throws Exception {
+  public void testCleanupExpiredOpenKeys(
+      int numDEFKeys, int numFSOKeys, boolean hsync) throws Exception {
 
     OpenKeyCleanupService openKeyCleanupService =
         (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
@@ -137,16 +141,15 @@ public class TestOpenKeyCleanupService {
     final long oldrunCount = openKeyCleanupService.getRunCount();
 
     final int keyCount = numDEFKeys + numFSOKeys;
-    createOpenKeys(numDEFKeys, BucketLayout.DEFAULT);
-    createOpenKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    createOpenKeys(numDEFKeys, hsync, BucketLayout.DEFAULT);
+    createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD.toMillis());
 
-    assertEquals(numDEFKeys == 0, keyManager.getExpiredOpenKeys(
-        EXPIRE_THRESHOLD, 1, BucketLayout.DEFAULT).isEmpty());
-    assertEquals(numFSOKeys == 0, keyManager.getExpiredOpenKeys(
-        EXPIRE_THRESHOLD, 1, BucketLayout.FILE_SYSTEM_OPTIMIZED).isEmpty());
+    assertExpiredOpenKeys(numDEFKeys == 0, hsync, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(numFSOKeys == 0, hsync,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     openKeyCleanupService.resume();
 
@@ -156,18 +159,28 @@ public class TestOpenKeyCleanupService {
         5 * (int) SERVICE_INTERVAL.toMillis());
 
     // wait for requests to complete
-    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    final int n = hsync ? numDEFKeys + numFSOKeys : 1;
+    Thread.sleep(n * SERVICE_INTERVAL.toMillis());
 
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         oldkeyCount + keyCount);
-    assertTrue(keyManager.getExpiredOpenKeys(EXPIRE_THRESHOLD,
-        1, BucketLayout.DEFAULT).isEmpty());
-    assertTrue(keyManager.getExpiredOpenKeys(EXPIRE_THRESHOLD,
-        1, BucketLayout.FILE_SYSTEM_OPTIMIZED).isEmpty());
+    assertExpiredOpenKeys(true, hsync, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(true, hsync,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
-  private void createOpenKeys(int keyCount, BucketLayout bucketLayout)
-      throws IOException {
+  void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,
+      BucketLayout layout) throws IOException {
+    final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
+        EXPIRE_THRESHOLD, 100, layout);
+    final int size = (hsync ? expired.getHsyncKeys()
+        : expired.getOpenKeyBuckets()).size();
+    assertEquals(expectedToEmpty, size == 0,
+        () -> "size=" + size + ", layout=" + layout);
+  }
+
+  private void createOpenKeys(int keyCount, boolean hsync,
+      BucketLayout bucketLayout) throws IOException {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < keyCount; x++) {
@@ -182,7 +195,7 @@ public class TestOpenKeyCleanupService {
 
       final int numBlocks = RandomUtils.nextInt(0, 3);
       // Create the key
-      createOpenKey(volume, bucket, key, numBlocks);
+      createOpenKey(volume, bucket, key, numBlocks, hsync);
     }
   }
 
@@ -206,7 +219,7 @@ public class TestOpenKeyCleanupService {
   }
 
   private void createOpenKey(String volumeName, String bucketName,
-      String keyName, int numBlocks) throws IOException {
+      String keyName, int numBlocks, boolean hsync) throws IOException {
     OmKeyArgs keyArg =
         new OmKeyArgs.Builder()
             .setVolumeName(volumeName)
@@ -223,6 +236,9 @@ public class TestOpenKeyCleanupService {
     for (int i = 0; i < numBlocks; i++) {
       keyArg.addLocationInfo(writeClient.allocateBlock(keyArg, session.getId(),
           new ExcludeList()));
+    }
+    if (hsync) {
+      writeClient.hsyncKey(keyArg, session.getId());
     }
   }
 }

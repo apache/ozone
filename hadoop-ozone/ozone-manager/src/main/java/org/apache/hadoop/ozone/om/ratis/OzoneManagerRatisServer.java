@@ -26,7 +26,9 @@ import com.google.protobuf.ServiceException;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -34,11 +36,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -598,7 +602,21 @@ public final class OzoneManagerRatisServer {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
-    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties, true);
+
+    // Set to enable RAFT to purge logs up to Snapshot Index
+    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties,
+        conf.getBoolean(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX_DEFAULT
+        )
+    );
+    // Set number of last RAFT logs to not be purged
+    RaftServerConfigKeys.Log.setPurgePreservationLogNum(properties,
+        conf.getLong(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT
+        )
+    );
 
     // Set RAFT segment pre-allocated size
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
@@ -729,16 +747,23 @@ public final class OzoneManagerRatisServer {
         .getPropsMatchPrefixAndTrimPrefix(OZONE_OM_HA_PREFIX + ".");
   }
 
-  public RaftPeer getLeader() throws IOException {
-    RaftServer.Division division = server.getDivision(raftGroupId);
-    if (division.getInfo().isLeader()) {
-      return division.getPeer();
-    } else {
-      ByteString leaderId = division.getInfo().getRoleInfoProto()
-          .getFollowerInfo().getLeaderInfo().getId().getId();
-      return leaderId.isEmpty() ? null :
-          division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+  public RaftPeer getLeader() {
+    try {
+      RaftServer.Division division = server.getDivision(raftGroupId);
+      if (division.getInfo().isLeader()) {
+        return division.getPeer();
+      } else {
+        ByteString leaderId = division.getInfo().getRoleInfoProto()
+            .getFollowerInfo().getLeaderInfo().getId().getId();
+        return leaderId.isEmpty() ? null :
+            division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+      }
+    } catch (IOException e) {
+      // In this case we return not a leader.
+      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", e);
     }
+    return null;
   }
 
   /**
@@ -805,6 +830,32 @@ public final class OzoneManagerRatisServer {
   @VisibleForTesting
   public RaftPeerId getRaftPeerId() {
     return this.raftPeerId;
+  }
+
+  @VisibleForTesting
+  public RaftPeerId getRaftLeaderId() {
+    return this.getLeader() == null ? null : this.getLeader().getId();
+  }
+
+  @VisibleForTesting
+  public String getRaftLeaderAddress() {
+    RaftPeer leaderPeer = getLeader();
+    if (leaderPeer == null) {
+      return null;
+    }
+    InetAddress leaderInetAddress = null;
+    try {
+      Optional<String> hostname =
+          HddsUtils.getHostName(leaderPeer.getAddress());
+      if (hostname.isPresent()) {
+        leaderInetAddress = InetAddress.getByName(hostname.get());
+      }
+    } catch (UnknownHostException e) {
+      LOG.error("OM Ratis LeaderInetAddress {} is unresolvable",
+          leaderPeer.getAddress(), e);
+    }
+    return leaderInetAddress == null ? null :
+        leaderInetAddress.toString();
   }
 
   public static UUID getRaftGroupIdFromOmServiceId(String omServiceId) {
