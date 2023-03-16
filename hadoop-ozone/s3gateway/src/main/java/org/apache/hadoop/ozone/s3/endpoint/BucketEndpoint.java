@@ -338,8 +338,6 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
           getAuditParameters()));
       getMetrics().incListMultipartUploadsSuccess();
-      getLatencyMetrics().addListMultipartUploadsLatencyNs(
-          Time.monotonicNowNanos() - start);
       return Response.ok(result).build();
     } catch (OMException exception) {
       AUDIT.logReadFailure(
@@ -354,6 +352,9 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
+    } finally {
+      getLatencyMetrics().addListMultipartUploadsLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 
@@ -619,7 +620,6 @@ public class BucketEndpoint extends EndpointBase {
       for (OzoneAcl acl : ozoneAclListOnVolume) {
         volume.addAcl(acl);
       }
-      getLatencyMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
     } catch (OMException exception) {
       getMetrics().incPutAclFailure();
       auditWriteFailure(S3GAction.PUT_ACL, exception);
@@ -632,6 +632,8 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OS3Exception ex) {
       getMetrics().incPutAclFailure();
       throw ex;
+    } finally {
+      getLatencyMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
     }
     getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();

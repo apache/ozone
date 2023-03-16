@@ -402,7 +402,6 @@ public class ObjectEndpoint extends EndpointBase {
       }
       addLastModifiedDate(responseBuilder, keyDetails);
       getMetrics().incGetKeySuccess();
-      getLatencyMetrics().addGetKeyLatencyNs(Time.monotonicNowNanos() - start);
       return responseBuilder.build();
     } catch (OMException ex) {
       auditSuccess = false;
@@ -435,6 +434,7 @@ public class ObjectEndpoint extends EndpointBase {
             buildAuditMessageForSuccess(s3GAction, getAuditParameters())
         );
       }
+      getLatencyMetrics().addGetKeyLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -634,8 +634,6 @@ public class ObjectEndpoint extends EndpointBase {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incInitMultiPartUploadSuccess();
-      getLatencyMetrics().addInitMultipartUploadLatencyNs(
-          Time.monotonicNowNanos() - start);
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (OMException ex) {
@@ -650,6 +648,9 @@ public class ObjectEndpoint extends EndpointBase {
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       getMetrics().incInitMultiPartUploadFailure();
       throw ex;
+    } finally {
+      getLatencyMetrics().addInitMultipartUploadLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 
@@ -712,8 +713,6 @@ public class ObjectEndpoint extends EndpointBase {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
       getMetrics().incCompleteMultiPartUploadSuccess();
-      getLatencyMetrics().addCompleteMultipartUploadLatencyNs(
-          Time.monotonicNowNanos() - start);
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
@@ -748,6 +747,9 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       throw ex;
+    } finally {
+      getLatencyMetrics().addCompleteMultipartUploadLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 
@@ -755,8 +757,8 @@ public class ObjectEndpoint extends EndpointBase {
                                       String key, long length, int partNumber,
                                       String uploadID, InputStream body)
       throws IOException, OS3Exception {
+    long start = Time.monotonicNowNanos();
     try {
-      long start = Time.monotonicNowNanos();
       String copyHeader;
       OzoneOutputStream ozoneOutputStream = null;
 
@@ -824,8 +826,6 @@ public class ObjectEndpoint extends EndpointBase {
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       getMetrics().incCreateMultipartKeySuccess();
-      getLatencyMetrics().addCreateMultipartKeyLatencyNs(
-          Time.monotonicNowNanos() - start);
       if (copyHeader != null) {
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
@@ -841,6 +841,9 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
       }
       throw ex;
+    } finally {
+      getLatencyMetrics().addCreateMultipartKeyLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 
@@ -899,9 +902,11 @@ public class ObjectEndpoint extends EndpointBase {
             bucket + "/" + key + "/" + uploadID, ex);
       }
       throw ex;
+    } finally {
+      getLatencyMetrics().addListPartsLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
     getMetrics().incListPartsSuccess();
-    getLatencyMetrics().addListPartsLatencyNs(Time.monotonicNowNanos() - start);
     return Response.status(Status.OK).entity(listPartsResponse).build();
   }
 
@@ -984,8 +989,6 @@ public class ObjectEndpoint extends EndpointBase {
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
-      getLatencyMetrics().addCopyObjectLatencyNs(
-          Time.monotonicNowNanos() - start);
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
@@ -997,6 +1000,9 @@ public class ObjectEndpoint extends EndpointBase {
             destBucket + "/" + destkey, ex);
       }
       throw ex;
+    } finally {
+      getLatencyMetrics().addCopyObjectLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 

@@ -73,8 +73,6 @@ public class RootEndpoint extends EndpointBase {
       }
 
       getMetrics().incListS3BucketsSuccess();
-      getLatencyMetrics().addListS3BucketsLatencyNs(
-          Time.monotonicNowNanos() - start);
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -90,6 +88,8 @@ public class RootEndpoint extends EndpointBase {
                 Collections.emptyMap())
         );
       }
+      getLatencyMetrics().addListS3BucketsLatencyNs(
+          Time.monotonicNowNanos() - start);
     }
   }
 
