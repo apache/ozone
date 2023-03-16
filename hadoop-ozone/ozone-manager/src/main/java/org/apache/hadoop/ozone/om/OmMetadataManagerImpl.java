@@ -340,6 +340,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return new OmMetadataManagerImpl(conf, dir, name);
   }
 
+  /**
+   * Metadata constructor for checkpoints.
+   *
+   * @param conf - Ozone conf.
+   * @param dir - Checkpoint parent directory.
+   * @param name - Checkpoint directory name.
+   * @throws IOException
+   */
+  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+      throws IOException {
+    lock = new OmReadOnlyLock();
+    omEpoch = 0;
+    setStore(loadDB(conf, dir, name, true));
+    initializeOmTables(false);
+  }
+
+
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {

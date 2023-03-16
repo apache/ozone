@@ -406,7 +406,7 @@ public class TestOMDbCheckpointServlet {
     setupCluster();
     metaDir = OMStorage.getOmDbDir(conf);
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster.newClient());
 
     // Create dummy keys for snapshotting.
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
@@ -461,7 +461,7 @@ public class TestOMDbCheckpointServlet {
       throws IOException, InterruptedException, TimeoutException {
     final OzoneManager om = cluster.getOzoneManager();
     String snapshotName = UUID.randomUUID().toString();
-    OzoneManagerProtocol writeClient = cluster.getRpcClient().getObjectStore()
+    OzoneManagerProtocol writeClient = cluster.newClient().getObjectStore()
         .getClientProxy().getOzoneManagerClient();
 
     writeClient.createSnapshot(vname, bname, snapshotName);

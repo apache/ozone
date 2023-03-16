@@ -591,11 +591,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     return Paths.get(dbPath.getParent().toString(), fileName);
   }
 
-
-  private ManagedRocksDB createDbForSnapshotDiff(OzoneConfiguration config) {
-    final ManagedOptions managedOptions = new ManagedOptions();
-    managedOptions.setCreateIfMissing(true);
-=======
   private int getIndexFromToken(final String token) throws IOException {
     if (isBlank(token)) {
       return 0;
@@ -615,7 +610,6 @@ public final class OmSnapshotManager implements AutoCloseable {
           "Resend the request with valid token returned in previous request.");
     }
   }
->>>>>>> origin/master
 
   private ManagedRocksDB createRocksDbForSnapshotDiff(
       final ManagedDBOptions dbOptions, String dbPath,
