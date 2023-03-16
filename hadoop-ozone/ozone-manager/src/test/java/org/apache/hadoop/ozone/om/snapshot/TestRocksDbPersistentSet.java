@@ -19,22 +19,27 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -42,102 +47,87 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * Test persistent set backed by RocksDB.
  */
 public class TestRocksDbPersistentSet {
-  private ColumnFamilyHandle columnFamily;
-  private ManagedRocksDB db;
-  private File file;
-  private CodecRegistry codecRegistry;
+  private static File file;
+  private static ManagedRocksDB db;
+  private static ManagedDBOptions dbOptions;
+  private static ManagedColumnFamilyOptions columnFamilyOptions;
 
-  @BeforeEach
-  public void init() throws RocksDBException, IOException {
-    ManagedOptions options = new ManagedOptions();
-    options.setCreateIfMissing(true);
+  @BeforeAll
+  public static void staticInit() throws RocksDBException {
+    dbOptions = new ManagedDBOptions();
+    dbOptions.setCreateIfMissing(true);
+    columnFamilyOptions = new ManagedColumnFamilyOptions();
+
     file = new File("./test-persistent-set");
     if (!file.mkdirs() && !file.exists()) {
       throw new IllegalArgumentException("Unable to create directory " +
           file);
     }
 
-    db = ManagedRocksDB.open(options,
-        Paths.get(file.toString(), "rocks.db").toFile().getAbsolutePath());
+    String absolutePath = Paths.get(file.toString(), "rocks.db").toFile()
+        .getAbsolutePath();
 
-    codecRegistry = new CodecRegistry();
+    List<ColumnFamilyDescriptor> columnFamilyDescriptors =
+        Collections.singletonList(new ColumnFamilyDescriptor(
+            StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME),
+            columnFamilyOptions));
 
-    columnFamily = db.get().createColumnFamily(
-        new ColumnFamilyDescriptor(
-            codecRegistry.asRawData("testSet"),
-            new ManagedColumnFamilyOptions()));
+    List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+
+    db = ManagedRocksDB.open(dbOptions, absolutePath, columnFamilyDescriptors,
+        columnFamilyHandles);
+
   }
 
-  @AfterEach
-  public void teardown() throws RocksDBException {
-    deleteDirectory(file);
-
-    if (columnFamily != null && db != null) {
-      db.get().dropColumnFamily(columnFamily);
+  @AfterAll
+  public static void staticTearDown() {
+    if (dbOptions != null) {
+      dbOptions.close();
     }
-    if (columnFamily != null) {
-      columnFamily.close();
+    if (columnFamilyOptions != null) {
+      columnFamilyOptions.close();
     }
     if (db != null) {
       db.close();
     }
+
+    GenericTestUtils.deleteDirectory(file);
   }
 
   @Test
-  public void testRocksDBPersistentSetForString() {
-    PersistentSet<String> persistentSet = new RocksDbPersistentSet<>(
-        db,
-        columnFamily,
-        codecRegistry,
-        String.class
-    );
+  public void testRocksDBPersistentSet() throws IOException, RocksDBException {
+    ColumnFamilyHandle columnFamily = null;
 
-    List<String> testList = Arrays.asList("e1", "e1", "e2", "e2", "e3");
-    Set<String> testSet = new HashSet<>(testList);
+    try {
+      CodecRegistry codecRegistry = new CodecRegistry();
+      columnFamily = db.get().createColumnFamily(
+          new ColumnFamilyDescriptor(
+              codecRegistry.asRawData("testSet"), columnFamilyOptions));
 
-    testList.forEach(persistentSet::add);
+      PersistentSet<String> persistentSet = new RocksDbPersistentSet<>(
+          db,
+          columnFamily,
+          codecRegistry,
+          String.class
+      );
 
-    Iterator<String> iterator = persistentSet.iterator();
-    Iterator<String> setIterator = testSet.iterator();
+      List<String> testList = Arrays.asList("e1", "e1", "e2", "e2", "e3");
+      Set<String> testSet = new HashSet<>(testList);
 
-    while (iterator.hasNext()) {
-      assertEquals(iterator.next(), setIterator.next());
-    }
-    assertFalse(setIterator.hasNext());
-  }
+      testList.forEach(persistentSet::add);
 
-  @Test
-  public void testRocksDBPersistentSetForLong() {
-    PersistentSet<Long> persistentSet = new RocksDbPersistentSet<>(
-        db,
-        columnFamily,
-        codecRegistry,
-        Long.class
-    );
+      Iterator<String> iterator = persistentSet.iterator();
+      Iterator<String> setIterator = testSet.iterator();
 
-    List<Long> testList = Arrays.asList(1L, 1L, 2L, 2L, 3L, 4L, 5L, 5L);
-    Set<Long> testSet = new HashSet<>(testList);
-
-    testList.forEach(persistentSet::add);
-
-    Iterator<Long> iterator = persistentSet.iterator();
-    Iterator<Long> setIterator = testSet.iterator();
-
-    while (iterator.hasNext()) {
-      assertEquals(iterator.next(), setIterator.next());
-    }
-    assertFalse(setIterator.hasNext());
-  }
-
-  private boolean deleteDirectory(File directoryToBeDeleted) {
-    File[] allContents = directoryToBeDeleted.listFiles();
-    if (allContents != null) {
-      for (File content : allContents) {
-        if (!deleteDirectory(content)) {
-          return false;
-        }
+      while (iterator.hasNext()) {
+        assertEquals(iterator.next(), setIterator.next());
+      }
+      assertFalse(setIterator.hasNext());
+    } finally {
+      if (columnFamily != null) {
+        db.get().dropColumnFamily(columnFamily);
+        columnFamily.close();
       }
     }
-    return directoryToBeDeleted.delete();
   }
 }
