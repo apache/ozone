@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoCodec;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -82,6 +85,7 @@ public class TestHSync {
   private static OzoneBucket bucket;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static OzoneClient client;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -106,13 +110,15 @@ public class TestHSync {
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, layout);
+    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
   }
 
   @AfterAll
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -255,7 +261,7 @@ public class TestHSync {
                 3, 2, ECReplicationConfig.EcCodec.RS, 1024)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(cluster, bucket.getVolumeName(), omBucketArgs,
+    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
