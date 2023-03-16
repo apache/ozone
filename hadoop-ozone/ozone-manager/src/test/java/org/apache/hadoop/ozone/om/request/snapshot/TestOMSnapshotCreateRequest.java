@@ -228,11 +228,11 @@ public class TestOMSnapshotCreateRequest {
     // return null.
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
-    // add key to cache
+    // run validateAndUpdateCache. add key to cache
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
-    
+
     // check cache
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
