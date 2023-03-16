@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.AfterClass;
@@ -67,6 +68,7 @@ public class TestOzoneFSInputStream {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static FileSystem fs;
   private static FileSystem ecFs;
   private static Path filePath = null;
@@ -93,9 +95,10 @@ public class TestOzoneFSInputStream {
         .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
@@ -119,7 +122,7 @@ public class TestOzoneFSInputStream {
                 1024)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(cluster, bucket.getVolumeName(), omBucketArgs,
+    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
@@ -132,6 +135,7 @@ public class TestOzoneFSInputStream {
    */
   @AfterClass
   public static void shutdown() throws IOException {
+    IOUtils.cleanupWithLogger(null, client);
     fs.close();
     ecFs.close();
     cluster.shutdown();

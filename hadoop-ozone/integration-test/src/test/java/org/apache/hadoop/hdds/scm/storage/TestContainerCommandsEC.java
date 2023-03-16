@@ -159,7 +159,6 @@ public class TestContainerCommandsEC {
     config.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
     startCluster(config);
     prepareData(KEY_SIZE_RANGES);
-    rpcClient = OzoneClientFactory.getRpcClient(config);
   }
 
   @AfterAll

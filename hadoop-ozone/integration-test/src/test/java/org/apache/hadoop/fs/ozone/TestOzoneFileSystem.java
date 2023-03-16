@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -40,6 +39,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -179,11 +179,11 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    client = cluster.getRpcClient();
+    client = cluster.newClient();
     writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -1515,7 +1515,7 @@ public class TestOzoneFileSystem {
   public void testCreateKeyShouldUseRefreshedBucketReplicationConfig()
       throws IOException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     final TestClock testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String

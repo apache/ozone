@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestStorageContainerManagerHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -75,6 +77,7 @@ public class TestScmSafeMode {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestScmSafeMode.class);
   private MiniOzoneCluster cluster = null;
+  private OzoneClient client;
   private MiniOzoneCluster.Builder builder = null;
   private OzoneConfiguration conf;
   private OzoneManager om;
@@ -105,6 +108,7 @@ public class TestScmSafeMode {
     cluster = builder.build();
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     om = cluster.getOzoneManager();
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
@@ -115,6 +119,7 @@ public class TestScmSafeMode {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       try {
         cluster.shutdown();
@@ -138,7 +143,7 @@ public class TestScmSafeMode {
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
-    ObjectStore store = cluster.getRpcClient().getObjectStore();
+    ObjectStore store = client.getObjectStore();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -163,7 +168,7 @@ public class TestScmSafeMode {
 
 
     final OzoneBucket bucket1 =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName)
+        client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
 // As cluster is restarted with out datanodes restart

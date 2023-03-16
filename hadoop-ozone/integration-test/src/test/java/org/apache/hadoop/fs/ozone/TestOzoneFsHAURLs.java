@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -87,6 +89,7 @@ public class TestOzoneFsHAURLs {
       "fs." + OzoneConsts.OZONE_URI_SCHEME + ".impl";
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
+  private static OzoneClient client;
 
   private final String ofsImplKey =
       "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
@@ -128,6 +131,7 @@ public class TestOzoneFsHAURLs {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
 
     om = cluster.getOzoneManager();
   }
@@ -141,8 +145,7 @@ public class TestOzoneFsHAURLs {
     Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    ObjectStore objectStore =
-        OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
@@ -165,6 +168,7 @@ public class TestOzoneFsHAURLs {
 
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
