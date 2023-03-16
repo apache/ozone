@@ -110,7 +110,6 @@ public class TestMoveManager {
     Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
     moveManager = new MoveManager(replicationManager, containerManager);
-    moveManager.onLeaderReady();
   }
 
   @Test

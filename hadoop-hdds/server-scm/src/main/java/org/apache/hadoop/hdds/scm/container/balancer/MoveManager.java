@@ -121,8 +121,6 @@ public final class MoveManager implements
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> pendingMoves =
       new ConcurrentHashMap<>();
 
-  private volatile boolean running = false;
-
   public MoveManager(final ReplicationManager replicationManager,
       final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
@@ -194,22 +192,6 @@ public final class MoveManager implements
   }
 
   /**
-   * notify MoveManager that the current scm has become leader and ready.
-   */
-  public void onLeaderReady() {
-    //discard all stale records
-    pendingMoves.clear();
-    running = true;
-  }
-
-  /**
-   * notify MoveManager that the current scm leader steps down.
-   */
-  public void onNotLeader() {
-    running = false;
-  }
-
-  /**
    * move a container replica from source datanode to
    * target datanode. A move is a two part operation. First a replication
    * command is scheduled to create a new copy of the replica. Later, when the
@@ -219,16 +201,11 @@ public final class MoveManager implements
    * @param src source datanode
    * @param tgt target datanode
    */
-  public CompletableFuture<MoveResult> move(
+  CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
       ContainerReplicaNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
-
-    if (!running) {
-      ret.complete(MoveResult.FAIL_LEADER_NOT_READY);
-      return ret;
-    }
 
     // Ensure src and tgt are IN_SERVICE and HEALTHY
     for (DatanodeDetails dn : Arrays.asList(src, tgt)) {
@@ -333,10 +310,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpCompleted(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -365,10 +338,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpExpired(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -513,10 +482,6 @@ public final class MoveManager implements
   @Override
   public void opCompleted(ContainerReplicaOp op, ContainerID containerID,
       boolean timedOut) {
-    if (!running) {
-      return;
-    }
-
     if (timedOut) {
       notifyContainerOpExpired(op, containerID);
     } else {
