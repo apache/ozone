@@ -215,7 +215,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
           TimeUnit.MILLISECONDS
       );
     } else {
-      executor = null;
+      this.executor = null;
     }
   }
 
