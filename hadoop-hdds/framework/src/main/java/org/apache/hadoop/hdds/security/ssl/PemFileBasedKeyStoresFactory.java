@@ -32,7 +32,6 @@ import javax.net.ssl.TrustManager;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * {@link KeyStoresFactory} implementation that reads the certificates from
@@ -56,15 +55,13 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
    */
   public static final String DEFAULT_KEYSTORE_TYPE = "jks";
 
-  private AtomicReference<KeyManager[]> keyManagers;
-  private AtomicReference<TrustManager[]> trustManagers;
+  private KeyManager[] keyManagers;
+  private TrustManager[] trustManagers;
   private final CertificateClient caClient;
 
   public PemFileBasedKeyStoresFactory(SecurityConfig securityConfig,
       CertificateClient client) {
     this.caClient = client;
-    keyManagers = new AtomicReference<>();
-    trustManagers = new AtomicReference<>();
   }
 
   /**
@@ -75,7 +72,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
       GeneralSecurityException, IOException {
     ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(
         DEFAULT_KEYSTORE_TYPE, caClient);
-    trustManagers.set(new TrustManager[] {trustManager});
+    trustManagers = new TrustManager[] {trustManager};
   }
 
   /**
@@ -86,7 +83,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
       GeneralSecurityException, IOException {
     ReloadingX509KeyManager keystoreManager =
         new ReloadingX509KeyManager(DEFAULT_KEYSTORE_TYPE, caClient);
-    keyManagers.set(new KeyManager[] {keystoreManager});
+    keyManagers = new KeyManager[] {keystoreManager};
   }
 
   /**
@@ -113,7 +110,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
           .getInstance(KeyManagerFactory.getDefaultAlgorithm());
 
       keyMgrFactory.init(keystore, null);
-      keyManagers.set(keyMgrFactory.getKeyManagers());
+      keyManagers = keyMgrFactory.getKeyManagers();
     }
 
     // trust manager
@@ -126,12 +123,12 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
    */
   @Override
   public synchronized void destroy() {
-    if (keyManagers.get() != null) {
-      keyManagers.set(null);
+    if (keyManagers != null) {
+      keyManagers = null;
     }
 
-    if (trustManagers.get() != null) {
-      trustManagers.set(null);
+    if (trustManagers != null) {
+      trustManagers = null;
     }
   }
 
@@ -141,7 +138,7 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public synchronized KeyManager[] getKeyManagers() {
-    return keyManagers.get();
+    return keyManagers;
   }
 
   /**
@@ -150,23 +147,23 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public synchronized TrustManager[] getTrustManagers() {
-    return trustManagers.get();
+    return trustManagers;
   }
 
   @Override
   public synchronized void notifyCertificateRenewed(
       CertificateClient certClient, String oldCertId, String newCertId) {
     LOG.info("{} notify certificate renewed", certClient.getComponentName());
-    if (keyManagers.get() != null) {
-      for (KeyManager km: keyManagers.get()) {
+    if (keyManagers != null) {
+      for (KeyManager km: keyManagers) {
         if (km instanceof ReloadingX509KeyManager) {
           ((ReloadingX509KeyManager) km).loadFrom(certClient);
         }
       }
     }
 
-    if (trustManagers.get() != null) {
-      for (TrustManager tm: trustManagers.get()) {
+    if (trustManagers != null) {
+      for (TrustManager tm: trustManagers) {
         if (tm instanceof ReloadingX509TrustManager) {
           ((ReloadingX509TrustManager) tm).loadFrom(certClient);
         }
