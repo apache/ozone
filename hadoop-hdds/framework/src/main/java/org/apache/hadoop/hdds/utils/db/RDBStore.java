@@ -106,8 +106,8 @@ public class RDBStore implements DBStore {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
             dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName, dbLocation, maxTimeAllowedForSnapshotInDag,
-            compactionDagDaemonInterval);
+            dbCompactionLogDirName, dbLocation.toString(),
+            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
