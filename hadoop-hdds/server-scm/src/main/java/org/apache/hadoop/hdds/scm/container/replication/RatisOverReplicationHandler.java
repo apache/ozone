@@ -296,7 +296,4 @@ public class RatisOverReplicationHandler
     return commandsSent;
   }
 
-  private DeleteContainerCommand createDeleteCommand(ContainerInfo container) {
-    return new DeleteContainerCommand(container.containerID(), true);
-  }
 }
