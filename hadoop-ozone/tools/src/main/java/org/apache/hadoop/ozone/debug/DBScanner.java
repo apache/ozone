@@ -82,9 +82,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private static boolean withKey;
 
   @CommandLine.Option(names = {"--length", "-l"},
-          description = "Maximum number of items to list. " +
-              "If -1 dumps the entire table data")
-  private static int limit = 100;
+          description = "Maximum number of items to list.")
+  private static int limit = -1;
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
