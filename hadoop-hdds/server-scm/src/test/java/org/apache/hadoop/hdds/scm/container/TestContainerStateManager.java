@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -92,6 +95,8 @@ public class TestContainerStateManager {
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
+            conf, Clock.system(ZoneId.systemDefault())))
         .build();
 
   }

@@ -239,6 +239,11 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
+
 
   /**
    * Default SCM Datanode ID file name.
@@ -395,6 +400,9 @@ public final class OzoneConsts {
   public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
 
   public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
+
+  /** Metadata stored in OmKeyInfo. */
+  public static final String HSYNC_CLIENT_ID = "hsyncClientId";
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";

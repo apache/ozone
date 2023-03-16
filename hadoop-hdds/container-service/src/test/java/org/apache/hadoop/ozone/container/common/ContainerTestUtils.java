@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,9 +31,11 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -40,8 +43,10 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -183,5 +188,36 @@ public final class ContainerTestUtils {
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
         .thenReturn(scanDataSuccess);
+  }
+
+  public static KeyValueContainer setUpTestContainerUnderTmpDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion)
+      throws IOException {
+    VolumeChoosingPolicy volumeChoosingPolicy =
+        new RoundRobinVolumeChoosingPolicy();
+    long containerId = HddsUtils.getTime();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
+        containerId, layout,
+        ContainerTestHelper.CONTAINER_MAX_SIZE,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    keyValueContainerData.setSchemaVersion(schemaVersion);
+
+    KeyValueContainer container =
+        new KeyValueContainer(keyValueContainerData, conf);
+    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
+
+    container.close();
+
+    // For testing, we are moving the container
+    // under the tmp directory, in order to delete
+    // it from there, during datanode startup or shutdown
+    KeyValueContainerUtil.ContainerDeleteDirectory
+        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
+
+    return container;
   }
 }

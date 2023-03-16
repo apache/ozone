@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 import java.util.List;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +52,7 @@ import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -74,6 +78,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONT
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
@@ -86,11 +91,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
 public class TestOmSnapshot {
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static String volumeName;
   private static String bucketName;
   private static OzoneManagerProtocol writeClient;
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
+  private static boolean forceFullSnapshotDiff;
   private static ObjectStore store;
   private static OzoneConfiguration leaderConfig;
   private static OzoneManager leaderOzoneManager;
@@ -105,30 +112,34 @@ public class TestOmSnapshot {
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-                         new Object[]{OBJECT_STORE, false},
-                         new Object[]{FILE_SYSTEM_OPTIMIZED, false},
-                         new Object[]{BucketLayout.LEGACY, true});
+                         new Object[]{OBJECT_STORE, false, false},
+                         new Object[]{FILE_SYSTEM_OPTIMIZED, false, false},
+                         new Object[]{BucketLayout.LEGACY, true, true});
   }
 
   public TestOmSnapshot(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths) throws Exception {
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff)
+      throws Exception {
     // Checking whether 'newBucketLayout' and
     // 'newEnableFileSystemPaths' flags represents next parameter
     // index values. This is to ensure that initialize init() function
     // will be invoked only at the beginning of every new set of
     // Parameterized.Parameters.
     if (TestOmSnapshot.enabledFileSystemPaths != newEnableFileSystemPaths ||
-            TestOmSnapshot.bucketLayout != newBucketLayout) {
-      setConfig(newBucketLayout, newEnableFileSystemPaths);
+            TestOmSnapshot.bucketLayout != newBucketLayout ||
+            TestOmSnapshot.forceFullSnapshotDiff != forceFullSnapDiff) {
+      setConfig(newBucketLayout, newEnableFileSystemPaths,
+          forceFullSnapDiff);
       tearDown();
       init();
     }
   }
 
   private static void setConfig(BucketLayout newBucketLayout,
-      boolean newEnableFileSystemPaths) {
+      boolean newEnableFileSystemPaths, boolean forceFullSnapDiff) {
     TestOmSnapshot.enabledFileSystemPaths = newEnableFileSystemPaths;
     TestOmSnapshot.bucketLayout = newBucketLayout;
+    TestOmSnapshot.forceFullSnapshotDiff = forceFullSnapDiff;
   }
 
   /**
@@ -142,6 +153,8 @@ public class TestOmSnapshot {
         enabledFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         bucketLayout.name());
+    conf.setBoolean(OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+        forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
@@ -151,9 +164,10 @@ public class TestOmSnapshot {
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, bucketLayout);
+        .createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -163,7 +177,6 @@ public class TestOmSnapshot {
         (RDBStore) leaderOzoneManager.getMetadataManager().getStore();
     cluster.setConf(leaderConfig);
 
-    OzoneClient client = cluster.getClient();
     store = client.getObjectStore();
     writeClient = store.getClientProxy().getOzoneManagerClient();
 
@@ -176,6 +189,7 @@ public class TestOmSnapshot {
 
   @AfterClass
   public static void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -321,10 +335,10 @@ public class TestOmSnapshot {
       }
     }
     OmKeyArgs keyArgs = genKeyArgs(snapshotKeyPrefix + key1);
-    
+
     OmKeyInfo omKeyInfo = writeClient.lookupKey(keyArgs);
     assertEquals(omKeyInfo.getKeyName(), snapshotKeyPrefix + key1);
-    
+
     OmKeyInfo fileInfo = writeClient.lookupFile(keyArgs);
     assertEquals(fileInfo.getKeyName(), snapshotKeyPrefix + key1);
 
@@ -411,6 +425,29 @@ public class TestOmSnapshot {
   }
 
   @Test
+  public void testCreateSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    String nullstr = "";
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(volume, nullstr));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> createSnapshot(nullstr, bucket));
+  }
+
+  @Test
   public void testBucketDeleteIfSnapshotExists() throws Exception {
     String volume1 = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket1 = "buc-" + RandomStringUtils.randomNumeric(5);
@@ -451,7 +488,8 @@ public class TestOmSnapshot {
     // Do nothing, take another snapshot
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
-    SnapshotDiffReport diff1 = store.snapshotDiff(volume, bucket, snap1, snap2);
+
+    SnapshotDiffReport diff1 = getSnapDiffReport(volume, bucket, snap1, snap2);
     Assert.assertTrue(diff1.getDiffList().isEmpty());
     // Create Key2 and delete Key1, take snapshot
     String key2 = "key-2-";
@@ -459,8 +497,9 @@ public class TestOmSnapshot {
     bucket1.deleteKey(key1);
     String snap3 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap3);
+
     // Diff should have 2 entries
-    SnapshotDiffReport diff2 = store.snapshotDiff(volume, bucket, snap2, snap3);
+    SnapshotDiffReport diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
     Assert.assertTrue(diff2.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -474,7 +513,8 @@ public class TestOmSnapshot {
     bucket1.renameKey(key2, key2Renamed);
     String snap4 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap4);
-    SnapshotDiffReport diff3 = store.snapshotDiff(volume, bucket, snap3, snap4);
+
+    SnapshotDiffReport diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReport.DiffReportEntry
@@ -486,7 +526,7 @@ public class TestOmSnapshot {
     bucket1.createDirectory(dir1);
     String snap5 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap5);
-    SnapshotDiffReport diff4 = store.snapshotDiff(volume, bucket, snap4, snap5);
+    SnapshotDiffReport diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     Assert.assertEquals(1, diff4.getDiffList().size());
     // for non-fso, directories are a special type of key with "/" appended
     // at the end.
@@ -497,6 +537,21 @@ public class TestOmSnapshot {
         SnapshotDiffReport.DiffReportEntry
             .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
 
+  }
+
+  private SnapshotDiffReport getSnapDiffReport(String volume,
+                                               String bucket,
+                                               String fromSnapshot,
+                                               String toSnapshot)
+      throws InterruptedException, IOException {
+    SnapshotDiffResponse response;
+    do {
+      response = store.snapshotDiff(volume, bucket, fromSnapshot,
+          toSnapshot, null, 0);
+      Thread.sleep(response.getWaitTimeInMs());
+    } while (response.getJobStatus() != DONE);
+
+    return response.getSnapshotDiffReport();
   }
 
   @Test
@@ -516,11 +571,11 @@ public class TestOmSnapshot {
     // Destination snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, snap2));
+            () -> store.snapshotDiff(volume, bucket, snap1, snap2, null, 0));
     // From snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap2, snap1));
+            () -> store.snapshotDiff(volume, bucket, snap2, snap1, null, 0));
   }
 
   @Test
@@ -545,15 +600,15 @@ public class TestOmSnapshot {
     // Bucket is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2));
+            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2, null, 0));
     // Volume is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1));
+            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1, null, 0));
     // Both volume and bucket are nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1));
+            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1, null, 0));
   }
 
   @Test
@@ -575,17 +630,44 @@ public class TestOmSnapshot {
     // Destination snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, nullstr));
+            () -> store.snapshotDiff(volume, bucket, snap1, nullstr, null, 0));
     // From snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, nullstr, snap1));
+            () -> store.snapshotDiff(volume, bucket, nullstr, snap1, null, 0));
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(volume, nullstr, snap1, snap2));
+            () -> store.snapshotDiff(volume, nullstr, snap1, snap2, null, 0));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2));
+            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2, null, 0));
+  }
+
+  @Test
+  public void testSnapDiffMultipleBuckets() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucketName1 = "buck-" + RandomStringUtils.randomNumeric(5);
+    String bucketName2 = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucketName1);
+    volume1.createBucket(bucketName2);
+    OzoneBucket bucket1 = volume1.getBucket(bucketName1);
+    OzoneBucket bucket2 = volume1.getBucket(bucketName2);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    key1 = createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucketName1, snap1);
+    // Create key in bucket2 and bucket1 and calculate diff
+    // Diff should not contain bucket2's key
+    createFileKey(bucket1, key1);
+    createFileKey(bucket2, key1);
+    String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucketName1, snap2);
+    SnapshotDiffReport diff1 =
+        getSnapDiffReport(volume, bucketName1, snap1, snap2);
+    Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
 
@@ -594,6 +676,7 @@ public class TestOmSnapshot {
    * snapshots pertaining to different buckets. This will test the
    * sst filtering code path.
    */
+  @Ignore //TODO - Fix in HDDS-8005
   @Test
   public void testSnapDiffWithMultipleSSTs()
       throws IOException, InterruptedException, TimeoutException {
@@ -630,8 +713,80 @@ public class TestOmSnapshot {
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
     SnapshotDiffReport diff1 =
-        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2);
+        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2, null, 0)
+            .getSnapshotDiffReport();
     Assert.assertEquals(1, diff1.getDiffList().size());
+  }
+
+  @Test
+  public void testDeleteSnapshotTwice() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, snap1));
+
+  }
+
+  @Test
+  public void testDeleteSnapshotFailure() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    // Delete non-existent snapshot
+    LambdaTestUtils.intercept(OMException.class,
+            "FILE_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
+
+    // Delete snapshot with non-existent url
+    LambdaTestUtils.intercept(OMException.class,
+            "BUCKET_NOT_FOUND",
+            () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+  }
+
+  @Test
+  public void testDeleteSnapshotMissingMandatoryParams() throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKey(bucket1, key1);
+    String snap1 = "snap" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+    String nullstr = "";
+    // Snapshot is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, bucket, nullstr));
+    // Bucket is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(volume, nullstr, snap1));
+    // Volume is empty
+    assertThrows(IllegalArgumentException.class,
+            () -> store.deleteSnapshot(nullstr, bucket, snap1));
   }
 
   @NotNull

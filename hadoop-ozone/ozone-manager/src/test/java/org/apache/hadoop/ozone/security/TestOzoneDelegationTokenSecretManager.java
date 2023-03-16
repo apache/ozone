@@ -24,17 +24,22 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretCache;
@@ -53,6 +58,11 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.apache.ratis.protocol.RaftPeerId;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -128,13 +138,21 @@ public class TestOzoneDelegationTokenSecretManager {
    * */
   private CertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    X509Certificate cert = KeyStoreTestUtil
+    CertificateFactory fact = CertificateCodec.getCertFactory();
+    X509Certificate singleCert = KeyStoreTestUtil
         .generateCertificate("CN=OzoneMaster", keyPair, 30, "SHA256withRSA");
+    CertPath certPath = fact.engineGenerateCertPath(
+        ImmutableList.of(singleCert));
 
-    return new OMCertificateClient(securityConfig) {
+    OMStorage omStorage = mock(OMStorage.class);
+    when(omStorage.getOmCertSerialId()).thenReturn(null);
+    when(omStorage.getClusterID()).thenReturn("test");
+    when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
+    return new OMCertificateClient(
+        securityConfig, omStorage, null, null, null) {
       @Override
-      public X509Certificate getCertificate() {
-        return cert;
+      public CertPath getCertPath() {
+        return certPath;
       }
 
       @Override
@@ -149,7 +167,7 @@ public class TestOzoneDelegationTokenSecretManager {
 
       @Override
       public X509Certificate getCertificate(String serialId) {
-        return cert;
+        return CertificateCodec.firstCertificateFrom(certPath);
       }
     };
   }
@@ -163,7 +181,7 @@ public class TestOzoneDelegationTokenSecretManager {
   public void testLeadershipCheckinRetrievePassword() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
-    Mockito.doThrow(new OMNotLeaderException("Not leader"))
+    Mockito.doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
         .when(om).checkLeaderStatus();
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
     try {

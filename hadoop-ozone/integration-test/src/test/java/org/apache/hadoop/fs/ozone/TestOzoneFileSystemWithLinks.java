@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -88,6 +88,7 @@ public class TestOzoneFileSystemWithLinks {
   private static BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
@@ -110,11 +111,12 @@ public class TestOzoneFileSystemWithLinks {
         .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -133,6 +135,7 @@ public class TestOzoneFileSystemWithLinks {
 
   @AfterClass
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -180,7 +183,6 @@ public class TestOzoneFileSystemWithLinks {
   public void testLoopInLinkBuckets() throws Exception {
     String linksVolume = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
 
     // Create volume

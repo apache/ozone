@@ -116,7 +116,7 @@ public class TestBlockOutputStreamFlushDelay {
    */
   @AfterAll
   public static void shutdown() {
-    IOUtils.close(null, client);
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

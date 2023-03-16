@@ -59,6 +59,7 @@ public class GrpcXceiverService extends
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
                     + " ContainerCommandRequestProto {}", request, e);
+          isClosed.set(true);
           responseObserver.onError(e);
         }
       }

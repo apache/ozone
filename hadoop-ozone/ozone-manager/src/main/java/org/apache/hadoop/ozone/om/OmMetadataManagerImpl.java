@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -30,7 +31,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import com.google.common.base.Optional;
@@ -43,12 +46,14 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -63,6 +68,7 @@ import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
+import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
@@ -82,15 +88,17 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -191,6 +199,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |----------------------------------------------------------------------|
+   * |  renamedKeyTable | /volumeName/bucketName/objectID -> OmKeyRenameInfo|
+   * |----------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -217,6 +227,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
+  public static final String RENAMED_KEY_TABLE = "renamedKeyTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -238,7 +249,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       TENANT_ACCESS_ID_TABLE,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
-      SNAPSHOT_INFO_TABLE
+      SNAPSHOT_INFO_TABLE,
+      RENAMED_KEY_TABLE
   };
 
   private DBStore store;
@@ -265,11 +277,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table tenantAccessIdTable;
   private Table principalToAccessIdsTable;
   private Table tenantStateTable;
+
   private Table snapshotInfoTable;
+  private Table renamedKeyTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
+
+  // Table-level locks that protects table read/write access. Note:
+  // Don't use this lock for tables other than deletedTable and deletedDirTable.
+  // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
+  private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
+
+  @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return tableLockMap.get(tableName);
+  }
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -307,39 +331,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.omEpoch = 0;
   }
 
-  /**
-   * Metadata constructor for checkpoints.
-   *
-   * @param conf - Ozone conf.
-   * @param dir - Checkpoint parent directory.
-   * @param name - Checkpoint directory name.
-   * @throws IOException
-   */
-  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
-      throws IOException {
-    lock = new OmReadOnlyLock();
-    omEpoch = 0;
-    setStore(loadDB(conf, dir, name, true));
-    initializeOmTables(false);
-  }
-
-  /**
-   * Factory method for creating snapshot metadata manager.
-   *
-   * @param conf - ozone configuration
-   * @param snapshotDirName - the UUID that identifies the snapshot
-   * @return the metadata manager representing the snapshot
-   * @throws IOException
-   */
-  public static OmMetadataManagerImpl createSnapshotMetadataManager(
-      OzoneConfiguration conf, String snapshotDirName) throws IOException {
-    File snapshotDir = new File(OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR);
-    OmMetadataManagerImpl smm = new OmMetadataManagerImpl(conf,
-        snapshotDir, OM_DB_NAME + snapshotDirName);
-    return smm;
-  }
-
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
@@ -347,6 +338,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     File dir = path.getParent().toFile();
     String name = path.getFileName().toString();
     return new OmMetadataManagerImpl(conf, dir, name);
+  }
+
+  // metadata constructor for snapshots
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
+      boolean isSnapshotInCache) throws IOException {
+    lock = new OmReadOnlyLock();
+    omEpoch = 0;
+    String snapshotDir = OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
+    File metaDir = new File(snapshotDir);
+    String dbName = OM_DB_NAME + snapshotDirName;
+    // The check is only to prevent every snapshot read to perform a disk IO
+    // and check if a checkpoint dir exists. If entry is present in cache,
+    // it is most likely DB entries will get flushed in this wait time.
+    if (isSnapshotInCache) {
+      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
+      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+    }
+    setStore(loadDB(conf, metaDir, dbName, true));
+    initializeOmTables(false);
   }
 
   @Override
@@ -522,6 +533,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
+        .addTable(RENAMED_KEY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -536,10 +548,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
-        .addCodec(OmDBUserPrincipalInfo.class,
-            new OmDBUserPrincipalInfoCodec())
-        .addCodec(SnapshotInfo.class,
-            new OmDBSnapshotInfoCodec());
+        .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
+        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec())
+        .addCodec(OmKeyRenameInfo.class, new OmKeyRenameInfoCodec());
   }
 
   /**
@@ -573,6 +584,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
+    // Currently, deletedTable is the only table that will need the table lock
+    tableLockMap.put(DELETED_TABLE, new ReentrantReadWriteLock(true));
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
@@ -642,6 +655,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
+    // objectID -> renamedKeys (renamed keys for key table)
+    renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
+        String.class, OmKeyRenameInfo.class);
+    checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
+    // TODO: [SNAPSHOT] Initialize table lock for renamedKeyTable.
   }
 
   /**
@@ -931,7 +949,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return false;
   }
-
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *
@@ -1393,8 +1410,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (keyIter.hasNext() && currentCount < keyCount) {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
+          // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
+            // Skip the key if it exists in the previous snapshot (of the same
+            // scope) as in this case its blocks should not be reclaimed
+
+            // TODO: [SNAPSHOT] HDDS-7968
+            //  1. If previous snapshot keyTable has key info.getObjectID(),
+            //  skip it. Pending HDDS-7740 merge to reuse the util methods to
+            //  check previousSnapshot.
+            //  2. For efficient lookup, the addition in design doc 4.b)1.b
+            //  is critical.
+            //  3. With snapshot it is possible that only some of the keys in
+            //  the DB key's RepeatedOmKeyInfo list can be reclaimed,
+            //  make sure to update deletedTable accordingly in this case.
+            //  4. Further optimization: Skip all snapshotted keys altogether
+            //  e.g. by prefixing all unreclaimable keys, then calling seek
+
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
                 info.getKeyLocationVersions()) {
@@ -1416,10 +1449,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+  public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
-    Map<String, OpenKeyBucket.Builder> expiredKeys = new HashMap<>();
+    final ExpiredOpenKeys expiredKeys = new ExpiredOpenKeys();
 
+    final Table<String, OmKeyInfo> kt = getKeyTable(bucketLayout);
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
@@ -1429,33 +1463,55 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       final long expiredCreationTimestamp =
           expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
-      OpenKey.Builder builder = OpenKey.newBuilder();
 
       int num = 0;
       while (num < count && keyValueTableIterator.hasNext()) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
+
+        final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+        final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
-          final String volume = openKeyInfo.getVolumeName();
-          final String bucket = openKeyInfo.getBucketName();
-          final String mapKey = volume + OM_KEY_PREFIX + bucket;
-          if (!expiredKeys.containsKey(mapKey)) {
-            expiredKeys.put(mapKey,
-                OpenKeyBucket.newBuilder()
-                    .setVolumeName(volume)
-                    .setBucketName(bucket));
+          final String clientIdString
+              = dbOpenKeyName.substring(lastPrefix + 1);
+
+          final OmKeyInfo info = kt.get(dbKeyName);
+          final boolean isHsync = java.util.Optional.ofNullable(info)
+              .map(WithMetadata::getMetadata)
+              .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+              .filter(id -> id.equals(clientIdString))
+              .isPresent();
+
+          if (!isHsync) {
+            // add non-hsync'ed keys
+            expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
+          } else {
+            // add hsync'ed keys
+            final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+                .setVolumeName(info.getVolumeName())
+                .setBucketName(info.getBucketName())
+                .setKeyName(info.getKeyName())
+                .setDataSize(info.getDataSize());
+            java.util.Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationList)
+                .map(Collection::stream)
+                .orElseGet(Stream::empty)
+                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .forEach(keyArgs::addKeyLocations);
+
+            OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(
+                info.getReplicationConfig(), keyArgs);
+
+            expiredKeys.addHsyncKey(keyArgs, Long.parseLong(clientIdString));
           }
-          expiredKeys.get(mapKey)
-              .addKeys(builder.setName(dbOpenKeyName).build());
           num++;
         }
       }
     }
 
-    return expiredKeys.values().stream().map(OpenKeyBucket.Builder::build)
-        .collect(Collectors.toList());
+    return expiredKeys;
   }
 
   @Override
@@ -1612,6 +1668,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return snapshotInfoTable;
   }
 
+  @Override
+  public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
+    return renamedKeyTable;
+  }
+
   /**
    * Update store used by subclass.
    *
@@ -1672,6 +1733,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(id);
     return openKey.toString();
+  }
+
+  @Override
+  public String getRenameKey(String volumeName, String bucketName,
+                             long objectID) {
+    StringBuilder renameKey = new StringBuilder();
+    renameKey.append(OM_KEY_PREFIX).append(volumeName);
+    renameKey.append(OM_KEY_PREFIX).append(bucketName);
+    renameKey.append(OM_KEY_PREFIX).append(objectID);
+    return renameKey.toString();
   }
 
   @Override

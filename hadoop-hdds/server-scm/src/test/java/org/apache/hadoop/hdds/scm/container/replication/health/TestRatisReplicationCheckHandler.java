@@ -290,7 +290,7 @@ public class TestRatisReplicationCheckHandler {
     // Unrecoverable, so not added to the queue.
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));

@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
@@ -111,6 +113,7 @@ public class TestOzoneShellHA {
   private static File testFile;
   private static String testFilePathString;
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
   private S3Shell s3Shell = null;
@@ -162,6 +165,7 @@ public class TestOzoneShellHA {
         .setNumDatanodes(numDNs)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   /**
@@ -169,6 +173,7 @@ public class TestOzoneShellHA {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -730,7 +735,7 @@ public class TestOzoneShellHA {
   @Test
   @SuppressWarnings("methodlength")
   public void testShQuota() throws Exception {
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
 
     // Test create with no quota
     String[] args = new String[]{"volume", "create", "vol"};
@@ -958,7 +963,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     OzoneVolume volume =
-        cluster.getClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
       Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
@@ -983,7 +988,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     OzoneKeyDetails key =
-        cluster.getClient().getObjectStore().getVolume(volumeName)
+        client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName).getKey(keyName);
     assertEquals(HddsProtos.ReplicationType.EC,
         key.getReplicationConfig().getReplicationType());
@@ -999,7 +1004,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     OzoneVolume volume =
-        cluster.getClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket1");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
@@ -1016,7 +1021,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     OzoneVolume volume =
-        cluster.getClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
       Assert.assertFalse(out.getOutputStream().getClass().getName()

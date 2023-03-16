@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -71,6 +72,7 @@ public class TestOzoneSnapshotRestore {
   private ObjectStore store;
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
+  private OzoneClient client;
 
   private static Stream<Arguments> bucketTypes() {
     return Stream.of(
@@ -109,7 +111,7 @@ public class TestOzoneSnapshotRestore {
     clientConf = new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    OzoneClient client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
 
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
@@ -123,6 +125,7 @@ public class TestOzoneSnapshotRestore {
 
   @AfterEach
   public void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+import java.io.FileNotFoundException;
 import java.util.Collections;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,11 +36,9 @@ import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.SstFileReader;
-import org.rocksdb.SstFileReaderIterator;
 import org.rocksdb.TableProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,32 +171,37 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Note that previous compaction logs are loaded by RDBStore after this
    * object's initialization by calling loadAllCompactionLogs().
    *
-   * @param metadataDir Ozone metadata directory.
-   * @param sstBackupDir Name of the SST backup dir under metadata dir.
+   * @param metadataDirName Ozone metadata directory.
+   * @param sstBackupDirName Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
-   * @param activeDBLocation Active RocksDB directory's location.
+   * @param activeDBLocationName Active RocksDB directory's location.
    * @param maxTimeAllowedForSnapshotInDagInMs Time after which snapshot will be
    *                                           pruned from the DAG by daemon.
    * @param pruneCompactionDagDaemonRunIntervalInMs Internal at which DAG
    *                                               pruning daemon will run.
    */
-  public RocksDBCheckpointDiffer(String metadataDir,
-                                 String sstBackupDir,
+  public RocksDBCheckpointDiffer(String metadataDirName,
+                                 String sstBackupDirName,
                                  String compactionLogDirName,
-                                 File activeDBLocation,
+                                 String activeDBLocationName,
                                  long maxTimeAllowedForSnapshotInDagInMs,
                                  long pruneCompactionDagDaemonRunIntervalInMs) {
+    Preconditions.checkNotNull(metadataDirName);
+    Preconditions.checkNotNull(sstBackupDirName);
+    Preconditions.checkNotNull(compactionLogDirName);
+    Preconditions.checkNotNull(activeDBLocationName);
+
     this.compactionLogDir =
-        createCompactionLogDir(metadataDir, compactionLogDirName);
-    this.sstBackupDir = Paths.get(metadataDir, sstBackupDir) + "/";
+        createCompactionLogDir(metadataDirName, compactionLogDirName);
+    this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
     createSstBackUpDir();
 
     // Active DB location is used in getSSTFileSummary
-    this.activeDBLocationStr = activeDBLocation.toString() + "/";
+    this.activeDBLocationStr = activeDBLocationName + "/";
     this.maxAllowedTimeInDag = maxTimeAllowedForSnapshotInDagInMs;
-    this.executor = Executors.newSingleThreadScheduledExecutor();
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
+      this.executor = Executors.newSingleThreadScheduledExecutor();
       this.executor.scheduleWithFixedDelay(
           this::pruneOlderSnapshotsWithCompactionHistory,
           pruneCompactionDagDaemonRunIntervalInMs,
@@ -210,18 +214,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS
       );
+    } else {
+      this.executor = null;
     }
-  }
-
-  public RocksDBCheckpointDiffer(String sstBackupDir,
-                                 String compactionLogDirName,
-                                 String activeDBLocationName,
-                                 long maxTimeAllowedForSnapshotInDagInMs) {
-    this.compactionLogDir = compactionLogDirName;
-    this.sstBackupDir = sstBackupDir;
-    this.activeDBLocationStr = activeDBLocationName;
-    this.maxAllowedTimeInDag = maxTimeAllowedForSnapshotInDagInMs;
-    this.executor = null;
   }
 
   private String createCompactionLogDir(String metadataDir,
@@ -524,12 +519,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @param filename SST filename
    * @return number of keys
    */
-  private long getSSTFileSummary(String filename) throws RocksDBException {
-
-    if (activeDBLocationStr == null) {
-      // For testing only
-      return 1L;
-    }
+  private long getSSTFileSummary(String filename)
+      throws RocksDBException, FileNotFoundException {
 
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
       filename += SST_FILE_EXTENSION;
@@ -547,7 +538,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     return properties.getNumEntries();
   }
 
-  private String getAbsoluteSstFilePath(String filename) {
+  private String getAbsoluteSstFilePath(String filename)
+      throws FileNotFoundException {
     if (!filename.endsWith(SST_FILE_EXTENSION)) {
       filename += SST_FILE_EXTENSION;
     }
@@ -558,7 +550,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     } else if (sstFileInActiveDB.exists()) {
       return activeDBLocationStr + filename;
     } else {
-      throw new RuntimeException("Can't find SST file: " + filename);
+      throw new FileNotFoundException("Can't find SST file: " + filename);
     }
   }
 
@@ -759,7 +751,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public List<String> getSSTDiffListWithFullPath(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     List<String> sstDiffList = getSSTDiffList(src, dest);
 
@@ -780,7 +772,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
   public synchronized List<String> getSSTDiffList(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) {
+      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
@@ -816,42 +808,26 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     }
 
     if (src.getTablePrefixes() != null && !src.getTablePrefixes().isEmpty()) {
-      filterRelevantSstFiles(fwdDAGDifferentFiles, src.getTablePrefixes());
+      filterRelevantSstFilesFullPath(fwdDAGDifferentFiles,
+          src.getTablePrefixes());
     }
 
     return new ArrayList<>(fwdDAGDifferentFiles);
   }
 
-  public void filterRelevantSstFiles(Set<String> inputFiles,
-      Map<String, String> tableToPrefixMap) {
+  /**
+   * construct absolute sst file path first and
+   * filter the files.
+   */
+  public void filterRelevantSstFilesFullPath(Set<String> inputFiles,
+      Map<String, String> tableToPrefixMap) throws IOException {
     for (Iterator<String> fileIterator =
          inputFiles.iterator(); fileIterator.hasNext();) {
       String filename = fileIterator.next();
       String filepath = getAbsoluteSstFilePath(filename);
-      try (SstFileReader sstFileReader = new SstFileReader(new Options())) {
-        sstFileReader.open(filepath);
-        TableProperties properties = sstFileReader.getTableProperties();
-        String tableName = new String(properties.getColumnFamilyName(), UTF_8);
-        if (tableToPrefixMap.containsKey(tableName)) {
-          String prefix = tableToPrefixMap.get(tableName);
-          SstFileReaderIterator iterator =
-              sstFileReader.newIterator(new ReadOptions());
-          iterator.seekToFirst();
-          String firstKey = RocksDiffUtils
-              .constructBucketKey(new String(iterator.key(), UTF_8));
-          iterator.seekToLast();
-          String lastKey = RocksDiffUtils
-              .constructBucketKey(new String(iterator.key(), UTF_8));
-          if (!RocksDiffUtils
-              .isKeyWithPrefixPresent(prefix, firstKey, lastKey)) {
-            fileIterator.remove();
-          }
-        } else {
-          // entry from other tables
-          fileIterator.remove();
-        }
-      } catch (RocksDBException e) {
-        e.printStackTrace();
+      if (!RocksDiffUtils.doesSstFileContainKeyRange(filepath,
+          tableToPrefixMap)) {
+        fileIterator.remove();
       }
     }
   }
@@ -1004,6 +980,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       numKeys = getSSTFileSummary(file);
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
+    } catch (FileNotFoundException e) {
+      LOG.info("Can't find SST '{}'", file, e);
     }
     CompactionNode fileNode = new CompactionNode(
         file, snapshotID, numKeys, seqNum);

@@ -190,6 +190,8 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -756,6 +758,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     updateKey(args, clientId, false);
   }
 
+  public static void setReplicationConfig(ReplicationConfig replication,
+      KeyArgs.Builder b) {
+    if (replication == null) {
+      return;
+    }
+    if (replication instanceof ECReplicationConfig) {
+      b.setEcReplicationConfig(((ECReplicationConfig) replication).toProto());
+    } else {
+      b.setFactor(ReplicationConfig.getLegacyFactor(replication));
+    }
+    b.setType(replication.getReplicationType());
+  }
+
   private void updateKey(OmKeyArgs args, long clientId, boolean hsync)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
@@ -771,16 +786,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(info -> info.getProtobuf(ClientVersion.CURRENT_VERSION))
             .collect(Collectors.toList()));
 
-    if (args.getReplicationConfig() != null) {
-      if (args.getReplicationConfig() instanceof ECReplicationConfig) {
-        keyArgsBuilder.setEcReplicationConfig(
-            ((ECReplicationConfig) args.getReplicationConfig()).toProto());
-      } else {
-        keyArgsBuilder.setFactor(
-            ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
-      }
-      keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
-    }
+    setReplicationConfig(args.getReplicationConfig(), keyArgsBuilder);
 
     req.setKeyArgs(keyArgsBuilder.build());
     req.setClientID(clientId);
@@ -1191,24 +1197,37 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
-      throws IOException {
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize) throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setFromSnapshot(fromSnapshot)
-            .setToSnapshot(toSnapshot);
+            .setToSnapshot(toSnapshot)
+            .setPageSize(pageSize);
+
+    if (!StringUtils.isBlank(token)) {
+      requestBuilder.setToken(token);
+    }
 
     final OMRequest omRequest = createOMRequest(Type.SnapshotDiff)
         .setSnapshotDiffRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    return SnapshotDiffReport.fromProtobuf(omResponse
-        .getSnapshotDiffResponse().getSnapshotDiffReport());
+    OzoneManagerProtocolProtos.SnapshotDiffResponse diffResponse =
+        omResponse.getSnapshotDiffResponse();
+
+    return new SnapshotDiffResponse(
+        SnapshotDiffReport.fromProtobuf(diffResponse.getSnapshotDiffReport()),
+        JobStatus.fromProtobuf(diffResponse.getJobStatus()),
+        diffResponse.getWaitTimeInMs());
   }
 
   /**
@@ -1351,16 +1370,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
 
-    if (omKeyArgs.getReplicationConfig() != null) {
-      if (omKeyArgs.getReplicationConfig() instanceof ECReplicationConfig) {
-        keyArgs.setEcReplicationConfig(
-            ((ECReplicationConfig) omKeyArgs.getReplicationConfig()).toProto());
-      } else {
-        keyArgs.setFactor(ReplicationConfig
-            .getLegacyFactor(omKeyArgs.getReplicationConfig()));
-      }
-      keyArgs.setType(omKeyArgs.getReplicationConfig().getReplicationType());
-    }
+    setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 
     multipartInfoInitiateRequest.setKeyArgs(keyArgs.build());
 

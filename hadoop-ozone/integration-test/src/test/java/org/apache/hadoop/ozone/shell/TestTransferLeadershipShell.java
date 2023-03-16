@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -101,5 +102,36 @@ public class TestTransferLeadershipShell {
     ozoneAdmin.execute(args3);
     Thread.sleep(3000);
     Assertions.assertNotSame(oldLeader, cluster.getOMLeader());
+  }
+
+  @Test
+  public void testScmTransfer() throws Exception {
+    StorageContainerManager oldLeader = getScmLeader(cluster);
+    List<StorageContainerManager> scmList = new ArrayList<>(cluster.
+        getStorageContainerManagersList());
+    Assertions.assertTrue(scmList.contains(oldLeader));
+    scmList.remove(oldLeader);
+    StorageContainerManager newLeader = scmList.get(0);
+
+    OzoneAdmin ozoneAdmin = new OzoneAdmin(conf);
+    String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
+    ozoneAdmin.execute(args1);
+    cluster.waitForClusterToBeReady();
+    Assertions.assertEquals(newLeader, getScmLeader(cluster));
+
+    oldLeader = getScmLeader(cluster);
+    String[] args3 = {"scm", "transfer", "-r"};
+    ozoneAdmin.execute(args3);
+    cluster.waitForClusterToBeReady();
+    Assertions.assertNotSame(oldLeader, getScmLeader(cluster));
+  }
+
+  static StorageContainerManager getScmLeader(MiniOzoneHAClusterImpl impl) {
+    for (StorageContainerManager scm : impl.getStorageContainerManagers()) {
+      if (scm.checkLeader()) {
+        return scm;
+      }
+    }
+    return null;
   }
 }

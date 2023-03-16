@@ -146,11 +146,12 @@ public class SstFilteringService extends BackgroundService {
 
           String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
               OM_SNAPSHOT_CHECKPOINT_DIR;
-          RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(),
-                  new File(snapshotCheckpointDir), dbName, true);
-          RocksDatabase db = rdbStore.getDb();
-          db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
+              .loadDB(ozoneManager.getConfiguration(), new File(snapshotCheckpointDir),
+                  dbName, true)) {
+            RocksDatabase db = rdbStore.getDb();
+            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          }
 
           // mark the snapshot as filtered by writing to the file
           String content = snapshotInfo.getSnapshotID() + "\n";

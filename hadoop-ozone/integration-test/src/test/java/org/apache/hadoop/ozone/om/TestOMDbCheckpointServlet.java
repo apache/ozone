@@ -557,5 +557,4 @@ public class TestOMDbCheckpointServlet {
     String file1 = files[1];
     Assert.assertEquals("hl filenames are the same", file0, file1);
   }
-
 }

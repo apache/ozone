@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -44,6 +45,7 @@ public class TestObjectStore {
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = new Timeout(1200000);
@@ -63,6 +65,7 @@ public class TestObjectStore {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   /**
@@ -70,6 +73,7 @@ public class TestObjectStore {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -79,7 +83,6 @@ public class TestObjectStore {
   public void testCreateBucketWithBucketLayout() throws Exception {
     String sampleVolumeName = UUID.randomUUID().toString();
     String sampleBucketName = UUID.randomUUID().toString();
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
     store.createVolume(sampleVolumeName);
     OzoneVolume volume = store.getVolume(sampleVolumeName);
@@ -138,7 +141,6 @@ public class TestObjectStore {
     // Chained link bucket
     String linkBucket3Name = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
 
     // Create volume
@@ -178,7 +180,6 @@ public class TestObjectStore {
     // Does not exist
     String sourceBucketName = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
 
     // Create volume
@@ -205,7 +206,6 @@ public class TestObjectStore {
   public void testLoopInLinkBuckets() throws Exception {
     String volumeName = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
 
     // Create volume

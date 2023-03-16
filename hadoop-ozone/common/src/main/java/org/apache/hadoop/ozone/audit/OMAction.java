@@ -93,8 +93,9 @@ public enum OMAction implements AuditAction {
   TENANT_LIST_USER,
 
   CREATE_SNAPSHOT,
+  LIST_SNAPSHOT,
   DELETE_SNAPSHOT,
-  LIST_SNAPSHOT;
+  SNAPSHOT_MOVE_DELETED_KEYS;
 
   @Override
   public String getAction() {
