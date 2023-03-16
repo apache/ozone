@@ -646,4 +646,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         ofsPath.getBucketName(),
         snapshotName);
   }
+  
+  public OzoneBucket getBucket() {
+    return bucket;
+  }
+
+  public OzoneVolume getVolume() {
+    return volume;
+  }
 }

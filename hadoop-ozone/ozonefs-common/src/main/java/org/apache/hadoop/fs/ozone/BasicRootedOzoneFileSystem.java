@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options;
@@ -1012,6 +1013,28 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_IS_FILE);
     return super.isFile(f);
   }
+
+  @Override
+  public FsStatus getStatus(Path p) throws IOException {
+    OFSPath ofsPath = new OFSPath(p,
+            OzoneConfiguration.of(getConfSource()));
+    adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
+    OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+    long usedBytes = bucket.getUsedBytes();
+    long quota = Long.MAX_VALUE;
+    if (bucket.getQuotaInBytes() > -1) {
+      quota = bucket.getQuotaInBytes();
+    } else {
+      OzoneVolume volume = adapterImpl.getObjectStore().getVolume(
+              ofsPath.getVolumeName());
+      if (volume.getQuotaInBytes() > -1) {
+        quota = volume.getQuotaInBytes();
+        usedBytes = volume.getUsedBytes();
+      }
+    }
+    return new FsStatus(quota, usedBytes, quota - usedBytes);
+  }
+
 
   @Override
   public RemoteIterator<LocatedFileStatus> listFiles(Path f, boolean recursive)

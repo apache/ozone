@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options.Rename;
@@ -42,6 +43,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1024,6 +1027,25 @@ public class BasicOzoneFileSystem extends FileSystem {
       statusList.remove(0);
     }
     return statusList;
+  }
+
+  @Override
+  public FsStatus getStatus(Path p) throws IOException {
+    BasicOzoneClientAdapterImpl adapterImpl =
+        (BasicOzoneClientAdapterImpl) adapter;
+    OzoneBucket bucket = adapterImpl.getBucket();
+    long usedBytes = bucket.getUsedBytes();
+    long quota = Long.MAX_VALUE;
+    if (bucket.getQuotaInBytes() > -1) {
+      quota = bucket.getQuotaInBytes();
+    } else {
+      OzoneVolume volume = adapterImpl.getVolume();
+      if (volume.getQuotaInBytes() > -1) {
+        quota = volume.getQuotaInBytes();
+        usedBytes = volume.getUsedBytes();
+      }
+    }
+    return new FsStatus(quota, usedBytes, quota - usedBytes);
   }
 
   /**
