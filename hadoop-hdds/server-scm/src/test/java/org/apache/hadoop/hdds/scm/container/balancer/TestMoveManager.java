@@ -36,14 +36,12 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ozone.test.TestClock;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -61,10 +59,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
