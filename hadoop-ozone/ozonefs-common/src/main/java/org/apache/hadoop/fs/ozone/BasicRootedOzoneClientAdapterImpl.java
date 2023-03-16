@@ -670,13 +670,6 @@ public class BasicRootedOzoneClientAdapterImpl
             ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
-      if (null != bucket && bucket.isLink()) {
-        if (e.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND
-            || e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
-          // return bucket file status as orphan bucket
-          return getFileStatusAdapterForBucket(bucket, uri, userName, userName);
-        }
-      }
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(key + ": No such file or directory!");
       } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
