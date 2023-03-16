@@ -20,10 +20,13 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
@@ -81,6 +84,12 @@ public class TestContainerBalancer {
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scm.getSCMServiceManager()).thenReturn(mock(SCMServiceManager.class));
+
+    ReplicationManager replicationManager =
+        Mockito.mock(ReplicationManager.class);
+    when(scm.getReplicationManager()).thenReturn(replicationManager);
+    when(replicationManager.getClock()).thenReturn(
+        Clock.system(ZoneId.systemDefault()));
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to

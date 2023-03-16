@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
@@ -182,10 +183,11 @@ public class ReplicationSupervisor {
       try {
         requestCounter.incrementAndGet();
 
-        if (task.getDeadline() > 0 && clock.millis() > task.getDeadline()) {
-          LOG.info("Ignoring" +
-              " {} since the current time {}ms is past the deadline {}ms",
-              this, clock.millis(), task.getDeadline());
+        final long now = clock.millis();
+        final long deadline = task.getDeadline();
+        if (deadline > 0 && now > deadline) {
+          LOG.info("Ignoring {} since the deadline has passed ({} < {})",
+              this, Instant.ofEpochMilli(deadline), Instant.ofEpochMilli(now));
           timeoutCounter.incrementAndGet();
           return;
         }
@@ -195,8 +197,8 @@ public class ReplicationSupervisor {
           if (dn != null && dn.getPersistedOpState() !=
               HddsProtos.NodeOperationalState.IN_SERVICE
               && task.shouldOnlyRunOnInServiceDatanodes()) {
-            LOG.info("Dn is of {} state. Ignore {}",
-                dn.getPersistedOpState(), this);
+            LOG.info("Ignoring {} since datanode is not in service ({})",
+                this, dn.getPersistedOpState());
             return;
           }
 
@@ -212,7 +214,7 @@ public class ReplicationSupervisor {
         task.setStatus(Status.IN_PROGRESS);
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
-          LOG.error("Failed {}", this);
+          LOG.warn("Failed {}", this);
           failureCounter.incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
           LOG.info("Successful {}", this);
@@ -223,7 +225,7 @@ public class ReplicationSupervisor {
         }
       } catch (Exception e) {
         task.setStatus(Status.FAILED);
-        LOG.error("Failed {}", this, e);
+        LOG.warn("Failed {}", this, e);
         failureCounter.incrementAndGet();
       } finally {
         inFlight.remove(task);

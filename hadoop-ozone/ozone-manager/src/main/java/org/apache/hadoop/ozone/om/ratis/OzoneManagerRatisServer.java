@@ -602,7 +602,21 @@ public final class OzoneManagerRatisServer {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
-    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties, true);
+
+    // Set to enable RAFT to purge logs up to Snapshot Index
+    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties,
+        conf.getBoolean(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX_DEFAULT
+        )
+    );
+    // Set number of last RAFT logs to not be purged
+    RaftServerConfigKeys.Log.setPurgePreservationLogNum(properties,
+        conf.getLong(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT
+        )
+    );
 
     // Set RAFT segment pre-allocated size
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(

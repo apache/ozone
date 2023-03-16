@@ -60,7 +60,9 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,7 +74,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
@@ -86,6 +90,7 @@ public class TestContainerBalancerTask {
       LoggerFactory.getLogger(TestContainerBalancerTask.class);
 
   private ReplicationManager replicationManager;
+  private MoveManager moveManager;
   private ContainerManager containerManager;
   private ContainerBalancerTask containerBalancerTask;
   private MockNodeManager mockNodeManager;
@@ -122,6 +127,7 @@ public class TestContainerBalancerTask {
     replicationManager = Mockito.mock(ReplicationManager.class);
     serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
     SCMServiceManager scmServiceManager = Mockito.mock(SCMServiceManager.class);
+    moveManager = Mockito.mock(MoveManager.class);
 
     // these configs will usually be specified in each test
     balancerConfiguration =
@@ -157,6 +163,9 @@ public class TestContainerBalancerTask {
         Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.
             completedFuture(MoveManager.MoveResult.COMPLETED));
+
+    Mockito.when(replicationManager.getClock())
+        .thenReturn(Clock.system(ZoneId.systemDefault()));
 
     when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
@@ -209,7 +218,13 @@ public class TestContainerBalancerTask {
         .register(Mockito.any(SCMService.class));
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), null);
+        sb.getMetrics(), balancerConfiguration);
+
+    containerBalancerTask.setMoveManager(moveManager);
+    Mockito.when(moveManager.move(any(ContainerID.class),
+            any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            MoveManager.MoveResult.COMPLETED));
   }
 
   @Test
@@ -261,6 +276,27 @@ public class TestContainerBalancerTask {
             unBalancedNodesAccordingToBalancer.get(j).getDatanodeDetails());
       }
     }
+  }
+
+  @Test
+  public void testBalancerWithMoveManager()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException,
+      NodeNotFoundException {
+    ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    rmConf.setEnableLegacy(false);
+    conf.setFromObject(rmConf);
+
+    startBalancer(balancerConfiguration);
+    Mockito.verify(moveManager, atLeastOnce())
+        .move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class));
+
+    Mockito.verify(replicationManager, times(0))
+        .move(Mockito.any(ContainerID.class), Mockito.any(
+            DatanodeDetails.class), Mockito.any(DatanodeDetails.class));
   }
 
   /**
@@ -478,6 +514,18 @@ public class TestContainerBalancerTask {
      containerToTargetMap).
      */
     Mockito.verify(replicationManager, times(numContainers))
+        .move(any(ContainerID.class), any(DatanodeDetails.class),
+            any(DatanodeDetails.class));
+
+    /*
+     Try the same test by disabling LegacyReplicationManager so that
+     MoveManager is used.
+     */
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+    numContainers = containerBalancerTask.getContainerToTargetMap().size();
+    Mockito.verify(moveManager, times(numContainers))
         .move(any(ContainerID.class), any(DatanodeDetails.class),
             any(DatanodeDetails.class));
   }
@@ -730,8 +778,22 @@ public class TestContainerBalancerTask {
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     stopBalancer();
+
+    /*
+    Try the same but use MoveManager for container move instead of legacy RM.
+     */
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    startBalancer(balancerConfiguration);
+    Assertions.assertEquals(
+        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+        containerBalancerTask.getIterationResult());
+    stopBalancer();
   }
 
+  /**
+   * Tests the situation where some container moves time out because they
+   * take longer than "move.timeout".
+   */
   @Test
   public void checkIterationResultTimeout()
       throws NodeNotFoundException, IOException,
@@ -742,7 +804,8 @@ public class TestContainerBalancerTask {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenReturn(genCompletableFuture(200), genCompletableFuture(2000));
+        .thenReturn(genCompletableFuture(10))
+        .thenAnswer(invocation -> genCompletableFuture(2000));
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
@@ -767,6 +830,28 @@ public class TestContainerBalancerTask {
             .getNumContainerMovesTimeoutInLatestIteration() > 1);
     stopBalancer();
 
+    /*
+    Test the same but use MoveManager instead of LegacyReplicationManager.
+    The first move being 10ms falls within the timeout duration of 500ms. It
+    should be successful. The rest should fail.
+     */
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(genCompletableFuture(10))
+        .thenAnswer(invocation -> genCompletableFuture(2000));
+
+    startBalancer(balancerConfiguration);
+    Assertions.assertEquals(
+        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+        containerBalancerTask.getIterationResult());
+    Assertions.assertEquals(1,
+        containerBalancerTask.getMetrics()
+            .getNumContainerMovesCompletedInLatestIteration());
+    Assertions.assertTrue(containerBalancerTask.getMetrics()
+        .getNumContainerMovesTimeoutInLatestIteration() > 1);
+    stopBalancer();
   }
 
   @Test
@@ -796,6 +881,23 @@ public class TestContainerBalancerTask {
 
     Assertions.assertTrue(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
+    Assertions.assertEquals(0, containerBalancerTask.getMetrics()
+        .getNumContainerMovesCompletedInLatestIteration());
+    stopBalancer();
+
+    /*
+    Try the same test with MoveManager instead of LegacyReplicationManager.
+     */
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(future).thenAnswer(invocation -> future2);
+
+    startBalancer(balancerConfiguration);
+    Assertions.assertTrue(containerBalancerTask.getMetrics()
+        .getNumContainerMovesTimeoutInLatestIteration() > 0);
+    Assertions.assertEquals(0, containerBalancerTask.getMetrics()
+        .getNumContainerMovesCompletedInLatestIteration());
     stopBalancer();
   }
 
@@ -812,15 +914,15 @@ public class TestContainerBalancerTask {
     Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
-        .thenThrow(new ContainerNotFoundException("Test Container not found"),
-            new NodeNotFoundException("Test Node not found"))
-        .thenReturn(future).thenReturn(CompletableFuture.supplyAsync(() -> {
+        .thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
-            Thread.sleep(200);
-          } catch (Exception ex) {
+            Thread.sleep(1);
+          } catch (Exception ignored) {
           }
-          throw new RuntimeException("Throw");
-        }));
+          throw new RuntimeException("Runtime Exception after doing work");
+        }))
+        .thenThrow(new ContainerNotFoundException("Test Container not found"))
+        .thenReturn(future);
 
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
@@ -839,6 +941,30 @@ public class TestContainerBalancerTask {
             .getNumContainerMovesFailed() >= 3);
     stopBalancer();
 
+    /*
+    Try the same test but with MoveManager instead of ReplicationManager.
+     */
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.supplyAsync(() -> {
+          try {
+            Thread.sleep(1);
+          } catch (Exception ignored) {
+          }
+          throw new RuntimeException("Runtime Exception after doing work");
+        }))
+        .thenThrow(new ContainerNotFoundException("Test Container not found"))
+        .thenReturn(future);
+
+    startBalancer(balancerConfiguration);
+    Assertions.assertEquals(
+        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+        containerBalancerTask.getIterationResult());
+    Assertions.assertTrue(
+        containerBalancerTask.getMetrics()
+            .getNumContainerMovesFailed() >= 3);
+    stopBalancer();
   }
 
   /**
@@ -1019,6 +1145,7 @@ public class TestContainerBalancerTask {
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException {
     containerBalancerTask.setConfig(config);
+    containerBalancerTask.setTaskStatus(ContainerBalancerTask.Status.RUNNING);
     containerBalancerTask.run();
   }
 

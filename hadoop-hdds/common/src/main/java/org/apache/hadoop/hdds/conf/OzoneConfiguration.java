@@ -35,6 +35,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -46,7 +48,8 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_TAGS_CUSTOM;
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
@@ -56,8 +59,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKD
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
-  public static final String OZONE_TAGS_SYSTEM_KEY =
-      "ozone.tags.system";
+
+  public static final SortedSet<String> TAGS = unmodifiableSortedSet(
+      Arrays.stream(ConfigTag.values())
+          .map(Enum::name)
+          .collect(toCollection(TreeSet::new)));
 
   static {
     addDeprecatedKeys();
@@ -309,17 +315,8 @@ public class OzoneConfiguration extends Configuration
   }
 
   @Override
-  public void addTags(Properties prop) {
-    if (!prop.containsKey(OZONE_TAGS_SYSTEM_KEY)) {
-      String ozoneTags = Arrays.stream(ConfigTag.values())
-          .map(Enum::name)
-          .sorted()
-          .collect(Collectors.joining(","));
-      prop.setProperty(HADOOP_TAGS_CUSTOM, ozoneTags);
-      prop.setProperty(OZONE_TAGS_SYSTEM_KEY, ozoneTags);
-    }
-
-    super.addTags(prop);
+  public boolean isPropertyTag(String tagStr) {
+    return TAGS.contains(tagStr) || super.isPropertyTag(tagStr);
   }
 
   private static void addDeprecatedKeys() {
