@@ -278,7 +278,8 @@ public final class RocksDatabase {
       return codec.fromPersistedFormat(nameBytes);
     }
 
-    protected ColumnFamilyHandle getHandle() {
+    @VisibleForTesting
+    public ColumnFamilyHandle getHandle() {
       return handle;
     }
 
