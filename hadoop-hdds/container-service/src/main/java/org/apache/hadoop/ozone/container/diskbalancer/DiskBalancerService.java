@@ -35,6 +35,10 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.FileUtils;
@@ -51,6 +55,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY;
 
 /**
  * A per-datanode disk balancing service takes in charge
@@ -89,6 +96,8 @@ public class DiskBalancerService extends BackgroundService {
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
+  private VolumeChoosingPolicy volumeChoosingPolicy;
+  private ContainerChoosingPolicy containerChoosingPolicy;
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
@@ -109,6 +118,19 @@ public class DiskBalancerService extends BackgroundService {
     inProgressContainers = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
+
+    try {
+      volumeChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY,
+          DefaultVolumeChoosingPolicy.class,
+          VolumeChoosingPolicy.class).newInstance();
+      containerChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY,
+          DefaultContainerChoosingPolicy.class,
+          ContainerChoosingPolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
 
     metrics = DiskBalancerServiceMetrics.create();
 
@@ -385,6 +407,14 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public void setBalancedBytesInLastWindow(long bytes) {
     this.balancedBytesInLastWindow.set(bytes);
+  }
+
+  public ContainerChoosingPolicy getContainerChoosingPolicy() {
+    return containerChoosingPolicy;
+  }
+
+  public VolumeChoosingPolicy getVolumeChoosingPolicy() {
+    return volumeChoosingPolicy;
   }
 
   @Override

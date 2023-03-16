@@ -41,6 +41,13 @@ public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
+  public static final String HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY
+      = "hdds.datanode.disk.balancer.volume.choosing.policy";
+
+  public static final String
+      HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY =
+      "hdds.datanode.disk.balancer.container.choosing.policy";
+
   @Config(key = "info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
       description = "The path where datanode diskBalancer's conf is to be " +
