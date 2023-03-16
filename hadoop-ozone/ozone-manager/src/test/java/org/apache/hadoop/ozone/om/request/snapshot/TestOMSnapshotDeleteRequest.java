@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -258,10 +257,6 @@ public class TestOMSnapshotDeleteRequest {
    */
   @Test
   public void testEntryExists() throws Exception {
-    SnapshotChainManager snapshotChainManager =
-        new SnapshotChainManager(omMetadataManager);
-    when(ozoneManager.getSnapshotChainManager())
-        .thenReturn(snapshotChainManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     String key = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
 
