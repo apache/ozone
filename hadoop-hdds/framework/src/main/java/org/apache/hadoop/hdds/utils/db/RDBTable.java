@@ -146,6 +146,11 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
+    db.deleteRange(family, beginKey, endKey);
+  }
+
+  @Override
   public void deleteWithBatch(BatchOperation batch, byte[] key)
       throws IOException {
     if (batch instanceof RDBBatchOperation) {

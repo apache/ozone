@@ -97,7 +97,7 @@ public class TestOMSnapshotDeleteResponse {
             .setCreateSnapshotResponse(
                 CreateSnapshotResponse.newBuilder()
                 .setSnapshotInfo(snapshotInfo.getProtobuf())
-                .build()).build(), volumeName, bucketName, snapshotName);
+                .build()).build(), snapshotInfo);
     omSnapshotCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
