@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -44,6 +43,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -180,7 +180,7 @@ public class TestRootedOzoneFileSystem {
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -260,7 +260,7 @@ public class TestRootedOzoneFileSystem {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     rootPath = String.format("%s://%s/",
@@ -978,7 +978,7 @@ public class TestRootedOzoneFileSystem {
     }
     OFSPath ofsPath = new OFSPath(key, conf);
     String keyInBucket = ofsPath.getKeyName();
-    return cluster.getClient().getObjectStore().getVolume(volumeName)
+    return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(keyInBucket);
   }
 
@@ -1649,7 +1649,7 @@ public class TestRootedOzoneFileSystem {
 
     // Create a new volume and a new bucket
     OzoneBucket bucket3 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
     // Need to setOwner to current test user so it has permission to list vols
     volume3.setOwner(username);
@@ -1744,7 +1744,7 @@ public class TestRootedOzoneFileSystem {
     }
     // create second bucket and write a key in it.
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     String volumeName2 = bucket2.getVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
     String bucketName2 = bucket2.getName();
@@ -2032,7 +2032,7 @@ public class TestRootedOzoneFileSystem {
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
     final OzoneBucket bucket100 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+        .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     Assert.assertEquals(ReplicationType.STAND_ALONE.name(),
         bucket100.getReplicationConfig().getReplicationType().name());
@@ -2063,7 +2063,7 @@ public class TestRootedOzoneFileSystem {
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
     final OzoneBucket bucket101 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+        .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     Assert.assertEquals(ReplicationType.EC.name(),
         bucket101.getReplicationConfig().getReplicationType().name());
@@ -2218,7 +2218,7 @@ public class TestRootedOzoneFileSystem {
   public void testSnapshotRead() throws Exception {
     // Init data
     OzoneBucket bucket1 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     Path volume1Path = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucket1Path = new Path(volume1Path, bucket1.getName());
     Path file1 = new Path(bucket1Path, "key1");
@@ -2228,7 +2228,7 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, file2);
 
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     Path volume2Path = new Path(OZONE_URI_DELIMITER, bucket2.getVolumeName());
     Path bucket2Path = new Path(volume2Path, bucket2.getName());
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,21 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.utils;
 
-package org.apache.hadoop.ozone.om.snapshot;
+import org.junit.jupiter.api.Test;
 
-import java.util.Iterator;
+import java.io.ByteArrayOutputStream;
 
 /**
- * Define an interface for persistent list.
+ * Tests for {@link IOUtils}.
  */
-public interface PersistentList<E> {
+class TestIOUtils {
 
-  boolean add(E entry);
+  @Test
+  void closeQuietlyNull() {
+    ByteArrayOutputStream out = null;
+    IOUtils.closeQuietly(out);
+  }
 
-  boolean addAll(PersistentList<E> from);
-
-  E get(int index);
-
-  Iterator<E> iterator();
 }

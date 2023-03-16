@@ -74,7 +74,7 @@ public final class DBStoreBuilder {
   public static final Logger ROCKS_DB_LOGGER =
       LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
-  private static final String DEFAULT_COLUMN_FAMILY_NAME =
+  public static final String DEFAULT_COLUMN_FAMILY_NAME =
       StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.

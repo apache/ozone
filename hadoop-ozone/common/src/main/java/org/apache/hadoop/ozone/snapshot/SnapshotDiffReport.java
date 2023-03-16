@@ -186,19 +186,20 @@ public class SnapshotDiffReport {
   /**
    * subsequent token for the diff report.
    */
-  // TODO: [SNAPSHOT] will set it properly in HDDS-7548
-  private final String token = null;
+  private final String token;
 
   public SnapshotDiffReport(final String volumeName,
                             final String bucketName,
                             final String fromSnapshot,
                             final String toSnapshot,
-                            final List<DiffReportEntry> entryList) {
+                            final List<DiffReportEntry> entryList,
+                            final String token) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.diffList = entryList != null ? entryList : Collections.emptyList();
+    this.token = token;
   }
 
   public List<DiffReportEntry> getDiffList() {
@@ -247,7 +248,8 @@ public class SnapshotDiffReport {
         report.getToSnapshot(),
         report.getDiffListList().stream()
             .map(DiffReportEntry::fromProtobuf)
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList()),
+        report.getToken());
   }
 
 }

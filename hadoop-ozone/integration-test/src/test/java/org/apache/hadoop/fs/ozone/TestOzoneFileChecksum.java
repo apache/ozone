@@ -18,7 +18,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
@@ -29,11 +28,13 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.Rule;
@@ -69,6 +70,7 @@ public class TestOzoneFileChecksum {
   private RootedOzoneFileSystem ofs;
   private BasicRootedOzoneClientAdapterImpl adapter;
   private String rootPath;
+  private OzoneClient client;
 
   @BeforeEach
   public void setup() throws IOException,
@@ -78,6 +80,7 @@ public class TestOzoneFileChecksum {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
@@ -88,6 +91,7 @@ public class TestOzoneFileChecksum {
 
   @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -114,8 +118,8 @@ public class TestOzoneFileChecksum {
 
     String vol2 = UUID.randomUUID().toString();
     String legacyBucket = UUID.randomUUID().toString();
-    TestDataUtil.createVolumeAndBucket(cluster, vol2,
-        legacyBucket, BucketLayout.LEGACY, omBucketArgs1);
+    TestDataUtil.createVolumeAndBucket(client, vol2,
+        legacyBucket, omBucketArgs1);
 
     try (OzoneFSOutputStream file = adapter.createFile(vol2 +
         "/" + legacyBucket + "/test", (short) 3, true, false)) {
@@ -139,7 +143,7 @@ public class TestOzoneFileChecksum {
     String vol = UUID.randomUUID().toString();
     String ecBucket = UUID.randomUUID().toString();
     final OzoneBucket bucket101 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, ecBucket, BucketLayout.LEGACY,
+        .createVolumeAndBucket(client, vol, ecBucket,
             omBucketArgs);
 
     Assertions.assertEquals(ReplicationType.EC.name(),

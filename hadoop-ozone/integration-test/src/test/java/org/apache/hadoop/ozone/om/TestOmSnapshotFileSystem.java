@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -29,6 +28,7 @@ import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -90,6 +90,8 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class TestOmSnapshotFileSystem {
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
+  private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
   private static String volumeName;
   private static String bucketName;
@@ -140,7 +142,7 @@ public class TestOmSnapshotFileSystem {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  private void init() throws Exception {
+  private static void init() throws Exception {
     conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
@@ -152,9 +154,10 @@ public class TestOmSnapshotFileSystem {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
-        .createVolumeAndBucket(cluster, bucketLayout);
+        .createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -168,8 +171,7 @@ public class TestOmSnapshotFileSystem {
     fs = FileSystem.get(conf);
     o3fs = (OzoneFileSystem) fs;
 
-    OzoneClient client = cluster.getClient();
-    ObjectStore objectStore = client.getObjectStore();
+    objectStore = client.getObjectStore();
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster.getOzoneManager();
     metaDir = OMStorage.getOmDbDir(conf);
@@ -180,6 +182,7 @@ public class TestOmSnapshotFileSystem {
   }
 
   public void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -189,9 +192,6 @@ public class TestOmSnapshotFileSystem {
   @Test
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
   public void testListKeysAtDifferentLevels() throws Exception {
-    OzoneClient client = cluster.getClient();
-
-    ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
@@ -358,7 +358,7 @@ public class TestOmSnapshotFileSystem {
     FSDataInputStream fsDataInputStream = o3fsNew.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    fsDataInputStream.close();
 
     Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
@@ -501,8 +501,7 @@ public class TestOmSnapshotFileSystem {
     String snapshotKeyPrefix = createSnapshot();
     Path fileInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
 
-    try {
-      FSDataInputStream inputStream = fs.open(fileInSnapshot);
+    try (FSDataInputStream inputStream = fs.open(fileInSnapshot)) {
       ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
       inputStream.read(buffer);
       byte[] readBytes = new byte[strBytes.length];

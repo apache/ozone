@@ -35,8 +35,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,6 +44,7 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -64,10 +65,11 @@ public class TestRatisUnderReplicationHandler {
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @Before
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException {
+      AllSourcesOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
@@ -91,17 +93,11 @@ public class TestRatisUnderReplicationHandler {
               HddsProtos.NodeState.HEALTHY);
         });
 
-    Mockito.when(replicationManager.createThrottledReplicationCommand(
-        Mockito.anyLong(), Mockito.anyList(),
-            Mockito.any(DatanodeDetails.class), Mockito.anyInt()))
-        .thenAnswer(invocationOnMock -> {
-          List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
-          ReplicateContainerCommand command = ReplicateContainerCommand
-              .toTarget(invocationOnMock.getArgument(0),
-              invocationOnMock.getArgument(2));
-          command.setReplicaIndex(invocationOnMock.getArgument(3));
-          return Pair.of(sources.get(0), command);
-        });
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
+        commandsSent);
   }
 
   /**
@@ -209,7 +205,7 @@ public class TestRatisUnderReplicationHandler {
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
 
     Assert.assertThrows(IOException.class,
-        () -> handler.processAndCreateCommands(replicas,
+        () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
   }
 
@@ -265,11 +261,10 @@ public class TestRatisUnderReplicationHandler {
     RatisUnderReplicationHandler handler =
         new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndSendCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
-    Assert.assertEquals(expectNumCommands, commands.size());
-    return commands;
+    Assert.assertEquals(expectNumCommands, commandsSent.size());
+    return commandsSent;
   }
 
   private UnderReplicatedHealthResult getUnderReplicatedHealthResult() {

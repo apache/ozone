@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils;
 
 import org.slf4j.Logger;
 
+import java.io.Closeable;
+
 /**
  * Static helper utilities for IO / Closable classes.
  */
@@ -36,9 +38,11 @@ public final class IOUtils {
    *                   null.
    * @param closeables the objects to close
    */
-  public static void cleanupWithLogger(Logger logger,
-      java.io.Closeable... closeables) {
-    for (java.io.Closeable c : closeables) {
+  public static void cleanupWithLogger(Logger logger, Closeable... closeables) {
+    if (closeables == null) {
+      return;
+    }
+    for (Closeable c : closeables) {
       if (c != null) {
         try {
           c.close();
@@ -55,6 +59,9 @@ public final class IOUtils {
    * Close each argument, catching exceptions and logging them as error.
    */
   public static void close(Logger logger, AutoCloseable... closeables) {
+    if (closeables == null) {
+      return;
+    }
     for (AutoCloseable c : closeables) {
       if (c != null) {
         try {
@@ -66,6 +73,13 @@ public final class IOUtils {
         }
       }
     }
+  }
+
+  /**
+   * Close each argument, swallowing exceptions.
+   */
+  public static void closeQuietly(AutoCloseable... closeables) {
+    close(null, closeables);
   }
 
 }

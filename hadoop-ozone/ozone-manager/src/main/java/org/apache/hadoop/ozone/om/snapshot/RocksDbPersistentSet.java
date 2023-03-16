@@ -54,7 +54,7 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
       byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -78,7 +78,7 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
-          // TODO:: Fail gracefully.
+          // TODO: [SNAPSHOT] Fail gracefully.
           throw new RuntimeException(exception);
         }
       }
