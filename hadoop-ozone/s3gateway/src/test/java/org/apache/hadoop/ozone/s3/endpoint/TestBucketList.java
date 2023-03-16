@@ -180,10 +180,12 @@ public class TestBucketList {
 
     getBucket.setClient(ozoneClient);
 
+    // Should behave the same if delimiter is null
     ListObjectResponse getBucketResponse =
       (ListObjectResponse) getBucket.get("b1", "", null, null, 100, "dir1/",
         null, null, null, null, null).getEntity();
 
+    Assert.assertEquals(0, getBucketResponse.getCommonPrefixes().size());
     Assert.assertEquals(4, getBucketResponse.getContents().size());
     Assert.assertEquals("dir1/",
       getBucketResponse.getContents().get(0).getKey().getName());
