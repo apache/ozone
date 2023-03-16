@@ -127,7 +127,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   @Override
-  public OzoneClient newClient() throws IOException {
+  protected OzoneClient createClient() throws IOException {
     String omServiceId = omhaService.getServiceId();
     if (omServiceId == null) {
       // Non-HA cluster.
