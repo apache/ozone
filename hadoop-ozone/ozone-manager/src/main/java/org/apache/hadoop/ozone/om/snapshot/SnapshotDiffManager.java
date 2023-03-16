@@ -228,7 +228,9 @@ public class SnapshotDiffManager {
     if (jobId != null) {
       return Pair.of(jobId, true);
     } else {
-      return Pair.of(UUID.randomUUID().toString(), false);
+      jobId = UUID.randomUUID().toString();
+      snapDiffJobTable.put(diffJobKey, jobId);
+      return Pair.of(jobId, false);
     }
   }
 

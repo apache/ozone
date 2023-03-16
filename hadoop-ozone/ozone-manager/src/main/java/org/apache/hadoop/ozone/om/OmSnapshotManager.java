@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -125,7 +126,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       // Add default CF
       columnFamilyDescriptors.add(new ColumnFamilyDescriptor(
           StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME),
-          columnFamilyOptions));
+          new ManagedColumnFamilyOptions(columnFamilyOptions)));
 
       columnFamilyDescriptors.addAll(getExitingColumnFamilyDescriptors(dbPath));
 
@@ -424,8 +425,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     try {
       return RocksDatabase.listColumnFamiliesEmptyOptions(path)
           .stream()
-          .map(columnFamilyName -> new ColumnFamilyDescriptor(
-              columnFamilyName, columnFamilyOptions))
+          .map(columnFamilyName ->
+              new ColumnFamilyDescriptor(columnFamilyName,
+                  new ManagedColumnFamilyOptions(columnFamilyOptions)
+              ))
           .collect(Collectors.toList());
     } catch (RocksDBException exception) {
       // TODO: [SNAPSHOT] Fail gracefully.
@@ -478,19 +481,19 @@ public final class OmSnapshotManager implements AutoCloseable {
       final List<ColumnFamilyHandle> columnFamilyHandles,
       final ManagedRocksDB managedRocksDB) {
 
-    if (managedColumnFamilyOptions != null) {
-      closeColumnFamilyOptions(managedColumnFamilyOptions);
+    if (columnFamilyHandles != null) {
+      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
+    }
+    if (managedRocksDB != null) {
+      managedRocksDB.close();
     }
     if (columnFamilyDescriptors != null) {
       columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
           closeColumnFamilyOptions((ManagedColumnFamilyOptions)
               columnFamilyDescriptor.getOptions()));
     }
-    if (columnFamilyHandles != null) {
-      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
-    }
-    if (managedRocksDB != null) {
-      managedRocksDB.close();
+    if (managedColumnFamilyOptions != null) {
+      closeColumnFamilyOptions(managedColumnFamilyOptions);
     }
     if (managedDBOptions != null) {
       managedDBOptions.close();
@@ -499,9 +502,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private void closeColumnFamilyOptions(
       final ManagedColumnFamilyOptions managedColumnFamilyOptions) {
-    if (managedColumnFamilyOptions.isReused()) {
-      return;
-    }
+    Preconditions.checkArgument(!managedColumnFamilyOptions.isReused());
     ManagedColumnFamilyOptions.closeDeeply(managedColumnFamilyOptions);
   }
 
