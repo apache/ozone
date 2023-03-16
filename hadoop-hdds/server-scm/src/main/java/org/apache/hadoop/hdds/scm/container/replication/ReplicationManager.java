@@ -232,13 +232,13 @@ public class ReplicationManager implements SCMService {
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
     ecOverReplicationHandler =
-        new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
+        new ECOverReplicationHandler(ecContainerPlacement, this);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
         conf, this, rmConf.isPush());
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
-        new RatisOverReplicationHandler(ratisContainerPlacement, nodeManager);
+        new RatisOverReplicationHandler(ratisContainerPlacement, this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -485,6 +485,15 @@ public class ReplicationManager implements SCMService {
     return Pair.of(sourceWithCmds.get(0).getRight(), cmd);
   }
 
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
+      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
+      throws AllSourcesOverloadedException, NotLeaderException {
+    Pair<DatanodeDetails, SCMCommand<?>> cmdPair =
+        createThrottledReplicationCommand(containerInfo.getContainerID(),
+            sources, target, replicaIndex);
+    sendDatanodeCommand(cmdPair.getRight(), containerInfo, cmdPair.getLeft());
+  }
+
   /**
    * Send a push replication command to the given source datanode, instructing
    * it to copy the given container to the target. The command is sent as a low
@@ -652,7 +661,7 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-  Set<Pair<DatanodeDetails, SCMCommand<?>>> processUnderReplicatedContainer(
+  int processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -662,22 +671,22 @@ public class ReplicationManager implements SCMService {
     if (result.getContainerInfo().getReplicationType() == EC) {
       if (result.getHealthState()
           == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-        return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+        return ecUnderReplicationHandler.processAndSendCommands(replicas,
             pendingOps, result, maintenanceRedundancy);
       } else if (result.getHealthState()
           == ContainerHealthResult.HealthState.MIS_REPLICATED) {
-        return ecMisReplicationHandler.processAndCreateCommands(replicas,
+        return ecMisReplicationHandler.processAndSendCommands(replicas,
             pendingOps, result, maintenanceRedundancy);
       } else {
         throw new IllegalArgumentException("Unexpected health state: "
             + result.getHealthState());
       }
     }
-    return ratisUnderReplicationHandler.processAndCreateCommands(replicas,
+    return ratisUnderReplicationHandler.processAndSendCommands(replicas,
         pendingOps, result, ratisMaintenanceMinReplicas);
   }
 
-  Set<Pair<DatanodeDetails, SCMCommand<?>>> processOverReplicatedContainer(
+  int processOverReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -685,10 +694,10 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     if (result.getContainerInfo().getReplicationType() == EC) {
-      return ecOverReplicationHandler.processAndCreateCommands(replicas,
+      return ecOverReplicationHandler.processAndSendCommands(replicas,
           pendingOps, result, maintenanceRedundancy);
     }
-    return ratisOverReplicationHandler.processAndCreateCommands(replicas,
+    return ratisOverReplicationHandler.processAndSendCommands(replicas,
         pendingOps, result, ratisMaintenanceMinReplicas);
   }
 

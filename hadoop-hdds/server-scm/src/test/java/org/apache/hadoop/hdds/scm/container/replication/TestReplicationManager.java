@@ -105,6 +105,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
+  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
   @Before
   public void setup() throws IOException {
@@ -118,7 +119,15 @@ public class TestReplicationManager {
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+    commandsSent = new HashSet<>();
     eventPublisher = Mockito.mock(EventPublisher.class);
+    Mockito.doAnswer(invocation -> {
+      CommandForDatanode<?> command = invocation.getArgument(1);
+      commandsSent.add(Pair.of(command.getDatanodeId(), command.getCommand()));
+      return null;
+    }).when(eventPublisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), any());
+
+
     scmContext = Mockito.mock(SCMContext.class);
     nodeManager = Mockito.mock(NodeManager.class);
     legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
@@ -313,19 +322,19 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, Collections.emptyList(),
+    handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commands.iterator().hasNext());
-    Assert.assertEquals(unhealthy.getDatanodeDetails(),
-        commands.iterator().next().getKey());
+    Assert.assertTrue(commandsSent.iterator().hasNext());
+    Assert.assertEquals(unhealthy.getDatanodeDetails().getUuid(),
+        commandsSent.iterator().next().getKey());
     Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commands.iterator().next().getValue().getType());
+        commandsSent.iterator().next().getValue().getType());
+
   }
 
   @Test
@@ -354,19 +363,18 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, Collections.emptyList(),
-            repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commands.iterator().hasNext());
-    Assert.assertNotEquals(unhealthy.getDatanodeDetails(),
-        commands.iterator().next().getKey());
+    handler.processAndSendCommands(replicas, Collections.emptyList(),
+        repQueue.dequeueOverReplicatedContainer(), 2);
+    Assert.assertTrue(commandsSent.iterator().hasNext());
+    Assert.assertNotEquals(unhealthy.getDatanodeDetails().getUuid(),
+        commandsSent.iterator().next().getKey());
     Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commands.iterator().next().getValue().getType());
+        commandsSent.iterator().next().getValue().getType());
   }
 
   @Test

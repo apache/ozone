@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -29,12 +28,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -74,14 +72,10 @@ public class RatisUnderReplicationHandler
    * @param result Health check result indicating under replication.
    * @param minHealthyForMaintenance Number of healthy replicas that must be
    *                                 available for a DN to enter maintenance
-   * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself. If an empty map is returned, it indicates
-   * the container is no longer unhealthy and can be removed from the unhealthy
-   * queue. Any exception indicates that the container is still unhealthy and
-   * should be retried later.
+   * @return The number of commands sent.
    */
   @Override
-  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
+  public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance)
       throws IOException {
@@ -99,7 +93,7 @@ public class RatisUnderReplicationHandler
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
     if (!verifyUnderReplication(withUnhealthy, withoutUnhealthy)) {
-      return Collections.emptySet();
+      return 0;
     }
 
     // find sources that can provide replicas
@@ -108,7 +102,7 @@ public class RatisUnderReplicationHandler
     if (sourceDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no CLOSED, QUASI_CLOSED" +
           " or UNHEALTHY replicas were found.", containerInfo);
-      return Collections.emptySet();
+      return 0;
     }
 
     // find targets to send replicas to
@@ -117,11 +111,10 @@ public class RatisUnderReplicationHandler
     if (targetDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no eligible targets " +
           "were found.", containerInfo);
-      return Collections.emptySet();
+      return 0;
     }
-
-    return createReplicationCommands(containerInfo.getContainerID(),
-        sourceDatanodes, targetDatanodes);
+    return sendReplicationCommands(
+        containerInfo, sourceDatanodes, targetDatanodes);
   }
 
   /**
@@ -246,24 +239,28 @@ public class RatisUnderReplicationHandler
         replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
   }
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
-      long containerID, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) throws AllSourcesOverloadedException {
+  private int sendReplicationCommands(
+      ContainerInfo containerInfo, List<DatanodeDetails> sources,
+      List<DatanodeDetails> targets) throws AllSourcesOverloadedException,
+      NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    int commandsSent = 0;
 
     if (push) {
       for (DatanodeDetails target : targets) {
-        commands.add(replicationManager.createThrottledReplicationCommand(
-            containerID, sources, target, 0));
+        replicationManager.sendThrottledReplicationCommand(
+            containerInfo, sources, target, 0);
+        commandsSent++;
       }
     } else {
       for (DatanodeDetails target : targets) {
         ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(containerID, sources);
-        commands.add(Pair.of(target, command));
+            ReplicateContainerCommand.fromSources(
+                containerInfo.getContainerID(), sources);
+        replicationManager.sendDatanodeCommand(command, containerInfo, target);
+        commandsSent++;
       }
     }
-    return commands;
+    return commandsSent;
   }
 }
