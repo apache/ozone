@@ -859,7 +859,6 @@ public class TestOmSnapshot {
 
     String snapshotName = UUID.randomUUID().toString();
     store.createSnapshot(volumeName, bucketName, snapshotName);
-
     List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
         .getOzoneManagersList();
     List<String> snapshotIds = new ArrayList<>();
@@ -891,4 +890,20 @@ public class TestOmSnapshot {
 
     assertEquals(1, snapshotIds.stream().distinct().count());
   }
+
+  @Test
+  public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    String snapPrefix = createSnapshot(volumeName, bucketName);
+    RDBStore snapshotDBStore = (RDBStore)
+            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            .getMetadataManager().getStore();
+
+    for (String table : snapshotDBStore.getTableNames().values()) {
+      Assertions.assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
+              .getHandle().getDescriptor()
+              .getOptions().disableAutoCompactions());
+    }
+  }
+
 }
