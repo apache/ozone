@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ozone.test.TestClock;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -59,8 +61,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
@@ -312,6 +316,22 @@ public class TestMoveManager {
   }
 
   @Test
+  public void testDeleteCommandFails() throws Exception {
+    CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
+
+    Mockito.doThrow(new ContainerNotFoundException("test"))
+        .when(containerManager).getContainer(any(ContainerID.class));
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, 0, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult moveResult = res.get();
+    Assert.assertEquals(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+        moveResult);
+  }
+
+  @Test
   public void testSuccessfulMove() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
@@ -320,7 +340,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -358,7 +378,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(true));
+        eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -390,7 +410,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
