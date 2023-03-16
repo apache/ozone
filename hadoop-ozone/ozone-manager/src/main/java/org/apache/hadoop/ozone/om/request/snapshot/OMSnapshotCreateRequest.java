@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -115,9 +115,10 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
-        ozoneManager.getSnapshotChainManager();
+        omMetadataManager.getSnapshotChainManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());

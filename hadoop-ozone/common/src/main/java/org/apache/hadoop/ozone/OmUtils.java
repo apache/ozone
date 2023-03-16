@@ -309,6 +309,7 @@ public final class OmUtils {
     case CreateSnapshot:
     case DeleteSnapshot:
     case SnapshotMoveDeletedKeys:
+    case SnapshotPurge:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

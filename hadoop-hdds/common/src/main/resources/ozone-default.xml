@@ -492,6 +492,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.key.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of deleted keys to be scanned by Snapshot
+      Deleting Service per snapshot run.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.service.ids</name>
     <value/>
     <tag>OM, HA</tag>

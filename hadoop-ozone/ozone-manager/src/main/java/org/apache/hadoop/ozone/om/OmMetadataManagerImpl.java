@@ -292,6 +292,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Map<String, Table> tableMap = new HashMap<>();
   private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
+  private SnapshotChainManager snapshotChainManager;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
@@ -464,6 +465,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       initializeOmTables(true);
     }
+
+    snapshotChainManager = new SnapshotChainManager(this);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
@@ -1630,6 +1633,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
     return renamedKeyTable;
+  }
+
+  /**
+   * Get Snapshot Chain Manager.
+   *
+   * @return SnapshotChainManager.
+   */
+  public SnapshotChainManager getSnapshotChainManager() {
+    return snapshotChainManager;
   }
 
   /**
