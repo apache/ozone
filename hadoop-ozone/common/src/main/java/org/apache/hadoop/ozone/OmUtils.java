@@ -308,6 +308,7 @@ public final class OmUtils {
     case SetRangerServiceVersion:
     case CreateSnapshot:
     case DeleteSnapshot:
+    case SnapshotMoveDeletedKeys:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

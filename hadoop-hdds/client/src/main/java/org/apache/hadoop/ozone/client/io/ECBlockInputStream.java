@@ -62,7 +62,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private final BlockInputStreamFactory streamFactory;
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
-  private final Function<BlockID, Pipeline> refreshFunction;
+  private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
   private final DatanodeDetails[] dataLocations;
   private final BlockExtendedInputStream[] blockStreams;
@@ -120,8 +120,9 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   public ECBlockInputStream(ECReplicationConfig repConfig,
       BlockLocationInfo blockInfo, boolean verifyChecksum,
-      XceiverClientFactory xceiverClientFactory, Function<BlockID,
-      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory) {
+      XceiverClientFactory xceiverClientFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      BlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
     this.ecChunkSize = repConfig.getEcChunkSize();
     this.verifyChecksum = verifyChecksum;
@@ -215,13 +216,14 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
    * @param refreshFunc
    * @return
    */
-  protected Function<BlockID, Pipeline> ecPipelineRefreshFunction(
-      int replicaIndex, Function<BlockID, Pipeline> refreshFunc) {
+  protected Function<BlockID, BlockLocationInfo> ecPipelineRefreshFunction(
+      int replicaIndex, Function<BlockID, BlockLocationInfo> refreshFunc) {
     return (blockID) -> {
-      Pipeline ecPipeline = refreshFunc.apply(blockID);
-      if (ecPipeline == null) {
+      BlockLocationInfo blockLocationInfo = refreshFunc.apply(blockID);
+      if (blockLocationInfo == null) {
         return null;
       }
+      Pipeline ecPipeline = blockLocationInfo.getPipeline();
       DatanodeDetails curIndexNode = ecPipeline.getNodes()
           .stream().filter(dn ->
               ecPipeline.getReplicaIndex(dn) == replicaIndex)
@@ -229,13 +231,15 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       if (curIndexNode == null) {
         return null;
       }
-      return Pipeline.newBuilder().setReplicationConfig(
+      Pipeline pipeline = Pipeline.newBuilder().setReplicationConfig(
               StandaloneReplicationConfig.getInstance(
                   HddsProtos.ReplicationFactor.ONE))
           .setNodes(Collections.singletonList(curIndexNode))
           .setId(PipelineID.randomId())
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
+      blockLocationInfo.setPipeline(pipeline);
+      return blockLocationInfo;
     };
   }
 

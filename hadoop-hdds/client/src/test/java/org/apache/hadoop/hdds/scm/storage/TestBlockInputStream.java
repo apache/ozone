@@ -84,18 +84,18 @@ public class TestBlockInputStream {
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
 
-  private Function<BlockID, Pipeline> refreshPipeline;
+  private Function<BlockID, BlockLocationInfo> refreshFunction;
 
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
-    refreshPipeline = Mockito.mock(Function.class);
+    refreshFunction = Mockito.mock(Function.class);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
 
     blockStream = new DummyBlockInputStream(blockID, blockSize, null, null,
-        false, null, refreshPipeline, chunks, chunkDataMap);
+        false, null, refreshFunction, chunks, chunkDataMap);
   }
 
   /**
@@ -290,15 +290,26 @@ public class TestBlockInputStream {
   void refreshesPipelineOnReadFailure(IOException ex) throws Exception {
     // GIVEN
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
+    when(blockLocationInfo.getPipeline()).thenReturn(pipeline);
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    BlockLocationInfo newBlockLocationInfo = mock(BlockLocationInfo.class);
 
-    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> newPipeline);
-    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> pipeline);
-    testRefreshesPipelineOnReadFailure(ex, pipeline, id -> null);
+    testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(newPipeline);
+    testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
+        id -> blockLocationInfo);
+
+    when(newBlockLocationInfo.getPipeline()).thenReturn(null);
+    testRefreshesPipelineOnReadFailure(ex, blockLocationInfo,
+        id -> newBlockLocationInfo);
   }
 
   private void testRefreshesPipelineOnReadFailure(IOException ex,
-      Pipeline pipeline, Function<BlockID, Pipeline> refreshFunction)
+      BlockLocationInfo blockLocationInfo,
+      Function<BlockID, BlockLocationInfo> refreshPipelineFunction)
       throws Exception {
 
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
@@ -306,10 +317,11 @@ public class TestBlockInputStream {
     final int len = 200;
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
-    when(refreshPipeline.apply(any()))
-        .thenAnswer(inv -> refreshFunction.apply(blockID));
+    when(this.refreshFunction.apply(any()))
+        .thenAnswer(inv -> refreshPipelineFunction.apply(blockID));
 
-    try (BlockInputStream subject = createSubject(blockID, pipeline, stream)) {
+    try (BlockInputStream subject = createSubject(blockID,
+        blockLocationInfo.getPipeline(), stream)) {
       subject.initialize();
 
       // WHEN
@@ -318,9 +330,9 @@ public class TestBlockInputStream {
 
       // THEN
       Assert.assertEquals(len, bytesRead);
-      verify(refreshPipeline).apply(blockID);
+      verify(this.refreshFunction).apply(blockID);
     } finally {
-      reset(refreshPipeline);
+      reset(this.refreshFunction);
     }
   }
 
@@ -349,7 +361,7 @@ public class TestBlockInputStream {
   private BlockInputStream createSubject(BlockID blockID, Pipeline pipeline,
       ChunkInputStream stream) {
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null, false,
-        null, refreshPipeline, chunks, null) {
+        null, refreshFunction, chunks, null) {
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;
@@ -376,7 +388,7 @@ public class TestBlockInputStream {
           () -> subject.read(new byte[len], 0, len));
 
       // THEN
-      verify(refreshPipeline, never()).apply(blockID);
+      verify(refreshFunction, never()).apply(blockID);
     }
   }
 
@@ -396,17 +408,19 @@ public class TestBlockInputStream {
     Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
     XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
     XceiverClientSpi client = mock(XceiverClientSpi.class);
+    BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
     when(clientFactory.acquireClientForReadData(pipeline))
         .thenReturn(client);
 
     final int len = 200;
     final ChunkInputStream stream = throwingChunkInputStream(ex, len, true);
 
-    when(refreshPipeline.apply(blockID))
-        .thenReturn(newPipeline);
+    when(refreshFunction.apply(blockID))
+        .thenReturn(blockLocationInfo);
+    when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
     BlockInputStream subject = new BlockInputStream(blockID, blockSize,
-        pipeline, null, false, clientFactory, refreshPipeline) {
+        pipeline, null, false, clientFactory, refreshFunction) {
       @Override
       protected List<ChunkInfo> getChunkInfos() throws IOException {
         acquireClient();
@@ -429,7 +443,7 @@ public class TestBlockInputStream {
 
       // THEN
       Assert.assertEquals(len, bytesRead);
-      verify(refreshPipeline).apply(blockID);
+      verify(refreshFunction).apply(blockID);
       verify(clientFactory).acquireClientForReadData(pipeline);
       verify(clientFactory).releaseClientForReadData(client, false);
     } finally {

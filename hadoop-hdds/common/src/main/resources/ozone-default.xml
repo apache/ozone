@@ -20,9 +20,7 @@
 <!-- wish to modify from this file into ozone-site.xml and change them -->
 <!-- there.  If ozone-site.xml does not already exist, create it.      -->
 
-<!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
-<!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE                                    -->
+<!--Tags supported are defined in org.apache.hadoop.hdds.conf.ConfigTag-->
 
 <configuration>
 
@@ -1340,17 +1338,6 @@
   </property>
 
   <property>
-    <name>hadoop.tags.custom</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,RECON</value>
-  </property>
-
-  <property>
-    <name>ozone.tags.system</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,TOKEN,TLS,RECON</value>
-  </property>
-
-
-  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1877,7 +1864,23 @@
       its log segments after taking snapshot.
     </description>
   </property>
-
+  <property>
+    <name>ozone.om.ratis.log.purge.upto.snapshot.index</name>
+    <value>true</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Enable/disable Raft server to purge its log up to the snapshot index
+      after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.purge.preservation.log.num</name>
+    <value>0</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      The number of latest Raft logs to not be purged after taking snapshot.
+    </description>
+  </property>
   <property>
     <name>ozone.om.ratis.server.request.timeout</name>
     <value>3s</value>
@@ -2728,7 +2731,7 @@
   <property>
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
-    <tag>S3G, SECURITY, KERBEROS</tag>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
@@ -3146,6 +3149,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.deleting.limit.per.task</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be reclaimed by
+      Snapshot Deleting Service per run.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -3157,6 +3168,25 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDeletingService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.interval</name>
+    <value>30s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDeletingService
+      thread run.
     </description>
   </property>
 
@@ -3416,7 +3446,7 @@
   <property>
     <name>ozone.audit.log.debug.cmd.list.dnaudit</name>
     <value></value>
-    <tag>DN</tag>
+    <tag>DATANODE</tag>
     <description>
       A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
       log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".

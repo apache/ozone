@@ -36,8 +36,6 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
-  public static final String OZONE_TAGS_SYSTEM_KEY =
-      "ozone.tags.system";
   public static final String DFS_CONTAINER_IPC_PORT =
       "dfs.container.ipc";
   public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
@@ -233,6 +231,16 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
+
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
+      "ozone.snapshot.deleting.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT = "30s";
+
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT =
+      "ozone.snapshot.deleting.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT = "300s";
 
   public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
       "ozone.block.deleting.service.workers";

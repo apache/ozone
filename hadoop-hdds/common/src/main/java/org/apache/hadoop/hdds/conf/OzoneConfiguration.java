@@ -28,12 +28,15 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -45,6 +48,8 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
@@ -54,6 +59,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKD
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
+
+  public static final SortedSet<String> TAGS = unmodifiableSortedSet(
+      Arrays.stream(ConfigTag.values())
+          .map(Enum::name)
+          .collect(toCollection(TreeSet::new)));
+
   static {
     addDeprecatedKeys();
 
@@ -301,6 +312,11 @@ public class OzoneConfiguration extends Configuration
       }
     }
     return configMap;
+  }
+
+  @Override
+  public boolean isPropertyTag(String tagStr) {
+    return TAGS.contains(tagStr) || super.isPropertyTag(tagStr);
   }
 
   private static void addDeprecatedKeys() {
