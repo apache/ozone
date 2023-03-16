@@ -247,9 +247,8 @@ public class SnapshotDeletingService extends BackgroundService {
             LOG.error("Error while running Snapshot Deleting Service", ex);
           }
         }
-        // TODO: [SNAPSHOT] Enable it once KeyDeletingService,
-        //  DirectoryDeletingService for snapshots are modified.
-        // submitSnapshotPurgeRequest(purgeSnapshotKeys);
+
+        submitSnapshotPurgeRequest(purgeSnapshotKeys);
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
       }
@@ -270,7 +269,9 @@ public class SnapshotDeletingService extends BackgroundService {
             .setClientId(clientId.toString())
             .build();
 
-        submitRequest(omRequest);
+        // TODO: [SNAPSHOT] Submit request once KeyDeletingService,
+        //  DirectoryDeletingService for snapshots are modified.
+        // submitRequest(omRequest);
       }
     }
 
