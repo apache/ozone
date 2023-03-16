@@ -134,7 +134,7 @@ public class ContainerBalancerTask implements Runnable {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
-    this.moveManager = new MoveManager(replicationManager, containerManager);
+    this.moveManager = scm.getMoveManager();
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;
@@ -1086,11 +1086,6 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   void setConfig(ContainerBalancerConfiguration config) {
     this.config = config;
-  }
-
-  @VisibleForTesting
-  void setMoveManager(MoveManager moveManager) {
-    this.moveManager = moveManager;
   }
 
   @VisibleForTesting

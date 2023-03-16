@@ -128,6 +128,10 @@ public class TestContainerBalancerTask {
     serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
     SCMServiceManager scmServiceManager = Mockito.mock(SCMServiceManager.class);
     moveManager = Mockito.mock(MoveManager.class);
+    Mockito.when(moveManager.move(any(ContainerID.class),
+            any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        .thenReturn(CompletableFuture.completedFuture(
+            MoveManager.MoveResult.COMPLETED));
 
     // these configs will usually be specified in each test
     balancerConfiguration =
@@ -194,6 +198,7 @@ public class TestContainerBalancerTask {
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
     when(scm.getPlacementPolicyValidateProxy())
         .thenReturn(placementPolicyValidateProxy);
+    when(scm.getMoveManager()).thenReturn(moveManager);
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to
@@ -219,12 +224,6 @@ public class TestContainerBalancerTask {
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
         sb.getMetrics(), balancerConfiguration);
-
-    containerBalancerTask.setMoveManager(moveManager);
-    Mockito.when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class), any(DatanodeDetails.class)))
-        .thenReturn(CompletableFuture.completedFuture(
-            MoveManager.MoveResult.COMPLETED));
   }
 
   @Test
