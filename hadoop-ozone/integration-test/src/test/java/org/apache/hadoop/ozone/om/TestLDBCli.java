@@ -17,6 +17,9 @@
 package org.apache.hadoop.ozone.om;
 
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -25,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -34,6 +38,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
+import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -42,21 +47,28 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
+import picocli.CommandLine;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-
+import static org.junit.Assert.assertEquals;
 
 /**
  * This class tests the Debug LDB CLI that reads from rocks db file.
@@ -69,16 +81,61 @@ public class TestLDBCli {
   private DBStore dbStore = null;
   private List<String> keyNames;
   private static final String DEFAULT_ENCODING = UTF_8.name();
-
+  private static final String KEY_TABLE = "keyTable";
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+  private final StringWriter stdout = new StringWriter();
+  private final StringWriter stderr = new StringWriter();
+  private CommandLine cmd;
+  private final Map<String, Map<String, ?>> expectedMap = new TreeMap<>();
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final Gson gson = new Gson();
 
   @Before
-  public void setup() throws Exception {
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
     rdbParser = new RDBParser();
     dbScanner = new DBScanner();
     keyNames = new ArrayList<>();
+
+    cmd = new CommandLine(rdbParser).addSubcommand(dbScanner)
+        .setOut(new PrintWriter(stdout)).setErr(new PrintWriter(stderr));
+
+    File newFolder = folder.newFolder();
+    if (!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+    // Dummy om.db with only keyTable
+    dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+        .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
+
+    // insert 5 keys
+    for (int i = 0; i < 5; i++) {
+      OmKeyInfo value =
+          OMRequestTestUtils.createOmKeyInfo("sampleVol", "sampleBuck",
+              "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
+              HddsProtos.ReplicationFactor.ONE);
+      String key = "key" + (i + 1);
+      byte[] keyBytes = key.getBytes(UTF_8);
+      byte[] valBytes =
+          value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
+      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+      keyTable.put(keyBytes, valBytes);
+
+      // Populate map
+      String k = new StringCodec().fromPersistedFormat(keyBytes);
+      OmKeyInfo v = new OmKeyInfoCodec(true).fromPersistedFormat(valBytes);
+      expectedMap.put(k, toMap(v));
+    }
+  }
+
+  private static Map<String, Object> toMap(OmKeyInfo obj) throws IOException {
+    // Have to use Gson here since DBScanner uses Gson.
+    // JsonUtils (ObjectMapper) would parse object differently.
+    String json = gson.toJson(obj);
+//    String json = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
+    return MAPPER.readValue(
+        json, new TypeReference<Map<String, Object>>() { });
   }
 
   @After
@@ -90,36 +147,43 @@ public class TestLDBCli {
     // Restore the static fields in DBScanner
     DBScanner.setContainerId(-1);
     DBScanner.setDnDBSchemaVersion("V2");
-    DBScanner.setWithKey(false);
+  }
+
+  private void assertNoError(int exitCode) {
+    Assertions.assertEquals(0, exitCode, stderr.toString());
+  }
+
+  private void assertContents(Map<String, ?> expected, String actualStr)
+      throws IOException {
+    // Parse actual output string into Map
+    Map<String, ? extends Map<String, ?>> actualMap = MAPPER.readValue(
+        actualStr, new TypeReference<Map<String, Map<String, ?>>>() { });
+
+//    String expectedStr = new Gson().toJson(expectedMap);
+//    String actualToStrAgain = new Gson().toJson(actual);
+
+//    Assertions.assertEquals(expectedStr, actualToStrAgain);
+    Assertions.assertEquals(expected, actualMap);
+  }
+
+  @Test
+  public void testDefaultScan() throws IOException {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE);
+
+    assertNoError(exitCode);
+    assertContents(expectedMap, stdout.toString());
   }
 
   @Test
   public void testOMDB() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
-    // Dummy om.db with only keyTable
-    dbStore = DBStoreBuilder.newBuilder(conf)
-      .setName("om.db")
-      .setPath(newFolder.toPath())
-      .addTable("keyTable")
-      .build();
-    // insert 5 keys
-    for (int i = 0; i < 5; i++) {
-      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
-          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
-          HddsProtos.ReplicationFactor.ONE);
-      String key = "key" + (i + 1);
-      Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      byte[] arr = value
-          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
-      keyTable.put(key.getBytes(UTF_8), arr);
-    }
+
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
     DBScanner.setLimit(100);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+    assertEquals(5, getKeyNames(dbScanner).size());
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
     Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
@@ -129,19 +193,19 @@ public class TestLDBCli {
     System.setOut(new PrintStream(outputStreamCaptor, false, DEFAULT_ENCODING));
     DBScanner.setShowCount(true);
     dbScanner.call();
-    Assert.assertEquals("5",
+    assertEquals("5",
         outputStreamCaptor.toString(DEFAULT_ENCODING).trim());
     System.setOut(System.out);
     DBScanner.setShowCount(false);
 
 
     DBScanner.setLimit(1);
-    Assert.assertEquals(1, getKeyNames(dbScanner).size());
+    assertEquals(1, getKeyNames(dbScanner).size());
 
     // Testing the startKey function
     DBScanner.setLimit(-1);
     DBScanner.setStartKey("key3");
-    Assert.assertEquals(3, getKeyNames(dbScanner).size());
+    assertEquals(3, getKeyNames(dbScanner).size());
 
     DBScanner.setLimit(0);
     try {
@@ -154,7 +218,7 @@ public class TestLDBCli {
     // If set with -1, check if it dumps entire table data.
     DBScanner.setLimit(-1);
     DBScanner.setStartKey(null);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+    assertEquals(5, getKeyNames(dbScanner).size());
 
     // Test dump to file.
     File tempFile = folder.newFolder();
@@ -165,7 +229,7 @@ public class TestLDBCli {
       DBScanner.setLimit(-1);
       DBScanner.setFileName(outFile);
       keyNames = getKeyNames(dbScanner);
-      Assert.assertEquals(5, keyNames.size());
+      assertEquals(5, keyNames.size());
       Assert.assertTrue(new File(outFile).exists());
 
       bufferedReader = new BufferedReader(
@@ -196,7 +260,7 @@ public class TestLDBCli {
       // ..
       // }
 
-      Assert.assertEquals("File does not have all keys",
+      assertEquals("File does not have all keys",
           keyNames.size() * 2, count);
     } finally {
       if (bufferedReader != null) {
@@ -211,6 +275,15 @@ public class TestLDBCli {
   private List<String> getKeyNames(DBScanner scanner)
             throws Exception {
     return Collections.emptyList();
+//    keyNames.clear();
+//    scanner.setTableName("keyTable");
+//    scanner.call();
+//    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
+//    for (Object o : scanner.getScannedObjects()) {
+//      OmKeyInfo keyInfo = (OmKeyInfo)o;
+//      keyNames.add(keyInfo.getKeyName());
+//    }
+//    return keyNames;
   }
 
   @Test
@@ -221,9 +294,9 @@ public class TestLDBCli {
     }
 
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
-    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
-            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V3, conf,
-        false).getStore();
+    dbStore = BlockUtils.getUncachedDatanodeStore(
+        newFolder.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
+        OzoneConsts.SCHEMA_V3, conf, false).getStore();
 
     // insert 2 containers, each with 2 blocks
     final int containerCount = 2;
@@ -244,7 +317,7 @@ public class TestLDBCli {
     dbScanner.setParent(rdbParser);
     dbScanner.setTableName("block_data");
     DBScanner.setDnDBSchemaVersion("V3");
-    DBScanner.setWithKey(true);
+    dbScanner.setWithKey(true);
 
     // Scan all container
     DBScanner.setLimit(-1);
@@ -310,7 +383,7 @@ public class TestLDBCli {
     dbScanner.setParent(rdbParser);
     dbScanner.setTableName("block_data");
     DBScanner.setDnDBSchemaVersion("V2");
-    DBScanner.setWithKey(true);
+    dbScanner.setWithKey(true);
 
     // Scan all container
     try (GenericTestUtils.SystemOutCapturer capture =
