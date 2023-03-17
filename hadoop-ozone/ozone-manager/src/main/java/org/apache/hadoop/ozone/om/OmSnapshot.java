@@ -71,7 +71,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
-  // Store current snapshot's DB key in snapshotInfoTable
+  // Store current snapshot's snapshotInfoTable DB key
   private final String snapshotDBKey;
   // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
