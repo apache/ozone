@@ -577,8 +577,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
     }
   }
-
-
   // Prepend the full path to the hard link entry entry.
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private static Path getFullPath(Path dbPath, String fileName) {

@@ -3787,8 +3787,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private void moveCheckpointFiles(File oldDB, Path checkpointPath, File dbDir,
-                         File dbBackup, File dbSnapshotsDir,
-                         File dbSnapshotsBackup) throws IOException {
+                                   File dbBackup, File dbSnapshotsDir,
+                                   File dbSnapshotsBackup) throws IOException {
     // Move the new DB checkpoint into the om metadata dir
     Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
     try {

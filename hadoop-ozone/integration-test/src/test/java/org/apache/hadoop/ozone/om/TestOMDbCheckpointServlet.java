@@ -313,9 +313,8 @@ public class TestOMDbCheckpointServlet {
     FileUtil.unTar(tempFile, newDbDir);
 
     // Move snapshot dir to correct location.
-    new File(newDbDirName, OM_SNAPSHOT_DIR)
-        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR));
-
+    Assert.assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR)
+        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR)));
 
     // Confirm the checkpoint directories match, (after remove extras).
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
@@ -427,8 +426,8 @@ public class TestOMDbCheckpointServlet {
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
     fabricatedSnapshot.toFile().mkdirs();
-    Paths.get(fabricatedSnapshot.toString(), "fabricatedFile")
-        .toFile().createNewFile();
+    Assert.assertTrue(Paths.get(fabricatedSnapshot.toString(), "fabricatedFile")
+        .toFile().createNewFile());
 
     // Create fabricated links to snapshot dirs
     // to confirm that links are recognized even if
