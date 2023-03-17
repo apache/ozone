@@ -35,7 +35,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -331,7 +330,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.omEpoch = 0;
   }
 
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
     Path path = checkpoint.getCheckpointLocation();

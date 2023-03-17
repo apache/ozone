@@ -405,7 +405,8 @@ public class TestOMDbCheckpointServlet {
     setupCluster();
     metaDir = OMStorage.getOmDbDir(conf);
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster.newClient());
+    OzoneBucket bucket = TestDataUtil
+        .createVolumeAndBucket(cluster.newClient());
 
     // Create dummy keys for snapshotting.
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),

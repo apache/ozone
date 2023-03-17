@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang.StringUtils;
@@ -200,7 +199,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
   private void processDir(Path dir, Map<Object, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
                           Set<Path> snapshotPaths)
@@ -243,7 +241,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return false;
   }
 
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private void writeFilesToArchive(Map<Object, Path> copyFiles,
                          Map<Path, Path> hardLinkFiles,
                          ArchiveOutputStream archiveOutputStream)

@@ -24,7 +24,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -53,10 +52,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 
-import java.io.File;
-import java.io.IOException;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -71,12 +66,8 @@ import javax.annotation.Nonnull;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -518,7 +509,6 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param hardLinkFiles - Map of link->file paths.
    * @return Path to the file of links created.
    */
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   static Path createHardLinkList(int truncateLength,
                                   Map<Path, Path> hardLinkFiles)
       throws IOException {
@@ -578,7 +568,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
   // Prepend the full path to the hard link entry entry.
-  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"})
   private static Path getFullPath(Path dbPath, String fileName) {
     File file = new File(fileName);
     // If there is no directory then this file belongs in the db.
