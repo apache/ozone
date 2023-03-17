@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -37,7 +36,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
-import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -114,8 +112,6 @@ public class TestLDBCli {
       keyTable.put(keyBytes, valBytes);
 
       // Populate map
-//      String k = new StringCodec().fromPersistedFormat(keyBytes);
-//      OmKeyInfo v = new OmKeyInfoCodec(true).fromPersistedFormat(valBytes);
       expectedMap.put(key, toMap(value));
     }
   }
@@ -152,7 +148,7 @@ public class TestLDBCli {
   }
 
   @Test
-  public void testScanDefault() throws IOException {
+  public void testDefault() throws IOException {
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -163,7 +159,7 @@ public class TestLDBCli {
   }
 
   @Test
-  public void testScanLimitLength1() throws Exception {
+  public void testLength() throws IOException {
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -172,6 +168,31 @@ public class TestLDBCli {
 
     assertNoError(exitCode);
     assertContents(expectedMap.headMap("key1", true), stdout.toString());
+  }
+
+  @Test
+  public void testInvalidLength() {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE,
+        "--length", "0");
+
+    Assert.assertNotEquals(0, exitCode);
+    Assert.assertTrue(stderr.toString().contains(
+        "IllegalArgumentException: List length should be a positive number"));
+  }
+
+  @Test
+  public void testUnlimitedLength() throws Exception {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column_family", KEY_TABLE,
+        "--length", "-1");
+
+    assertNoError(exitCode);
+    assertContents(expectedMap, stdout.toString());
   }
 
 //  @Test
