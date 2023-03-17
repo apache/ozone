@@ -43,12 +43,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,6 +52,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Parser for scm.db, om.db or container db file.
@@ -70,14 +68,17 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   public static final Logger LOG =
       LoggerFactory.getLogger(DBScanner.class);
 
-  @CommandLine.Option(names = {"--column_family", "--column-family"},
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
       required = true,
       description = "Table name")
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
       description = "List Key -> Value instead of just Value.",
-      defaultValue = "false",
+      defaultValue = "true",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private static boolean withKey;
 
@@ -89,7 +90,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "File to dump table scan data")
   private static String fileName;
 
-  @CommandLine.Option(names = {"--startkey", "-sk"},
+  @CommandLine.Option(names = {"--startkey", "--sk"},
       description = "Key from which to iterate the DB")
   private static String startKey;
 
@@ -98,7 +99,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
 
-  @CommandLine.Option(names = {"--container-id", "-cid"},
+  @CommandLine.Option(names = {"--container-id", "--cid"},
       description = "Container ID when datanode DB Schema is V3",
       defaultValue = "-1")
   private static long containerId;
@@ -118,11 +119,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private List<Object> scannedObjects;
 
+  private PrintWriter err() {
+    return spec.commandLine().getErr();
+  }
+
+  private PrintWriter out() {
+    return spec.commandLine().getOut();
+  }
+
   public static byte[] getValueObject(
-      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) {
     Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
     if (keyType.equals(String.class)) {
-      return startKey.getBytes(StandardCharsets.UTF_8);
+      return startKey.getBytes(UTF_8);
     } else if (keyType.equals(ContainerID.class)) {
       return new ContainerID(Long.parseLong(startKey)).getBytes();
     } else if (keyType.equals(Long.class)) {
@@ -136,68 +145,79 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
   }
 
-  private static List<Object> displayTable(ManagedRocksIterator iterator,
+  private void displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
-    List<Object> outputs = new ArrayList<>();
+
+    iterator.get().seekToFirst();
+
+    if (fileName != null) {
+      try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
+        displayTable(iterator, dbColumnFamilyDefinition, out);
+      }
+    } else {
+      displayTable(iterator, dbColumnFamilyDefinition, out());
+    }
+  }
+
+  private void displayTable(ManagedRocksIterator iterator,
+      DBColumnFamilyDefinition dbColumnFamilyDefinition, PrintWriter out)
+      throws IOException {
 
     if (startKey != null) {
       iterator.get().seek(getValueObject(dbColumnFamilyDefinition));
     }
 
-    Writer fileWriter = null;
-    PrintWriter printWriter = null;
-    try {
-      if (fileName != null) {
-        fileWriter = new OutputStreamWriter(
-            new FileOutputStream(fileName), StandardCharsets.UTF_8);
-        printWriter = new PrintWriter(fileWriter);
-      }
+    if (withKey) {
+      // Start JSON map
+      out.print("{ ");
+    } else {
+      // Start JSON array
+      out.print("[ ");
+    }
 
-      boolean schemaV3 = dnDBSchemaVersion != null &&
-          dnDBSchemaVersion.equals("V3");
-      while (iterator.get().isValid()) {
-        StringBuilder result = new StringBuilder();
-        if (withKey) {
-          Object key = dbColumnFamilyDefinition.getKeyCodec()
-              .fromPersistedFormat(iterator.get().key());
-          Gson gson = new GsonBuilder().setPrettyPrinting().create();
-          if (schemaV3) {
-            int index =
-                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
-            String cid = key.toString().substring(0, index);
-            String blockId = key.toString().substring(index);
-            result.append(gson.toJson(Longs.fromByteArray(
-                FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
-          } else {
-            result.append(gson.toJson(key));
-          }
-          result.append(" -> ");
-        }
-        Object o = dbColumnFamilyDefinition.getValueCodec()
-            .fromPersistedFormat(iterator.get().value());
-        outputs.add(o);
+    boolean schemaV3 = dnDBSchemaVersion != null &&
+        dnDBSchemaVersion.equals("V3");
+    while (iterator.get().isValid()) {
+      StringBuilder sb = new StringBuilder();
+      if (withKey) {
+        Object key = dbColumnFamilyDefinition.getKeyCodec()
+            .fromPersistedFormat(iterator.get().key());
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        result.append(gson.toJson(o));
-        if (fileName != null) {
-          printWriter.println(result);
+        if (schemaV3) {
+          int index =
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
+          String cid = key.toString().substring(0, index);
+          String blockId = key.toString().substring(index);
+          sb.append(gson.toJson(Longs.fromByteArray(
+              FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
         } else {
-          System.out.println(result.toString());
+          sb.append(gson.toJson(key));
         }
-        limit--;
-        iterator.get().next();
-        if (limit == 0) {
-          break;
-        }
+        sb.append(": ");
       }
-    } finally {
-      if (printWriter != null) {
-        printWriter.close();
+      Object o = dbColumnFamilyDefinition.getValueCodec()
+          .fromPersistedFormat(iterator.get().value());
+      Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      sb.append(gson.toJson(o));
+      iterator.get().next();
+      if (iterator.get().isValid()) {
+        // If this is not the last entry, append comma
+        sb.append(',');
       }
-      if (fileWriter != null) {
-        fileWriter.close();
+      out.print(sb);
+      limit--;
+      if (limit == 0) {
+        break;
       }
     }
-    return outputs;
+
+    if (withKey) {
+      // End JSON map
+      out.println(" }");
+    } else {
+      // End JSON array
+      out.println(" ]");
+    }
   }
 
   public void setTableName(String tableName) {
@@ -214,10 +234,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   public static void setLimit(int limit) {
     DBScanner.limit = limit;
-  }
-
-  public List<Object> getScannedObjects() {
-    return scannedObjects;
   }
 
   public static void setFileName(String name) {
@@ -305,7 +321,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 this.columnFamilyMap.get(tableName);
         ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
                 columnFamilyDefinition.getTableName()
-                        .getBytes(StandardCharsets.UTF_8),
+                        .getBytes(UTF_8),
                 columnFamilyHandleList);
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
@@ -334,7 +350,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               rocksDB.get().newIterator(columnFamilyHandle));
           iterator.get().seekToFirst();
         }
-        scannedObjects = displayTable(iterator, columnFamilyDefinition);
+        displayTable(iterator, columnFamilyDefinition);
       }
     } else {
       System.out.println("Incorrect db Path");

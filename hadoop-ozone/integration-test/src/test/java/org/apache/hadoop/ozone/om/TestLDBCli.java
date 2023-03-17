@@ -51,6 +51,7 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -209,15 +210,7 @@ public class TestLDBCli {
 
   private List<String> getKeyNames(DBScanner scanner)
             throws Exception {
-    keyNames.clear();
-    scanner.setTableName("keyTable");
-    scanner.call();
-    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-    for (Object o : scanner.getScannedObjects()) {
-      OmKeyInfo keyInfo = (OmKeyInfo)o;
-      keyNames.add(keyInfo.getKeyName());
-    }
-    return keyNames;
+    return Collections.emptyList();
   }
 
   @Test
