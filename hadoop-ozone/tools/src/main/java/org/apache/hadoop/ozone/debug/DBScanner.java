@@ -85,7 +85,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--length", "-l"},
       description = "Maximum number of items to list.")
-  private static long limit = -1;
+  private long limit = -1;
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
@@ -239,8 +239,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.parent = parent;
   }
 
-  public static void setLimit(int limit) {
-    DBScanner.limit = limit;
+  public void setLimit(int limit) {
+    this.limit = limit;
   }
 
   public static void setFileName(String name) {

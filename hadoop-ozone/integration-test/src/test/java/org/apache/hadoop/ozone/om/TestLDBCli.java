@@ -229,7 +229,7 @@ public class TestLDBCli {
     dbScanner.setWithKey(true);
 
     // Scan all container
-    DBScanner.setLimit(-1);
+    dbScanner.setLimit(-1);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
@@ -241,7 +241,7 @@ public class TestLDBCli {
 
     // Scan container 1
     DBScanner.setContainerId(1);
-    DBScanner.setLimit(2);
+    dbScanner.setLimit(2);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
@@ -253,7 +253,7 @@ public class TestLDBCli {
 
     // Scan container 2
     DBScanner.setContainerId(2);
-    DBScanner.setLimit(2);
+    dbScanner.setLimit(2);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
