@@ -56,7 +56,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       db.get().put(columnFamilyHandle, rawKey, rawValue);
       return true;
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -74,7 +74,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, entryType);
     } catch (IOException | RocksDBException exception) {
-      // TODO:: Fail gracefully.
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
   }
@@ -98,41 +98,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
-          // TODO:: Fail gracefully.
-          throw new RuntimeException(exception);
-        }
-      }
-    };
-  }
-
-  @Override
-  public Iterator<E> iterator(int index) {
-    byte[] target;
-    try {
-      target = codecRegistry.asRawData(index);
-    } catch (IOException e) {
-      // TODO:: Fail gracefully.
-      throw new RuntimeException(e);
-    }
-
-    ManagedRocksIterator managedRocksIterator =
-        new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
-    managedRocksIterator.get().seek(target);
-
-    return new Iterator<E>() {
-      @Override
-      public boolean hasNext() {
-        return managedRocksIterator.get().isValid();
-      }
-
-      @Override
-      public E next() {
-        byte[] rawKey = managedRocksIterator.get().value();
-        managedRocksIterator.get().next();
-        try {
-          return codecRegistry.asObject(rawKey, entryType);
-        } catch (IOException exception) {
-          // TODO:: Fail gracefully.
+          // TODO: [SNAPSHOT] Fail gracefully.
           throw new RuntimeException(exception);
         }
       }

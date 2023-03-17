@@ -272,7 +272,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
     rawTable.deleteWithBatch(batch, codecRegistry.asRawData(key));
+  }
 
+  @Override
+  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+    rawTable.deleteRange(codecRegistry.asRawData(beginKey),
+        codecRegistry.asRawData(endKey));
   }
 
   @Override

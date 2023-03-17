@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -25,6 +26,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -71,6 +73,7 @@ public class TestOMSnapshotDAG {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
+  private static OzoneClient client;
   private final File metaDir = OMStorage.getOmDbDir(conf);
 
   /**
@@ -100,8 +103,8 @@ public class TestOMSnapshotDAG {
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
-
-    store = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
 
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.INFO);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.INFO);
@@ -112,6 +115,7 @@ public class TestOMSnapshotDAG {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

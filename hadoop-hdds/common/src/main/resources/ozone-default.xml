@@ -2458,24 +2458,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.security.ssl.keystore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the keystore
-      certificates file has changed and needs reloading. Default is 60s. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>hdds.security.ssl.truststore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the truststore
-      certificates file has changed and needs reloading. Default is 60s. Unit could
-      be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>
@@ -3149,6 +3131,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.deleting.limit.per.task</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be reclaimed by
+      Snapshot Deleting Service per run.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -3160,6 +3150,25 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDeletingService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.interval</name>
+    <value>30s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDeletingService
+      thread run.
     </description>
   </property>
 

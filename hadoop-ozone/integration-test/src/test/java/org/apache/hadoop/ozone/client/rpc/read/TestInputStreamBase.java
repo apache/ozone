@@ -141,7 +141,7 @@ public abstract class TestInputStreamBase {
    */
   @After
   public void shutdown() {
-    IOUtils.close(null, client);
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

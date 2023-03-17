@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -64,6 +65,7 @@ public class TestListKeysWithFSO {
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneBucket legacyOzoneBucket2;
   private static OzoneBucket fsoOzoneBucket2;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = new Timeout(1200000);
@@ -88,13 +90,13 @@ public class TestListKeysWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.LEGACY);
+        .createVolumeAndBucket(client, BucketLayout.LEGACY);
     String volumeName = legacyOzoneBucket.getVolumeName();
 
-    OzoneClient client = cluster.getClient();
     OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
 
     // create buckets
@@ -125,6 +127,7 @@ public class TestListKeysWithFSO {
 
   @AfterClass
   public static void teardownClass() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

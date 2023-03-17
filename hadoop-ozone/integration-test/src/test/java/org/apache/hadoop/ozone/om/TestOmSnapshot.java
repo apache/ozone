@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 import java.util.List;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -92,6 +93,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
 public class TestOmSnapshot {
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static String volumeName;
   private static String bucketName;
   private static OzoneManagerProtocol writeClient;
@@ -164,9 +166,10 @@ public class TestOmSnapshot {
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, bucketLayout);
+        .createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -176,7 +179,6 @@ public class TestOmSnapshot {
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
 
-    OzoneClient client = cluster.getClient();
     store = client.getObjectStore();
     writeClient = store.getClientProxy().getOzoneManagerClient();
 
@@ -190,6 +192,7 @@ public class TestOmSnapshot {
 
   @AfterClass
   public static void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -866,7 +869,6 @@ public class TestOmSnapshot {
 
     String snapshotName = UUID.randomUUID().toString();
     store.createSnapshot(volumeName, bucketName, snapshotName);
-
     List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
         .getOzoneManagersList();
     List<String> snapshotIds = new ArrayList<>();
@@ -898,4 +900,20 @@ public class TestOmSnapshot {
 
     assertEquals(1, snapshotIds.stream().distinct().count());
   }
+
+  @Test
+  public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    String snapPrefix = createSnapshot(volumeName, bucketName);
+    RDBStore snapshotDBStore = (RDBStore)
+            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            .getMetadataManager().getStore();
+
+    for (String table : snapshotDBStore.getTableNames().values()) {
+      Assertions.assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
+              .getHandle().getDescriptor()
+              .getOptions().disableAutoCompactions());
+    }
+  }
+
 }

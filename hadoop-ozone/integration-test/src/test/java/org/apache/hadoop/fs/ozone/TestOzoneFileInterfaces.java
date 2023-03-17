@@ -29,7 +29,6 @@ import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -58,8 +57,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
 import org.junit.After;
@@ -176,15 +177,17 @@ public class TestOzoneFileInterfaces {
     OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
-        getBucketLayout());
+    try (OzoneClient client = cluster.newClient()) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          getBucketLayout());
+    }
 
     rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
             volumeName);
     if (setDefaultFs) {
       // Set the fs.defaultFS and start the filesystem
-      conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+      conf.set(FS_DEFAULT_NAME_KEY, rootPath);
       fs = FileSystem.get(conf);
     } else {
       fs = FileSystem.get(new URI(rootPath + "/test.txt"), conf);
@@ -551,31 +554,32 @@ public class TestOzoneFileInterfaces {
   public void testFileSystemWithObjectStoreLayout() throws IOException {
     String obsVolume = UUID.randomUUID().toString();
 
-    OzoneClient client = cluster.getClient();
-    ObjectStore store = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore store = client.getObjectStore();
 
-    // Create volume and bucket
-    store.createVolume(obsVolume);
-    OzoneVolume volume = store.getVolume(obsVolume);
-    String obsBucket = UUID.randomUUID().toString();
-    // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
-    volume.createBucket(obsBucket,
-        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
-            .build());
+      // Create volume and bucket
+      store.createVolume(obsVolume);
+      OzoneVolume volume = store.getVolume(obsVolume);
+      String obsBucket = UUID.randomUUID().toString();
+      // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
+      volume.createBucket(obsBucket,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+              .build());
 
-    String obsRootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
+      String obsRootPath = String.format("%s://%s.%s/",
+          OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
 
-    OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
-    config.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, obsRootPath);
+      OzoneConfiguration config = (OzoneConfiguration) fs.getConf();
+      config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
-    try {
-      fs = FileSystem.get(fs.getConf());
-      Assert.fail("Should throw Exception due incompatible bucket layout");
-    } catch (IllegalArgumentException iae) {
-      // Expected exception
-      Assert.assertTrue(iae.getMessage().contains(
-          "OBJECT_STORE, which does not support file system semantics"));
+      try {
+        fs = FileSystem.get(fs.getConf());
+        Assert.fail("Should throw Exception due incompatible bucket layout");
+      } catch (IllegalArgumentException iae) {
+        // Expected exception
+        Assert.assertTrue(iae.getMessage().contains(
+            "OBJECT_STORE, which does not support file system semantics"));
+      }
     }
   }
 

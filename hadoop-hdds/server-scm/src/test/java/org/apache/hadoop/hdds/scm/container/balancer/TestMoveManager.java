@@ -107,10 +107,9 @@ public class TestMoveManager {
         .thenReturn(pendingOps);
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
+    Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
-    moveManager = new MoveManager(
-        replicationManager, clock, containerManager);
-    moveManager.onLeaderReady();
+    moveManager = new MoveManager(replicationManager, containerManager);
   }
 
   @Test
