@@ -77,36 +77,36 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
-      description = "List Key -> Value instead of just Value.",
+      description = "Print a JSON object of key->value pairs (default)"
+          + " instead of a JSON array of only values.",
       defaultValue = "true",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private static boolean withKey;
+  private boolean withKey;
 
   @CommandLine.Option(names = {"--length", "-l"},
-          description = "Maximum number of items to list.")
-  private static int limit = -1;
+      description = "Maximum number of items to list.")
+  private static long limit = -1;
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
   private static String fileName;
 
-  @CommandLine.Option(names = {"--startkey", "--sk"},
+  @CommandLine.Option(names = {"--startkey", "--sk", "-s"},
       description = "Key from which to iterate the DB")
   private static String startKey;
 
-  @CommandLine.Option(names = {"--dnSchema", "-d", "--dn-schema"},
-      description = "Datanode DB Schema Version : V1/V2/V3",
+  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+      description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V2")
   private static String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "--cid"},
-      description = "Container ID when datanode DB Schema is V3",
+      description = "Container ID. Applicable if datanode DB Schema is V3",
       defaultValue = "-1")
   private static long containerId;
 
-  @CommandLine.Option(names = { "--show-count",
-      "-count" }, description = "Get estimated key count for a"
-      + " given column family in the db",
+  @CommandLine.Option(names = { "--show-count", "--count" },
+      description = "Get estimated key count for the given DB column family",
       defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private static boolean showCount;
@@ -117,7 +117,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
-  private List<Object> scannedObjects;
+  private final String SCHEMA_V3 = "V3";
 
   private PrintWriter err() {
     return spec.commandLine().getErr();
@@ -168,7 +168,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     if (withKey) {
-      // Start JSON map
+      // Start JSON object (map)
       out.print("{ ");
     } else {
       // Start JSON array
@@ -176,8 +176,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     boolean schemaV3 = dnDBSchemaVersion != null &&
-        dnDBSchemaVersion.equals("V3");
-    while (iterator.get().isValid()) {
+        dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3);
+
+    // Count number of keys printed so far
+    long count = 0;
+    while (withinLimit(count) && iterator.get().isValid()) {
       StringBuilder sb = new StringBuilder();
       if (withKey) {
         Object key = dbColumnFamilyDefinition.getKeyCodec()
@@ -195,29 +198,33 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         }
         sb.append(": ");
       }
+
+      Gson gson = new GsonBuilder().setPrettyPrinting().create();
       Object o = dbColumnFamilyDefinition.getValueCodec()
           .fromPersistedFormat(iterator.get().value());
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
       sb.append(gson.toJson(o));
+
       iterator.get().next();
-      if (iterator.get().isValid()) {
+      ++count;
+      if (withinLimit(count) && iterator.get().isValid()) {
         // If this is not the last entry, append comma
         sb.append(',');
       }
+
       out.print(sb);
-      limit--;
-      if (limit == 0) {
-        break;
-      }
     }
 
     if (withKey) {
-      // End JSON map
+      // End JSON object
       out.println(" }");
     } else {
       // End JSON array
       out.println(" ]");
     }
+  }
+
+  private boolean withinLimit(long i) {
+    return limit == -1L || i < limit;
   }
 
   public void setTableName(String tableName) {
@@ -248,8 +255,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBScanner.dnDBSchemaVersion = version;
   }
 
-  public static void setWithKey(boolean withKey) {
-    DBScanner.withKey = withKey;
+  public void setWithKey(boolean withKey) {
+    this.withKey = withKey;
   }
 
   public static void setShowCount(boolean showCount) {
@@ -264,9 +271,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               handle -> {
                 try {
                   return Arrays.equals(handle.getName(), name);
-                    } catch (Exception ex) {
+                } catch (Exception ex) {
                   throw new RuntimeException(ex);
-                    }
+                }
               })
             .findAny()
             .orElse(null);
@@ -291,8 +298,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         new ArrayList<>();
     ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
-    this.printAppropriateTable(columnFamilyHandleList,
-           rocksDB, parent.getDbPath());
+    printAppropriateTable(columnFamilyHandleList, rocksDB, parent.getDbPath());
     return null;
   }
 
@@ -327,17 +333,17 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         columnFamilyDefinition.getTableName().getBytes(UTF_8),
         columnFamilyHandleList);
     if (columnFamilyHandle == null) {
-      throw new IllegalArgumentException("columnFamilyHandle is null");
+      throw new IllegalStateException("columnFamilyHandle is null");
     }
     if (showCount) {
       long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
           RocksDatabase.ESTIMATE_NUM_KEYS);
-      System.out.println(keyCount);
+      out().println(keyCount);
       return;
     }
     ManagedRocksIterator iterator;
     if (containerId > 0 && dnDBSchemaVersion != null
-        && dnDBSchemaVersion.equals("V3")) {
+        && dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3)) {
       ManagedReadOptions readOptions = new ManagedReadOptions();
       readOptions.setIterateUpperBound(new ManagedSlice(
           FixedLengthStringUtils.string2Bytes(
@@ -372,4 +378,3 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBScanner.startKey = startKey;
   }
 }
-
