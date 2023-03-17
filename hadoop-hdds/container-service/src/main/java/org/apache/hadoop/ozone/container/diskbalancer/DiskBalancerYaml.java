@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import org.apache.hadoop.hdds.server.YamlUtils;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -70,7 +71,7 @@ public final class DiskBalancerYaml {
       DiskBalancerInfoYaml diskBalancerInfoYaml;
       try {
         diskBalancerInfoYaml =
-            yaml.loadAs(inputFileStream, DiskBalancerInfoYaml.class);
+            YamlUtils.loadAs(inputFileStream, DiskBalancerInfoYaml.class);
       } catch (Exception e) {
         throw new IOException("Unable to parse yaml file.", e);
       }
