@@ -67,7 +67,6 @@ public final class DiskBalancerYaml {
     DiskBalancerInfo diskBalancerInfo;
 
     try (FileInputStream inputFileStream = new FileInputStream(path)) {
-      Yaml yaml = new Yaml();
       DiskBalancerInfoYaml diskBalancerInfoYaml;
       try {
         diskBalancerInfoYaml =
