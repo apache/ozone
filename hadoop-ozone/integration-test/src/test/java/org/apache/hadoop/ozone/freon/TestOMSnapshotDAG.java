@@ -303,14 +303,18 @@ public class TestOMSnapshotDAG {
         cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, compactionLogDirName);
-    for (File file : logPath.toFile().listFiles()) {
-      if (file.isFile() && file.getName().endsWith(".log")) {
+    File[] fileList = logPath.toFile().listFiles();
+    Assertions.assertNotNull(fileList);
+    for (File file : fileList) {
+      if (file != null && file.isFile() && file.getName().endsWith(".log")) {
         Assertions.assertEquals(0L, file.length());
       }
     }
-    // And no SST has been backed up
+    // Verify that no SST has been backed up
     Path sstBackupPath = Paths.get(omMetadataDir, sstBackUpDirName);
-    Assertions.assertEquals(0L, sstBackupPath.toFile().listFiles().length);
+    fileList = sstBackupPath.toFile().listFiles();
+    Assertions.assertNotNull(fileList);
+    Assertions.assertEquals(0L, fileList.length);
   }
 
 }
