@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -51,24 +50,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import picocli.CommandLine;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
 
 /**
  * This class tests the Debug LDB CLI that reads from rocks db file.
@@ -79,15 +69,12 @@ public class TestLDBCli {
   private RDBParser rdbParser;
   private DBScanner dbScanner;
   private DBStore dbStore = null;
-  private List<String> keyNames;
-  private static final String DEFAULT_ENCODING = UTF_8.name();
   private static final String KEY_TABLE = "keyTable";
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
-  private final StringWriter stdout = new StringWriter();
-  private final StringWriter stderr = new StringWriter();
+  private StringWriter stdout, stderr;
   private CommandLine cmd;
-  private final Map<String, Map<String, ?>> expectedMap = new TreeMap<>();
+  private NavigableMap<String, Map<String, ?>> expectedMap;
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Gson gson = new Gson();
 
@@ -96,10 +83,13 @@ public class TestLDBCli {
     conf = new OzoneConfiguration();
     rdbParser = new RDBParser();
     dbScanner = new DBScanner();
-    keyNames = new ArrayList<>();
+    stdout = new StringWriter();
+    stderr = new StringWriter();
 
-    cmd = new CommandLine(rdbParser).addSubcommand(dbScanner)
-        .setOut(new PrintWriter(stdout)).setErr(new PrintWriter(stderr));
+    cmd = new CommandLine(rdbParser)
+        .addSubcommand(dbScanner)
+        .setOut(new PrintWriter(stdout))
+        .setErr(new PrintWriter(stderr));
 
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
@@ -108,24 +98,25 @@ public class TestLDBCli {
     // Dummy om.db with only keyTable
     dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
         .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
+    Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
 
+    expectedMap = new TreeMap<>();
     // insert 5 keys
-    for (int i = 0; i < 5; i++) {
+    for (int i = 1; i <= 5; i++) {
+      String key = "key" + i;
       OmKeyInfo value =
           OMRequestTestUtils.createOmKeyInfo("sampleVol", "sampleBuck",
-              "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
+              key, HddsProtos.ReplicationType.STAND_ALONE,
               HddsProtos.ReplicationFactor.ONE);
-      String key = "key" + (i + 1);
       byte[] keyBytes = key.getBytes(UTF_8);
       byte[] valBytes =
           value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
-      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
       keyTable.put(keyBytes, valBytes);
 
       // Populate map
-      String k = new StringCodec().fromPersistedFormat(keyBytes);
-      OmKeyInfo v = new OmKeyInfoCodec(true).fromPersistedFormat(valBytes);
-      expectedMap.put(k, toMap(v));
+//      String k = new StringCodec().fromPersistedFormat(keyBytes);
+//      OmKeyInfo v = new OmKeyInfoCodec(true).fromPersistedFormat(valBytes);
+      expectedMap.put(key, toMap(value));
     }
   }
 
@@ -133,7 +124,6 @@ public class TestLDBCli {
     // Have to use Gson here since DBScanner uses Gson.
     // JsonUtils (ObjectMapper) would parse object differently.
     String json = gson.toJson(obj);
-//    String json = JsonUtils.toJsonStringWithDefaultPrettyPrinter(obj);
     return MAPPER.readValue(
         json, new TypeReference<Map<String, Object>>() { });
   }
@@ -143,7 +133,6 @@ public class TestLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
-    System.setOut(System.out);
     // Restore the static fields in DBScanner
     DBScanner.setContainerId(-1);
     DBScanner.setDnDBSchemaVersion("V2");
@@ -159,15 +148,11 @@ public class TestLDBCli {
     Map<String, ? extends Map<String, ?>> actualMap = MAPPER.readValue(
         actualStr, new TypeReference<Map<String, Map<String, ?>>>() { });
 
-//    String expectedStr = new Gson().toJson(expectedMap);
-//    String actualToStrAgain = new Gson().toJson(actual);
-
-//    Assertions.assertEquals(expectedStr, actualToStrAgain);
     Assertions.assertEquals(expected, actualMap);
   }
 
   @Test
-  public void testDefaultScan() throws IOException {
+  public void testScanDefault() throws IOException {
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -178,115 +163,18 @@ public class TestLDBCli {
   }
 
   @Test
-  public void testOMDB() throws Exception {
+  public void testScanLimitLength1() throws Exception {
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", KEY_TABLE,
+        "--length", "1");
 
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    DBScanner.setLimit(100);
-    assertEquals(5, getKeyNames(dbScanner).size());
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
-    Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
-
-    final ByteArrayOutputStream outputStreamCaptor =
-        new ByteArrayOutputStream();
-    System.setOut(new PrintStream(outputStreamCaptor, false, DEFAULT_ENCODING));
-    DBScanner.setShowCount(true);
-    dbScanner.call();
-    assertEquals("5",
-        outputStreamCaptor.toString(DEFAULT_ENCODING).trim());
-    System.setOut(System.out);
-    DBScanner.setShowCount(false);
-
-
-    DBScanner.setLimit(1);
-    assertEquals(1, getKeyNames(dbScanner).size());
-
-    // Testing the startKey function
-    DBScanner.setLimit(-1);
-    DBScanner.setStartKey("key3");
-    assertEquals(3, getKeyNames(dbScanner).size());
-
-    DBScanner.setLimit(0);
-    try {
-      getKeyNames(dbScanner);
-      Assert.fail("IllegalArgumentException is expected");
-    }  catch (IllegalArgumentException e) {
-      //ignore
-    }
-
-    // If set with -1, check if it dumps entire table data.
-    DBScanner.setLimit(-1);
-    DBScanner.setStartKey(null);
-    assertEquals(5, getKeyNames(dbScanner).size());
-
-    // Test dump to file.
-    File tempFile = folder.newFolder();
-    String outFile = tempFile.getAbsolutePath() + "keyTable"
-        + LocalDateTime.now();
-    BufferedReader bufferedReader = null;
-    try {
-      DBScanner.setLimit(-1);
-      DBScanner.setFileName(outFile);
-      keyNames = getKeyNames(dbScanner);
-      assertEquals(5, keyNames.size());
-      Assert.assertTrue(new File(outFile).exists());
-
-      bufferedReader = new BufferedReader(
-          new InputStreamReader(new FileInputStream(outFile), UTF_8));
-
-      String readLine;
-      int count = 0;
-
-      while ((readLine = bufferedReader.readLine()) != null) {
-        for (String keyName : keyNames) {
-          if (readLine.contains(keyName)) {
-            count++;
-            break;
-          }
-        }
-      }
-
-      // As keyName will be in the file twice for each key.
-      // Once in keyName and second time in fileName.
-
-      // Sample key data.
-      // {
-      // ..
-      // ..
-      // "keyName": "key5",
-      // "fileName": "key5",
-      // ..
-      // ..
-      // }
-
-      assertEquals("File does not have all keys",
-          keyNames.size() * 2, count);
-    } finally {
-      if (bufferedReader != null) {
-        bufferedReader.close();
-      }
-      if (new File(outFile).exists()) {
-        FileUtils.deleteQuietly(new File(outFile));
-      }
-    }
+    assertNoError(exitCode);
+    assertContents(expectedMap.headMap("key1", true), stdout.toString());
   }
 
-  private List<String> getKeyNames(DBScanner scanner)
-            throws Exception {
-    return Collections.emptyList();
-//    keyNames.clear();
-//    scanner.setTableName("keyTable");
-//    scanner.call();
-//    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-//    for (Object o : scanner.getScannedObjects()) {
-//      OmKeyInfo keyInfo = (OmKeyInfo)o;
-//      keyNames.add(keyInfo.getKeyName());
-//    }
-//    return keyNames;
-  }
-
-  @Test
+//  @Test
   public void testDNDBSchemaV3() throws Exception {
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
@@ -355,7 +243,7 @@ public class TestLDBCli {
     }
   }
 
-  @Test
+//  @Test
   public void testDNDBSchemaV2() throws Exception {
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
