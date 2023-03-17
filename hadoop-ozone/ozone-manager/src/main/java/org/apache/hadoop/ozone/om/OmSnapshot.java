@@ -23,11 +23,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -41,6 +43,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Metadata Reading class for OM Snapshots.
@@ -67,7 +71,12 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  // Store current snapshot's DB key in snapshotInfoTable
+  private final String snapshotDBKey;
+  // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
+  // To access active OM DB metadata
+  private final OMMetadataManager activeOMMetadataManager;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -82,11 +91,30 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.bucketName = bucketName;
     this.volumeName = volumeName;
     this.omMetadataManager = keyManager.getMetadataManager();
+    this.snapshotDBKey = SnapshotInfo.getTableKey(
+        volumeName, bucketName, snapshotName);
+    this.activeOMMetadataManager = ozoneManager.getMetadataManager();
   }
 
+  /**
+   * Check snapshot status in active DB snapshotInfoTable.
+   * @throws IOException FileNotFoundException when snapshot is not active.
+   */
+  private void checkSnapshotStatus() throws IOException {
+    if (activeOMMetadataManager.getSnapshotInfoTable().get(snapshotDBKey)
+        .getSnapshotStatus()
+        .equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+      return;
+    }
+
+    // Any FS operation on a non-active snapshot shall be denied
+    throw new OMException("Snapshot '" + snapshotName + "' is no longer active",
+        FILE_NOT_FOUND);
+  }
 
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
+    checkSnapshotStatus();
     return denormalizeOmKeyInfo(omMetadataReader.lookupKey(
         normalizeOmKeyArgs(args)));
   }
@@ -95,6 +123,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
                                              boolean assumeS3Context)
       throws IOException {
+    checkSnapshotStatus();
     return denormalizeKeyInfoWithVolumeContext(
         omMetadataReader.getKeyInfo(normalizeOmKeyArgs(args),
         assumeS3Context));
@@ -104,6 +133,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
+    checkSnapshotStatus();
     List<OzoneFileStatus> l = omMetadataReader
         .listStatus(normalizeOmKeyArgs(args),
         recursive, normalizeKeyName(startKey), numEntries,
@@ -114,12 +144,14 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
+    checkSnapshotStatus();
     return denormalizeOzoneFileStatus(
         omMetadataReader.getFileStatus(normalizeOmKeyArgs(args)));
   }
 
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
+    checkSnapshotStatus();
     return denormalizeOmKeyInfo(omMetadataReader
         .lookupFile(normalizeOmKeyArgs(args)));
   }
@@ -127,6 +159,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @Override
   public List<OmKeyInfo> listKeys(String vname, String bname,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
+    checkSnapshotStatus();
     List<OmKeyInfo> l = omMetadataReader.listKeys(vname, bname,
         normalizeKeyName(startKey), normalizeKeyName(keyPrefix), maxKeys);
     return l.stream().map(this::denormalizeOmKeyInfo)
@@ -135,6 +168,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
+    checkSnapshotStatus();
     // TODO: handle denormalization
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
   }

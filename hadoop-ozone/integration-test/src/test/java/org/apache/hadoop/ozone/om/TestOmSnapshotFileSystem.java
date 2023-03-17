@@ -45,10 +45,12 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -56,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -134,11 +137,13 @@ public class TestOmSnapshotFileSystem {
       init();
     }
   }
+
   private static void setConfig(BucketLayout newBucketLayout,
       boolean newEnableFileSystemPaths) {
     TestOmSnapshotFileSystem.enabledFileSystemPaths = newEnableFileSystemPaths;
     TestOmSnapshotFileSystem.bucketLayout = newBucketLayout;
   }
+
   /**
    * Create a MiniDFSCluster for testing.
    */
@@ -368,6 +373,64 @@ public class TestOmSnapshotFileSystem {
   }
 
   @Test
+  public void testBlockSnapshotFSAccessAfterDeletion() throws Exception {
+    Path root = new Path("/");
+    Path dir = new Path(root, "/testListKeysBeforeAfterSnapshotDeletion");
+    Path key1 = new Path(dir, "key1");
+    Path key2 = new Path(dir, "key2");
+
+    // Create 2 keys
+    ContractTestUtils.touch(fs, key1);
+    ContractTestUtils.touch(fs, key2);
+
+    // Create a snapshot
+    String snapshotName = UUID.randomUUID().toString();
+    String snapshotKeyPrefix = createSnapshot(snapshotName);
+
+    // Can list keys in snapshot
+    Path snapshotRoot = new Path(snapshotKeyPrefix + root);
+    Path snapshotParent = new Path(snapshotKeyPrefix + dir);
+    // Check dir in snapshot
+    FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
+    Assertions.assertEquals(1, fileStatuses.length);
+    // List keys in dir in snapshot
+    fileStatuses = o3fs.listStatus(snapshotParent);
+    Assertions.assertEquals(2, fileStatuses.length);
+
+    // Check key metadata
+    Path snapshotKey1 = new Path(snapshotKeyPrefix + key1);
+    FileStatus fsActiveKey = o3fs.getFileStatus(key1);
+    FileStatus fsSnapshotKey = o3fs.getFileStatus(snapshotKey1);
+    Assert.assertEquals(fsActiveKey.getModificationTime(),
+        fsSnapshotKey.getModificationTime());
+
+    Path snapshotKey2 = new Path(snapshotKeyPrefix + key2);
+    fsActiveKey = o3fs.getFileStatus(key2);
+    fsSnapshotKey = o3fs.getFileStatus(snapshotKey2);
+    Assert.assertEquals(fsActiveKey.getModificationTime(),
+        fsSnapshotKey.getModificationTime());
+
+    // Delete the snapshot
+    deleteSnapshot(snapshotName);
+
+    // Can't access keys in snapshot anymore with FS API. Should throw exception
+    final String listErrorMsg = "no longer active";
+    LambdaTestUtils.intercept(FileNotFoundException.class, listErrorMsg,
+        () -> o3fs.listStatus(snapshotRoot));
+    LambdaTestUtils.intercept(FileNotFoundException.class, listErrorMsg,
+        () -> o3fs.listStatus(snapshotParent));
+
+    final String getErrorMsg = "No such file or directory";
+    // Exceptions are thrown from the same check in getFileStatus as in
+    // listStatus, but the error message returned to the user is slightly
+    // different due to OM handling.
+    LambdaTestUtils.intercept(FileNotFoundException.class, getErrorMsg,
+        () -> o3fs.getFileStatus(snapshotKey1));
+    LambdaTestUtils.intercept(FileNotFoundException.class, getErrorMsg,
+        () -> o3fs.getFileStatus(snapshotKey2));
+  }
+
+  @Test
   // based on TestOzoneFileSystem:testListStatus
   public void testListStatus() throws Exception {
     Path root = new Path("/");
@@ -524,7 +587,6 @@ public class TestOmSnapshotFileSystem {
     writeClient.commitKey(keyArgs, session.getId());
   }
 
-
   /**
    * Tests listStatus operation on root directory.
    */
@@ -637,9 +699,13 @@ public class TestOmSnapshotFileSystem {
 
   private String createSnapshot()
       throws IOException, InterruptedException, TimeoutException {
+    return createSnapshot(UUID.randomUUID().toString());
+  }
+
+  private String createSnapshot(String snapshotName)
+      throws IOException, InterruptedException, TimeoutException {
 
     // create snapshot
-    String snapshotName = UUID.randomUUID().toString();
     writeClient.createSnapshot(volumeName, bucketName, snapshotName);
 
     // wait till the snapshot directory exists
@@ -653,5 +719,9 @@ public class TestOmSnapshotFileSystem {
         1000, 120000);
 
     return OM_KEY_PREFIX + OmSnapshotManager.getSnapshotPrefix(snapshotName);
+  }
+
+  private void deleteSnapshot(String snapshotName) throws IOException {
+    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
   }
 }
