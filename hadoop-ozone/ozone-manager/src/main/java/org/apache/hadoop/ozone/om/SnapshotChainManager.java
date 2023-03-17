@@ -522,8 +522,8 @@ public class SnapshotChainManager {
         .getPreviousSnapshotID();
   }
 
-  public String getTableKey(String snapshotPath) {
-    return snapshotIdToTableKey.get(snapshotPath);
+  public String getTableKey(String snapshotId) {
+    return snapshotIdToTableKey.get(snapshotId);
   }
 
   @VisibleForTesting

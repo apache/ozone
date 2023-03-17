@@ -210,6 +210,7 @@ public class SnapshotDeletingService extends BackgroundService {
               if (!deletedKey.startsWith(snapshotBucketKey)) {
                 // If snapshot deletedKeyTable doesn't have any
                 // entry in the snapshot scope it can be reclaimed
+                // TODO: [SNAPSHOT] Check deletedDirTable to be empty.
                 purgeSnapshotKeys.add(snapInfo.getTableKey());
                 break;
               }
@@ -331,15 +332,18 @@ public class SnapshotDeletingService extends BackgroundService {
         return false;
       }
 
+      // Construct keyTable or fileTable DB key depending on the bucket type
       if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-        // Handle FSO buckets
-        dbKey = ozoneManager.getMetadataManager().getOzonePathKey(volumeId,
-            bucketInfo.getObjectID(), deletedKeyInfo.getParentObjectID(),
+        dbKey = ozoneManager.getMetadataManager().getOzonePathKey(
+            volumeId,
+            bucketInfo.getObjectID(),
+            deletedKeyInfo.getParentObjectID(),
             deletedKeyInfo.getKeyName());
       } else {
-        dbKey = ozoneManager.getMetadataManager()
-            .getOzoneKey(deletedKeyInfo.getVolumeName(),
-                deletedKeyInfo.getBucketName(), deletedKeyInfo.getKeyName());
+        dbKey = ozoneManager.getMetadataManager().getOzoneKey(
+            deletedKeyInfo.getVolumeName(),
+            deletedKeyInfo.getBucketName(),
+            deletedKeyInfo.getKeyName());
       }
 
       // renamedKeyTable: volumeName/bucketName/objectID -> OMRenameKeyInfo
@@ -365,11 +369,11 @@ public class SnapshotDeletingService extends BackgroundService {
       OmKeyInfo prevKeyInfo = isKeyRenamed ? previousKeyTable
           .get(dbOriginalKey) : previousKeyTable.get(dbKey);
 
-      if (prevKeyInfo != null &&
-          prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID()) {
-        return true;
+      if (prevKeyInfo == null) {
+        return false;
       }
-      return false;
+
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
     }
 
     private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
