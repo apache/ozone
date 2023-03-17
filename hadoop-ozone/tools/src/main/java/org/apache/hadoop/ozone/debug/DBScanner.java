@@ -78,12 +78,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--with-keys"},
       description = "Print a JSON object of key->value pairs (default)"
-          + " instead of a JSON array of only values.",
-      defaultValue = "true",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private boolean withKey;
+          + " instead of a JSON array of only values.")
+  private boolean withKey = true;
 
-  @CommandLine.Option(names = {"--length", "-l"},
+  @CommandLine.Option(names = {"--length", "--limit", "-l"},
       description = "Maximum number of items to list.")
   private long limit = -1;
 
@@ -103,7 +101,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @CommandLine.Option(names = {"--container-id", "--cid"},
       description = "Container ID. Applicable if datanode DB Schema is V3",
       defaultValue = "-1")
-  private static long containerId;
+  private long containerId;
 
   @CommandLine.Option(names = { "--show-count", "--count" },
       description = "Get estimated key count for the given DB column family",
@@ -147,8 +145,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private void displayTable(ManagedRocksIterator iterator,
       DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
-
-    iterator.get().seekToFirst();
 
     if (fileName != null) {
       try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
@@ -247,8 +243,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBScanner.fileName = name;
   }
 
-  public static void setContainerId(long id) {
-    DBScanner.containerId = id;
+  public void setContainerId(long cid) {
+    this.containerId = cid;
   }
 
   public static void setDnDBSchemaVersion(String version) {
@@ -335,6 +331,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     if (columnFamilyHandle == null) {
       throw new IllegalStateException("columnFamilyHandle is null");
     }
+
     if (showCount) {
       long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
           RocksDatabase.ESTIMATE_NUM_KEYS);
@@ -342,7 +339,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return;
     }
     ManagedRocksIterator iterator;
-    if (containerId > 0 && dnDBSchemaVersion != null
+    if (containerId > 0L && dnDBSchemaVersion != null
         && dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3)) {
       ManagedReadOptions readOptions = new ManagedReadOptions();
       readOptions.setIterateUpperBound(new ManagedSlice(
@@ -352,13 +349,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       iterator = new ManagedRocksIterator(
           rocksDB.get().newIterator(columnFamilyHandle, readOptions));
       iterator.get().seek(FixedLengthStringUtils.string2Bytes(
-          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-              containerId)));
+          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId)));
     } else {
       iterator = new ManagedRocksIterator(
           rocksDB.get().newIterator(columnFamilyHandle));
       iterator.get().seekToFirst();
     }
+
     displayTable(iterator, columnFamilyDefinition);
   }
 

@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,15 +65,14 @@ public class TestLDBCli {
   private DBScanner dbScanner;
   private DBStore dbStore = null;
   private static final String KEY_TABLE = "keyTable";
+  private static final String BLOCK_DATA_TABLE = "block_data";
   @TempDir
   private File newFolder;
   private StringWriter stdout, stderr;
   private CommandLine cmd;
-  private NavigableMap<String, Map<String, ?>> expectedKeyMap;
+  private NavigableMap<String, Map<String, ?>> expectedMap;
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Gson gson = new Gson();
-  private NavigableMap<String, Map<String, ?>> expectedDNV2Map;
-  private NavigableMap<String, Map<String, ?>> expectedDNV3Map;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -89,30 +87,81 @@ public class TestLDBCli {
         .setOut(new PrintWriter(stdout))
         .setErr(new PrintWriter(stderr));
 
-    // Dummy om.db with only keyTable
-    dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
-        .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
-    Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+    expectedMap = new TreeMap<>();
+  }
 
-    expectedKeyMap = new TreeMap<>();
-    // insert 5 keys
-    for (int i = 1; i <= 5; i++) {
-      String key = "key" + i;
-      OmKeyInfo value =
-          OMRequestTestUtils.createOmKeyInfo("sampleVol", "sampleBuck",
-              key, HddsProtos.ReplicationType.STAND_ALONE,
-              HddsProtos.ReplicationFactor.ONE);
-      byte[] keyBytes = key.getBytes(UTF_8);
-      byte[] valBytes =
-          value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
-      keyTable.put(keyBytes, valBytes);
+  private void prepareTable(String tableName) throws IOException {
+    prepareTable(tableName, false);
+  }
 
-      // Populate map
-      expectedKeyMap.put(key, toMap(value));
+  private void prepareTable(String tableName, boolean schemaV3)
+      throws IOException {
+
+    switch (tableName) {
+    case KEY_TABLE:
+      // Dummy om.db with only keyTable
+      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+          .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
+
+      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+      // Insert 5 keys
+      for (int i = 1; i <= 5; i++) {
+        String key = "key" + i;
+        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
+            key, HddsProtos.ReplicationType.STAND_ALONE,
+            HddsProtos.ReplicationFactor.ONE);
+        keyTable.put(key.getBytes(UTF_8),
+            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+
+        // Populate map
+        expectedMap.put(key, toMap(value));
+      }
+      break;
+
+    case BLOCK_DATA_TABLE:
+      conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
+          schemaV3);
+      dbStore = BlockUtils.getUncachedDatanodeStore(
+          newFolder.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
+          schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
+          conf, false).getStore();
+
+      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA_TABLE);
+      // insert 2 containers, each with 2 blocks
+      final int containerCount = 2;
+      final int blockCount = 2;
+      int blockId = 1;
+      for (int cid = 1; cid <= containerCount; cid++) {
+        for (int blockIdx = 1; blockIdx <= blockCount; blockIdx++, blockId++) {
+          if (schemaV3) {
+            String key = DatanodeSchemaThreeDBDefinition
+                .getContainerKeyPrefix(cid) + blockId;
+            BlockData blockData = new BlockData(new BlockID(cid, blockId));
+            blockTable.put(FixedLengthStringUtils.string2Bytes(key),
+                blockData.getProtoBufMessage().toByteArray());
+
+            // Populate map. Schema V3 ldb output key is "containerId: blockId"
+            String ldbKey = cid + ": " + blockId;
+            expectedMap.put(ldbKey, toMap(blockData));
+          } else {
+            String key = String.valueOf(blockId);
+            BlockData blockData = new BlockData(new BlockID(cid, blockId));
+            blockTable.put(StringUtils.string2Bytes(key),
+                blockData.getProtoBufMessage().toByteArray());
+
+            // Populate map. Schema V2 ldb output key is just blockId
+            expectedMap.put(key, toMap(blockData));
+          }
+        }
+      }
+      break;
+
+    default:
+      throw new IllegalArgumentException("Unsupported table: " + tableName);
     }
   }
 
-  private static Map<String, Object> toMap(OmKeyInfo obj) throws IOException {
+  private static Map<String, Object> toMap(Object obj) throws IOException {
     // Have to use Gson here since DBScanner uses Gson.
     // JsonUtils (ObjectMapper) would parse object differently.
     String json = gson.toJson(obj);
@@ -121,12 +170,11 @@ public class TestLDBCli {
   }
 
   @AfterEach
-  public void shutdown() throws Exception {
+  public void shutdown() throws IOException {
     if (dbStore != null) {
       dbStore.close();
     }
     // Restore the static fields in DBScanner
-    DBScanner.setContainerId(-1);
     DBScanner.setDnDBSchemaVersion("V2");
   }
 
@@ -137,25 +185,27 @@ public class TestLDBCli {
   private void assertContents(Map<String, ?> expected, String actualStr)
       throws IOException {
     // Parse actual output string into Map
-    Map<String, ? extends Map<String, ?>> actualMap = MAPPER.readValue(
-        actualStr, new TypeReference<Map<String, Map<String, ?>>>() { });
+    Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
+        actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
 
     Assertions.assertEquals(expected, actualMap);
   }
 
   @Test
   public void testDefault() throws IOException {
+    prepareTable(KEY_TABLE);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
         "--column-family", KEY_TABLE);
 
     assertNoError(exitCode);
-    assertContents(expectedKeyMap, stdout.toString());
+    assertContents(expectedMap, stdout.toString());
   }
 
   @Test
   public void testLength() throws IOException {
+    prepareTable(KEY_TABLE);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -163,11 +213,12 @@ public class TestLDBCli {
         "--length", "1");
 
     assertNoError(exitCode);
-    assertContents(expectedKeyMap.headMap("key1", true), stdout.toString());
+    assertContents(expectedMap.headMap("key1", true), stdout.toString());
   }
 
   @Test
-  public void testInvalidLength() {
+  public void testInvalidLength() throws IOException {
+    prepareTable(KEY_TABLE);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -180,114 +231,78 @@ public class TestLDBCli {
   }
 
   @Test
-  public void testUnlimitedLength() throws Exception {
+  public void testUnlimitedLength() throws IOException {
+    prepareTable(KEY_TABLE);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
-        "--column_family", KEY_TABLE,
+        "--column-family", KEY_TABLE,
         "--length", "-1");
 
     assertNoError(exitCode);
-    assertContents(expectedKeyMap, stdout.toString());
+    assertContents(expectedMap, stdout.toString());
   }
 
   @Test
-  public void testDNDBSchemaV3() throws Exception {
+  public void testDNDBSchemaV3Default() throws IOException {
+    prepareTable(BLOCK_DATA_TABLE, true);
 
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
-    dbStore = BlockUtils.getUncachedDatanodeStore(
-        newFolder.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
-        OzoneConsts.SCHEMA_V3, conf, false).getStore();
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", BLOCK_DATA_TABLE,
+        "--dn-schema", "V3",
+        "--length", "-1");
 
-    // insert 2 containers, each with 2 blocks
-    final int containerCount = 2;
-    final int blockCount = 2;
-    int blockId = 1;
-    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
-    for (int i = 1; i <= containerCount; i++) {
-      for (int j = 1; j <= blockCount; j++, blockId++) {
-        String key =
-            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(i) + blockId;
-        BlockData blockData = new BlockData(new BlockID(i, blockId));
-        blockTable.put(FixedLengthStringUtils.string2Bytes(key),
-            blockData.getProtoBufMessage().toByteArray());
-      }
-    }
-
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    dbScanner.setTableName("block_data");
-    DBScanner.setDnDBSchemaVersion("V3");
-    dbScanner.setWithKey(true);
-
-    // Scan all container
-    dbScanner.setLimit(-1);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for container 2 block 4
-      Assertions.assertTrue(capture.getOutput().contains("2: 4"));
-      // Assert that output has info for container 1 block 1
-      Assertions.assertTrue(capture.getOutput().contains("1: 1"));
-    }
-
-    // Scan container 1
-    DBScanner.setContainerId(1);
-    dbScanner.setLimit(2);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output doesn't have info for container 2 block 4
-      Assertions.assertFalse(capture.getOutput().contains("2: 4"));
-      // Assert that output has info for container 1 block 1
-      Assertions.assertTrue(capture.getOutput().contains("1: 1"));
-    }
-
-    // Scan container 2
-    DBScanner.setContainerId(2);
-    dbScanner.setLimit(2);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for container 2 block 4
-      Assertions.assertTrue(capture.getOutput().contains("2: 4"));
-      // Assert that output doesn't have info for container 1 block 1
-      Assertions.assertFalse(capture.getOutput().contains("1: 1"));
-    }
+    assertNoError(exitCode);
+    assertContents(expectedMap, stdout.toString());
   }
 
-//  @Test
-  public void testDNDBSchemaV2() throws Exception {
+  @Test
+  public void testDNDBSchemaV3LimitContainer1() throws IOException {
+    prepareTable(BLOCK_DATA_TABLE, true);
 
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
-    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
-            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V2, conf,
-        false).getStore();
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", BLOCK_DATA_TABLE,
+        "--dn-schema", "V3",
+        "--container-id", "1",
+        "--length", "2");
 
-    // insert 1 containers with 2 blocks
-    final long cid = 1;
-    final int blockCount = 2;
-    int blockId = 1;
-    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
-    for (int j = 1; j <= blockCount; j++, blockId++) {
-      String key = String.valueOf(blockId);
-      BlockData blockData = new BlockData(new BlockID(cid, blockId));
-      blockTable.put(StringUtils.string2Bytes(key),
-          blockData.getProtoBufMessage().toByteArray());
-    }
+    assertNoError(exitCode);
+    // Result should include "1: 1" and "1: 2"
+    assertContents(expectedMap.headMap("1: 2", true), stdout.toString());
+  }
 
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    dbScanner.setTableName("block_data");
-    DBScanner.setDnDBSchemaVersion("V2");
-    dbScanner.setWithKey(true);
+  @Test
+  public void testDNDBSchemaV3LimitContainer2() throws IOException {
+    prepareTable(BLOCK_DATA_TABLE, true);
 
-    // Scan all container
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for block 2
-      Assertions.assertTrue(capture.getOutput().contains("2"));
-    }
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", BLOCK_DATA_TABLE,
+        "--dn-schema", "V3",
+        "--container-id", "2",
+        "--length", "2");
+
+    assertNoError(exitCode);
+    // Result should include "2: 3" and "2: 4"
+    assertContents(expectedMap.tailMap("2: 3", true), stdout.toString());
+  }
+
+  @Test
+  public void testDNDBSchemaV2() throws IOException {
+    prepareTable(BLOCK_DATA_TABLE, false);
+
+    int exitCode = cmd.execute(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", BLOCK_DATA_TABLE,
+        "--dn-schema", "V2");
+
+    assertNoError(exitCode);
+    assertContents(expectedMap, stdout.toString());
   }
 }
