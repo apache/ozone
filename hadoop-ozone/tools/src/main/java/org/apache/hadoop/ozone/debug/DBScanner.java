@@ -65,11 +65,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
-  public static final Logger LOG =
+  public final Logger LOG =
       LoggerFactory.getLogger(DBScanner.class);
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.ParentCommand
+  private RDBParser parent;
 
   @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
       required = true,
@@ -87,16 +90,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
-  private static String fileName;
+  private String fileName;
 
   @CommandLine.Option(names = {"--startkey", "--sk", "-s"},
       description = "Key from which to iterate the DB")
-  private static String startKey;
+  private String startKey;
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V2")
-  private static String dnDBSchemaVersion;
+  private String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "--cid"},
       description = "Container ID. Applicable if datanode DB Schema is V3",
@@ -107,11 +110,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       description = "Get estimated key count for the given DB column family",
       defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private static boolean showCount;
-
-
-  @CommandLine.ParentCommand
-  private RDBParser parent;
+  private boolean showCount;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
@@ -125,7 +124,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return spec.commandLine().getOut();
   }
 
-  public static byte[] getValueObject(
+  public byte[] getValueObject(
       DBColumnFamilyDefinition dbColumnFamilyDefinition) {
     Class<?> keyType = dbColumnFamilyDefinition.getKeyType();
     if (keyType.equals(String.class)) {
@@ -223,43 +222,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return limit == -1L || i < limit;
   }
 
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-
-  public RDBParser getParent() {
-    return parent;
-  }
-
-  public void setParent(RDBParser parent) {
-    this.parent = parent;
-  }
-
-  public void setLimit(int limit) {
-    this.limit = limit;
-  }
-
-  public static void setFileName(String name) {
-    DBScanner.fileName = name;
-  }
-
-  public void setContainerId(long cid) {
-    this.containerId = cid;
-  }
-
-  public static void setDnDBSchemaVersion(String version) {
-    DBScanner.dnDBSchemaVersion = version;
-  }
-
-  public void setWithKey(boolean withKey) {
-    this.withKey = withKey;
-  }
-
-  public static void setShowCount(boolean showCount) {
-    DBScanner.showCount = showCount;
-  }
-
-  private static ColumnFamilyHandle getColumnFamilyHandle(
+  private ColumnFamilyHandle getColumnFamilyHandle(
             byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
             .stream()
@@ -369,9 +332,5 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return RDBParser.class;
-  }
-
-  public static void setStartKey(String startKey) {
-    DBScanner.startKey = startKey;
   }
 }

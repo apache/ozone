@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -59,39 +58,30 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * This class tests the Debug LDB CLI that reads from rocks db file.
  */
 public class TestLDBCli {
-  private OzoneConfiguration conf;
-
-  private RDBParser rdbParser;
-  private DBScanner dbScanner;
-  private DBStore dbStore = null;
   private static final String KEY_TABLE = "keyTable";
   private static final String BLOCK_DATA_TABLE = "block_data";
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final Gson gson = new Gson();
+  private OzoneConfiguration conf;
+  private DBStore dbStore = null;
   @TempDir
   private File newFolder;
   private StringWriter stdout, stderr;
   private CommandLine cmd;
   private NavigableMap<String, Map<String, ?>> expectedMap;
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Gson gson = new Gson();
 
   @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    rdbParser = new RDBParser();
-    dbScanner = new DBScanner();
     stdout = new StringWriter();
     stderr = new StringWriter();
 
-    cmd = new CommandLine(rdbParser)
-        .addSubcommand(dbScanner)
+    cmd = new CommandLine(new RDBParser())
+        .addSubcommand(new DBScanner())
         .setOut(new PrintWriter(stdout))
         .setErr(new PrintWriter(stderr));
 
     expectedMap = new TreeMap<>();
-  }
-
-  private void prepareTable(String tableName) throws IOException {
-    prepareTable(tableName, false);
   }
 
   private void prepareTable(String tableName, boolean schemaV3)
@@ -174,8 +164,6 @@ public class TestLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
-    // Restore the static fields in DBScanner
-    DBScanner.setDnDBSchemaVersion("V2");
   }
 
   private void assertNoError(int exitCode) {
@@ -193,7 +181,7 @@ public class TestLDBCli {
 
   @Test
   public void testDefault() throws IOException {
-    prepareTable(KEY_TABLE);
+    prepareTable(KEY_TABLE, false);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -205,7 +193,7 @@ public class TestLDBCli {
 
   @Test
   public void testLength() throws IOException {
-    prepareTable(KEY_TABLE);
+    prepareTable(KEY_TABLE, false);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -218,7 +206,7 @@ public class TestLDBCli {
 
   @Test
   public void testInvalidLength() throws IOException {
-    prepareTable(KEY_TABLE);
+    prepareTable(KEY_TABLE, false);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
@@ -232,7 +220,7 @@ public class TestLDBCli {
 
   @Test
   public void testUnlimitedLength() throws IOException {
-    prepareTable(KEY_TABLE);
+    prepareTable(KEY_TABLE, false);
     int exitCode = cmd.execute(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
