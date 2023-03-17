@@ -57,7 +57,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -304,15 +303,14 @@ public class TestOMSnapshotDAG {
         cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, compactionLogDirName);
-    for (File file : Objects.requireNonNull(logPath.toFile().listFiles())) {
+    for (File file : logPath.toFile().listFiles()) {
       if (file.isFile() && file.getName().endsWith(".log")) {
         Assertions.assertEquals(0L, file.length());
       }
     }
     // And no SST has been backed up
     Path sstBackupPath = Paths.get(omMetadataDir, sstBackUpDirName);
-    Assertions.assertEquals(0L,
-        Objects.requireNonNull(sstBackupPath.toFile().listFiles()).length);
+    Assertions.assertEquals(0L, sstBackupPath.toFile().listFiles().length);
   }
 
 }
