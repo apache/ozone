@@ -273,10 +273,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private void constructColumnFamilyMap(DBDefinition dbDefinition) {
-    if (dbDefinition == null) {
-      System.out.println("Incorrect Db Path");
-      return;
-    }
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
@@ -311,50 +307,53 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);
-    this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(Paths.get(dbPath), new OzoneConfiguration()));
-    if (this.columnFamilyMap != null) {
-      if (!this.columnFamilyMap.containsKey(tableName)) {
-        System.out.print("Table with name:" + tableName + " does not exist");
-      } else {
-        DBColumnFamilyDefinition columnFamilyDefinition =
-                this.columnFamilyMap.get(tableName);
-        ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-                columnFamilyDefinition.getTableName()
-                        .getBytes(UTF_8),
-                columnFamilyHandleList);
-        if (columnFamilyHandle == null) {
-          throw new IllegalArgumentException("columnFamilyHandle is null");
-        }
-        if (showCount) {
-          long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
-              RocksDatabase.ESTIMATE_NUM_KEYS);
-          System.out.println(keyCount);
-          return;
-        }
-        ManagedRocksIterator iterator;
-        if (containerId > 0 && dnDBSchemaVersion != null &&
-            dnDBSchemaVersion.equals("V3")) {
-          ManagedReadOptions readOptions = new ManagedReadOptions();
-          readOptions.setIterateUpperBound(new ManagedSlice(
-              FixedLengthStringUtils.string2Bytes(
-                  DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId + 1))));
-          iterator = new ManagedRocksIterator(
-              rocksDB.get().newIterator(columnFamilyHandle, readOptions));
-          iterator.get().seek(FixedLengthStringUtils.string2Bytes(
-              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId)));
-        } else {
-          iterator = new ManagedRocksIterator(
-              rocksDB.get().newIterator(columnFamilyHandle));
-          iterator.get().seekToFirst();
-        }
-        displayTable(iterator, columnFamilyDefinition);
-      }
-    } else {
-      System.out.println("Incorrect db Path");
+    DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
+        Paths.get(dbPath), new OzoneConfiguration());
+    if (dbDefinition == null) {
+      err().println("Error: Incorrect DB Path");
+      return;
     }
+
+    constructColumnFamilyMap(dbDefinition);
+
+    if (!this.columnFamilyMap.containsKey(tableName)) {
+      err().print("Error: Table with name '" + tableName + "' does not exist");
+      return;
+    }
+
+    DBColumnFamilyDefinition columnFamilyDefinition =
+        this.columnFamilyMap.get(tableName);
+    ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
+        columnFamilyDefinition.getTableName().getBytes(UTF_8),
+        columnFamilyHandleList);
+    if (columnFamilyHandle == null) {
+      throw new IllegalArgumentException("columnFamilyHandle is null");
+    }
+    if (showCount) {
+      long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
+          RocksDatabase.ESTIMATE_NUM_KEYS);
+      System.out.println(keyCount);
+      return;
+    }
+    ManagedRocksIterator iterator;
+    if (containerId > 0 && dnDBSchemaVersion != null
+        && dnDBSchemaVersion.equals("V3")) {
+      ManagedReadOptions readOptions = new ManagedReadOptions();
+      readOptions.setIterateUpperBound(new ManagedSlice(
+          FixedLengthStringUtils.string2Bytes(
+              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                  containerId + 1))));
+      iterator = new ManagedRocksIterator(
+          rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+      iterator.get().seek(FixedLengthStringUtils.string2Bytes(
+          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+              containerId)));
+    } else {
+      iterator = new ManagedRocksIterator(
+          rocksDB.get().newIterator(columnFamilyHandle));
+      iterator.get().seekToFirst();
+    }
+    displayTable(iterator, columnFamilyDefinition);
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
