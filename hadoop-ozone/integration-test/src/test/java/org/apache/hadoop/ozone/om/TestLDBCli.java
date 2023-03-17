@@ -39,13 +39,11 @@ import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -68,15 +66,17 @@ public class TestLDBCli {
   private DBScanner dbScanner;
   private DBStore dbStore = null;
   private static final String KEY_TABLE = "keyTable";
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private File newFolder;
   private StringWriter stdout, stderr;
   private CommandLine cmd;
-  private NavigableMap<String, Map<String, ?>> expectedMap;
+  private NavigableMap<String, Map<String, ?>> expectedKeyMap;
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Gson gson = new Gson();
+  private NavigableMap<String, Map<String, ?>> expectedDNV2Map;
+  private NavigableMap<String, Map<String, ?>> expectedDNV3Map;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     rdbParser = new RDBParser();
@@ -89,16 +89,12 @@ public class TestLDBCli {
         .setOut(new PrintWriter(stdout))
         .setErr(new PrintWriter(stderr));
 
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
     // Dummy om.db with only keyTable
     dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
         .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
     Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
 
-    expectedMap = new TreeMap<>();
+    expectedKeyMap = new TreeMap<>();
     // insert 5 keys
     for (int i = 1; i <= 5; i++) {
       String key = "key" + i;
@@ -112,7 +108,7 @@ public class TestLDBCli {
       keyTable.put(keyBytes, valBytes);
 
       // Populate map
-      expectedMap.put(key, toMap(value));
+      expectedKeyMap.put(key, toMap(value));
     }
   }
 
@@ -124,7 +120,7 @@ public class TestLDBCli {
         json, new TypeReference<Map<String, Object>>() { });
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws Exception {
     if (dbStore != null) {
       dbStore.close();
@@ -155,7 +151,7 @@ public class TestLDBCli {
         "--column-family", KEY_TABLE);
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(expectedKeyMap, stdout.toString());
   }
 
   @Test
@@ -167,7 +163,7 @@ public class TestLDBCli {
         "--length", "1");
 
     assertNoError(exitCode);
-    assertContents(expectedMap.headMap("key1", true), stdout.toString());
+    assertContents(expectedKeyMap.headMap("key1", true), stdout.toString());
   }
 
   @Test
@@ -178,8 +174,8 @@ public class TestLDBCli {
         "--column-family", KEY_TABLE,
         "--length", "0");
 
-    Assert.assertNotEquals(0, exitCode);
-    Assert.assertTrue(stderr.toString().contains(
+    Assertions.assertNotEquals(0, exitCode);
+    Assertions.assertTrue(stderr.toString().contains(
         "IllegalArgumentException: List length should be a positive number"));
   }
 
@@ -192,15 +188,11 @@ public class TestLDBCli {
         "--length", "-1");
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(expectedKeyMap, stdout.toString());
   }
 
-//  @Test
+  @Test
   public void testDNDBSchemaV3() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
 
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
     dbStore = BlockUtils.getUncachedDatanodeStore(
@@ -234,9 +226,9 @@ public class TestLDBCli {
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
       // Assert that output has info for container 2 block 4
-      Assert.assertTrue(capture.getOutput().contains("2: 4"));
+      Assertions.assertTrue(capture.getOutput().contains("2: 4"));
       // Assert that output has info for container 1 block 1
-      Assert.assertTrue(capture.getOutput().contains("1: 1"));
+      Assertions.assertTrue(capture.getOutput().contains("1: 1"));
     }
 
     // Scan container 1
@@ -246,9 +238,9 @@ public class TestLDBCli {
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
       // Assert that output doesn't have info for container 2 block 4
-      Assert.assertFalse(capture.getOutput().contains("2: 4"));
+      Assertions.assertFalse(capture.getOutput().contains("2: 4"));
       // Assert that output has info for container 1 block 1
-      Assert.assertTrue(capture.getOutput().contains("1: 1"));
+      Assertions.assertTrue(capture.getOutput().contains("1: 1"));
     }
 
     // Scan container 2
@@ -258,18 +250,14 @@ public class TestLDBCli {
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
       // Assert that output has info for container 2 block 4
-      Assert.assertTrue(capture.getOutput().contains("2: 4"));
+      Assertions.assertTrue(capture.getOutput().contains("2: 4"));
       // Assert that output doesn't have info for container 1 block 1
-      Assert.assertFalse(capture.getOutput().contains("1: 1"));
+      Assertions.assertFalse(capture.getOutput().contains("1: 1"));
     }
   }
 
 //  @Test
   public void testDNDBSchemaV2() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
 
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
     dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
@@ -299,7 +287,7 @@ public class TestLDBCli {
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
       // Assert that output has info for block 2
-      Assert.assertTrue(capture.getOutput().contains("2"));
+      Assertions.assertTrue(capture.getOutput().contains("2"));
     }
   }
 }
