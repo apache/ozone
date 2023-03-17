@@ -518,7 +518,10 @@ public final class OmSnapshotManager implements AutoCloseable {
       String fixedFile = truncateFileName(truncateLength, entry.getValue());
       // If this file is from the active db, strip the path.
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
-        fixedFile = Paths.get(fixedFile).getFileName().toString();
+        Path f = Paths.get(fixedFile).getFileName();
+        if (f != null) {
+          fixedFile = f.toString();
+        }
       }
       sb.append(truncateFileName(truncateLength, entry.getKey()))
           .append("\t")
@@ -568,14 +571,19 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
   // Prepend the full path to the hard link entry entry.
-  private static Path getFullPath(Path dbPath, String fileName) {
+  private static Path getFullPath(Path dbPath, String fileName)
+      throws IOException {
     File file = new File(fileName);
     // If there is no directory then this file belongs in the db.
     if (file.getName().equals(fileName)) {
       return Paths.get(dbPath.toString(), fileName);
     }
     // Else this file belong in a directory parallel to the db.
-    return Paths.get(dbPath.getParent().toString(), fileName);
+    Path parent = dbPath.getParent();
+    if (parent == null) {
+      throw new IOException("Invalid database " + dbPath);
+    }
+    return Paths.get(parent.toString(), fileName);
   }
 
   private int getIndexFromToken(final String token) throws IOException {
