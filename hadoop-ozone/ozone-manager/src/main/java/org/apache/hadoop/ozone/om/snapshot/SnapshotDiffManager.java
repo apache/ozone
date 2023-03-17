@@ -194,7 +194,7 @@ public class SnapshotDiffManager {
     // This needs to be updated to queuing and job status base.
     if (!jobExist) {
       generateSnapshotDiffReport(jobId, volume, bucket, fromSnapshot,
-          toSnapshot, fsInfo, tsInfo);
+          toSnapshot, fsInfo, tsInfo, forceFullDiff);
     }
 
     List<DiffReportEntry> diffReportList = new ArrayList<>();
@@ -242,7 +242,8 @@ public class SnapshotDiffManager {
                                           final OmSnapshot fromSnapshot,
                                           final OmSnapshot toSnapshot,
                                           final SnapshotInfo fsInfo,
-                                          final SnapshotInfo tsInfo)
+                                          final SnapshotInfo tsInfo,
+                                          final boolean forceFullDiff)
       throws RocksDBException {
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;

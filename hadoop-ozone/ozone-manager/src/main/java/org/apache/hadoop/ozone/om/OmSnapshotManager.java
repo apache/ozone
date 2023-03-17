@@ -433,7 +433,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     final String fromSnapshot,
                                                     final String toSnapshot,
                                                     final String token,
-                                                    final int pageSize,
+                                                    int pageSize,
                                                     boolean forceFullDiff)
       throws IOException {
     // Validate fromSnapshot and toSnapshot
