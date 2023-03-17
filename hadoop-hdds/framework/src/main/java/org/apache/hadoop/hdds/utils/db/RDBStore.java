@@ -77,6 +77,8 @@ public class RDBStore implements DBStore {
    * Can be made configurable later.
    */
   private final String dbCompactionLogDirName = "compaction-log";
+  // Can't import OmMetadataManagerImpl (circular dependency otherwise)
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -159,6 +161,12 @@ public class RDBStore implements DBStore {
       }
 
       if (enableCompactionLog) {
+        ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
+        Preconditions.checkNotNull(ssInfoTableCF,
+            "SnapshotInfoTable column family handle should not be null");
+        // Set CF handle in differ to be used in DB listener
+        rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
+            ssInfoTableCF.getHandle());
         // Finish the initialization of compaction DAG tracker by setting the
         // sequence number as current compaction log filename.
         rocksDBCheckpointDiffer.setCurrentCompactionLog(
