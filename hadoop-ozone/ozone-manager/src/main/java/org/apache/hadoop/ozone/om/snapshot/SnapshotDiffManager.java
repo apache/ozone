@@ -138,7 +138,7 @@ public class SnapshotDiffManager {
                                                   final OmSnapshot toSnapshot,
                                                   final SnapshotInfo fsInfo,
                                                   final SnapshotInfo tsInfo,
-                                                  final boolean fullDiff)
+                                                  final boolean forceFullDiff)
       throws IOException, RocksDBException {
 
     final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
@@ -215,7 +215,7 @@ public class SnapshotDiffManager {
       boolean useFullDiff = configuration.getBoolean(
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
-      if (fullDiff) {
+      if (forceFullDiff) {
         useFullDiff = true;
       }
 

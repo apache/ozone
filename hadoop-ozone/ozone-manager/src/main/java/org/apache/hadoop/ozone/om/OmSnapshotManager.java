@@ -264,7 +264,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     final String toSnapshot,
                                                     final String token,
                                                     final int pageSize,
-                                                    boolean fullDiff)
+                                                    boolean forceFullDiff)
       throws IOException {
     // Validate fromSnapshot and toSnapshot
     final SnapshotInfo fsInfo = getSnapshotInfo(volume, bucket, fromSnapshot);
@@ -278,7 +278,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       final OmSnapshot ts = snapshotCache.get(tsKey);
       SnapshotDiffReport snapshotDiffReport = snapshotDiffManager
           .getSnapshotDiffReport(volume, bucket, fs, ts,
-              fsInfo, tsInfo, fullDiff);
+              fsInfo, tsInfo, forceFullDiff);
       return new SnapshotDiffResponse(snapshotDiffReport, DONE, 0L);
     } catch (ExecutionException | RocksDBException e) {
       throw new IOException(e.getCause());

@@ -636,7 +636,7 @@ public class ClientProtocolStub implements ClientProtocol {
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean fullDiff)
+                                           boolean forceFullDiff)
       throws IOException {
     return null;
   }

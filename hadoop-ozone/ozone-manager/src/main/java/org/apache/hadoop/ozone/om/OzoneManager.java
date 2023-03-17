@@ -4479,10 +4479,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean fullDiff)
+                                           boolean forceFullDiff)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize, fullDiff);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   @Override // ReconfigureProtocol
