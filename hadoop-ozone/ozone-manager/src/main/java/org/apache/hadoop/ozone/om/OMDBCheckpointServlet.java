@@ -205,9 +205,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
-        if (file.toFile().isDirectory()) {
+        File f = file.toFile();
+        if (f.isDirectory()) {
           // Skip any unexpected snapshot files.
-          if (file.getParent().toString().endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
+          String parent = f.getParent();
+          if (parent != null && parent.endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
               && !snapshotPaths.contains(file)) {
             continue;
           }
@@ -254,7 +256,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
-        fixedFile = Paths.get(fixedFile).getFileName().toString();
+        Path f = Paths.get(fixedFile).getFileName();
+        if (f != null) {
+          fixedFile = f.toString();
+        }
       }
       includeFile(file.toFile(), fixedFile, archiveOutputStream);
     }
