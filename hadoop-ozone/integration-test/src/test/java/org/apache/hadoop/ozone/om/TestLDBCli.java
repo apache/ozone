@@ -100,6 +100,12 @@ public class TestLDBCli {
     }
   }
 
+  /**
+   * Prepare the table for testing.
+   * Also populate dbMap that contains all possibly expected results.
+   * @param tableName table name.
+   * @param schemaV3 set to true for SchemaV3. applicable to block_data table.
+   */
   private void prepareTable(String tableName, boolean schemaV3)
       throws IOException {
 
