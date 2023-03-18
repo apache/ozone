@@ -3619,4 +3619,54 @@
       without using the optimised DAG based pruning approach
     </description>
   </property>
+
+  <property>
+    <name>ozone.s3g.decay-scheduler.enable</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      It specifies whether to enable the decay scheduler.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.decay-scheduler.decay-factor</name>
+    <value>0.0</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The decay factor it can be any value from 0.0 to 1.0 both inclusive.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.decay-scheduler.period-ms</name>
+    <value>5000</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The decay period in milliseconds.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.decay-scheduler.rejection.ratio</name>
+    <value>0.5</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      A percentage of total requests made in the last decay window.
+      If a user's total requests exceeds that percentage, the user
+      is considered to be making to many requests.
+      The value must be within [0.0, 1.0]
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.decay-scheduler.threads.rejection.ratio</name>
+    <value>0.9</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      A percentage of max handlers. If the total running requests exceeded,
+      the s3gateway is considered to be on a high load and will start
+      throttling users based on their consumption.
+      The value must be within [0.0, 1.0)
+    </description>
+  </property>
+
 </configuration>
