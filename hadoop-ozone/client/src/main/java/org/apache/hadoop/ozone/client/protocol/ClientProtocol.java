@@ -1059,7 +1059,7 @@ public interface ClientProtocol {
    * @param toSnapshot The name of the ending snapshot
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
-   * @param forceFullDiff show full diff without using the optimised DAG method
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
