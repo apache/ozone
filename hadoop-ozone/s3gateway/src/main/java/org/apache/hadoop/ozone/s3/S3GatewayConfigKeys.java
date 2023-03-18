@@ -72,6 +72,34 @@ public final class S3GatewayConfigKeys {
   public static final boolean OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT =
       true;
 
+  public static final String OZONE_S3G_DECAYSCHEDULER_FACTOR_KEY =
+          "ozone.s3g.decay-scheduler.decay-factor";
+  public static final double OZONE_S3G_DECAYSCHEDULER_FACTOR_DEFAULT =
+          0.0;
+  public static final String OZONE_S3G_DECAYSCHEDULER_PERIOD_KEY =
+          "ozone.s3g.decay-scheduler.period-ms";
+  public static final long OZONE_S3G_DECAYSCHEDULER_PERIOD_DEFAULT =
+          5000;
+
+  public static final String OZONE_S3G_DECAYSCHEDULER_REJECTION_RATIO_KEY =
+          "ozone.s3g.decay-scheduler.rejection.ratio";
+
+  public static final double OZONE_S3G_DECAYSCHEDULER_REJECTION_RATIO_DEFAULT =
+          0.5;
+
+  public static final String OZONE_S3G_DECAYSCHEDULER_ENABLE_KEY =
+          "ozone.s3g.decay-scheduler.enable";
+
+  public static final boolean OZONE_S3G_DECAYSCHEDULER_ENABLE_DEFAULT = false;
+
+  public static final String
+          OZONE_S3G_DECAYSCHEDULER_THREADS_REJECTION_RATIO_KEY =
+          "ozone.s3g.decay-scheduler.threads.rejection.ratio";
+
+  public static final double
+          OZONE_S3G_DECAYSCHEDULER_THREADS_REJECTION_RATIO_DEFAULT = 0.9;
+
+
   /**
    * Never constructed.
    */
