@@ -179,7 +179,8 @@ public class SnapshotDiffManager {
                                                   final SnapshotInfo fsInfo,
                                                   final SnapshotInfo tsInfo,
                                                   final int index,
-                                                  final int pageSize)
+                                                  final int pageSize,
+                                                  final boolean forceFullDiff)
       throws IOException, RocksDBException {
     String diffJobKey = fsInfo.getSnapshotID() + DELIMITER +
         tsInfo.getSnapshotID();
@@ -193,7 +194,7 @@ public class SnapshotDiffManager {
     // This needs to be updated to queuing and job status base.
     if (!jobExist) {
       generateSnapshotDiffReport(jobId, volume, bucket, fromSnapshot,
-          toSnapshot, fsInfo, tsInfo);
+          toSnapshot, fsInfo, tsInfo, forceFullDiff);
     }
 
     List<DiffReportEntry> diffReportList = new ArrayList<>();
@@ -241,7 +242,8 @@ public class SnapshotDiffManager {
                                           final OmSnapshot fromSnapshot,
                                           final OmSnapshot toSnapshot,
                                           final SnapshotInfo fsInfo,
-                                          final SnapshotInfo tsInfo)
+                                          final SnapshotInfo tsInfo,
+                                          final boolean forceFullDiff)
       throws RocksDBException {
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
@@ -300,6 +302,9 @@ public class SnapshotDiffManager {
       boolean useFullDiff = configuration.getBoolean(
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
+      if (forceFullDiff) {
+        useFullDiff = true;
+      }
 
       Map<String, String> tablePrefixes =
           getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
@@ -461,11 +466,13 @@ public class SnapshotDiffManager {
       // End of Workaround
     }
 
-    if (deltaFiles.isEmpty()) {
+    if (useFullDiff || deltaFiles.isEmpty()) {
       // If compaction DAG is not available (already cleaned up), fall back to
       //  the slower approach.
-      LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
-          " slow path");
+      if (!useFullDiff) {
+        LOG.warn("RocksDBCheckpointDiffer is not available, falling back to" +
+                " slow path");
+      }
 
       Set<String> fromSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(

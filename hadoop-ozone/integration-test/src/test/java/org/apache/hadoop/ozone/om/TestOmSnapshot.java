@@ -550,7 +550,7 @@ public class TestOmSnapshot {
     SnapshotDiffResponse response;
     do {
       response = store.snapshotDiff(volume, bucket, fromSnapshot,
-          toSnapshot, null, 0);
+          toSnapshot, null, 0, false);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
 
@@ -574,11 +574,13 @@ public class TestOmSnapshot {
     // Destination snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap1, snap2,
+                null, 0, false));
     // From snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap2, snap1,
+                null, 0, false));
   }
 
   @Test
@@ -603,15 +605,18 @@ public class TestOmSnapshot {
     // Bucket is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
+                null, 0, false));
     // Volume is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
+                null, 0, false));
     // Both volume and bucket are nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
+                null, 0, false));
   }
 
   @Test
@@ -633,17 +638,21 @@ public class TestOmSnapshot {
     // Destination snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, nullstr, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
+                null, 0, false));
     // From snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, nullstr, snap1, null, 0));
+            () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
+                null, 0, false));
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(volume, nullstr, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
+                null, 0, false));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2,
+                null, 0, false));
   }
 
   @Test
@@ -716,7 +725,8 @@ public class TestOmSnapshot {
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
     SnapshotDiffReport diff1 =
-        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2, null, 0)
+        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2,
+                null, 0, false)
             .getSnapshotDiffReport();
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
