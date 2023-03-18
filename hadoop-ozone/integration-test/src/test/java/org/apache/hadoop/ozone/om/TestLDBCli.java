@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,17 +41,26 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Optional;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -65,10 +75,10 @@ public class TestLDBCli {
   private OzoneConfiguration conf;
   private DBStore dbStore = null;
   @TempDir
-  private File newFolder;
+  private File tempDir;
   private StringWriter stdout, stderr;
   private CommandLine cmd;
-  private NavigableMap<String, Map<String, ?>> expectedMap;
+  private NavigableMap<String, Map<String, ?>> dbMap;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -81,7 +91,14 @@ public class TestLDBCli {
         .setOut(new PrintWriter(stdout))
         .setErr(new PrintWriter(stderr));
 
-    expectedMap = new TreeMap<>();
+    dbMap = new TreeMap<>();
+  }
+
+  @AfterEach
+  public void shutdown() throws IOException {
+    if (dbStore != null) {
+      dbStore.close();
+    }
   }
 
   private void prepareTable(String tableName, boolean schemaV3)
@@ -91,7 +108,7 @@ public class TestLDBCli {
     case KEY_TABLE:
       // Dummy om.db with only keyTable
       dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
-          .setPath(newFolder.toPath()).addTable(KEY_TABLE).build();
+          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
 
       Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
       // Insert 5 keys
@@ -104,7 +121,7 @@ public class TestLDBCli {
             value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
 
         // Populate map
-        expectedMap.put(key, toMap(value));
+        dbMap.put(key, toMap(value));
       }
       break;
 
@@ -112,36 +129,34 @@ public class TestLDBCli {
       conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
           schemaV3);
       dbStore = BlockUtils.getUncachedDatanodeStore(
-          newFolder.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
+          tempDir.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
           schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
           conf, false).getStore();
 
       Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA_TABLE);
-      // insert 2 containers, each with 2 blocks
+      // Insert 2 containers with 2 blocks each
       final int containerCount = 2;
       final int blockCount = 2;
       int blockId = 1;
       for (int cid = 1; cid <= containerCount; cid++) {
         for (int blockIdx = 1; blockIdx <= blockCount; blockIdx++, blockId++) {
+          byte[] dbKey;
+          String mapKey;
+          BlockData blockData = new BlockData(new BlockID(cid, blockId));
           if (schemaV3) {
-            String key = DatanodeSchemaThreeDBDefinition
+            String dbKeyStr = DatanodeSchemaThreeDBDefinition
                 .getContainerKeyPrefix(cid) + blockId;
-            BlockData blockData = new BlockData(new BlockID(cid, blockId));
-            blockTable.put(FixedLengthStringUtils.string2Bytes(key),
-                blockData.getProtoBufMessage().toByteArray());
-
-            // Populate map. Schema V3 ldb output key is "containerId: blockId"
-            String ldbKey = cid + ": " + blockId;
-            expectedMap.put(ldbKey, toMap(blockData));
+            dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
+            // Schema V3 ldb scan output key is "containerId: blockId"
+            mapKey = cid + ": " + blockId;
           } else {
-            String key = String.valueOf(blockId);
-            BlockData blockData = new BlockData(new BlockID(cid, blockId));
-            blockTable.put(StringUtils.string2Bytes(key),
-                blockData.getProtoBufMessage().toByteArray());
-
-            // Populate map. Schema V2 ldb output key is just blockId
-            expectedMap.put(key, toMap(blockData));
+            String dbKeyStr = String.valueOf(blockId);
+            dbKey = StringUtils.string2Bytes(dbKeyStr);
+            // Schema V2 ldb scan output key is "blockId"
+            mapKey = dbKeyStr;
           }
+          blockTable.put(dbKey, blockData.getProtoBufMessage().toByteArray());
+          dbMap.put(mapKey, toMap(blockData));
         }
       }
       break;
@@ -152,18 +167,10 @@ public class TestLDBCli {
   }
 
   private static Map<String, Object> toMap(Object obj) throws IOException {
-    // Have to use Gson here since DBScanner uses Gson.
-    // JsonUtils (ObjectMapper) would parse object differently.
+    // Have to use the same serializer (Gson) as DBScanner does.
+    // JsonUtils (ObjectMapper) parses object differently.
     String json = gson.toJson(obj);
-    return MAPPER.readValue(
-        json, new TypeReference<Map<String, Object>>() { });
-  }
-
-  @AfterEach
-  public void shutdown() throws IOException {
-    if (dbStore != null) {
-      dbStore.close();
-    }
+    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 
   private void assertNoError(int exitCode) {
@@ -188,7 +195,7 @@ public class TestLDBCli {
         "--column-family", KEY_TABLE);
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(dbMap, stdout.toString());
   }
 
   @Test
@@ -201,7 +208,53 @@ public class TestLDBCli {
         "--length", "1");
 
     assertNoError(exitCode);
-    assertContents(expectedMap.headMap("key1", true), stdout.toString());
+    // Should print just key1
+    assertContents(dbMap.subMap("key1", "key2"), stdout.toString());
+  }
+
+  /**
+   * Defines ldb tool test cases.
+   */
+  private static Stream<Arguments> scanTestCases() {
+    return Stream.of(
+        Arguments.of(Named.of("Default", 0),
+            Arrays.asList(KEY_TABLE),
+            Optional.empty()
+        ),
+        Arguments.of(Named.of("Limit 1", 0),
+            Arrays.asList(KEY_TABLE, "--length", "1"),
+            Optional.of(Pair.of("key1", "key2"))
+        )
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("scanTestCases")
+  void testLDBScan(int expectedExitCode, List<String> scanArgs,
+      Optional<Pair> expectedMapRange) throws IOException {
+    prepareTable(KEY_TABLE, false);
+
+    // Prepend scan args
+    List<String> completeScanArgs = new ArrayList<>();
+    completeScanArgs.addAll(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family"));
+    completeScanArgs.addAll(scanArgs);
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    // Check exit code. Print stderr if not expected
+    Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
+
+    Map<String, Map<String, ?>> expectedMap;
+    if (expectedMapRange.isPresent()) {
+      Pair<String, String> range = expectedMapRange.get();
+      expectedMap = dbMap.subMap(range.getLeft(), range.getRight());
+    } else {
+      expectedMap = dbMap;
+    }
+
+    assertContents(expectedMap, stdout.toString());
   }
 
   @Test
@@ -228,7 +281,7 @@ public class TestLDBCli {
         "--length", "-1");
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(dbMap, stdout.toString());
   }
 
   @Test
@@ -243,7 +296,7 @@ public class TestLDBCli {
         "--length", "-1");
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(dbMap, stdout.toString());
   }
 
   @Test
@@ -260,7 +313,7 @@ public class TestLDBCli {
 
     assertNoError(exitCode);
     // Result should include "1: 1" and "1: 2"
-    assertContents(expectedMap.headMap("1: 2", true), stdout.toString());
+    assertContents(dbMap.subMap("1: 1", "2: 3"), stdout.toString());
   }
 
   @Test
@@ -277,7 +330,7 @@ public class TestLDBCli {
 
     assertNoError(exitCode);
     // Result should include "2: 3" and "2: 4"
-    assertContents(expectedMap.tailMap("2: 3", true), stdout.toString());
+    assertContents(dbMap.subMap("2: 3", "3: 5"), stdout.toString());
   }
 
   @Test
@@ -291,6 +344,6 @@ public class TestLDBCli {
         "--dn-schema", "V2");
 
     assertNoError(exitCode);
-    assertContents(expectedMap, stdout.toString());
+    assertContents(dbMap, stdout.toString());
   }
 }
