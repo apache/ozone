@@ -59,7 +59,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Stream;
 
@@ -195,26 +194,32 @@ public class TestLDBCli {
         Arguments.of(
             Named.of("Default", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
-            Named.of("No more args", Collections.emptyList()),
-            Named.of("Expect key1-key5", Optional.of(Pair.of("key1", "key6")))
+            Named.of("No extra args", Collections.emptyList()),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
             Named.of("Length", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Limit 1", Arrays.asList("--length", "1")),
-            Named.of("Expect key1 only", Optional.of(Pair.of("key1", "key2")))
+            Named.of("Expect key1 only", Pair.of("key1", "key2"))
         ),
         Arguments.of(
             Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Limit 0", Arrays.asList("--length", "0")),
-            Named.of("Expect empty result", Optional.empty())
+            Named.of("Expect empty result", null)
         ),
         Arguments.of(
             Named.of("UnlimitedLength", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Limit -1", Arrays.asList("--length", "-1")),
-            Named.of("Expect key1-key5", Optional.of(Pair.of("key1", "key6")))
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of("Default", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
+            Named.of("SchemaV3", Arrays.asList("--dn-schema", "V3")),
+            Named.of("Expect '1: 1'-'2: 4'", Pair.of("1: 1", "3: 5"))
         )
     );
   }
@@ -224,7 +229,7 @@ public class TestLDBCli {
   void testLDBScan(Pair<Integer, String> expectedExitCodeStderrPair,
       Pair<String, Boolean> tableAndOption,
       List<String> scanArgs,
-      Optional<Pair<String, String>> expectedMapRange) throws IOException {
+      Pair<String, String> dbMapRange) throws IOException {
 
     final String tableName = tableAndOption.getLeft();
     final Boolean schemaV3 = tableAndOption.getRight();
@@ -246,9 +251,8 @@ public class TestLDBCli {
 
     // Construct expected result map given test param input
     Map<String, Map<String, ?>> expectedMap;
-    if (expectedMapRange.isPresent()) {
-      Pair<String, String> range = expectedMapRange.get();
-      expectedMap = dbMap.subMap(range.getLeft(), range.getRight());
+    if (dbMapRange != null) {
+      expectedMap = dbMap.subMap(dbMapRange.getLeft(), dbMapRange.getRight());
     } else {
       expectedMap = new TreeMap<>();
     }
@@ -263,21 +267,6 @@ public class TestLDBCli {
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
-  }
-
-  @Test
-  public void testDNDBSchemaV3Default() throws IOException {
-    prepareTable(BLOCK_DATA_TABLE, true);
-
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", BLOCK_DATA_TABLE,
-        "--dn-schema", "V3",
-        "--length", "-1");
-
-    assertNoError(exitCode);
-    assertContents(dbMap, stdout.toString());
   }
 
   @Test
