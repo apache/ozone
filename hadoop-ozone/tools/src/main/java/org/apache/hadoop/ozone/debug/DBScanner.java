@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -114,7 +115,18 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private boolean showCount;
 
-  private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
+  @Override
+  public Void call() throws Exception {
+    List<ColumnFamilyDescriptor> cfs =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+
+    final List<ColumnFamilyHandle> columnFamilyHandleList = new ArrayList<>();
+    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
+        cfs, columnFamilyHandleList);
+    printTable(columnFamilyHandleList, rocksDB, parent.getDbPath());
+
+    return null;
+  }
 
   private PrintWriter err() {
     return spec.commandLine().getErr();
@@ -238,33 +250,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             .orElse(null);
   }
 
-  private void constructColumnFamilyMap(DBDefinition dbDefinition) {
-    this.columnFamilyMap = new HashMap<>();
-    DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
-            .getColumnFamilies();
-    for (DBColumnFamilyDefinition definition:columnFamilyDefinitions) {
+  private void constructColumnFamilyMap(
+      Map<String, DBColumnFamilyDefinition> columnFamilyMap,
+      DBDefinition dbDefinition) {
+    for (DBColumnFamilyDefinition definition :
+        dbDefinition.getColumnFamilies()) {
       LOG.info("Added definition for table: {}", definition.getTableName());
-      this.columnFamilyMap.put(definition.getTableName(), definition);
+      columnFamilyMap.put(definition.getTableName(), definition);
     }
   }
 
-  @Override
-  public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs =
-        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
-
-    final List<ColumnFamilyHandle> columnFamilyHandleList =
-        new ArrayList<>();
-    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
-            cfs, columnFamilyHandleList);
-    printAppropriateTable(columnFamilyHandleList, rocksDB, parent.getDbPath());
-    return null;
-  }
-
-  private void printAppropriateTable(
-          List<ColumnFamilyHandle> columnFamilyHandleList,
-          ManagedRocksDB rocksDB, String dbPath)
+  /**
+   * Main table printing logic.
+   * User-provided args are not in the arg list.
+   */
+  private void printTable(List<ColumnFamilyHandle> columnFamilyHandleList,
+      ManagedRocksDB rocksDB, String dbPath)
       throws IOException, RocksDBException {
+
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
               "List length should be a positive number. Only allowed negative" +
@@ -279,15 +282,15 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return;
     }
 
-    constructColumnFamilyMap(dbDefinition);
-
-    if (!this.columnFamilyMap.containsKey(tableName)) {
+    Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
+    constructColumnFamilyMap(columnFamilyMap, dbDefinition);
+    if (!columnFamilyMap.containsKey(tableName)) {
       err().print("Error: Table with name '" + tableName + "' does not exist");
       return;
     }
 
     DBColumnFamilyDefinition columnFamilyDefinition =
-        this.columnFamilyMap.get(tableName);
+        columnFamilyMap.get(tableName);
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
         columnFamilyDefinition.getTableName().getBytes(UTF_8),
         columnFamilyHandleList);
@@ -308,7 +311,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       readOptions.setIterateUpperBound(new ManagedSlice(
           FixedLengthStringUtils.string2Bytes(
               DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId + 1))));
+                  containerId + 1L))));
       iterator = new ManagedRocksIterator(
           rocksDB.get().newIterator(columnFamilyHandle, readOptions));
       iterator.get().seek(FixedLengthStringUtils.string2Bytes(
