@@ -42,7 +42,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -247,6 +246,18 @@ public class TestLDBCli {
                 "--container-id", "2",
                 "--length", "1")),
             Named.of("Expect '2: 3' only", Pair.of("2: 3", "2: 4"))
+        ),
+        Arguments.of(
+            Named.of("Default", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, false)),
+            Named.of("V2", Collections.emptyList()),
+            Named.of("Expect 1-4", Pair.of("1", "5"))
+        ),
+        Arguments.of(
+            Named.of("Explicit V2", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, false)),
+            Named.of("V2", Arrays.asList("--dn-schema", "V2")),
+            Named.of("Expect 1-4", Pair.of("1", "5"))
         )
     );
   }
@@ -296,17 +307,4 @@ public class TestLDBCli {
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
   }
 
-  @Test
-  public void testDNDBSchemaV2() throws IOException {
-    prepareTable(BLOCK_DATA_TABLE, false);
-
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", BLOCK_DATA_TABLE,
-        "--dn-schema", "V2");
-
-    assertNoError(exitCode);
-    assertContents(dbMap, stdout.toString());
-  }
 }
