@@ -215,7 +215,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       ++count;
       if (withinLimit(count) && iterator.get().isValid()) {
         // If this is not the last entry, append comma
-        sb.append(',');
+        sb.append(", ");
       }
 
       out.print(sb);

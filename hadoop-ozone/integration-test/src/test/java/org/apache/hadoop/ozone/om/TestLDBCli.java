@@ -138,7 +138,7 @@ public class TestLDBCli {
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("ContainerID 1", Pair.of(0, "")),
-            Named.of("V3, cid 1", Arrays.asList(
+            Named.of("V3 + cid 1", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "1",
                 "--length", "2")),
@@ -147,7 +147,7 @@ public class TestLDBCli {
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("ContainerID 2", Pair.of(0, "")),
-            Named.of("cid 2", Arrays.asList(
+            Named.of("V3 + cid 2", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "2")),
@@ -156,7 +156,7 @@ public class TestLDBCli {
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("ContainerID 2 + Length", Pair.of(0, "")),
-            Named.of("cid 2 + limit 1", Arrays.asList(
+            Named.of("V3 + cid 2 + limit 1", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "1")),
