@@ -55,6 +55,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -186,64 +187,54 @@ public class TestLDBCli {
     Assertions.assertEquals(expected, actualMap);
   }
 
-  @Test
-  public void testDefault() throws IOException {
-    prepareTable(KEY_TABLE, false);
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", KEY_TABLE);
-
-    assertNoError(exitCode);
-    assertContents(dbMap, stdout.toString());
-  }
-
-  @Test
-  public void testLength() throws IOException {
-    prepareTable(KEY_TABLE, false);
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", KEY_TABLE,
-        "--length", "1");
-
-    assertNoError(exitCode);
-    // Should print just key1
-    assertContents(dbMap.subMap("key1", "key2"), stdout.toString());
-  }
-
   /**
    * Defines ldb tool test cases.
    */
   private static Stream<Arguments> scanTestCases() {
     return Stream.of(
-        Arguments.of(Named.of("Default", 0),
-            Arrays.asList(KEY_TABLE),
-            Optional.empty()
+        Arguments.of(
+            Named.of("Default", Pair.of(0, "")),
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("No extra args", Collections.emptyList()),
+            Optional.of(Pair.of("key1", "key6"))
         ),
-        Arguments.of(Named.of("Limit 1", 0),
-            Arrays.asList(KEY_TABLE, "--length", "1"),
+        Arguments.of(
+            Named.of("Length", Pair.of(0, "")),
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Limit 1", Arrays.asList("--length", "1")),
             Optional.of(Pair.of("key1", "key2"))
+        ),
+        Arguments.of(
+            Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Limit 0", Arrays.asList("--length", "0")),
+            Optional.empty()
         )
     );
   }
 
   @ParameterizedTest
   @MethodSource("scanTestCases")
-  void testLDBScan(int expectedExitCode, List<String> scanArgs,
-      Optional<Pair> expectedMapRange) throws IOException {
-    prepareTable(KEY_TABLE, false);
+  void testLDBScan(Pair<Integer, String> expectedExitCodeStderrPair,
+      Pair<String, Boolean> tableAndOption,
+      List<String> scanArgs,
+      Optional<Pair<String, String>> expectedMapRange) throws IOException {
+
+    final String tableName = tableAndOption.getLeft();
+    final Boolean schemaV3 = tableAndOption.getRight();
+    prepareTable(tableName, schemaV3);
 
     // Prepend scan args
     List<String> completeScanArgs = new ArrayList<>();
     completeScanArgs.addAll(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
         "scan",
-        "--column-family"));
+        "--column-family", tableName));
     completeScanArgs.addAll(scanArgs);
 
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     // Check exit code. Print stderr if not expected
+    int expectedExitCode = expectedExitCodeStderrPair.getLeft();
     Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
 
     Map<String, Map<String, ?>> expectedMap;
@@ -251,24 +242,17 @@ public class TestLDBCli {
       Pair<String, String> range = expectedMapRange.get();
       expectedMap = dbMap.subMap(range.getLeft(), range.getRight());
     } else {
-      expectedMap = dbMap;
+      expectedMap = new TreeMap<>();
     }
 
-    assertContents(expectedMap, stdout.toString());
-  }
+    if (exitCode == 0) {
+      assertContents(expectedMap, stdout.toString());
+    } else {
+      Assertions.assertEquals(0, stdout.toString().length());
+    }
 
-  @Test
-  public void testInvalidLength() throws IOException {
-    prepareTable(KEY_TABLE, false);
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", KEY_TABLE,
-        "--length", "0");
-
-    Assertions.assertNotEquals(0, exitCode);
-    Assertions.assertTrue(stderr.toString().contains(
-        "IllegalArgumentException: List length should be a positive number"));
+    final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
+    Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
   }
 
   @Test
