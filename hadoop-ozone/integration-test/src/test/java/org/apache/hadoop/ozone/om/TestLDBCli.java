@@ -71,7 +71,6 @@ public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
   private static final String BLOCK_DATA = "block_data";
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Gson gson = new Gson();
   private OzoneConfiguration conf;
   private DBStore dbStore;
   @TempDir
@@ -312,7 +311,7 @@ public class TestLDBCli {
   private static Map<String, Object> toMap(Object obj) throws IOException {
     // Have to use the same serializer (Gson) as DBScanner does.
     // JsonUtils (ObjectMapper) parses object differently.
-    String json = gson.toJson(obj);
+    String json = new Gson().toJson(obj);
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 

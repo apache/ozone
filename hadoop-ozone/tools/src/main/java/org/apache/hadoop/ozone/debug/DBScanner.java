@@ -65,8 +65,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
-  public final Logger LOG =
-      LoggerFactory.getLogger(DBScanner.class);
+  public static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
+  private static final String SCHEMA_V3 = "V3";
 
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
@@ -81,12 +81,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--with-keys"},
       description = "Print a JSON object of key->value pairs (default)"
-          + " instead of a JSON array of only values.")
-  private boolean withKey = true;
+          + " instead of a JSON array of only values.",
+      defaultValue = "true")
+  private boolean withKey;
 
   @CommandLine.Option(names = {"--length", "--limit", "-l"},
-      description = "Maximum number of items to list.")
-  private long limit = -1;
+      description = "Maximum number of items to list.",
+      defaultValue = "-1")
+  private long limit;
 
   @CommandLine.Option(names = {"--out", "-o"},
       description = "File to dump table scan data")
@@ -113,8 +115,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private boolean showCount;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
-
-  private final String SCHEMA_V3 = "V3";
 
   private PrintWriter err() {
     return spec.commandLine().getErr();
