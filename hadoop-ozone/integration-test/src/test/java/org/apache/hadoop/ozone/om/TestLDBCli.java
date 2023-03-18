@@ -218,8 +218,35 @@ public class TestLDBCli {
         Arguments.of(
             Named.of("Default", Pair.of(0, "")),
             Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
-            Named.of("SchemaV3", Arrays.asList("--dn-schema", "V3")),
+            Named.of("V3", Arrays.asList("--dn-schema", "V3")),
             Named.of("Expect '1: 1'-'2: 4'", Pair.of("1: 1", "3: 5"))
+        ),
+        Arguments.of(
+            Named.of("ContainerID 1", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
+            Named.of("V3, cid 1", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "1",
+                "--length", "2")),
+            Named.of("Expect '1: 1' and '1: 2'", Pair.of("1: 1", "2: 3"))
+        ),
+        Arguments.of(
+            Named.of("ContainerID 2", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
+            Named.of("V3, cid 2", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "2",
+                "--length", "2")),
+            Named.of("Expect '2: 3' and '2: 4'", Pair.of("2: 3", "3: 5"))
+        ),
+        Arguments.of(
+            Named.of("ContainerID 2 Length", Pair.of(0, "")),
+            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
+            Named.of("V3, cid 2, limit 1", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "2",
+                "--length", "1")),
+            Named.of("Expect '2: 3' only", Pair.of("2: 3", "2: 4"))
         )
     );
   }
@@ -267,40 +294,6 @@ public class TestLDBCli {
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
-  }
-
-  @Test
-  public void testDNDBSchemaV3LimitContainer1() throws IOException {
-    prepareTable(BLOCK_DATA_TABLE, true);
-
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", BLOCK_DATA_TABLE,
-        "--dn-schema", "V3",
-        "--container-id", "1",
-        "--length", "2");
-
-    assertNoError(exitCode);
-    // Result should include "1: 1" and "1: 2"
-    assertContents(dbMap.subMap("1: 1", "2: 3"), stdout.toString());
-  }
-
-  @Test
-  public void testDNDBSchemaV3LimitContainer2() throws IOException {
-    prepareTable(BLOCK_DATA_TABLE, true);
-
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", BLOCK_DATA_TABLE,
-        "--dn-schema", "V3",
-        "--container-id", "2",
-        "--length", "2");
-
-    assertNoError(exitCode);
-    // Result should include "2: 3" and "2: 4"
-    assertContents(dbMap.subMap("2: 3", "3: 5"), stdout.toString());
   }
 
   @Test
