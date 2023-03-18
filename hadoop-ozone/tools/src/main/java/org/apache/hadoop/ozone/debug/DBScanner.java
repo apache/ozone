@@ -250,16 +250,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
             .orElse(null);
   }
 
-  private void constructColumnFamilyMap(
-      Map<String, DBColumnFamilyDefinition> columnFamilyMap,
-      DBDefinition dbDefinition) {
-    for (DBColumnFamilyDefinition definition :
-        dbDefinition.getColumnFamilies()) {
-      LOG.info("Added definition for table: {}", definition.getTableName());
-      columnFamilyMap.put(definition.getTableName(), definition);
-    }
-  }
-
   /**
    * Main table printing logic.
    * User-provided args are not in the arg list.
@@ -283,9 +273,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
-    constructColumnFamilyMap(columnFamilyMap, dbDefinition);
+    for (DBColumnFamilyDefinition cfDef : dbDefinition.getColumnFamilies()) {
+      LOG.info("Found table: {}", cfDef.getTableName());
+      columnFamilyMap.put(cfDef.getTableName(), cfDef);
+    }
     if (!columnFamilyMap.containsKey(tableName)) {
-      err().print("Error: Table with name '" + tableName + "' does not exist");
+      err().print("Error: Table with name '" + tableName + "' not found");
       return;
     }
 
