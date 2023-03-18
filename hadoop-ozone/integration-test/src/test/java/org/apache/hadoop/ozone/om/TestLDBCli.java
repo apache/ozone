@@ -195,20 +195,26 @@ public class TestLDBCli {
         Arguments.of(
             Named.of("Default", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
-            Named.of("No extra args", Collections.emptyList()),
-            Optional.of(Pair.of("key1", "key6"))
+            Named.of("No more args", Collections.emptyList()),
+            Named.of("Expect key1-key5", Optional.of(Pair.of("key1", "key6")))
         ),
         Arguments.of(
             Named.of("Length", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Limit 1", Arrays.asList("--length", "1")),
-            Optional.of(Pair.of("key1", "key2"))
+            Named.of("Expect key1 only", Optional.of(Pair.of("key1", "key2")))
         ),
         Arguments.of(
             Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
             Named.of("Limit 0", Arrays.asList("--length", "0")),
-            Optional.empty()
+            Named.of("Expect empty result", Optional.empty())
+        ),
+        Arguments.of(
+            Named.of("UnlimitedLength", Pair.of(0, "")),
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Limit -1", Arrays.asList("--length", "-1")),
+            Named.of("Expect key1-key5", Optional.of(Pair.of("key1", "key6")))
         )
     );
   }
@@ -222,9 +228,10 @@ public class TestLDBCli {
 
     final String tableName = tableAndOption.getLeft();
     final Boolean schemaV3 = tableAndOption.getRight();
+    // Prepare dummy table. Populate dbMap that contains expected results
     prepareTable(tableName, schemaV3);
 
-    // Prepend scan args
+    // Prepare scan args
     List<String> completeScanArgs = new ArrayList<>();
     completeScanArgs.addAll(Arrays.asList(
         "--db", dbStore.getDbLocation().getAbsolutePath(),
@@ -237,6 +244,7 @@ public class TestLDBCli {
     int expectedExitCode = expectedExitCodeStderrPair.getLeft();
     Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
 
+    // Construct expected result map given test param input
     Map<String, Map<String, ?>> expectedMap;
     if (expectedMapRange.isPresent()) {
       Pair<String, String> range = expectedMapRange.get();
@@ -245,27 +253,16 @@ public class TestLDBCli {
       expectedMap = new TreeMap<>();
     }
 
+    // Verify result
     if (exitCode == 0) {
       assertContents(expectedMap, stdout.toString());
     } else {
       Assertions.assertEquals(0, stdout.toString().length());
     }
 
+    // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
-  }
-
-  @Test
-  public void testUnlimitedLength() throws IOException {
-    prepareTable(KEY_TABLE, false);
-    int exitCode = cmd.execute(
-        "--db", dbStore.getDbLocation().getAbsolutePath(),
-        "scan",
-        "--column-family", KEY_TABLE,
-        "--length", "-1");
-
-    assertNoError(exitCode);
-    assertContents(dbMap, stdout.toString());
   }
 
   @Test
