@@ -64,7 +64,7 @@ import java.util.stream.Stream;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * This class tests the Debug LDB CLI that reads from rocks db file.
+ * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
  */
 public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
@@ -72,7 +72,7 @@ public class TestLDBCli {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Gson gson = new Gson();
   private OzoneConfiguration conf;
-  private DBStore dbStore = null;
+  private DBStore dbStore;
   @TempDir
   private File tempDir;
   private StringWriter stdout, stderr;
@@ -98,97 +98,6 @@ public class TestLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
-  }
-
-  /**
-   * Prepare the table for testing.
-   * Also populate dbMap that contains all possibly expected results.
-   * @param tableName table name.
-   * @param schemaV3 set to true for SchemaV3. applicable to block_data table.
-   */
-  private void prepareTable(String tableName, boolean schemaV3)
-      throws IOException {
-
-    switch (tableName) {
-    case KEY_TABLE:
-      // Dummy om.db with only keyTable
-      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
-          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
-
-      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
-      // Insert 5 keys
-      for (int i = 1; i <= 5; i++) {
-        String key = "key" + i;
-        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
-            key, HddsProtos.ReplicationType.STAND_ALONE,
-            HddsProtos.ReplicationFactor.ONE);
-        keyTable.put(key.getBytes(UTF_8),
-            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
-
-        // Populate map
-        dbMap.put(key, toMap(value));
-      }
-      break;
-
-    case BLOCK_DATA_TABLE:
-      conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
-          schemaV3);
-      dbStore = BlockUtils.getUncachedDatanodeStore(
-          tempDir.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
-          schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
-          conf, false).getStore();
-
-      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA_TABLE);
-      // Insert 2 containers with 2 blocks each
-      final int containerCount = 2;
-      final int blockCount = 2;
-      int blockId = 1;
-      for (int cid = 1; cid <= containerCount; cid++) {
-        for (int blockIdx = 1; blockIdx <= blockCount; blockIdx++, blockId++) {
-          byte[] dbKey;
-          String mapKey;
-          BlockData blockData = new BlockData(new BlockID(cid, blockId));
-          if (schemaV3) {
-            String dbKeyStr = DatanodeSchemaThreeDBDefinition
-                .getContainerKeyPrefix(cid) + blockId;
-            dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
-            // Schema V3 ldb scan output key is "containerId: blockId"
-            mapKey = cid + ": " + blockId;
-          } else {
-            String dbKeyStr = String.valueOf(blockId);
-            dbKey = StringUtils.string2Bytes(dbKeyStr);
-            // Schema V2 ldb scan output key is "blockId"
-            mapKey = dbKeyStr;
-          }
-          blockTable.put(dbKey, blockData.getProtoBufMessage().toByteArray());
-          dbMap.put(mapKey, toMap(blockData));
-        }
-      }
-      break;
-
-    default:
-      throw new IllegalArgumentException("Unsupported table: " + tableName);
-    }
-  }
-
-  private static Map<String, Object> toMap(Object obj) throws IOException {
-    // Have to use the same serializer (Gson) as DBScanner does.
-    // JsonUtils (ObjectMapper) parses object differently.
-    String json = gson.toJson(obj);
-    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
-  }
-
-  private void assertNoError(int exitCode) {
-    Assertions.assertEquals(0, exitCode, stderr.toString());
-  }
-
-  private void assertContents(Map<String, ?> expected, String actualStr)
-      throws IOException {
-    // Parse actual output string into Map
-    Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
-        actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
-
-    Assertions.assertEquals(expected, actualMap);
   }
 
   /**
@@ -311,6 +220,98 @@ public class TestLDBCli {
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
     Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
+  }
+
+  /**
+   * Converts String input to a Map and compares to the given Map input.
+   * @param expected expected result Map
+   * @param actualStr String input
+   */
+  private void assertContents(Map<String, ?> expected, String actualStr)
+      throws IOException {
+    // Parse actual output (String) into Map
+    Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
+        actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
+
+    Assertions.assertEquals(expected, actualMap);
+  }
+
+  /**
+   * Prepare the table for testing.
+   * Also populate dbMap that contains all possibly expected results.
+   * @param tableName table name
+   * @param schemaV3 set to true for SchemaV3. applicable to block_data table
+   */
+  private void prepareTable(String tableName, boolean schemaV3)
+      throws IOException {
+
+    switch (tableName) {
+    case KEY_TABLE:
+      // Dummy om.db with only keyTable
+      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
+
+      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+      // Insert 5 keys
+      for (int i = 1; i <= 5; i++) {
+        String key = "key" + i;
+        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
+            key, HddsProtos.ReplicationType.STAND_ALONE,
+            HddsProtos.ReplicationFactor.ONE);
+        keyTable.put(key.getBytes(UTF_8),
+            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+
+        // Populate map
+        dbMap.put(key, toMap(value));
+      }
+      break;
+
+    case BLOCK_DATA_TABLE:
+      conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
+          schemaV3);
+      dbStore = BlockUtils.getUncachedDatanodeStore(
+          tempDir.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
+          schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
+          conf, false).getStore();
+
+      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA_TABLE);
+      // Insert 2 containers with 2 blocks each
+      final int containerCount = 2;
+      final int blockCount = 2;
+      int blockId = 1;
+      for (int cid = 1; cid <= containerCount; cid++) {
+        for (int blockIdx = 1; blockIdx <= blockCount; blockIdx++, blockId++) {
+          byte[] dbKey;
+          String mapKey;
+          BlockData blockData = new BlockData(new BlockID(cid, blockId));
+          if (schemaV3) {
+            String dbKeyStr = DatanodeSchemaThreeDBDefinition
+                .getContainerKeyPrefix(cid) + blockId;
+            dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
+            // Schema V3 ldb scan output key is "containerId: blockId"
+            mapKey = cid + ": " + blockId;
+          } else {
+            String dbKeyStr = String.valueOf(blockId);
+            dbKey = StringUtils.string2Bytes(dbKeyStr);
+            // Schema V2 ldb scan output key is "blockId"
+            mapKey = dbKeyStr;
+          }
+          blockTable.put(dbKey, blockData.getProtoBufMessage().toByteArray());
+          dbMap.put(mapKey, toMap(blockData));
+        }
+      }
+      break;
+
+    default:
+      throw new IllegalArgumentException("Unsupported table: " + tableName);
+    }
+  }
+
+  private static Map<String, Object> toMap(Object obj) throws IOException {
+    // Have to use the same serializer (Gson) as DBScanner does.
+    // JsonUtils (ObjectMapper) parses object differently.
+    String json = gson.toJson(obj);
+    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 
 }
