@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
-  private static final String BLOCK_DATA_TABLE = "block_data";
+  private static final String BLOCK_DATA = "block_data";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Gson gson = new Gson();
   private OzoneConfiguration conf;
@@ -106,38 +107,38 @@ public class TestLDBCli {
   private static Stream<Arguments> scanTestCases() {
     return Stream.of(
         Arguments.of(
-            Named.of("Default", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
             Named.of("No extra args", Collections.emptyList()),
             Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
-            Named.of("Length", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Length", Pair.of(0, "")),
             Named.of("Limit 1", Arrays.asList("--length", "1")),
             Named.of("Expect key1 only", Pair.of("key1", "key2"))
         ),
         Arguments.of(
-            Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
             Named.of("Limit 0", Arrays.asList("--length", "0")),
             Named.of("Expect empty result", null)
         ),
         Arguments.of(
-            Named.of("UnlimitedLength", Pair.of(0, "")),
             Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("UnlimitedLength", Pair.of(0, "")),
             Named.of("Limit -1", Arrays.asList("--length", "-1")),
             Named.of("Expect key1-key5", Pair.of("key1", "key6"))
         ),
         Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),
             Named.of("Expect '1: 1'-'2: 4'", Pair.of("1: 1", "3: 5"))
         ),
         Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("ContainerID 1", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
             Named.of("V3, cid 1", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "1",
@@ -145,32 +146,32 @@ public class TestLDBCli {
             Named.of("Expect '1: 1' and '1: 2'", Pair.of("1: 1", "2: 3"))
         ),
         Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("ContainerID 2", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
-            Named.of("V3, cid 2", Arrays.asList(
+            Named.of("cid 2", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "2")),
             Named.of("Expect '2: 3' and '2: 4'", Pair.of("2: 3", "3: 5"))
         ),
         Arguments.of(
-            Named.of("ContainerID 2 Length", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, true)),
-            Named.of("V3, cid 2, limit 1", Arrays.asList(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("ContainerID 2 + Length", Pair.of(0, "")),
+            Named.of("cid 2 + limit 1", Arrays.asList(
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "1")),
             Named.of("Expect '2: 3' only", Pair.of("2: 3", "2: 4"))
         ),
         Arguments.of(
+            Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
             Named.of("Default", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, false)),
             Named.of("V2", Collections.emptyList()),
             Named.of("Expect 1-4", Pair.of("1", "5"))
         ),
         Arguments.of(
+            Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
             Named.of("Explicit V2", Pair.of(0, "")),
-            Named.of(BLOCK_DATA_TABLE, Pair.of(BLOCK_DATA_TABLE, false)),
             Named.of("V2", Arrays.asList("--dn-schema", "V2")),
             Named.of("Expect 1-4", Pair.of("1", "5"))
         )
@@ -179,8 +180,9 @@ public class TestLDBCli {
 
   @ParameterizedTest
   @MethodSource("scanTestCases")
-  void testLDBScan(Pair<Integer, String> expectedExitCodeStderrPair,
-      Pair<String, Boolean> tableAndOption,
+  void testLDBScan(
+      @NotNull Pair<String, Boolean> tableAndOption,
+      @NotNull Pair<Integer, String> expectedExitCodeStderrPair,
       List<String> scanArgs,
       Pair<String, String> dbMapRange) throws IOException {
 
@@ -266,7 +268,7 @@ public class TestLDBCli {
       }
       break;
 
-    case BLOCK_DATA_TABLE:
+    case BLOCK_DATA:
       conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
           schemaV3);
       dbStore = BlockUtils.getUncachedDatanodeStore(
@@ -274,7 +276,7 @@ public class TestLDBCli {
           schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
           conf, false).getStore();
 
-      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA_TABLE);
+      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA);
       // Insert 2 containers with 2 blocks each
       final int containerCount = 2;
       final int blockCount = 2;
