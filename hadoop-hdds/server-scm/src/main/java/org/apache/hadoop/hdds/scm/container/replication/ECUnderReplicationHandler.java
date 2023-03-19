@@ -165,9 +165,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       try {
         commandsSent += processMissingIndexes(replicaCount, sources,
             availableSourceNodes, excludedNodes);
-        commandsSent += processDecommissioningIndexes(replicaCount, replicas,
+        commandsSent += processDecommissioningIndexes(replicaCount, sources,
             availableSourceNodes, excludedNodes);
-        commandsSent +=  processMaintenanceOnlyIndexes(replicaCount, replicas,
+        commandsSent +=  processMaintenanceOnlyIndexes(replicaCount, sources,
             excludedNodes);
         // TODO - we should be able to catch SCMException here and check the
         //        result code but the RackAware topology never sets the code.
@@ -337,7 +337,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    */
   private int processDecommissioningIndexes(
       ECContainerReplicaCount replicaCount,
-      Set<ContainerReplica> replicas,
+      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
       List<DatanodeDetails> availableSourceNodes,
       List<DatanodeDetails> excludedNodes) throws IOException {
     ContainerInfo container = replicaCount.getContainer();
@@ -350,18 +350,25 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         excludedNodes.addAll(selectedDatanodes);
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
         // In this case we need to do one to one copy.
-        for (ContainerReplica replica : replicas) {
-          if (decomIndexes.contains(replica.getReplicaIndex())) {
-            if (!iterator.hasNext()) {
-              LOG.warn("Couldn't find enough targets. Available source"
-                      + " nodes: {}, the target nodes: {}, excluded nodes: {}"
-                      + "  and the decommission indexes: {}",
-                  replicas, selectedDatanodes, excludedNodes, decomIndexes);
-              break;
-            }
-            createReplicateCommand(container, iterator, replica);
-            commandsSent++;
+        for (Integer decomIndex : decomIndexes) {
+          Pair<ContainerReplica, NodeStatus> source = sources.get(decomIndex);
+          if (source == null) {
+            LOG.warn("Cannot find source replica for decommissioning index " +
+                    "{} in container {}", decomIndex, container.containerID());
+            continue;
           }
+          ContainerReplica sourceReplica = source.getLeft();
+          if (!iterator.hasNext()) {
+            LOG.warn("Couldn't find enough targets. Available source"
+                + " nodes: {}, the target nodes: {}, excluded nodes: {}"
+                + "  and the decommission indexes: {}",
+                sources.values().stream()
+                    .map(Pair::getLeft).collect(Collectors.toSet()),
+                selectedDatanodes, excludedNodes, decomIndexes);
+            break;
+          }
+          createReplicateCommand(container, iterator, sourceReplica);
+          commandsSent++;
         }
       }
     }
@@ -372,13 +379,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * Processes replicas that are in maintenance nodes and should need
    * additional copies.
    * @param replicaCount
-   * @param replicas set of container replicas
+   * @param sources Map of Replica Index to a pair of ContainerReplica and
+   *                NodeStatus. This is the list of available replicas.
    * @param excludedNodes nodes that should not be targets for new copies
    * @@return number of commands sent
    * @throws IOException
    */
   private int processMaintenanceOnlyIndexes(
-      ECContainerReplicaCount replicaCount, Set<ContainerReplica> replicas,
+      ECContainerReplicaCount replicaCount,
+      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
       List<DatanodeDetails> excludedNodes) throws IOException {
     Set<Integer> maintIndexes = replicaCount.maintenanceOnlyIndexes(true);
     if (maintIndexes.isEmpty()) {
@@ -399,20 +408,30 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     Iterator<DatanodeDetails> iterator = targets.iterator();
     int commandsSent = 0;
     // copy replica from source maintenance DN to a target DN
-    for (ContainerReplica replica : replicas) {
-      if (maintIndexes.contains(replica.getReplicaIndex()) &&
-          additionalMaintenanceCopiesNeeded > 0) {
-        if (!iterator.hasNext()) {
-          LOG.warn("Couldn't find enough targets. Available source"
-                  + " nodes: {}, target nodes: {}, excluded nodes: {} and"
-                  + " maintenance indexes: {}",
-              replicas, targets, excludedNodes, maintIndexes);
-          break;
-        }
-        createReplicateCommand(container, iterator, replica);
-        commandsSent++;
-        additionalMaintenanceCopiesNeeded -= 1;
+
+    for (Integer maintIndex : maintIndexes) {
+      if (additionalMaintenanceCopiesNeeded <= 0) {
+        break;
       }
+      Pair<ContainerReplica, NodeStatus> source = sources.get(maintIndex);
+      if (source == null) {
+        LOG.warn("Cannot find source replica for maintenance index " +
+            "{} in container {}", maintIndex, container.containerID());
+        continue;
+      }
+      ContainerReplica sourceReplica = source.getLeft();
+      if (!iterator.hasNext()) {
+        LOG.warn("Couldn't find enough targets. Available source"
+                + " nodes: {}, target nodes: {}, excluded nodes: {} and"
+                + " maintenance indexes: {}",
+            sources.values().stream()
+                .map(Pair::getLeft).collect(Collectors.toSet()),
+            targets, excludedNodes, maintIndexes);
+        break;
+      }
+      createReplicateCommand(container, iterator, sourceReplica);
+      commandsSent++;
+      additionalMaintenanceCopiesNeeded -= 1;
     }
     return commandsSent;
   }
