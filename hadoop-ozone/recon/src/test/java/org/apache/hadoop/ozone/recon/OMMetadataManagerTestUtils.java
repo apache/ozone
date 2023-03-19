@@ -65,82 +65,37 @@ public final class OMMetadataManagerTestUtils {
   }
 
   /**
-   * Initialize a new OMMetadataManager with the provided OM DB directory.
-   * @param omDbDir directory where the OM DB will be stored
-   * @return initialized OMMetadataManager
-   * @throws IOException if there was an error initializing
+   * Create a new OM Metadata manager instance with default volume and bucket.
+   * @throws IOException ioEx
    */
-  public static OMMetadataManager initializeNewOmMetadataManager(File omDbDir)
+  public static OMMetadataManager initializeNewOmMetadataManager(
+      File omDbDir)
       throws IOException {
-    // Create a new OzoneConfiguration instance
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
+    omConfiguration.set(OZONE_OM_DB_DIRS,
+        omDbDir.getAbsolutePath());
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
+        omConfiguration);
 
-    // Set the OM DB directory path
-    omConfiguration.set(OZONE_OM_DB_DIRS, omDbDir.getAbsolutePath());
-
-    // Create a new OmMetadataManagerImpl instance using the OzoneConfiguration
-    OMMetadataManager omMetadataManager =
-        new OmMetadataManagerImpl(omConfiguration);
-
-    // Create a new volume and add it to the volume table
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
-    OmVolumeArgs args = OmVolumeArgs.newBuilder()
-        .setVolume("sampleVol")
-        .setAdminName("TestUser")
-        .setOwnerName("TestUser")
-        .build();
+    OmVolumeArgs args =
+        OmVolumeArgs.newBuilder()
+            .setVolume("sampleVol")
+            .setAdminName("TestUser")
+            .setOwnerName("TestUser")
+            .build();
     omMetadataManager.getVolumeTable().put(volumeKey, args);
 
-    // Create a new bucket and add it to the bucket table
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
         .build();
-    String bucketKey =
-        omMetadataManager.getBucketKey(bucketInfo.getVolumeName(),
-            bucketInfo.getBucketName());
+
+    String bucketKey = omMetadataManager.getBucketKey(
+        bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
 
-    // Create another new volume and add it to the volume table
-    volumeKey = omMetadataManager.getVolumeKey("sampleVol2");
-    args = OmVolumeArgs.newBuilder()
-        .setVolume("sampleVol2")
-        .setAdminName("TestUser")
-        .setOwnerName("TestUser")
-        .setObjectID(0L)
-        .build();
-    omMetadataManager.getVolumeTable().put(volumeKey, args);
-
-    // Create another new bucket and add it to the bucket table
-    bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName("sampleVol2")
-        .setBucketName("fsoBucket")
-        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .setObjectID(1L)
-        .build();
-    bucketKey = omMetadataManager.getBucketKey(bucketInfo.getVolumeName(),
-        bucketInfo.getBucketName());
-    omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
-
-    // Create a new directory and add it to the directory table
-    OmDirectoryInfo dirInfo1 = OmDirectoryInfo.newBuilder()
-        .setName("dir1")
-        .setParentObjectID(1L)
-        .setUpdateID(1L)
-        .setObjectID(2L)
-        .build();
-    OmDirectoryInfo dirInfo2 = OmDirectoryInfo.newBuilder()
-        .setName("dir2")
-        .setParentObjectID(1L)
-        .setUpdateID(1L)
-        .setObjectID(3L)
-        .build();
-    String dirKey1 = omMetadataManager.getOzonePathKey(0, 1, 1L, "dir1");
-    String dirKey2 = omMetadataManager.getOzonePathKey(0, 1, 2L, "dir2");
-    omMetadataManager.getDirectoryTable().put(dirKey1, dirInfo1);
-    omMetadataManager.getDirectoryTable().put(dirKey2, dirInfo2);
-
-    // Return the initialized OMMetadataManager
     return omMetadataManager;
   }
 

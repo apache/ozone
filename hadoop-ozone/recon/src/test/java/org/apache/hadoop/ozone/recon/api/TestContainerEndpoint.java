@@ -61,7 +61,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
@@ -266,7 +269,48 @@ public class TestContainerEndpoint {
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
   }
 
-  private void setUpMultiBlockKey() throws IOException {
+  private void setUpFSOData() throws IOException {
+
+    // Create another new volume and add it to the volume table
+    String volumeKey = reconOMMetadataManager.getVolumeKey(VOLUME_NAME);
+    OmVolumeArgs args = OmVolumeArgs.newBuilder()
+        .setVolume(VOLUME_NAME)
+        .setAdminName("TestUser")
+        .setOwnerName("TestUser")
+        .setObjectID(0L)
+        .build();
+    reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
+
+    // Create another new bucket and add it to the bucket table
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setObjectID(1L)
+        .build();
+    String bucketKey =
+        reconOMMetadataManager.getBucketKey(bucketInfo.getVolumeName(),
+            bucketInfo.getBucketName());
+    reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    // Create a new directory and add it to the directory table
+    OmDirectoryInfo dirInfo1 = OmDirectoryInfo.newBuilder()
+        .setName("dir1")
+        .setParentObjectID(1L)
+        .setUpdateID(1L)
+        .setObjectID(2L)
+        .build();
+    OmDirectoryInfo dirInfo2 = OmDirectoryInfo.newBuilder()
+        .setName("dir2")
+        .setParentObjectID(1L)
+        .setUpdateID(1L)
+        .setObjectID(3L)
+        .build();
+    String dirKey1 = reconOMMetadataManager.getOzonePathKey(0, 1, 1L, "dir1");
+    String dirKey2 = reconOMMetadataManager.getOzonePathKey(0, 1, 2L, "dir2");
+    reconOMMetadataManager.getDirectoryTable().put(dirKey1, dirInfo1);
+    reconOMMetadataManager.getDirectoryTable().put(dirKey2, dirInfo2);
+
     OmKeyLocationInfoGroup locationInfoGroup =
         getLocationInfoGroup1();
 
@@ -369,7 +413,7 @@ public class TestContainerEndpoint {
 
     // Now to check if the ContainerEndpoint also reads the File table
     // Set up test data for FSO keys
-    setUpMultiBlockKey();
+    setUpFSOData();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     response = containerEndpoint.getKeysForContainer(20L, -1, "");
@@ -450,7 +494,7 @@ public class TestContainerEndpoint {
     assertEquals(0, data.getTotalCount());
 
     // Set up test data for FSO keys
-    setUpMultiBlockKey();
+    setUpFSOData();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
 
@@ -496,7 +540,7 @@ public class TestContainerEndpoint {
   @Test
   public void testCorrectPathForLayout() throws IOException {
     // Set up test data for FSO keys
-    setUpMultiBlockKey();
+    setUpFSOData();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
 
