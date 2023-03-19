@@ -516,7 +516,8 @@ public class TestContainerEndpoint {
     actualPath = containerEndpoint.correctPathForLayout(givenPath);
     assertEquals(expectedPath, actualPath);
 
-    // Test with nested directories
+    // Test with nested directories : Only the parent of the Immediate directory
+    // will be shown in the path
     givenPath =
         "/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + FSO_KEY_NAME2;
     expectedPath =
