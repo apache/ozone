@@ -114,14 +114,15 @@ public class TestContainerEndpoint {
   private PipelineID pipelineID;
   private long keyCount = 5L;
   private static final String FSO_KEY_NAME1 = "dir1/file7";
-  private static final String FSO_KEY_NAME2 = "dir1/file8";
-  private static final String BUCKET_NAME = "bucket1";
-  private static final String VOLUME_NAME = "vol";
+  private static final String FSO_KEY_NAME2 = "dir1/dir2/file8";
+  private static final String BUCKET_NAME = "fsoBucket";
+  private static final String VOLUME_NAME = "sampleVol2";
   private static final String FILE_NAME1 = "file7";
   private static final String FILE_NAME2 = "file8";
   private static final long FILE_ONE_OBJECT_ID = 13L;
   private static final long FILE_TWO_OBJECT_ID = 14L;
   private static final long PARENT_OBJECT_ID = 2L;
+  private static final long PARENT_OBJECT_ID2 = 3L;
   private static final long BUCKET_OBJECT_ID = 1L;
   private static final long VOL_OBJECT_ID = 0L;
   private static final long CONTAINER_ID_1 = 20L;
@@ -290,7 +291,7 @@ public class TestContainerEndpoint {
         VOLUME_NAME,
         FILE_NAME2,
         FILE_TWO_OBJECT_ID,
-        PARENT_OBJECT_ID,
+        PARENT_OBJECT_ID2,
         BUCKET_OBJECT_ID,
         VOL_OBJECT_ID,
         Collections.singletonList(locationInfoGroup),
@@ -324,7 +325,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetKeysForContainer() {
+  public void testGetKeysForContainer() throws IOException {
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
@@ -365,45 +366,41 @@ public class TestContainerEndpoint {
     keyMetadataList = data.getKeys();
     assertEquals(1, keyMetadataList.size());
     assertEquals(3, data.getTotalCount());
-  }
 
-  @Test
-  public void testGetFileTableKeysForContainer() throws IOException {
-    // test to check if the ContainerEndpoint also reads the File table
-
+    // Now to check if the ContainerEndpoint also reads the File table
     // Set up test data for FSO keys
     setUpMultiBlockKey();
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
-    Response response = containerEndpoint.getKeysForContainer(20L, -1, "");
+    response = containerEndpoint.getKeysForContainer(20L, -1, "");
 
     // Ensure that the expected number of keys is returned
-    KeysResponse data = (KeysResponse) response.getEntity();
-    Collection<KeyMetadata> keyMetadataList = data.getKeys();
+    data = (KeysResponse) response.getEntity();
+    keyMetadataList = data.getKeys();
 
     assertEquals(2, data.getTotalCount());
     assertEquals(2, keyMetadataList.size());
 
     // Retrieve the first key from the list and verify its metadata
-    Iterator<KeyMetadata> iterator = keyMetadataList.iterator();
-    KeyMetadata keyMetadata = iterator.next();
-    assertEquals("dir1/file7", keyMetadata.getKey());
-    assertEquals(1, keyMetadata.getVersions().size());
-    assertEquals(1, keyMetadata.getBlockIds().size());
-    Map<Long, List<KeyMetadata.ContainerBlockMetadata>> blockIds =
-        keyMetadata.getBlockIds();
-    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
-
+    iterator = keyMetadataList.iterator();
     keyMetadata = iterator.next();
-    assertEquals("dir1/file8", keyMetadata.getKey());
+    assertEquals("dir1/file7", keyMetadata.getKey());
     assertEquals(1, keyMetadata.getVersions().size());
     assertEquals(1, keyMetadata.getBlockIds().size());
     blockIds = keyMetadata.getBlockIds();
     assertEquals(0, blockIds.get(0L).get(0).getLocalID());
+
+    keyMetadata = iterator.next();
+    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+    blockIds = keyMetadata.getBlockIds();
+    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
+
   }
 
   @Test
-  public void testGetKeysForContainerWithPrevKey() {
+  public void testGetKeysForContainerWithPrevKey() throws IOException {
     // test if prev-key param works as expected
     Response response = containerEndpoint.getKeysForContainer(
         1L, -1, "/sampleVol/bucketOne/key_one");
@@ -419,10 +416,12 @@ public class TestContainerEndpoint {
     Iterator<KeyMetadata> iterator = keyMetadataList.iterator();
     KeyMetadata keyMetadata = iterator.next();
 
+    // assert that the returned key metadata is correct
     assertEquals("key_two", keyMetadata.getKey());
     assertEquals(2, keyMetadata.getVersions().size());
     assertEquals(2, keyMetadata.getBlockIds().size());
 
+    // test for an empty prev-key parameter
     response = containerEndpoint.getKeysForContainer(
         1L, -1, StringUtils.EMPTY);
     data = (KeysResponse) response.getEntity();
@@ -442,12 +441,89 @@ public class TestContainerEndpoint {
     assertEquals(3, data.getTotalCount());
     assertEquals(0, keyMetadataList.size());
 
+    // test for a container ID that does not exist
     response = containerEndpoint.getKeysForContainer(
         5L, -1, "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(0, keyMetadataList.size());
     assertEquals(0, data.getTotalCount());
+
+    // Set up test data for FSO keys
+    setUpMultiBlockKey();
+    // Reprocess the container key mapper to ensure the latest mapping is used
+    reprocessContainerKeyMapper();
+
+    // test getting keys for a container with a prev-key parameter for FSO keys
+    String prevKey = reconOMMetadataManager.getOzoneKey(VOLUME_NAME,
+        BUCKET_NAME, FSO_KEY_NAME1);
+    // The path "sampleVol2/bucketTwo/dir/file7" is used to generate the prevKey
+    // parameter for the current test case. This path will be skipped from the
+    // result since we are querying for keys after this path.
+    response =
+        containerEndpoint.getKeysForContainer(CONTAINER_ID_1, -1, prevKey);
+    data =
+        (KeysResponse) response.getEntity();
+
+    assertEquals(2, data.getTotalCount());
+
+    keyMetadataList = data.getKeys();
+    assertEquals(1, keyMetadataList.size());
+
+    iterator = keyMetadataList.iterator();
+    keyMetadata = iterator.next();
+
+    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+
+    // test for an empty prev-key parameter for FSO keys, hence all
+    // keys for that container will be returned to the response
+    response = containerEndpoint.getKeysForContainer(
+        CONTAINER_ID_1, -1, StringUtils.EMPTY);
+    data = (KeysResponse) response.getEntity();
+    keyMetadataList = data.getKeys();
+
+    assertEquals(2, data.getTotalCount());
+    assertEquals(2, keyMetadataList.size());
+    iterator = keyMetadataList.iterator();
+    keyMetadata = iterator.next();
+    assertEquals("dir1/file7", keyMetadata.getKey());
+    keyMetadata = iterator.next();
+    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
+  }
+
+  @Test
+  public void testCorrectPathForLayout() throws IOException {
+    // Set up test data for FSO keys
+    setUpMultiBlockKey();
+    // Reprocess the container key mapper to ensure the latest mapping is used
+    reprocessContainerKeyMapper();
+
+    // Test with a non-FSO bucket : Return the Same path with names
+    String prevKeyPrefix = "/sampleVol/bucketOne/dir1/file1";
+    String expectedPath = prevKeyPrefix;
+    String actualPath = containerEndpoint.correctPathForLayout(prevKeyPrefix);
+    assertEquals(expectedPath, actualPath);
+
+
+    // Test with a FSO bucket : Return the Same path but with objectIDs
+    String givenPath =
+        "/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + FSO_KEY_NAME1;
+    expectedPath =
+        "/" + VOL_OBJECT_ID + "/" + BUCKET_OBJECT_ID + "/" + PARENT_OBJECT_ID +
+            "/" + FILE_NAME1;
+    actualPath = containerEndpoint.correctPathForLayout(givenPath);
+    assertEquals(expectedPath, actualPath);
+
+    // Test with nested directories
+    givenPath =
+        "/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + FSO_KEY_NAME2;
+    expectedPath =
+        "/" + VOL_OBJECT_ID + "/" + BUCKET_OBJECT_ID + "/" + PARENT_OBJECT_ID2 +
+            "/" + FILE_NAME2;
+    actualPath = containerEndpoint.correctPathForLayout(givenPath);
+    assertEquals(expectedPath, actualPath);
   }
 
   @Test

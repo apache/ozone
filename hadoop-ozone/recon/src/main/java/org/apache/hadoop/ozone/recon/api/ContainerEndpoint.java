@@ -42,7 +42,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -428,14 +427,14 @@ public class ContainerEndpoint {
    * @return the object path for the file system optimized bucket
    * @throws IOException if an IO error occurs
    */
-  private String correctPathForLayout(String prevKeyPrefix)
+  public String correctPathForLayout(String prevKeyPrefix)
       throws IOException {
     if (StringUtils.isEmpty(prevKeyPrefix)) {
       return "";
     }
 
     try {
-      // Normalize the path to remove duplicate slashes & make it easier to parse.
+      // Normalize the path to remove duplicate slashes & make it easy to parse.
       String[] names = parseRequestPath(prevKeyPrefix);
 
       if (names.length < 3) {
@@ -467,7 +466,7 @@ public class ContainerEndpoint {
       volumeId = handler.getVolumeObjectId(names);
       parentId = handler.getDirObjectId(names, names.length - 1);
 
-      // Build the object path by concatenating the object IDs with the key name.
+      // Build the object path by concatenating the object IDs with the keyName.
       StringBuilder objectPathBuilder = new StringBuilder();
       objectPathBuilder.append(OM_KEY_PREFIX).append(volumeId)
           .append(OM_KEY_PREFIX).append(bucketId)
