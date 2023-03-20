@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -248,6 +249,13 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public void storeCertificate(String cert, CAType caType)
       throws CertificateException {
+  }
+
+  @Override
+  public String storeCertificate(
+      SCMSecurityProtocolProtos.SCMGetCertResponseProto response)
+      throws CertificateException {
+    return null;
   }
 
   @Override

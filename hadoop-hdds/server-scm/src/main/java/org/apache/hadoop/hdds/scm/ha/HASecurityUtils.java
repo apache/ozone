@@ -147,30 +147,19 @@ public final class HASecurityUtils {
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
           HddsServerUtil.getScmSecurityClientWithFixedDuration(config);
 
-      // Get SCM sub CA cert.
+      // Get SCM cert chain
       SCMGetCertResponseProto response = secureScmClient.
           getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr));
-      String pemEncodedCert = response.getX509Certificate();
 
-      // Store SCM sub CA and root CA certificate.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedRootCert = response.getX509CACertificate();
-        client.storeCertificate(
-            pemEncodedRootCert, CAType.SUBORDINATE);
-        client.storeCertificate(pemEncodedCert, CAType.NONE);
-        //note: this does exactly the same as store certificate
-        persistSubCACertificate(config, client,
-            pemEncodedCert);
+      // Store SCM cert and all it's ancestor CA certs
+      String certId = client.storeCertificate(response);
 
-        X509Certificate certificate =
-            CertificateCodec.getX509Certificate(pemEncodedCert);
-        // Persist scm cert serial ID.
-        scmStorageConfig.setScmCertSerialId(certificate.getSerialNumber()
-            .toString());
-      } else {
-        throw new RuntimeException("Unable to retrieve SCM certificate chain");
-      }
-    } catch (IOException | CertificateException e) {
+      //note: this does exactly the same as store SCM certificate
+      persistSubCACertificate(config, client, response.getX509Certificate());
+
+      // Persist SCM cert serial ID
+      scmStorageConfig.setScmCertSerialId(certId);
+    } catch (IOException e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       throw new RuntimeException(e);
     }

@@ -36,6 +36,7 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertPath;
+import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
@@ -61,6 +62,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -501,6 +503,56 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         component);
     storeCertificate(pemEncodedCert, caType,
         certificateCodec, true);
+  }
+
+  /**
+   * Stores all Certificates in this response on local disk.
+   * @param response - response from SCM
+   * @return first certificate ID
+   * @throws CertificateException - on Error
+   */
+  public String storeCertificate(SCMGetCertResponseProto response)
+      throws CertificateException {
+    return storeCertificate(response,
+        getSecurityConfig().getCertificateLocation(getComponentName()));
+  }
+
+  protected String storeCertificate(SCMGetCertResponseProto response,
+      Path codecPath) throws CertificateException {
+    CertificateCodec certCodec = new CertificateCodec(securityConfig,
+        codecPath);
+    try {
+      String pemEncodedCert = response.getX509Certificate();
+      String pemEncodedRootCert = response.getX509RootCACertificate();
+      if (pemEncodedRootCert == null) {
+        throw new RuntimeException("Unable to find SCM root certificate");
+      }
+      X509Certificate rootCert =
+          CertificateCodec.getX509Certificate(pemEncodedRootCert);
+      CertPath path =
+          CertificateCodec.getCertPathFromPemEncodedString(pemEncodedCert);
+      for (Certificate c: path.getCertificates()) {
+        X509Certificate cert = (X509Certificate) c;
+        CAType caType = CAType.NONE;
+        if (cert.getBasicConstraints() != -1) {
+          if (rootCert.getSerialNumber().toString().equals(
+              cert.getSerialNumber().toString())) {
+            caType = CAType.ROOT;
+          } else {
+            caType = CAType.SUBORDINATE;
+          }
+        }
+        String certName = String.format(CERT_FILE_NAME_FORMAT,
+            caType.getFileNamePrefix() + cert.getSerialNumber().toString());
+        certCodec.writeCertificate(
+            CertificateCodec.getCertificateHolder(cert), certName);
+      }
+      return ((X509Certificate)path.getCertificates().get(0))
+          .getSerialNumber().toString();
+    } catch (IOException | java.security.cert.CertificateException e) {
+      throw new CertificateException("Error while storing certificate.", e,
+          CERTIFICATE_ERROR);
+    }
   }
 
   public synchronized void storeCertificate(String pemEncodedCert,

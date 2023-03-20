@@ -863,22 +863,29 @@ public final class TestSecureOzoneCluster {
       OzoneManager.setTestSecureOmFlag(true);
       om = OzoneManager.createOm(conf);
 
-      assertNotNull(om.getCertificateClient());
-      assertNotNull(om.getCertificateClient().getPublicKey());
-      assertNotNull(om.getCertificateClient().getPrivateKey());
-      assertNotNull(om.getCertificateClient().getCertificate());
+      OMCertificateClient client =
+          (OMCertificateClient)om.getCertificateClient();
+      assertNotNull(client);
+      assertNotNull(client.getPublicKey());
+      assertNotNull(client.getPrivateKey());
+      assertNotNull(client.getCertificate());
       assertTrue(omLogs.getOutput().contains("Init response: GETCERT"));
       assertTrue(omLogs.getOutput().contains("Successfully stored " +
           "SCM signed certificate"));
-      X509Certificate certificate = om.getCertificateClient().getCertificate();
+      X509Certificate certificate = client.getCertificate();
       validateCertificate(certificate);
       String pemEncodedCACert =
           scm.getSecurityProtocolServer().getCACertificate();
       X509Certificate caCert =
           CertificateCodec.getX509Certificate(pemEncodedCACert);
-      X509Certificate caCertStored = om.getCertificateClient()
-          .getCertificate(caCert.getSerialNumber().toString());
+      X509Certificate caCertStored =
+          client.getCertificate(caCert.getSerialNumber().toString());
       assertEquals(caCert, caCertStored);
+      // assure there are three certificate files under OM metadata directory,
+      // root CA, sub CA and OM cert
+      Path certDir =
+          client.getSecurityConfig().getCertificateLocation(COMPONENT);
+      assertEquals(3, certDir.toFile().listFiles().length);
     } finally {
       if (scm != null) {
         scm.stop();

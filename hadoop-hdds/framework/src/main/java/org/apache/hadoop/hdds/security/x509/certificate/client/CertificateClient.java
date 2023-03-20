@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -187,6 +188,15 @@ public interface CertificateClient extends Closeable {
    * @throws CertificateException - on Error.
    */
   void storeCertificate(String pemEncodedCert, CAType caType)
+      throws CertificateException;
+
+  /**
+   * Stores all Certificates in this response on local disk.
+   * @param response - response from SCM
+   * @return first certificate ID
+   * @throws CertificateException - on Error
+   */
+  String storeCertificate(SCMGetCertResponseProto response)
       throws CertificateException;
 
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {

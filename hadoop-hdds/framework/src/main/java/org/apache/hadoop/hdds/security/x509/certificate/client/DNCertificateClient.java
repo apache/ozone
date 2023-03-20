@@ -22,8 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -37,14 +35,13 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * Certificate client for DataNodes.
  */
-public class DNCertificateClient extends DefaultCertificateClient {
+public class DNCertificateClient extends CommonCertificateClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DNCertificateClient.class);
@@ -100,34 +97,8 @@ public class DNCertificateClient extends DefaultCertificateClient {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
           getScmSecureClient().getDataNodeCertificateChain(
               dn.getProtoBufMessage(), getEncodedString(csr));
-
-      // Persist certificates.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certificatePath);
-        // Certs will be added to cert map after reloadAllCertificate called
-        storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec,
-            false);
-        storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE,
-            certCodec, false);
-
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
-        }
-        // Return the default certificate ID
-        String dnCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        return dnCertSerialId;
-      } else {
-        throw new CertificateException("Unable to retrieve datanode " +
-            "certificate chain.");
-      }
-    } catch (IOException | java.security.cert.CertificateException e) {
+      return storeCertificate(response, certificatePath);
+    } catch (IOException e) {
       LOG.error("Error while signing and storing SCM signed certificate.", e);
       throw new CertificateException(
           "Error while signing and storing SCM signed certificate.", e);

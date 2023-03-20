@@ -23,9 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -126,31 +124,8 @@ public class OMCertificateClient extends CommonCertificateClient {
     try {
       SCMGetCertResponseProto response = getScmSecureClient()
           .getOMCertChain(omInfo, getEncodedString(request));
-
-      String pemEncodedCert = response.getX509Certificate();
-      CertificateCodec certCodec = new CertificateCodec(
-          getSecurityConfig(), certificatePath);
-
-      // Store SCM CA certificate.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedRootCert = response.getX509CACertificate();
-        storeCertificate(pemEncodedRootCert,
-            CAType.SUBORDINATE, certCodec, false);
-        storeCertificate(pemEncodedCert, CAType.NONE, certCodec,
-            false);
-
-        // Store Root CA certificate if available.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
-        }
-        return CertificateCodec.getX509Certificate(pemEncodedCert)
-            .getSerialNumber().toString();
-      } else {
-        throw new CertificateException("Unable to retrieve OM certificate " +
-            "chain.");
-      }
-    } catch (IOException | java.security.cert.CertificateException e) {
+      return storeCertificate(response, certificatePath);
+    } catch (IOException e) {
       LOG.error("Error while signing and storing SCM signed certificate.", e);
       throw new CertificateException(
           "Error while signing and storing SCM signed certificate.", e);
