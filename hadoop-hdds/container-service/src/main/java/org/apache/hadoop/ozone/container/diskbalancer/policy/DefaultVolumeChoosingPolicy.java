@@ -58,6 +58,7 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
     // Can not generate DiskBalancerTask if we have less than 2 results
     if (volumes.size() <= 1) {
+      LOG.debug("Can not find appropriate Source volume and Dest Volume.");
       return null;
     }
     return Pair.of(volumes.get(0), volumes.get(volumes.size() - 1));

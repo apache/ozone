@@ -129,6 +129,7 @@ public class DiskBalancerService extends BackgroundService {
           DefaultContainerChoosingPolicy.class,
           ContainerChoosingPolicy.class).newInstance();
     } catch (Exception e) {
+      LOG.error("Got exception when initializing DiskBalancerService", e);
       throw new RuntimeException(e);
     }
 

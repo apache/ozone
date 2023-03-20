@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -33,6 +34,6 @@ public interface ContainerChoosingPolicy {
    *
    * @return a Container
    */
-  ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume volume, Set<Long> inProgressContainerIDs);
+  List<ContainerData> chooseContainer(OzoneContainer ozoneContainer,
+      HddsVolume volume, Set<Long> inProgressContainerIDs, Long targetSize);
 }

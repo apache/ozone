@@ -25,7 +25,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -36,17 +38,22 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       DefaultContainerChoosingPolicy.class);
 
   @Override
-  public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
+  public List<ContainerData> chooseContainer(OzoneContainer ozoneContainer,
+      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs,
+      Long targetSize) {
+    List<ContainerData> results = new ArrayList<>();
+    long sizeTotal = 0L;
+
     Iterator<Container<?>> itr = ozoneContainer.getController()
         .getContainers(hddsVolume);
-    while (itr.hasNext()) {
+    while (itr.hasNext() && sizeTotal < targetSize) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
           containerData.getContainerID()) && containerData.isClosed()) {
-        return containerData;
+        results.add(containerData);
+        sizeTotal += containerData.getBytesUsed();
       }
     }
-    return null;
+    return results;
   }
 }
