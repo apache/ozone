@@ -95,7 +95,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--dnSchema", "-d", "--dn-schema"},
       description = "Datanode DB Schema Version : V1/V2/V3",
-      defaultValue = "V2")
+      defaultValue = "V3")
   private static String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "-cid"},
@@ -112,7 +112,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
 
   @CommandLine.ParentCommand
-  private RDBParser parent;
+  private static RDBParser parent;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
@@ -154,7 +154,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       }
 
       boolean schemaV3 = dnDBSchemaVersion != null &&
-          dnDBSchemaVersion.equals("V3");
+              dnDBSchemaVersion.equals("V3") &&
+              parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
       while (iterator.get().isValid()) {
         StringBuilder result = new StringBuilder();
         if (withKey) {
@@ -318,7 +319,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         }
         ManagedRocksIterator iterator;
         if (containerId > 0 && dnDBSchemaVersion != null &&
-            dnDBSchemaVersion.equals("V3")) {
+            dnDBSchemaVersion.equals("V3") &&
+                parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME)) {
           ManagedReadOptions readOptions = new ManagedReadOptions();
           readOptions.setIterateUpperBound(new ManagedSlice(
               FixedLengthStringUtils.string2Bytes(
