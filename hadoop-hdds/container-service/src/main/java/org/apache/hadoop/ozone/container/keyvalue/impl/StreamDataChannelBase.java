@@ -64,6 +64,10 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
     return randomAccessFile.getChannel();
   }
 
+  public ContainerData getContainerData() {
+    return containerData;
+  }
+
   @Override
   public final void force(boolean metadata) throws IOException {
     getChannel().force(metadata);

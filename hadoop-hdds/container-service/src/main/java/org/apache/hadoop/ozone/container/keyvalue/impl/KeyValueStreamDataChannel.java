@@ -47,6 +47,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+
 /**
  * This class is used to get the DataChannel for streaming.
  */
@@ -158,7 +160,12 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   public int write(ReferenceCountedObject<ByteBuffer> referenceCounted)
       throws IOException {
     assertOpen();
-    return writeBuffers(referenceCounted, buffers, super::writeFileChannel);
+    try {
+      return writeBuffers(referenceCounted, buffers, super::writeFileChannel);
+    } catch (IOException e) {
+      volumeOnFailure();
+      throw e;
+    }
   }
 
   static int writeBuffers(ReferenceCountedObject<ByteBuffer> src,
@@ -198,8 +205,13 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   @Override
   public void close() throws IOException {
     if (closed.compareAndSet(false, true)) {
-      putBlockRequest.set(closeBuffers(buffers, super::writeFileChannel));
-      super.close();
+      try {
+        putBlockRequest.set(closeBuffers(buffers, super::writeFileChannel));
+        super.close();
+      } catch (IOException e) {
+        volumeOnFailure();
+        throw e;
+      }
     }
   }
 
@@ -273,5 +285,9 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
           ContainerProtos.Result.MALFORMED_REQUEST);
     }
     return request;
+  }
+
+  private void volumeOnFailure() {
+    onFailure(getContainerData().getVolume());
   }
 }
