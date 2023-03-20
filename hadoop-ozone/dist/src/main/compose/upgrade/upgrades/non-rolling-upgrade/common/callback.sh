@@ -45,12 +45,18 @@ get_cluster_setup_file() {
   echo "$TEST_DIR"/compose/ha/load.sh
 }
 
-with_this_version() {
+with_old_version() {
+  # TODO check if old version supports this command
+  execute_robot_test scm --include finalized upgrade/check-finalization.robot
   generate old1
   validate old1
 }
 
-with_new_version_pre_finalized() {
+with_this_version_pre_finalized() {
+  # TODO OM/SCM may not be pre-finalized if the release did not add a layout
+  #  feature. May just need to check integrity of this output with the
+  #  finalize command.
+  execute_robot_test scm --include pre-finalized upgrade/check-finalization.robot
   validate old1
   # HDDS-6261: overwrite the same keys intentionally
   generate old1 --exclude create-volume-and-bucket
@@ -59,7 +65,9 @@ with_new_version_pre_finalized() {
   validate new1
 }
 
-with_this_version_downgraded() {
+with_old_version_downgraded() {
+  # TODO Check if old version supported this command.
+  execute_robot_test scm --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
 
@@ -71,7 +79,7 @@ with_this_version_downgraded() {
   generate old1 --exclude create-volume-and-bucket
 }
 
-with_new_version_finalized() {
+with_this_version_finalized() {
   execute_robot_test scm --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1

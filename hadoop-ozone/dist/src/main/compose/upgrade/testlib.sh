@@ -53,34 +53,13 @@ create_data_dirs() {
 prepare_for_image() {
   local image_version="$1"
 
-# Need a way to get the setup file for the current cluster.
-  source "$(get_cluster_setup_file)"
+  # Load docker compose setup.
+  source "$OZONE_COMPOSE_DIR"/load.sh
 
   if [[ "$image_version" = 'current' ]]; then
       prepare_for_runner_image
   else
       prepare_for_binary_image "$image_version"
-  fi
-}
-
-## @description Prints the path to the file to source to load the docker
-##    compose setup for this test.
-## @param The name of the function to run.
-get_cluster_setup_file() {
-  set -u
-  : "${OZONE_UPGRADE_CALLBACK}"
-  : "${TEST_DIR}"
-  set +u
-
-  # Check if there is a callback to load a specific docker cluster.
-  # Use the default one only if one is not defined.
-  has_setup_override=false
-  if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
-    _run_callback "$OZONE_UPGRADE_CALLBACK" get_cluster_setup_file && has_setup_override=true
-  fi
-
-  if [[ "$has_setup_override" = false ]]; then
-    _run_callback "$TEST_DIR"/upgrades/"$UPGRADE_TYPE"/common/callback.sh get_cluster_setup_file
   fi
 }
 
@@ -128,8 +107,9 @@ _run_callback() {
 ## @param The version of Ozone to upgrade to.
 run_test() {
   export UPGRADE_TYPE="$1"
-  export OZONE_UPGRADE_FROM="$2"
-  export OZONE_UPGRADE_TO="$3"
+  local compose_dir="$2"
+  export OZONE_UPGRADE_FROM="$3"
+  export OZONE_UPGRADE_TO="$4"
 
   # Export variables needed by test, since it is run in a subshell.
   local test_dir="$_upgrade_dir/upgrades/$UPGRADE_TYPE"
@@ -137,6 +117,7 @@ run_test() {
   export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
   export OZONE_VOLUME="$test_subdir"/"$OZONE_UPGRADE_TO"/data
   export RESULT_DIR="$test_subdir"/"$OZONE_UPGRADE_TO"/result
+  export OZONE_COMPOSE_DIR="$_upgrade_dir"/compose/"$compose_dir"
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
