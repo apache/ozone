@@ -77,7 +77,6 @@ public interface SCMHAManager {
    * @throws IOException
    */
   boolean removeSCM(RemoveSCMRequest request) throws IOException;
-  // Change the argument to RemoveSCMRequest
 
   /**
    * Download the latest checkpoint from leader SCM.

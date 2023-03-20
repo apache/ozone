@@ -324,7 +324,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public boolean removeSCM(RemoveSCMRequest request) throws IOException {
     final List<RaftPeer> newRaftPeerList =
-        new ArrayList<>(getDivision().getGroup().getPeers());
+        new ArrayList<>(division.getGroup().getPeers());
     // remove the SCM node from the raft peer list
 
     final RaftPeer raftPeer = RaftPeer.newBuilder().setId(request.getScmId())
