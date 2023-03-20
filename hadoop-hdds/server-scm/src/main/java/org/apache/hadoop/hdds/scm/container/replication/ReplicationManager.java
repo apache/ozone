@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -568,9 +567,7 @@ public class ReplicationManager implements SCMService {
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadlineEpochMs);
-    final CommandForDatanode<?> datanodeCommand =
-        new CommandForDatanode<>(target.getUuid(), command);
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    nodeManager.addDatanodeCommand(target.getUuid(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
