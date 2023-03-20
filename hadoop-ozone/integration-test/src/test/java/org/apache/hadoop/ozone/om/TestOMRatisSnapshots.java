@@ -171,7 +171,7 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
-    createSnapshot(leaderOM, keys);
+    createOzoneSnapshot(leaderOM, keys);
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -563,7 +563,7 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  private void createSnapshot(OzoneManager leaderOM, List<String> keys)
+  private void createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
       throws TimeoutException, InterruptedException, IOException {
     // Avoid double buffer issue waiting for keys.
     GenericTestUtils.waitFor(() -> {

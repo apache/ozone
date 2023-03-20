@@ -68,6 +68,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -553,20 +554,21 @@ public final class OmSnapshotManager implements AutoCloseable {
         OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
       // Read file.
-      List<String> lines =
-          Files.lines(hardLinkFile.toPath()).collect(Collectors.toList());
+      try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
+        List<String> lines = s.collect(Collectors.toList());
 
-      // Create a link for each line.
-      for (String l : lines) {
-        String from = l.split("\t")[1];
-        String to = l.split("\t")[0];
-        Path fullFromPath = getFullPath(dbPath, from);
-        Path fullToPath = getFullPath(dbPath, to);
-        Files.createLink(fullToPath, fullFromPath);
-      }
-      if (!hardLinkFile.delete()) {
-        throw new IOException(
-            "Failed to delete: " + hardLinkFile);
+        // Create a link for each line.
+        for (String l : lines) {
+          String from = l.split("\t")[1];
+          String to = l.split("\t")[0];
+          Path fullFromPath = getFullPath(dbPath, from);
+          Path fullToPath = getFullPath(dbPath, to);
+          Files.createLink(fullToPath, fullFromPath);
+        }
+        if (!hardLinkFile.delete()) {
+          throw new IOException(
+              "Failed to delete: " + hardLinkFile);
+        }
       }
     }
   }

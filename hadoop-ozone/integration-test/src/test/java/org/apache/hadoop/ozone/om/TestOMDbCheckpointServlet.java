@@ -341,22 +341,22 @@ public class TestOMDbCheckpointServlet {
         getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
 
     // Check each line in the hard link file.
-    Stream<String> lines = Files.lines(Paths.get(newDbDirName,
-        OM_HARDLINK_FILE));
-
     List<String> fabricatedLinkLines = new ArrayList<>();
-    for (String line: lines.collect(Collectors.toList())) {
-      Assert.assertFalse("CURRENT file is not a hard link",
-          line.contains("CURRENT"));
-      if (line.contains("fabricatedFile")) {
-        fabricatedLinkLines.add(line);
-      } else {
-        checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
-        // add links to the final set
-        finalFullSet.add(line.split("\t")[0]);
+    try (Stream<String> lines = Files.lines(Paths.get(newDbDirName,
+        OM_HARDLINK_FILE))) {
+
+      for (String line : lines.collect(Collectors.toList())) {
+        Assert.assertFalse("CURRENT file is not a hard link",
+            line.contains("CURRENT"));
+        if (line.contains("fabricatedFile")) {
+          fabricatedLinkLines.add(line);
+        } else {
+          checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
+          // add links to the final set
+          finalFullSet.add(line.split("\t")[0]);
+        }
       }
     }
-
     Set<String> directories = Sets.newHashSet(
         shortSnapshotLocation, shortSnapshotLocation2,
         shortCompactionDirLocation);
@@ -364,7 +364,7 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
-    Assert.assertEquals("found expected snapshot files",
+    Assert.assertEquals("expected snapshot files not found",
         initialFullSet, finalFullSet);
   }
 
@@ -399,8 +399,6 @@ public class TestOMDbCheckpointServlet {
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
   }
 
-
-
   private void prepSnapshotData() throws Exception {
     setupCluster();
     metaDir = OMStorage.getOmDbDir(conf);
@@ -414,9 +412,6 @@ public class TestOMDbCheckpointServlet {
     TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
         "content");
 
-    // This sleep can be removed after this is fixed:
-    // https://issues.apache.org/jira/browse/HDDS-7279
-    Thread.sleep(2000);
     snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
     snapshotDirName2 =
