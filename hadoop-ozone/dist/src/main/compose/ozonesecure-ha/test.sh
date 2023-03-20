@@ -42,7 +42,7 @@ execute_robot_test ${SCM} -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-lin
 execute_robot_test ${SCM} basic/links.robot
 
 exclude=""
-for bucket in encrypted; do
+for bucket in encrypted link; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   exclude="--exclude no-bucket-type"
