@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -187,15 +188,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return snapshotPaths;
   }
 
-  private void waitForDirToExist(Path dir)
-      throws IOException, InterruptedException {
-    long endTime = System.currentTimeMillis() +
-        Duration.parse(DURATION_TO_WAIT_FOR_DIRECTORY).toMillis();
-    while (!dir.toFile().exists()) {
-      Thread.sleep(100);
-      if (System.currentTimeMillis() > endTime) {
-        throw new IOException("snapshot dir doesn't exist: " + dir);
-      }
+  private void waitForDirToExist(Path dir) throws IOException {
+    if (!RDBCheckpointManager.waitForCheckpointDirectoryExist(dir.toFile())) {
+      throw new IOException("snapshot dir doesn't exist: " + dir);
     }
   }
 

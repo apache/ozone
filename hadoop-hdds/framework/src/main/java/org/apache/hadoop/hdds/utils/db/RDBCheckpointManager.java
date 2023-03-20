@@ -113,7 +113,7 @@ public class RDBCheckpointManager implements Closeable {
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
    * poll interval.
    */
-  public static void waitForCheckpointDirectoryExist(File file)
+  public static boolean waitForCheckpointDirectoryExist(File file)
       throws IOException {
     Instant start = Instant.now();
     try {
@@ -126,9 +126,11 @@ public class RDBCheckpointManager implements Closeable {
               " availability.",
           Duration.between(start, Instant.now()).toMillis(),
           file.getAbsoluteFile());
+      return true;
     } catch (ConditionTimeoutException exception) {
       LOG.info("Checkpoint directory: {} didn't get created in 5 secs.",
           file.getAbsolutePath());
+      return false;
     }
   }
 
