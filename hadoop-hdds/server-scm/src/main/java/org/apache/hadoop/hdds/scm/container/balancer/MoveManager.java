@@ -110,10 +110,10 @@ public final class MoveManager implements
   //        delete after the move, but before anything else can, eg RM?
 
   /*
-  moveDeadline and replicationDeadline are set by ContainerBalancer.
+  moveTimeout and replicationTimeout are set by ContainerBalancer.
    */
-  private long moveDeadline = 1000 * 90 * 60;
-  private long replicationDeadline = 1000 * 60 * 60;
+  private long moveTimeout = 1000 * 90 * 60;
+  private long replicationTimeout = 1000 * 60 * 60;
   private static final double MOVE_DEADLINE_FACTOR = 0.95;
 
   private final ReplicationManager replicationManager;
@@ -448,8 +448,8 @@ public final class MoveManager implements
         containerInfo.containerID(), src);
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + replicationDeadline,
-        now + Math.round(replicationDeadline * MOVE_DEADLINE_FACTOR));
+        replicaIndex, src, tgt, now + replicationTimeout,
+        now + Math.round(replicationTimeout * MOVE_DEADLINE_FACTOR));
   }
 
   /**
@@ -465,11 +465,11 @@ public final class MoveManager implements
       NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), datanode);
-    long deleteDeadline = moveDeadline - replicationDeadline;
+    long deleteTimeout = moveTimeout - replicationTimeout;
     long now = clock.millis();
     replicationManager.sendDeleteCommand(
-        containerInfo, replicaIndex, datanode, true, now + deleteDeadline,
-        now + Math.round(deleteDeadline * MOVE_DEADLINE_FACTOR));
+        containerInfo, replicaIndex, datanode, true, now + deleteTimeout,
+        now + Math.round(deleteTimeout * MOVE_DEADLINE_FACTOR));
   }
 
   private int getContainerReplicaIndex(
@@ -494,11 +494,11 @@ public final class MoveManager implements
     }
   }
 
-  void setMoveDeadline(long moveDeadline) {
-    this.moveDeadline = moveDeadline;
+  void setMoveTimeout(long moveTimeout) {
+    this.moveTimeout = moveTimeout;
   }
 
-  void setReplicationDeadline(long replicationDeadline) {
-    this.replicationDeadline = replicationDeadline;
+  void setReplicationTimeout(long replicationTimeout) {
+    this.replicationTimeout = replicationTimeout;
   }
 }
