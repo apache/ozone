@@ -63,7 +63,9 @@ prepare_for_image() {
   fi
 }
 
-## @description Runs a callback function only if it exists.
+## @description Run the common callback function first, then the one specific to
+##   the upgrade being tested if one exists. If neither exists, print a
+##   warning that nothing was tested.
 ## @param The name of the function to run.
 callback() {
   local func="$1"
@@ -73,32 +75,30 @@ callback() {
   : "${TEST_DIR}"
   set +u
 
-  # If this upgrade has no callbacks for custom testing, only the common ones
-  # will be run.
-  if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
-    _run_callback "$OZONE_UPGRADE_CALLBACK" "$func"
-  fi
-  _run_callback "$TEST_DIR"/upgrades/non-rolling-upgrade/common/callback.sh "$func"
-}
-
-_run_callback() {
-  local script="$1"
-  local func="$2"
-
+  local common_callback="$TEST_DIR"/upgrades/"$UPGRADE_TYPE"/common/callback.sh
   (
-    if [[ -f "$script" ]]; then
-      source "$script"
-      if [[ "$(type -t "$func")" = function ]]; then
-        "$func"
-      else
-        echo "Skipping callback $func. No function implementation found." 1>&2
-        return 1
-      fi
+    source "$common_callback" || exit 1
+    if [[ "$(type -t "$func")" = function ]]; then
+      "$func"
     else
-        echo "Skipping callback $func. No script $script found." 1>&2
-        return 1
+      exit 1
     fi
   )
+  common_callback_rc="$?"
+
+  (
+    source "$OZONE_UPGRADE_CALLBACK" || exit 1
+    if [[ "$(type -t "$func")" = function ]]; then
+      "$func"
+    else
+      exit 1
+    fi
+  )
+  callback_rc="$?"
+
+  if [[ ! "$common_callback_rc" ]] && [[ ! "$callback_rc" ]]; then
+    echo "Failed to execute callback for $func in $common_callback or $OZONE_UPGRADE_CALLBACK" 1>&2
+  fi
 }
 
 ## @description Sets up and runs the test defined by "$1"/test.sh.
