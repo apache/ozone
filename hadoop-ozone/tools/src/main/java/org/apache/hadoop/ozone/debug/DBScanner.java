@@ -209,8 +209,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     return parent;
   }
 
-  public void setParent(RDBParser parent) {
-    this.parent = parent;
+  public static void setParent(RDBParser parent) {
+    DBScanner.parent = parent;
   }
 
   public static void setLimit(int limit) {
