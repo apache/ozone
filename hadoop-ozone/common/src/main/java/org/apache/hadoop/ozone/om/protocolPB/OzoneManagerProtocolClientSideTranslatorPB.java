@@ -1202,7 +1202,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize) throws IOException {
+                                           int pageSize,
+                                           boolean forceFullDiff)
+      throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
@@ -1210,7 +1212,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setBucketName(bucketName)
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
-            .setPageSize(pageSize);
+            .setPageSize(pageSize)
+            .setForceFullDiff(forceFullDiff);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);

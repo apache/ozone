@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -169,6 +168,7 @@ public class ReplicationManager implements SCMService {
   private final ECMisReplicationHandler ecMisReplicationHandler;
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
+  private final RatisMisReplicationHandler ratisMisReplicationHandler;
   private final int maintenanceRedundancy;
   private final int ratisMaintenanceMinReplicas;
   private Thread underReplicatedProcessorThread;
@@ -239,6 +239,8 @@ public class ReplicationManager implements SCMService {
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
+    ratisMisReplicationHandler = new RatisMisReplicationHandler(
+        ratisContainerPlacement, conf, this, rmConf.isPush());
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -565,9 +567,7 @@ public class ReplicationManager implements SCMService {
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadlineEpochMs);
-    final CommandForDatanode<?> datanodeCommand =
-        new CommandForDatanode<>(target.getUuid(), command);
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    nodeManager.addDatanodeCommand(target.getUuid(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
@@ -682,8 +682,18 @@ public class ReplicationManager implements SCMService {
             + result.getHealthState());
       }
     }
-    return ratisUnderReplicationHandler.processAndSendCommands(replicas,
-        pendingOps, result, ratisMaintenanceMinReplicas);
+    if (result.getHealthState()
+        == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      return ratisUnderReplicationHandler.processAndSendCommands(replicas,
+          pendingOps, result, ratisMaintenanceMinReplicas);
+    } else if (result.getHealthState()
+        == ContainerHealthResult.HealthState.MIS_REPLICATED) {
+      return ratisMisReplicationHandler.processAndSendCommands(replicas,
+          pendingOps, result, ratisMaintenanceMinReplicas);
+    } else {
+      throw new IllegalArgumentException("Unexpected health state: "
+          + result.getHealthState());
+    }
   }
 
   int processOverReplicatedContainer(

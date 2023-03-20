@@ -45,6 +45,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -147,8 +148,8 @@ public class SstFilteringService extends BackgroundService {
           String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
               OM_SNAPSHOT_CHECKPOINT_DIR;
           try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(),
-                  new File(snapshotCheckpointDir), dbName, true)) {
+              .loadDB(ozoneManager.getConfiguration(), new File(snapshotCheckpointDir),
+                  dbName, true, Optional.of(Boolean.TRUE))) {
             RocksDatabase db = rdbStore.getDb();
             db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
           }
