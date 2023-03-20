@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -83,15 +84,22 @@ public class SCMBlockDeletingService extends BackgroundService
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
 
+  private long lastTimeToBeReadyInMillis = 0;
+  private final long waitTimeInMillis;
+  private final Clock clock;
+
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
              NodeManager nodeManager, EventPublisher eventPublisher,
              SCMContext scmContext, SCMServiceManager serviceManager,
              Duration interval, long serviceTimeout,
              ConfigurationSource conf,
-             ScmBlockDeletingServiceMetrics metrics) {
+             ScmBlockDeletingServiceMetrics metrics,
+             long waitTimeInMillis, Clock clock) {
     super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
+    this.waitTimeInMillis = waitTimeInMillis;
+    this.clock = clock;
     this.deletedBlockLog = deletedBlockLog;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
@@ -211,7 +219,9 @@ public class SCMBlockDeletingService extends BackgroundService
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      if (scmContext.isLeaderReady()) {
+      if (scmContext.isLeaderReady() && !scmContext.isInSafeMode() &&
+          serviceStatus != ServiceStatus.RUNNING) {
+        lastTimeToBeReadyInMillis = clock.millis();
         serviceStatus = ServiceStatus.RUNNING;
       } else {
         serviceStatus = ServiceStatus.PAUSING;
@@ -225,7 +235,15 @@ public class SCMBlockDeletingService extends BackgroundService
   public boolean shouldRun() {
     serviceLock.lock();
     try {
-      return serviceStatus == ServiceStatus.RUNNING;
+      long alreadyWaitTimeInMillis = clock.millis() - lastTimeToBeReadyInMillis;
+      boolean run = serviceStatus == ServiceStatus.RUNNING &&
+          (alreadyWaitTimeInMillis >= waitTimeInMillis);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Check scm block delete run: {} serviceStatus: {} waitTimeInMillis: {} alreadyWaitTimeInMillis: {}",
+            run, serviceStatus, waitTimeInMillis, alreadyWaitTimeInMillis);
+      }
+      return run;
     } finally {
       serviceLock.unlock();
     }
