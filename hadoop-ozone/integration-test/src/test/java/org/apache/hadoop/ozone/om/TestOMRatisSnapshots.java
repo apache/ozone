@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -55,7 +56,9 @@ import org.slf4j.event.Level;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -63,8 +66,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -171,7 +180,7 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
-    createOzoneSnapshot(leaderOM, keys);
+    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM, keys);
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -253,6 +262,35 @@ public class TestOMRatisSnapshots {
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+
+    // Confirm followers snapshot hard links are as expected
+    File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
+    Path followerActiveDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
+    Path followerSnapshotDir =
+        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo));
+    Path leaderSnapshotDir =
+        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+    // Check snapshot hard links
+
+    // Get the list of sst files from the leader.  Then use those filenames to
+    //  compare the followers snapshot with the followers active fs for
+    //  hard links
+    int sstCount = 0;
+    try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
+      for (Path p: list.collect(Collectors.toList())) {
+        String fileName = p.getFileName().toString();
+        if (fileName.toLowerCase().endsWith(".sst")) {
+          Path snapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
+          Path activeSST =  Paths.get(followerActiveDir.toString(), fileName);
+          assertEquals("Snapshot sst file is supposed to be a hard link",
+              OmSnapshotManager.getINode(activeSST),
+              OmSnapshotManager.getINode(snapshotSST));
+          sstCount++;
+
+        }
+      }
+    }
+    assertTrue("No sst files were found", sstCount > 0);
   }
 
   @Ignore("Enable this unit test after RATIS-1481 used")
@@ -563,36 +601,25 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  private void createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
-      throws TimeoutException, InterruptedException, IOException {
-    // Avoid double buffer issue waiting for keys.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        OmKeyInfo key = leaderOM.getMetadataManager()
-            .getKeyTable(ozoneBucket.getBucketLayout())
-            .getSkipCache(leaderOM.getMetadataManager()
-            .getOzoneKey(volumeName, bucketName, keys.get(0)));
-        return key != null;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 100, 10000);
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
+      throws IOException {
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
-    // Allow the snapshot to be written to the info table.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        String tableKey = SnapshotInfo.getTableKey(volumeName,
-            bucketName,
-            "snap1");
-        SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
-            .getSnapshotInfoTable()
-            .getSkipCache(tableKey);
-        return snapshotInfo != null;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 100, 3000);
+    String tableKey = SnapshotInfo.getTableKey(volumeName,
+                                               bucketName,
+                                               "snap1");
+    SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
+      .getSnapshotInfoTable()
+      .get(tableKey);
+    // Allow the snapshot to be written to disk
+    String fileName =
+        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+    File snapshotDir = new File(fileName);
+    if (!RDBCheckpointManager
+        .waitForCheckpointDirectoryExist(snapshotDir)) {
+      throw new IOException("snapshot directory doesn't exist");
+    }
+    return snapshotInfo;
   }
 
   private List<String> writeKeysToIncreaseLogIndex(
