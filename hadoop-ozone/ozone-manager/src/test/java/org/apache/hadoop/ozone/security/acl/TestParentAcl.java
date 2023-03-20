@@ -148,11 +148,11 @@ public class TestParentAcl {
     List<OzoneAcl> originalBuckAcls = getBucketAcls(vol, buck);
     List<OzoneAcl> originalKeyAcls = getBucketAcls(vol, buck);
 
-    testParentChild(keyObj, WRITE, WRITE_ACL);
+    testParentChild(keyObj, READ, WRITE_ACL);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls,
         key, originalKeyAcls);
 
-    testParentChild(keyObj, WRITE, DELETE);
+    testParentChild(keyObj, READ, DELETE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls,
         key, originalKeyAcls);
 
@@ -190,10 +190,10 @@ public class TestParentAcl {
 
     List<OzoneAcl> originalVolAcls = getVolumeAcls(vol);
     List<OzoneAcl> originalBuckAcls = getBucketAcls(vol, buck);
-    testParentChild(bucketObj, WRITE, WRITE_ACL);
+    testParentChild(bucketObj, READ, WRITE_ACL);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, WRITE, DELETE);
+    testParentChild(bucketObj, READ, DELETE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
     testParentChild(bucketObj, READ, READ_ACL);
@@ -208,7 +208,7 @@ public class TestParentAcl {
     testParentChild(bucketObj, READ, READ);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, WRITE, WRITE);
+    testParentChild(bucketObj, READ, WRITE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
   }
 
@@ -263,7 +263,9 @@ public class TestParentAcl {
       Assert.assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
 
       // add the volume acl (grand-parent), now key access is allowed.
-      addVolumeAcl(child.getVolumeName(), parentAcl);
+      OzoneAcl parentVolumeAcl = new OzoneAcl(USER,
+          testUgi1.getUserName(), READ, ACCESS);
+      addVolumeAcl(child.getVolumeName(), parentVolumeAcl);
       Assert.assertTrue(nativeAuthorizer.checkAccess(child, requestContext));
     }
   }
