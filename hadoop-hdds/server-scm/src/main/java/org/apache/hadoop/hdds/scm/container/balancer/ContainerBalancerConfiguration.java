@@ -108,9 +108,9 @@ public final class ContainerBalancerConfiguration {
   private long moveReplicationTimeout = Duration.ofMinutes(60).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "130m", tags = {ConfigTag.BALANCER}, description =
+      defaultValue = "160m", tags = {ConfigTag.BALANCER}, description =
       "The interval period between each iteration of Container Balancer.")
-  private long balancingInterval = Duration.ofMinutes(130).toMillis();
+  private long balancingInterval = Duration.ofMinutes(160).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
