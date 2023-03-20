@@ -128,7 +128,7 @@ public abstract class StorageVolume
       this.conf = b.conf;
     } else {
       storageDir = new File(b.volumeRootStr);
-      this.volumeInfo = Optional.ofNullable(null);
+      this.volumeInfo = Optional.empty();
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
@@ -397,10 +397,7 @@ public abstract class StorageVolume
   }
 
   public void refreshVolumeInfo() {
-
-    if (volumeInfo.isPresent()) {
-      volumeInfo.get().refreshNow();
-    }
+    volumeInfo.ifPresent(VolumeInfo::refreshNow);
   }
 
   public Optional<VolumeInfo> getVolumeInfo() {
@@ -408,15 +405,13 @@ public abstract class StorageVolume
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    if (volumeInfo.isPresent()) {
-      volumeInfo.get().incrementUsedSpace(usedSpace);
-    }
+    volumeInfo.ifPresent(volInfo -> volInfo
+            .incrementUsedSpace(usedSpace));
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    if (volumeInfo.isPresent()) {
-      volumeInfo.get().decrementUsedSpace(reclaimedSpace);
-    }
+    volumeInfo.ifPresent(volInfo -> volInfo
+            .decrementUsedSpace(reclaimedSpace));
   }
 
   public VolumeSet getVolumeSet() {
@@ -424,10 +419,8 @@ public abstract class StorageVolume
   }
 
   public StorageType getStorageType() {
-    if (volumeInfo.isPresent()) {
-      return volumeInfo.get().getStorageType();
-    }
-    return StorageType.DEFAULT;
+    return volumeInfo.map(VolumeInfo::getStorageType)
+            .orElse(StorageType.DEFAULT);
   }
 
   public String getStorageID() {
@@ -468,16 +461,12 @@ public abstract class StorageVolume
 
   public void failVolume() {
     setState(VolumeState.FAILED);
-    if (volumeInfo.isPresent()) {
-      volumeInfo.get().shutdownUsageThread();
-    }
+    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
   }
 
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
-    if (volumeInfo.isPresent()) {
-      volumeInfo.get().shutdownUsageThread();
-    }
+    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
   }
 
   /**

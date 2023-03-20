@@ -371,19 +371,21 @@ public class TestHddsVolume {
 
   @Test
   public void testFailedVolumeSpace() throws IOException {
-
     // Build failed volume
     HddsVolume volume = volumeBuilder.failedVolume(true).build();
+    VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
 
-    // In case of failed volume all stats should return 0.
-    assertEquals(0, volume.getVolumeInfoStats().getUsed());
-    assertEquals(0, volume.getVolumeInfoStats().getAvailable());
-    assertEquals(0, volume.getVolumeInfoStats().getCapacity());
-    assertEquals(0, volume.getVolumeInfoStats().getReserved());
-    assertEquals(0, volume.getVolumeInfoStats().getTotalCapacity());
-
-    // Shutdown the volume.
-    volume.shutdown();
+    try {
+      // In case of failed volume all stats should return 0.
+      assertEquals(0, volumeInfoMetrics.getUsed());
+      assertEquals(0, volumeInfoMetrics.getAvailable());
+      assertEquals(0, volumeInfoMetrics.getCapacity());
+      assertEquals(0, volumeInfoMetrics.getReserved());
+      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
+    } finally {
+      // Shutdown the volume.
+      volume.shutdown();
+    }
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {
