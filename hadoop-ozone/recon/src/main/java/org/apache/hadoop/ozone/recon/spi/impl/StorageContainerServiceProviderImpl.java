@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
+import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -201,8 +201,7 @@ public class StorageContainerServiceProviderImpl
             try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
                 hostAddress, grpcPort, configuration,
                 new ReconCertificateClient(new SecurityConfig(configuration),
-                    reconStorage.getReconCertSerialId(),
-                    reconStorage.getClusterID(), reconStorage.getReconId()))) {
+                    reconStorage, null, null))) {
               downloadClient.download(targetFile.toPath()).get();
             } catch (ExecutionException | InterruptedException e) {
               LOG.error("Rocks DB checkpoint downloading failed", e);

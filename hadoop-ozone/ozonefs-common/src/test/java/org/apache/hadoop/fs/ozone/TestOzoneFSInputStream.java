@@ -19,14 +19,22 @@ package org.apache.hadoop.fs.ozone;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoCodec;
+import org.apache.hadoop.crypto.CryptoInputStream;
+import org.apache.hadoop.crypto.Decryptor;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.ozone.client.io.KeyInputStream;
+
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.IntFunction;
@@ -34,6 +42,11 @@ import java.util.function.IntFunction;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link OzoneFSInputStream}.
@@ -129,6 +142,27 @@ public class TestOzoneFSInputStream {
       if (capableOzoneFSInputStream != null) {
         capableOzoneFSInputStream.close();
       }
+    }
+  }
+
+  @Test
+  public void testCryptoStreamUnbuffer()
+      throws IOException, GeneralSecurityException {
+    KeyInputStream keyInputStream = mock(KeyInputStream.class);
+    when(keyInputStream.hasCapability(anyString())).thenReturn(true);
+
+    CryptoCodec codec = mock(CryptoCodec.class);
+    when(codec.getCipherSuite()).thenReturn(CipherSuite.AES_CTR_NOPADDING);
+    when(codec.getConf()).thenReturn(new Configuration());
+    Decryptor decryptor = mock(Decryptor.class);
+    when(codec.createDecryptor()).thenReturn(decryptor);
+    CryptoInputStream cis = new CryptoInputStream(keyInputStream, codec,
+        new byte[0], new byte[0]);
+    try {
+      cis.unbuffer();
+      verify(keyInputStream, times(1)).unbuffer();
+    } finally {
+      cis.close();
     }
   }
 

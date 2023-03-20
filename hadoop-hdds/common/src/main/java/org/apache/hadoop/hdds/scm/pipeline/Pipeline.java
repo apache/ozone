@@ -153,6 +153,11 @@ public final class Pipeline {
     this.leaderId = leaderId;
   }
 
+  /** @return the number of datanodes in this pipeline. */
+  public int size() {
+    return nodeStatus.size();
+  }
+
   /**
    * Returns the list of nodes which form this pipeline.
    *
@@ -216,18 +221,46 @@ public final class Pipeline {
   }
 
   public DatanodeDetails getFirstNode() throws IOException {
+    return getFirstNode(null);
+  }
+
+  public DatanodeDetails getFirstNode(Set<DatanodeDetails> excluded)
+      throws IOException {
+    if (excluded == null) {
+      excluded = Collections.emptySet();
+    }
     if (nodeStatus.isEmpty()) {
       throw new IOException(String.format("Pipeline=%s is empty", id));
     }
-    return nodeStatus.keySet().iterator().next();
+    for (DatanodeDetails d : nodeStatus.keySet()) {
+      if (!excluded.contains(d)) {
+        return d;
+      }
+    }
+    throw new IOException(String.format(
+        "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
   public DatanodeDetails getClosestNode() throws IOException {
+    return getClosestNode(null);
+  }
+
+  public DatanodeDetails getClosestNode(Set<DatanodeDetails> excluded)
+      throws IOException {
+    if (excluded == null) {
+      excluded = Collections.emptySet();
+    }
     if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      return getFirstNode();
+      return getFirstNode(excluded);
     }
-    return nodesInOrder.get().get(0);
+    for (DatanodeDetails d : nodesInOrder.get()) {
+      if (!excluded.contains(d)) {
+        return d;
+      }
+    }
+    throw new IOException(String.format(
+        "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
   public boolean isClosed() {

@@ -20,7 +20,10 @@ package org.apache.hadoop.fs.ozone.contract;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,6 +37,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -44,15 +48,37 @@ import org.junit.Assert;
  */
 class OzoneContract extends AbstractFSContract {
 
+  private static final List<Boolean> FSO_COMBINATIONS = Arrays.asList(
+      // FSO configuration is a cluster level server side configuration.
+      // If the cluster is configured with SIMPLE metadata layout,
+      // non-FSO bucket will created.
+      // If the cluster is configured with PREFIX metadata layout,
+      // FSO bucket will be created.
+      // Presently, OzoneClient checks bucketMetadata then invokes FSO or
+      // non-FSO specific code and it makes no sense to add client side
+      // configs now. Once the specific client API to set FSO or non-FSO
+      // bucket is provided the contract test can be refactored to include
+      // another parameter (fsoClient) which sets/unsets the client side
+      // configs.
+      true, // Server is configured with new layout (PREFIX)
+      // and new buckets will be operated on
+      false // Server is configured with old layout (SIMPLE)
+      // and old buckets will be operated on
+  );
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
   private static boolean fsOptimizedServer;
+  private static OzoneClient client;
 
   OzoneContract(Configuration conf) {
     super(conf);
     //insert the base features
     addConfResource(CONTRACT_XML);
+  }
+
+  static List<Boolean> getFsoCombinations() {
+    return FSO_COMBINATIONS;
   }
 
   @Override
@@ -62,8 +88,7 @@ class OzoneContract extends AbstractFSContract {
 
   @Override
   public Path getTestPath() {
-    Path path = new Path("/test");
-    return path;
+    return new Path("/test");
   }
 
   public static void initOzoneConfiguration(boolean fsoServer) {
@@ -92,22 +117,16 @@ class OzoneContract extends AbstractFSContract {
 
     conf.addResource(CONTRACT_XML);
 
-    if (fsOptimizedServer) {
-      // Default bucket layout is set to FSO in case of FSO server.
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
-    } else {
-      // Default bucket layout is set to LEGACY to support Hadoop compatible
-      // FS operations that are incompatible with OBS (default config value).
-      conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-          BucketLayout.LEGACY.name());
-    }
+    BucketLayout bucketLayout = fsOptimizedServer
+        ? BucketLayout.FILE_SYSTEM_OPTIMIZED : BucketLayout.LEGACY;
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
               180000);
+      client = cluster.newClient();
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -120,9 +139,9 @@ class OzoneContract extends AbstractFSContract {
   @Override
   public FileSystem getTestFileSystem() throws IOException {
     //assumes cluster is not null
-    Assert.assertNotNull("cluster not created", cluster);
+    Assert.assertNotNull("cluster not created", client);
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     String uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
@@ -133,6 +152,7 @@ class OzoneContract extends AbstractFSContract {
   }
 
   public static void destroyCluster() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       cluster = null;

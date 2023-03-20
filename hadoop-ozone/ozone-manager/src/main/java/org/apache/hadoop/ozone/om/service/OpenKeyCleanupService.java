@@ -25,12 +25,14 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
@@ -44,10 +46,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 /**
  * This is the background service to delete hanging open keys.
@@ -174,34 +178,60 @@ public class OpenKeyCleanupService extends BackgroundService {
 
       runCount.incrementAndGet();
       long startTime = Time.monotonicNow();
-      List<OpenKeyBucket> openKeyBuckets = null;
+      final ExpiredOpenKeys expiredOpenKeys;
       try {
-        openKeyBuckets = keyManager.getExpiredOpenKeys(expireThreshold,
+        expiredOpenKeys = keyManager.getExpiredOpenKeys(expireThreshold,
             cleanupLimitPerTask, bucketLayout);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in next interval", e);
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      if (openKeyBuckets != null && !openKeyBuckets.isEmpty()) {
-        int numOpenKeys = openKeyBuckets.stream()
-            .mapToInt(OpenKeyBucket::getKeysCount).sum();
-
-        OMRequest omRequest = createRequest(openKeyBuckets);
+      final Collection<OpenKeyBucket.Builder> openKeyBuckets
+          = expiredOpenKeys.getOpenKeyBuckets();
+      final int numOpenKeys = openKeyBuckets.stream()
+          .mapToInt(OpenKeyBucket.Builder::getKeysCount)
+          .sum();
+      if (!openKeyBuckets.isEmpty()) {
+        // delete non-hsync'ed keys
+        final OMRequest omRequest = createDeleteOpenKeysRequest(
+            openKeyBuckets.stream());
         submitRequest(omRequest);
-
-        LOG.debug("Number of expired keys submitted for deletion: {}, elapsed"
-            + " time: {}ms", numOpenKeys, Time.monotonicNow() - startTime);
-        submittedOpenKeyCount.addAndGet(numOpenKeys);
       }
-      return BackgroundTaskResult.EmptyTaskResult.newResult();
+
+      final List<CommitKeyRequest.Builder> hsyncKeys
+          = expiredOpenKeys.getHsyncKeys();
+      final int numHsyncKeys = hsyncKeys.size();
+      if (!hsyncKeys.isEmpty()) {
+        // commit hsync'ed keys
+        hsyncKeys.forEach(b -> submitRequest(createCommitKeyRequest(b)));
+      }
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Number of expired open keys submitted for deletion: {},"
+            + " for commit: {}, elapsed time: {}ms",
+            numOpenKeys, numHsyncKeys, Time.monotonicNow() - startTime);
+      }
+      final int numKeys = numOpenKeys + numHsyncKeys;
+      submittedOpenKeyCount.addAndGet(numKeys);
+      return () -> numKeys;
     }
 
-    private OMRequest createRequest(List<OpenKeyBucket> openKeyBuckets) {
-      DeleteOpenKeysRequest request =
-          DeleteOpenKeysRequest.newBuilder()
-              .addAllOpenKeysPerBucket(openKeyBuckets)
-              .setBucketLayout(bucketLayout.toProto())
-              .build();
+    private OMRequest createCommitKeyRequest(
+        CommitKeyRequest.Builder request) {
+      return OMRequest.newBuilder()
+          .setCmdType(Type.CommitKey)
+          .setCommitKeyRequest(request)
+          .setClientId(clientId.toString())
+          .build();
+    }
+
+    private OMRequest createDeleteOpenKeysRequest(
+        Stream<OpenKeyBucket.Builder> openKeyBuckets) {
+      final DeleteOpenKeysRequest.Builder request
+          = DeleteOpenKeysRequest.newBuilder()
+          .setBucketLayout(bucketLayout.toProto());
+      openKeyBuckets.forEach(request::addOpenKeysPerBucket);
 
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(Type.DeleteOpenKeys)
@@ -232,7 +262,8 @@ public class OpenKeyCleanupService extends BackgroundService {
           ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
         }
       } catch (ServiceException e) {
-        LOG.error("Open key delete request failed. Will retry at next run.", e);
+        LOG.error("Open key " + omRequest.getCmdType()
+            + " request failed. Will retry at next run.", e);
       }
     }
   }

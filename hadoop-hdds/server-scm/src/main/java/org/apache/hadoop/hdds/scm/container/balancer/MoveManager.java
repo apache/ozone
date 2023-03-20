@@ -46,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A class which schedules, tracks and completes moves scheduled by the
@@ -91,8 +90,13 @@ public final class MoveManager implements
     // rack location) will not be satisfied, so we should not delete
     // the container
     DELETE_FAIL_POLICY,
+    /*
+    Container is not healthy if it has issues such as under, over, or mis
+    replication. We don't try to move replicas of such containers.
+     */
+    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
     //  replicas + target - src does not satisfy placement policy
-    REPLICATION_NOT_HEALTHY,
+    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
     // A move is already scheduled for this container
     FAIL_CONTAINER_ALREADY_BEING_MOVED,
     // Unexpected error
@@ -117,13 +121,11 @@ public final class MoveManager implements
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> pendingMoves =
       new ConcurrentHashMap<>();
 
-  private volatile boolean running = false;
-
   public MoveManager(final ReplicationManager replicationManager,
-      final Clock clock, final ContainerManager containerManager) {
+      final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
-    this.clock = clock;
+    this.clock = replicationManager.getClock();
   }
 
   /**
@@ -132,6 +134,10 @@ public final class MoveManager implements
   public Map<ContainerID,
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> getPendingMove() {
     return pendingMoves;
+  }
+
+  void resetState() {
+    pendingMoves.clear();
   }
 
   /**
@@ -186,22 +192,6 @@ public final class MoveManager implements
   }
 
   /**
-   * notify MoveManager that the current scm has become leader and ready.
-   */
-  public void onLeaderReady() {
-    //discard all stale records
-    pendingMoves.clear();
-    running = true;
-  }
-
-  /**
-   * notify MoveManager that the current scm leader steps down.
-   */
-  public void onNotLeader() {
-    running = false;
-  }
-
-  /**
    * move a container replica from source datanode to
    * target datanode. A move is a two part operation. First a replication
    * command is scheduled to create a new copy of the replica. Later, when the
@@ -211,16 +201,11 @@ public final class MoveManager implements
    * @param src source datanode
    * @param tgt target datanode
    */
-  public CompletableFuture<MoveResult> move(
+  CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
-      TimeoutException, ContainerReplicaNotFoundException {
+      ContainerReplicaNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
-
-    if (!running) {
-      ret.complete(MoveResult.FAIL_LEADER_NOT_READY);
-      return ret;
-    }
 
     // Ensure src and tgt are IN_SERVICE and HEALTHY
     for (DatanodeDetails dn : Arrays.asList(src, tgt)) {
@@ -238,67 +223,83 @@ public final class MoveManager implements
 
     // Ensure the container exists on the src and is not present on the target
     ContainerInfo containerInfo = containerManager.getContainer(cid);
-    final Set<ContainerReplica> currentReplicas = containerManager
-        .getContainerReplicas(cid);
+    synchronized (containerInfo) {
+      final Set<ContainerReplica> currentReplicas = containerManager
+          .getContainerReplicas(cid);
 
-    boolean srcExists = false;
-    for (ContainerReplica r : currentReplicas) {
-      if (r.getDatanodeDetails().equals(src)) {
-        srcExists = true;
+      boolean srcExists = false;
+      for (ContainerReplica r : currentReplicas) {
+        if (r.getDatanodeDetails().equals(src)) {
+          srcExists = true;
+        }
+        if (r.getDatanodeDetails().equals(tgt)) {
+          ret.complete(MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
+          return ret;
+        }
       }
-      if (r.getDatanodeDetails().equals(tgt)) {
-        ret.complete(MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
+      if (!srcExists) {
+        ret.complete(MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
         return ret;
       }
-    }
-    if (!srcExists) {
-      ret.complete(MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
-      return ret;
-    }
 
-    /*
-     * Ensure the container has no inflight actions.
-     * The reason why the given container should not be taking any inflight
-     * action is that: if the given container is being replicated or deleted,
-     * the num of its replica is not deterministic, so move operation issued
-     * by balancer may cause a nondeterministic result, so we should drop
-     * this option for this time.
-     */
-    List<ContainerReplicaOp> pendingOps =
-        replicationManager.getPendingReplicationOps(cid);
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
-        return ret;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
+      /*
+      If the container is under, over, or mis replicated, we should let
+      replication manager solve these issues first. Fail move for such a
+      container.
+       */
+      ContainerHealthResult healthBeforeMove =
+          replicationManager.getContainerReplicationHealth(containerInfo,
+              currentReplicas);
+      if (healthBeforeMove.getHealthState() !=
+          ContainerHealthResult.HealthState.HEALTHY) {
+        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE);
         return ret;
       }
-    }
 
-    // Ensure the container is CLOSED
-    HddsProtos.LifeCycleState currentContainerStat = containerInfo.getState();
-    if (currentContainerStat != HddsProtos.LifeCycleState.CLOSED) {
-      ret.complete(MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+      /*
+       * Ensure the container has no inflight actions.
+       * The reason why the given container should not be taking any inflight
+       * action is that: if the given container is being replicated or deleted,
+       * the num of its replica is not deterministic, so move operation issued
+       * by balancer may cause a nondeterministic result, so we should drop
+       * this option for this time.
+       */
+      List<ContainerReplicaOp> pendingOps =
+          replicationManager.getPendingReplicationOps(cid);
+      for (ContainerReplicaOp op : pendingOps) {
+        if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+          ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
+          return ret;
+        } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+          ret.complete(MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
+          return ret;
+        }
+      }
+
+      // Ensure the container is CLOSED
+      HddsProtos.LifeCycleState currentContainerStat = containerInfo.getState();
+      if (currentContainerStat != HddsProtos.LifeCycleState.CLOSED) {
+        ret.complete(MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+        return ret;
+      }
+
+      // Create a set or replicas that indicates how the container will look
+      // after the move and ensure it is healthy - ie not under, over or mis
+      // replicated.
+      Set<ContainerReplica> replicasAfterMove = createReplicaSetAfterMove(
+          src, tgt, currentReplicas);
+      ContainerHealthResult healthResult = replicationManager
+          .getContainerReplicationHealth(containerInfo, replicasAfterMove);
+      if (healthResult.getHealthState()
+          != ContainerHealthResult.HealthState.HEALTHY) {
+        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE);
+        return ret;
+      }
+      startMove(containerInfo, src, tgt, ret);
+      LOG.debug("Processed a move request for container {}, from {} to {}",
+          cid, src.getUuidString(), tgt.getUuidString());
       return ret;
     }
-
-    // Create a set or replicas that indicates how the container will look
-    // after the move and ensure it is healthy - ie not under, over or mis
-    // replicated.
-    Set<ContainerReplica> replicasAfterMove = createReplicaSetAfterMove(
-        src, tgt, currentReplicas);
-    ContainerHealthResult healthResult = replicationManager
-        .getContainerReplicationHealth(containerInfo, replicasAfterMove);
-    if (healthResult.getHealthState()
-        != ContainerHealthResult.HealthState.HEALTHY) {
-      ret.complete(MoveResult.REPLICATION_NOT_HEALTHY);
-      return ret;
-    }
-    startMove(containerInfo, src, tgt, ret);
-    LOG.debug("Processed a move request for container {}, from {} to {}",
-        cid, src.getUuidString(), tgt.getUuidString());
-    return ret;
   }
 
   /**
@@ -309,10 +310,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpCompleted(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -341,10 +338,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpExpired(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -371,41 +364,44 @@ public final class MoveManager implements
     }
     MoveDataNodePair movePair = pair.getRight();
     final DatanodeDetails src = movePair.getSrc();
-    Set<ContainerReplica> currentReplicas = containerManager
-        .getContainerReplicas(cid);
 
-    Set<ContainerReplica> futureReplicas = new HashSet<>(currentReplicas);
-    boolean found = futureReplicas.removeIf(
-        r -> r.getDatanodeDetails().equals(src));
-    if (!found) {
-      // if the target is present but source disappears somehow,
-      // we can consider move is successful.
-      completeMove(cid, MoveResult.COMPLETED);
-      return;
-    }
+    ContainerInfo containerInfo = containerManager.getContainer(cid);
+    synchronized (containerInfo) {
+      Set<ContainerReplica> currentReplicas = containerManager
+          .getContainerReplicas(cid);
 
-    final NodeStatus nodeStatus = replicationManager.getNodeStatus(src);
-    if (nodeStatus.getOperationalState()
-        != HddsProtos.NodeOperationalState.IN_SERVICE) {
-      completeMove(cid, MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
-      return;
-    }
-    if (!nodeStatus.isHealthy()) {
-      completeMove(cid, MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
-      return;
-    }
+      Set<ContainerReplica> futureReplicas = new HashSet<>(currentReplicas);
+      boolean found = futureReplicas.removeIf(
+          r -> r.getDatanodeDetails().equals(src));
+      if (!found) {
+        // if the target is present but source disappears somehow,
+        // we can consider move is successful.
+        completeMove(cid, MoveResult.COMPLETED);
+        return;
+      }
 
-    final ContainerInfo containerInfo = containerManager.getContainer(cid);
-    ContainerHealthResult healthResult = replicationManager
-        .getContainerReplicationHealth(containerInfo, futureReplicas);
+      final NodeStatus nodeStatus = replicationManager.getNodeStatus(src);
+      if (nodeStatus.getOperationalState()
+          != HddsProtos.NodeOperationalState.IN_SERVICE) {
+        completeMove(cid, MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE);
+        return;
+      }
+      if (!nodeStatus.isHealthy()) {
+        completeMove(cid, MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
+        return;
+      }
 
-    if (healthResult.getHealthState() ==
-        ContainerHealthResult.HealthState.HEALTHY) {
-      sendDeleteCommand(containerInfo, src);
-    } else {
-      LOG.info("Cannot remove source replica as the container health would " +
-          "be {}", healthResult.getHealthState());
-      completeMove(cid, MoveResult.DELETE_FAIL_POLICY);
+      ContainerHealthResult healthResult = replicationManager
+          .getContainerReplicationHealth(containerInfo, futureReplicas);
+
+      if (healthResult.getHealthState() ==
+          ContainerHealthResult.HealthState.HEALTHY) {
+        sendDeleteCommand(containerInfo, src);
+      } else {
+        LOG.info("Cannot remove source replica as the container health would " +
+            "be {}", healthResult.getHealthState());
+        completeMove(cid, MoveResult.DELETE_FAIL_POLICY);
+      }
     }
   }
 
@@ -486,10 +482,6 @@ public final class MoveManager implements
   @Override
   public void opCompleted(ContainerReplicaOp op, ContainerID containerID,
       boolean timedOut) {
-    if (!running) {
-      return;
-    }
-
     if (timedOut) {
       notifyContainerOpExpired(op, containerID);
     } else {

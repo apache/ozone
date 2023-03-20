@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -39,11 +40,11 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -276,11 +277,18 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
-   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -374,6 +382,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmDBTenantState> getTenantStateTable();
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
+
+  Table<String, OmKeyRenameInfo> getRenamedKeyTable();
 
   /**
    * Gets the OM Meta table.
@@ -482,6 +492,18 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOpenFileName(long volumeId, long bucketId,
                          long parentObjectId, String fileName, long id);
+
+
+  /**
+   * Given a volume, bucket and a objectID, return the DB key name in
+   * renamedKeyTable.
+   *
+   * @param volume   - volume name
+   * @param bucket   - bucket name
+   * @param objectID - objectID of the key
+   * @return DB rename key as String.
+   */
+  String getRenameKey(String volume, String bucket, long objectID);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.

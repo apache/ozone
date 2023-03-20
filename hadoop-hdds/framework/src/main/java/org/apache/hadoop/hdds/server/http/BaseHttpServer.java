@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -43,6 +44,7 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.createDir;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
@@ -70,6 +72,7 @@ public abstract class BaseHttpServer {
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
   private static final String JETTY_BASETMPDIR =
       "org.eclipse.jetty.webapp.basetempdir";
+  public static final String SERVER_DIR = "/webserver";
 
   private HttpServer2 httpServer;
   private final MutableConfigurationSource conf;
@@ -178,12 +181,20 @@ public abstract class BaseHttpServer {
       }
 
       String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
-      if (!StringUtils.isEmpty(baseDir)) {
-        createDir(baseDir);
-        httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
-        LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
+
+      if (StringUtils.isEmpty(baseDir)) {
+        baseDir = getOzoneMetaDirPath(conf) + SERVER_DIR;
       }
+      createDir(baseDir);
+      httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
+      LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
+  }
+
+  @VisibleForTesting
+  public String getJettyBaseTmpDir() {
+    return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
+        .toString();
   }
 
   /**

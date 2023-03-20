@@ -118,8 +118,12 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
                 .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
                         keyInfo.getKeyName());
 
+        // TODO: [SNAPSHOT] Acquire deletedTable write table lock
+
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
                 deletedKey, repeatedOmKeyInfo);
+
+        // TODO: [SNAPSHOT] Release deletedTable write table lock
 
       }
 

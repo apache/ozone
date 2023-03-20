@@ -1309,6 +1309,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void unRegister() {
+    if (dbCheckpointMetrics != null) {
+      dbCheckpointMetrics.unRegister();
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

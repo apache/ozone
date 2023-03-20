@@ -117,6 +117,7 @@ public class TestLDBCli {
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
+    DBScanner.setLimit(100);
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
@@ -253,6 +254,7 @@ public class TestLDBCli {
     DBScanner.setWithKey(true);
 
     // Scan all container
+    DBScanner.setLimit(-1);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
@@ -264,6 +266,7 @@ public class TestLDBCli {
 
     // Scan container 1
     DBScanner.setContainerId(1);
+    DBScanner.setLimit(2);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();
@@ -275,6 +278,7 @@ public class TestLDBCli {
 
     // Scan container 2
     DBScanner.setContainerId(2);
+    DBScanner.setLimit(2);
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       dbScanner.call();

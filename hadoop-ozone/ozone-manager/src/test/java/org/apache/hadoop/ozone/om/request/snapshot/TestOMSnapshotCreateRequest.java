@@ -23,6 +23,8 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 
@@ -31,9 +33,12 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
@@ -67,6 +72,7 @@ public class TestOMSnapshotCreateRequest {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
+  private BatchOperation batchOperation;
 
   private String volumeName;
   private String bucketName;
@@ -98,6 +104,7 @@ public class TestOMSnapshotCreateRequest {
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
@@ -111,6 +118,9 @@ public class TestOMSnapshotCreateRequest {
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 
   @Test
@@ -167,6 +177,8 @@ public class TestOMSnapshotCreateRequest {
             "snap75795657617173401188448010125899089001363595171500499231286";
     String name64 =
             "snap156808943643007724443266605711479126926050896107709081166294";
+    String name2 = "s1";
+    String name3 = "sn1";
 
     // name length = 63
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
@@ -181,11 +193,29 @@ public class TestOMSnapshotCreateRequest {
     LambdaTestUtils.intercept(OMException.class,
             "Invalid snapshot name: " + name64,
             () -> doPreExecute(omRequest2));
+
+    // name length = 3
+    when(ozoneManager.isOwner(any(), any())).thenReturn(true);
+    OMRequest omRequest3 = OMRequestTestUtils.createSnapshotRequest(
+            volumeName, bucketName, name3);
+    // should not throw any error
+    doPreExecute(omRequest3);
+
+    // name length = 2
+    OMRequest omRequest4 = OMRequestTestUtils.createSnapshotRequest(
+            volumeName, bucketName, name2);
+    LambdaTestUtils.intercept(OMException.class,
+            "Invalid snapshot name: " + name2,
+            () -> doPreExecute(omRequest4));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
         volumeName, bucketName, snapshotName);
@@ -198,11 +228,11 @@ public class TestOMSnapshotCreateRequest {
     // return null.
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
-    // add key to cache
+    // run validateAndUpdateCache. add key to cache
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
-    
+
     // check cache
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
@@ -223,8 +253,60 @@ public class TestOMSnapshotCreateRequest {
   }
 
   @Test
-  public void testEntryExists() throws Exception {
+  public void testEmptyRenamedKeyTable() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
+    OmKeyInfo toKeyInfo = addKey("key1");
+    OmKeyInfo fromKeyInfo = addKey("key2");
+
+    OMResponse omResponse =
+        OMResponse.newBuilder().setRenameKeyResponse(
+            OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+            .build();
+    OMKeyRenameResponse omKeyRenameResponse =
+        new OMKeyRenameResponse(omResponse, fromKeyInfo.getKeyName(),
+            toKeyInfo.getKeyName(), toKeyInfo);
+
+    Assert.assertTrue(omMetadataManager.getRenamedKeyTable().isEmpty());
+    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    Assert.assertFalse(omMetadataManager.getRenamedKeyTable().isEmpty());
+
+    OMRequest omRequest =
+        OMRequestTestUtils.createSnapshotRequest(
+            volumeName, bucketName, snapshotName);
+    OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
+    String key = SnapshotInfo.getTableKey(volumeName,
+        bucketName, snapshotName);
+
+    Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
+
+    //create entry
+    OMClientResponse omClientResponse = 
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+        ozoneManagerDoubleBufferHelper);
+    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    SnapshotInfo snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable().get(key);
+    Assert.assertNotNull(snapshotInfo);
+    Assert.assertTrue(omMetadataManager.getRenamedKeyTable().isEmpty());
+
+  }
+
+  @Test
+  public void testEntryExists() throws Exception {
+    SnapshotChainManager snapshotChainManager =
+        new SnapshotChainManager(omMetadataManager);
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
+    when(ozoneManager.getSnapshotChainManager())
+        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
         volumeName, bucketName, snapshotName);
@@ -272,6 +354,18 @@ public class TestOMSnapshotCreateRequest {
     OMRequest modifiedRequest =
         omSnapshotCreateRequest.preExecute(ozoneManager);
     return new OMSnapshotCreateRequest(modifiedRequest);
+  }
+
+  private OmKeyInfo addKey(String keyName) {
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE, 0L);
+  }
+
+  protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addKeyToTable(false, false, keyInfo, 0, 0L,
+        omMetadataManager);
+    return omMetadataManager.getOzoneKey(keyInfo.getVolumeName(),
+        keyInfo.getBucketName(), keyInfo.getKeyName());
   }
 
 }
