@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 
 /**
  * Ozone Acl Wrapper class.
@@ -89,11 +90,13 @@ public final class OzoneAclUtils {
     // only READ access on parent level access. OzoneNativeAuthorizer has
     // different parent level access based on the child level access type
     if (omMetadataReader.isNativeAuthorizerEnabled()) {
-      if (aclType == IAccessAuthorizer.ACLType.CREATE ||
-          aclType == IAccessAuthorizer.ACLType.DELETE ||
-          aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
+      // For Native, below parent assignment is not used,
+      // overwritten in NativeACL Handler where parent ACL is re-defined
+      if (aclType == IAccessAuthorizer.ACLType.CREATE) {
         parentAclRight = IAccessAuthorizer.ACLType.WRITE;
       } else if (aclType == IAccessAuthorizer.ACLType.READ_ACL ||
+          aclType == IAccessAuthorizer.ACLType.WRITE_ACL ||
+          aclType == IAccessAuthorizer.ACLType.DELETE ||
           aclType == IAccessAuthorizer.ACLType.LIST) {
         parentAclRight = IAccessAuthorizer.ACLType.READ;
       }

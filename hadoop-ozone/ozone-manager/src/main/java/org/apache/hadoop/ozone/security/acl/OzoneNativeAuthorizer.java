@@ -34,6 +34,7 @@ import java.util.Objects;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -79,6 +80,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     Objects.requireNonNull(context);
     OzoneObjInfo objInfo;
     RequestContext parentContext;
+    RequestContext parentVolContext;
     boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
 
     if (ozObject instanceof OzoneObjInfo) {
@@ -104,34 +106,45 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     // Refined the parent context
     // OP         |CHILD       |PARENT
 
-    // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
-    // DELETE      DELETE       WRITE
-    // WRITE       WRITE        WRITE
-    // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
+    // CREATE      NONE        WRITE     (parent:'CREATE' when 'create bucket')
+    // DELETE      DELETE      READ
+    // WRITE       WRITE       WRITE     (For key/prefix, volume is READ)
+    // WRITE_ACL   WRITE_ACL   READ      (V1 WRITE_ACL=>WRITE)
 
-    // READ        READ         READ
-    // LIST        LIST         READ      (V1 LIST=>READ)
-    // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
+    // READ        READ        READ
+    // LIST        LIST        READ      (V1 LIST=>READ)
+    // READ_ACL    READ_ACL    READ      (V1 READ_ACL=>READ)
 
     ACLType aclRight = context.getAclRights();
     ACLType parentAclRight = aclRight;
 
-    if (aclRight == ACLType.CREATE || aclRight == ACLType.DELETE ||
-        aclRight == ACLType.WRITE_ACL) {
+    if (aclRight == ACLType.CREATE) {
       parentAclRight = ACLType.WRITE;
-    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST) {
+    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST
+        || aclRight == ACLType.WRITE_ACL || aclRight == ACLType.DELETE) {
       parentAclRight = ACLType.READ;
     }
     // To prevent ACL enlargement, parent should be 'CREATE'
     // when op is 'create bucket'. see HDDS-7461.
-    if (objInfo.getResourceType() == BUCKET && aclRight == ACLType.CREATE) {
-      parentAclRight = ACLType.CREATE;
+    if (objInfo.getResourceType() == BUCKET) {
+      if (aclRight == ACLType.CREATE) {
+        parentAclRight = ACLType.CREATE;
+      } else if (aclRight == ACLType.WRITE) {
+        parentAclRight = ACLType.READ;
+      }
     }
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
         .setAclRights(parentAclRight).build();
+    
+    // Volume will be always read in case of bucket,
+    parentVolContext = RequestContext.newBuilder()
+        .setClientUgi(context.getClientUgi())
+        .setIp(context.getIp())
+        .setAclType(context.getAclType())
+        .setAclRights(ACLType.READ).build();
 
     switch (objInfo.getResourceType()) {
     case VOLUME:
@@ -168,7 +181,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return (keyAccess
           && prefixManager.checkAccess(objInfo, parentContext)
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     case PREFIX:
       LOG.trace("Checking access for Prefix: {}", objInfo);
       // Skip check for volume owner
@@ -181,7 +194,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           || prefixManager.checkAccess(objInfo, context);
       return (prefixAccess
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     default:
       throw new OMException("Unexpected object type:" +
           objInfo.getResourceType(), INVALID_REQUEST);
