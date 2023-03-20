@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
@@ -85,7 +84,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -196,7 +194,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |----------------------------------------------------------------------|
-   * |  renamedKeyTable | /volumeName/bucketName/objectID -> OmKeyRenameInfo|
+   * |  renamedKeyTable | /volumeName/bucketName/objectID -> renamedKey     |
    * |----------------------------------------------------------------------|
    */
 
@@ -542,8 +540,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
         .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
-        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec())
-        .addCodec(OmKeyRenameInfo.class, new OmKeyRenameInfoCodec());
+        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec());
   }
 
   /**
@@ -648,9 +645,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
-    // objectID -> renamedKeys (renamed keys for key table)
+    // objectID -> renamed Key (renamed key for key table)
     renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
-        String.class, OmKeyRenameInfo.class);
+        String.class, String.class);
     checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
     // TODO: [SNAPSHOT] Initialize table lock for renamedKeyTable.
   }
@@ -1662,7 +1659,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
+  public Table<String, String> getRenamedKeyTable() {
     return renamedKeyTable;
   }
 
