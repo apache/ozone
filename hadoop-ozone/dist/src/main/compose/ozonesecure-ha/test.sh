@@ -33,14 +33,14 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-execute_robot_test ${SCM} kinit.robot
+execute_robot_test s3g kinit.robot
 
-execute_robot_test ${SCM} freon
+execute_robot_test s3g freon
 
-execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
-execute_robot_test ${SCM} -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
+execute_robot_test s3g -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
+execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
 
-execute_robot_test ${SCM} basic/links.robot
+execute_robot_test s3g basic/links.robot
 
 exclude=""
 for bucket in encrypted link generated; do
@@ -49,12 +49,13 @@ for bucket in encrypted link generated; do
   exclude="--exclude no-bucket-type"
 done
 
-execute_robot_test ${SCM} admincli
+execute_robot_test s3g admincli
 
-execute_robot_test ${SCM} httpfs
+execute_robot_test s3g httpfs
 
 export SCM=scm2.org
-execute_robot_test ${SCM} admincli
+execute_robot_test s3g admincli
+
 stop_docker_env
 
 generate_report
