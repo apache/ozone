@@ -356,7 +356,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
-    setStore(loadDB(conf, dir, name, true));
+    setStore(loadDB(conf, dir, name, true, java.util.Optional.of(Boolean.TRUE)));
     initializeOmTables(false);
   }
 
