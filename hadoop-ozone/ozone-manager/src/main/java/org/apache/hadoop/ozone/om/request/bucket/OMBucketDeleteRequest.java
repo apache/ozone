@@ -245,7 +245,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
           cacheIter.next();
       String key = cacheKeyValue.getKey().getCacheKey();
-      // TODO: Revisit when delete snapshot gets implemented as entry
+      // TODO: [SNAPSHOT] Revisit when delete snapshot gets implemented as entry
       //  in cache/table could be null.
       if (key.startsWith(snapshotBucketKey)) {
         return true;

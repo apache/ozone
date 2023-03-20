@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -84,17 +85,20 @@ public class OMKeyRenameResponse extends OmKeyResponse {
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
             renameKeyInfo);
 
+    // Check if the bucket is in snapshot scope, if yes
+    // add the key to renamedKeyTable.
+    boolean isSnapshotBucket = OMClientRequestUtils.
+        isSnapshotBucket(omMetadataManager, renameKeyInfo);
     String renameDbKey = omMetadataManager.getRenameKey(
         renameKeyInfo.getVolumeName(), renameKeyInfo.getBucketName(),
         renameKeyInfo.getObjectID());
     OmKeyRenameInfo omKeyRenameInfo = omMetadataManager.getRenamedKeyTable()
         .get(renameDbKey);
-    if (omKeyRenameInfo == null) {
+    if (isSnapshotBucket && omKeyRenameInfo == null) {
       omKeyRenameInfo = new OmKeyRenameInfo(fromDbKey);
       omMetadataManager.getRenamedKeyTable().putWithBatch(
           batchOperation, renameDbKey, omKeyRenameInfo);
     }
-
   }
 
   public OmKeyInfo getRenameKeyInfo() {
