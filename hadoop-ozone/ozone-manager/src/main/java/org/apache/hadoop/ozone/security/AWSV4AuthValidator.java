@@ -53,7 +53,7 @@ final class AWSV4AuthValidator {
         } catch (NoSuchAlgorithmException nsa) {
           throw new IllegalArgumentException(
               "Failed to initialize Mac instance that implements the " +
-                  HMAC_SHA256_ALGORITHM + " algorithm" + nsa);
+                  HMAC_SHA256_ALGORITHM + " algorithm.", nsa);
         }
       });
 
