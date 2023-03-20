@@ -54,10 +54,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME, null, null);
-  }
-
   public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId, String component) {
     super(securityConfig, LOG, certSerialId, component, null, null);
@@ -135,7 +131,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         .setDigitalEncryption(true)
         .setDigitalSignature(true)
         // Set CA to true, as this will be used to sign certs for OM/DN.
-        .setCA(true);
+        .setCA(true)
+        .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
 
@@ -149,12 +146,5 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       Path certPath) throws CertificateException {
     throw new UnsupportedOperationException("signAndStoreCertificate of " +
         " SCMCertificateClient is not supported currently");
-  }
-
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException {
-    throw new UnsupportedOperationException("getCSRBuilder of " +
-        "SCMCertificateClient is not supported currently");
   }
 }

@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -55,6 +57,7 @@ class TestOzoneHARatisLogParser {
   private MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
+  private OzoneClient client;
 
   @BeforeEach
   void setup() throws Exception {
@@ -72,8 +75,8 @@ class TestOzoneHARatisLogParser {
         .setNumOfStorageContainerManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
-    ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    ObjectStore objectStore = client.getObjectStore();
     performFewRequests(objectStore);
     System.setOut(new PrintStream(out, false, UTF_8.name()));
     System.setErr(new PrintStream(err, false, UTF_8.name()));
@@ -88,6 +91,7 @@ class TestOzoneHARatisLogParser {
 
   @AfterEach
   void destroy() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

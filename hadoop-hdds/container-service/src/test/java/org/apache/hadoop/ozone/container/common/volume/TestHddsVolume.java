@@ -102,6 +102,16 @@ public class TestHddsVolume {
         versionFile.exists());
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
+
+    // Create a working directory
+    // tmp directory should be initialized.
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File tmpDir = new File(volume.getTmpDirPath().toString());
+    assertTrue(tmpDir.exists());
+
+    // Shutdown the volume.
+    volume.shutdown();
   }
 
   @Test

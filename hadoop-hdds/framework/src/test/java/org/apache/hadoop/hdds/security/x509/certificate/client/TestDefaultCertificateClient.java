@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -51,7 +50,6 @@ import java.util.Date;
 import java.util.UUID;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 
 
@@ -208,11 +206,10 @@ public class TestDefaultCertificateClient {
     // Expect error when there is no private key to sign.
     LambdaTestUtils.intercept(IOException.class, "Error while " +
             "signing the stream",
-        () -> dnCertClient.signDataStream(IOUtils.toInputStream(data, UTF_8)));
+        () -> dnCertClient.signData(data.getBytes(UTF_8)));
 
     generateKeyPairFiles();
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
     validateHash(sign, data.getBytes(UTF_8));
   }
 
@@ -235,21 +232,15 @@ public class TestDefaultCertificateClient {
   @Test
   public void verifySignatureStream() throws Exception {
     String data = RandomStringUtils.random(500);
-    byte[] sign = dnCertClient.signDataStream(IOUtils.toInputStream(data,
-        UTF_8));
+    byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
 
   }
 
@@ -264,23 +255,10 @@ public class TestDefaultCertificateClient {
     // Positive tests.
     assertTrue(dnCertClient.verifySignature(data.getBytes(UTF_8), sign,
         x509Certificate));
-    assertTrue(dnCertClient.verifySignature(
-        IOUtils.toInputStream(data, UTF_8),
-        sign, x509Certificate));
 
     // Negative tests.
     assertFalse(dnCertClient.verifySignature(data.getBytes(UTF_8),
         "abc".getBytes(UTF_8), x509Certificate));
-    assertFalse(dnCertClient.verifySignature(IOUtils.toInputStream(data,
-        UTF_8), "abc".getBytes(UTF_8), x509Certificate));
-
-  }
-
-  @Test
-  public void queryCertificate() throws Exception {
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Operation not supported",
-        () -> dnCertClient.queryCertificate(""));
   }
 
   @Test
@@ -334,9 +312,9 @@ public class TestDefaultCertificateClient {
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
 
-    dnCertClient.storeCertificate(getPEMEncodedString(cert1));
-    dnCertClient.storeCertificate(getPEMEncodedString(cert2));
-    dnCertClient.storeCertificate(getPEMEncodedString(cert3));
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.NONE);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.NONE);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
         .toString()));
@@ -452,12 +430,6 @@ public class TestDefaultCertificateClient {
           @Override
           public String signAndStoreCertificate(
               PKCS10CertificationRequest request, Path certificatePath)
-              throws CertificateException {
-            return null;
-          }
-
-          @Override
-          public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
               throws CertificateException {
             return null;
           }

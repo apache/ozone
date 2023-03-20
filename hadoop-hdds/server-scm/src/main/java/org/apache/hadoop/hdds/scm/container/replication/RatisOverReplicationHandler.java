@@ -18,23 +18,20 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -54,12 +51,12 @@ public class RatisOverReplicationHandler
   public static final Logger LOG =
       LoggerFactory.getLogger(RatisOverReplicationHandler.class);
 
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
 
   public RatisOverReplicationHandler(PlacementPolicy placementPolicy,
-      NodeManager nodeManager) {
+      ReplicationManager replicationManager) {
     super(placementPolicy);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
   }
 
   /**
@@ -74,11 +71,10 @@ public class RatisOverReplicationHandler
    *                                 replication
    * @param minHealthyForMaintenance Number of healthy replicas that must be
    *                                 available for a DN to enter maintenance
-   * @return Returns a map of Datanodes and SCMCommands that can be sent to
-   * delete replicas on those datanodes.
+   * @return The number of commands sent.
    */
   @Override
-  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
+  public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance) throws
       IOException {
@@ -94,9 +90,15 @@ public class RatisOverReplicationHandler
     // HEALTHY one, and then the STALE ones goes away, we will lose them both.
     // To avoid this, we will filter out any non-healthy replicas first.
     Set<ContainerReplica> healthyReplicas = replicas.stream()
-        .filter(r -> ReplicationManager.getNodeStatus(
-            r.getDatanodeDetails(), nodeManager).isHealthy()
-        ).collect(Collectors.toSet());
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
+        .collect(Collectors.toSet());
 
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(containerInfo, healthyReplicas,
@@ -104,7 +106,7 @@ public class RatisOverReplicationHandler
 
     // verify that this container is actually over replicated
     if (!verifyOverReplication(replicaCount)) {
-      return Collections.emptySet();
+      return 0;
     }
 
     // count pending deletes
@@ -126,11 +128,12 @@ public class RatisOverReplicationHandler
     if (eligibleReplicas.size() == 0) {
       LOG.info("Did not find any replicas that are eligible to be deleted for" +
           " container {}.", containerInfo);
-      return Collections.emptySet();
+      return 0;
     }
 
     // get number of excess replicas
     int excess = replicaCount.getExcessRedundancy(true);
+
     return createCommands(containerInfo, eligibleReplicas, excess);
   }
 
@@ -243,25 +246,26 @@ public class RatisOverReplicationHandler
         .collect(Collectors.toList());
   }
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createCommands(
+  private int createCommands(
       ContainerInfo containerInfo, List<ContainerReplica> replicas,
-      int excess) {
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+      int excess) throws NotLeaderException {
 
     /*
     Being in the over replication queue means we have enough replicas that
     match the container's state, so unhealthy or mismatched replicas can be
     deleted. This might make the container violate placement policy.
      */
+    int commandsSent = 0;
     List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commands;
+        return commandsSent;
       }
       if (!ReplicationManager.compareState(
           containerInfo.getState(), replica.getState())) {
-        commands.add(Pair.of(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo)));
+        replicationManager.sendDeleteCommand(containerInfo,
+            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+        commandsSent++;
         replicasRemoved.add(replica);
         excess--;
       }
@@ -277,20 +281,18 @@ public class RatisOverReplicationHandler
     // iterate through replicas in deterministic order
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commands;
+        return commandsSent;
       }
 
       if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
-        commands.add(Pair.of(replica.getDatanodeDetails(),
-            createDeleteCommand(containerInfo)));
+        replicationManager.sendDeleteCommand(containerInfo,
+            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+        commandsSent++;
         excess--;
       }
     }
-    return commands;
+    return commandsSent;
   }
 
-  private DeleteContainerCommand createDeleteCommand(ContainerInfo container) {
-    return new DeleteContainerCommand(container.containerID(), true);
-  }
 }

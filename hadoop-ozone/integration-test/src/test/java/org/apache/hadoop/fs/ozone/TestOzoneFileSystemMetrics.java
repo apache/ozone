@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -52,6 +54,7 @@ public class TestOzoneFileSystemMetrics {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static FileSystem fs;
   private static OzoneBucket bucket;
 
@@ -81,9 +84,10 @@ public class TestOzoneFileSystemMetrics {
         .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    bucket = TestDataUtil.createVolumeAndBucket(client);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
@@ -97,6 +101,7 @@ public class TestOzoneFileSystemMetrics {
    */
   @AfterClass
   public static void shutdown() throws IOException {
+    IOUtils.closeQuietly(client);
     fs.close();
     cluster.shutdown();
   }

@@ -390,11 +390,11 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     Assertions.assertTrue(omMultipartUploadCompleteInfo.getHash() != null);
 
 
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-    ozoneInputStream.read(fileContent);
-    Assertions.assertEquals(value, new String(fileContent, UTF_8));
+    try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assertions.assertEquals(value, new String(fileContent, UTF_8));
+    }
   }
 
   @Test

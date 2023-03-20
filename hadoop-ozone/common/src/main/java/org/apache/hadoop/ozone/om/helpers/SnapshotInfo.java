@@ -368,10 +368,17 @@ public final class SnapshotInfo implements Auditable {
         .setBucketName(bucketName)
         .setSnapshotStatus(snapshotStatus.toProto())
         .setCreationTime(creationTime)
-        .setDeletionTime(deletionTime)
-        .setPathPreviousSnapshotID(pathPreviousSnapshotID)
-        .setGlobalPreviousSnapshotID(globalPreviousSnapshotID)
-        .setSnapshotPath(snapshotPath)
+        .setDeletionTime(deletionTime);
+
+    if (pathPreviousSnapshotID != null) {
+      sib.setPathPreviousSnapshotID(pathPreviousSnapshotID);
+    }
+
+    if (globalPreviousSnapshotID != null) {
+      sib.setGlobalPreviousSnapshotID(globalPreviousSnapshotID);
+    }
+
+    sib.setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
         .setDbTxSequenceNumber(dbTxSequenceNumber);
     return sib.build();
@@ -392,12 +399,19 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotStatus(SnapshotStatus.valueOf(snapshotInfoProto
             .getSnapshotStatus()))
         .setCreationTime(snapshotInfoProto.getCreationTime())
-        .setDeletionTime(snapshotInfoProto.getDeletionTime())
-        .setPathPreviousSnapshotID(snapshotInfoProto.
-            getPathPreviousSnapshotID())
-        .setGlobalPreviousSnapshotID(snapshotInfoProto.
-            getGlobalPreviousSnapshotID())
-        .setSnapshotPath(snapshotInfoProto.getSnapshotPath())
+        .setDeletionTime(snapshotInfoProto.getDeletionTime());
+
+    if (snapshotInfoProto.hasPathPreviousSnapshotID()) {
+      osib.setPathPreviousSnapshotID(snapshotInfoProto.
+          getPathPreviousSnapshotID());
+    }
+
+    if (snapshotInfoProto.hasGlobalPreviousSnapshotID()) {
+      osib.setGlobalPreviousSnapshotID(snapshotInfoProto.
+          getGlobalPreviousSnapshotID());
+    }
+
+    osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
         .setCheckpointDir(snapshotInfoProto.getCheckpointDir())
         .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
 
@@ -499,8 +513,9 @@ public final class SnapshotInfo implements Auditable {
         name.equals(that.name) && volumeName.equals(that.volumeName) &&
         bucketName.equals(that.bucketName) &&
         snapshotStatus == that.snapshotStatus &&
-        pathPreviousSnapshotID.equals(that.pathPreviousSnapshotID) &&
-        globalPreviousSnapshotID.equals(that.globalPreviousSnapshotID) &&
+        Objects.equals(pathPreviousSnapshotID, that.pathPreviousSnapshotID) &&
+        Objects.equals(
+            globalPreviousSnapshotID, that.globalPreviousSnapshotID) &&
         snapshotPath.equals(that.snapshotPath) &&
         checkpointDir.equals(that.checkpointDir);
   }

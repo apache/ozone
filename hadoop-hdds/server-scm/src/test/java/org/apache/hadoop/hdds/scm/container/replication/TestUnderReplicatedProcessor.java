@@ -17,29 +17,19 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 
@@ -83,62 +73,16 @@ public class TestUnderReplicatedProcessor {
   }
 
   @Test
-  public void testEcReconstructionCommand() throws IOException {
-    ContainerInfo container = ReplicationTestUtil
-        .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    queue.enqueue(new UnderReplicatedHealthResult(
-        container, 3, false, false, false));
-    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
-        sourceNodes = new ArrayList<>();
-    for (int i = 1; i <= 3; i++) {
-      sourceNodes.add(
-          new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
-              MockDatanodeDetails.randomDatanodeDetails(), i));
-    }
-    List<DatanodeDetails> targetNodes = new ArrayList<>();
-    targetNodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    targetNodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    byte[] missingIndexes = {4, 5};
-
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
-    commands.add(Pair.of(MockDatanodeDetails.randomDatanodeDetails(),
-        new ReconstructECContainersCommand(container.getContainerID(),
-            sourceNodes, targetNodes, missingIndexes, repConfig)));
-
-    Mockito.when(replicationManager
-            .processUnderReplicatedContainer(any()))
-        .thenReturn(commands);
-    underReplicatedProcessor.processAll();
-
-    Mockito.verify(replicationManager, Mockito.times(1))
-        .sendDatanodeCommand(any(), any(), any());
-    Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueUnderReplicatedContainer(any());
-  }
-
-  @Test
-  public void testEcReplicationCommand() throws IOException {
+  public void testSuccessfulCommand() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     queue.enqueue(new UnderReplicatedHealthResult(
         container, 3, true, false, false));
-    List<DatanodeDetails> sourceDns = new ArrayList<>();
-    sourceDns.add(MockDatanodeDetails.randomDatanodeDetails());
-    DatanodeDetails targetDn = MockDatanodeDetails.randomDatanodeDetails();
-    ReplicateContainerCommand rcc = ReplicateContainerCommand.fromSources(
-        container.getContainerID(), sourceDns);
-    rcc.setReplicaIndex(3);
-
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
-    commands.add(Pair.of(targetDn, rcc));
-
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(any()))
-        .thenReturn(commands);
+        .thenReturn(1);
     underReplicatedProcessor.processAll();
 
-    Mockito.verify(replicationManager, Mockito.times(1))
-        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(0))
         .requeueUnderReplicatedContainer(any());
   }
@@ -156,8 +100,6 @@ public class TestUnderReplicatedProcessor {
         .thenThrow(new AssertionError("Should process only one item"));
     underReplicatedProcessor.processAll();
 
-    Mockito.verify(replicationManager, Mockito.times(0))
-        .sendDatanodeCommand(any(), any(), any());
     Mockito.verify(replicationManager, Mockito.times(1))
         .requeueUnderReplicatedContainer(any());
   }

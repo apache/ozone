@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.util.concurrent.ThreadLocalRandom;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -29,6 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,6 +59,7 @@ public class TestOzoneFileSystemWithStreaming {
   private static OzoneBucket bucket;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static OzoneClient client;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -82,13 +86,15 @@ public class TestOzoneFileSystemWithStreaming {
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, layout);
+    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
   }
 
   @AfterAll
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

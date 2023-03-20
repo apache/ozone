@@ -81,6 +81,7 @@ public class TestContainerBalancer {
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scm.getSCMServiceManager()).thenReturn(mock(SCMServiceManager.class));
+    when(scm.getMoveManager()).thenReturn(Mockito.mock(MoveManager.class));
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to

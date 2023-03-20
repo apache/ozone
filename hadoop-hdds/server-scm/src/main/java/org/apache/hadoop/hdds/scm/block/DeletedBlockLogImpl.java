@@ -92,6 +92,8 @@ public class DeletedBlockLogImpl
   private final SequenceIdGenerator sequenceIdGen;
   private final ScmBlockDeletingServiceMetrics metrics;
 
+  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
+
   @SuppressWarnings("parameternumber")
   public DeletedBlockLogImpl(ConfigurationSource conf,
       ContainerManager containerManager,
@@ -126,18 +128,27 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public List<DeletedBlocksTransaction> getFailedTransactions()
-      throws IOException {
+  public List<DeletedBlocksTransaction> getFailedTransactions(int count,
+      long startTxId) throws IOException {
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
-        while (iter.hasNext()) {
-          DeletedBlocksTransaction delTX = iter.next().getValue();
-          if (delTX.getCount() == -1) {
-            failedTXs.add(delTX);
+        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
+          while (iter.hasNext()) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1) {
+              failedTXs.add(delTX);
+            }
+          }
+        } else {
+          while (iter.hasNext() && failedTXs.size() < count) {
+            DeletedBlocksTransaction delTX = iter.next().getValue();
+            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
+              failedTXs.add(delTX);
+            }
           }
         }
       }
@@ -191,7 +202,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       if (txIDs == null || txIDs.isEmpty()) {
-        txIDs = getFailedTransactions().stream()
+        txIDs = getFailedTransactions(LIST_ALL_FAILED_TRANSACTIONS, 0).stream()
             .map(DeletedBlocksTransaction::getTxID)
             .collect(Collectors.toList());
       }

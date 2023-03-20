@@ -84,9 +84,10 @@ public class TestOzoneContainer {
       //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
-      client.connect();
-      createContainerForTesting(client, containerID);
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
+        client.connect();
+        createContainerForTesting(client, containerID);
+      }
     } finally {
       if (container != null) {
         container.stop();

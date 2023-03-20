@@ -31,6 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -64,7 +65,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private final BlockID blockID;
   private final long length;
   private Pipeline pipeline;
-  private final Token<OzoneBlockTokenIdentifier> token;
+  private Token<OzoneBlockTokenIdentifier> token;
   private final boolean verifyChecksum;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
@@ -103,19 +104,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
   // can be reset if a new position is seeked.
   private int chunkIndexOfPrevPosition;
 
-  private final Function<BlockID, Pipeline> refreshPipelineFunction;
+  private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory,
-      Function<BlockID, Pipeline> refreshPipelineFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction) {
     this.blockID = blockId;
     this.length = blockLen;
     this.pipeline = pipeline;
     this.token = token;
     this.verifyChecksum = verifyChecksum;
     this.xceiverClientFactory = xceiverClientFactory;
-    this.refreshPipelineFunction = refreshPipelineFunction;
+    this.refreshFunction = refreshFunction;
   }
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
@@ -150,12 +151,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
-        refreshPipeline(ex);
+        refreshBlockInfo(ex);
         catchEx = ex;
       } catch (IOException ex) {
         LOG.debug("Retry to get chunk info fail", ex);
         if (isConnectivityIssue(ex)) {
-          refreshPipeline(ex);
+          refreshBlockInfo(ex);
         }
         catchEx = ex;
       }
@@ -199,17 +200,19 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
   }
 
-  private void refreshPipeline(IOException cause) throws IOException {
+  private void refreshBlockInfo(IOException cause) throws IOException {
     LOG.info("Unable to read information for block {} from pipeline {}: {}",
         blockID, pipeline.getId(), cause.getMessage());
-    if (refreshPipelineFunction != null) {
-      LOG.debug("Re-fetching pipeline for block {}", blockID);
-      Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
-      if (newPipeline == null) {
-        LOG.debug("No new pipeline for block {}", blockID);
+    if (refreshFunction != null) {
+      LOG.debug("Re-fetching pipeline and block token for block {}", blockID);
+      BlockLocationInfo blockLocationInfo = refreshFunction.apply(blockID);
+      if (blockLocationInfo == null) {
+        LOG.debug("No new block location info for block {}", blockID);
       } else {
-        LOG.debug("New pipeline for block {}: {}", blockID, newPipeline);
-        this.pipeline = newPipeline;
+        LOG.debug("New pipeline for block {}: {}", blockID,
+            blockLocationInfo.getPipeline());
+        this.pipeline = blockLocationInfo.getPipeline();
+        this.token = blockLocationInfo.getToken();
       }
     } else {
       throw cause;
@@ -232,7 +235,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
           .build();
     }
     acquireClient();
-    List<ChunkInfo> chunks;
     try {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Initializing BlockInputStream for get key to access {}",
@@ -249,14 +251,32 @@ public class BlockInputStream extends BlockExtendedInputStream {
         blkIDBuilder.setReplicaIndex(replicaIndex);
       }
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, blkIDBuilder.build(), token);
+          .getBlock(xceiverClient, VALIDATORS, blkIDBuilder.build(), token);
 
-      chunks = response.getBlockData().getChunksList();
+      return response.getBlockData().getChunksList();
     } finally {
       releaseClient();
     }
+  }
 
-    return chunks;
+  private static final List<CheckedBiFunction> VALIDATORS
+      = ContainerProtocolCalls.toValidatorList(
+          (request, response) -> validate(response));
+
+  static void validate(ContainerCommandResponseProto response)
+      throws IOException {
+    if (!response.hasGetBlock()) {
+      throw new IllegalArgumentException("Not GetBlock: response=" + response);
+    }
+    final GetBlockResponseProto b = response.getGetBlock();
+    final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
+    for (int i = 0; i < chunks.size(); i++) {
+      final ChunkInfo c = chunks.get(i);
+      if (c.getLen() <= 0) {
+        throw new IOException("Failed to get chunkInfo["
+            + i + "]: len == " + c.getLen());
+      }
+    }
   }
 
   protected void acquireClient() throws IOException {
@@ -526,7 +546,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     }
 
-    refreshPipeline(cause);
+    refreshBlockInfo(cause);
   }
 
   @VisibleForTesting

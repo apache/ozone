@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.snapshot;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto.DiffTypeProto;
@@ -182,14 +183,23 @@ public class SnapshotDiffReport {
    */
   private final List<DiffReportEntry> diffList;
 
-  public SnapshotDiffReport(final String volumeName, final String bucketName,
-                            final String fromSnapshot, final String toSnapshot,
-                            List<DiffReportEntry> entryList) {
+  /**
+   * subsequent token for the diff report.
+   */
+  private final String token;
+
+  public SnapshotDiffReport(final String volumeName,
+                            final String bucketName,
+                            final String fromSnapshot,
+                            final String toSnapshot,
+                            final List<DiffReportEntry> entryList,
+                            final String token) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.diffList = entryList != null ? entryList : Collections.emptyList();
+    this.token = token;
   }
 
   public List<DiffReportEntry> getDiffList() {
@@ -199,13 +209,18 @@ public class SnapshotDiffReport {
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
-    String from = "snapshot " + fromSnapshot;
-    String to = "snapshot " + toSnapshot;
-    str.append("Difference between ").append(from).append(" and ").append(to)
-        .append(":")
+    str.append("Difference between snapshot: ")
+        .append(fromSnapshot)
+        .append(" and snapshot: ")
+        .append(toSnapshot)
         .append(LINE_SEPARATOR);
     for (DiffReportEntry entry : diffList) {
       str.append(entry.toString()).append(LINE_SEPARATOR);
+    }
+    if (StringUtils.isNotEmpty(token)) {
+      str.append("Next token: ")
+          .append(token)
+          .append(LINE_SEPARATOR);
     }
     return str.toString();
   }
@@ -219,15 +234,22 @@ public class SnapshotDiffReport {
         .setToSnapshot(toSnapshot);
     builder.addAllDiffList(diffList.stream().map(DiffReportEntry::toProtobuf)
         .collect(Collectors.toList()));
+    if (StringUtils.isNotEmpty(token)) {
+      builder.setToken(token);
+    }
     return builder.build();
   }
 
   public static SnapshotDiffReport fromProtobuf(
       final SnapshotDiffReportProto report) {
     return new SnapshotDiffReport(report.getVolumeName(),
-        report.getBucketName(), report.getFromSnapshot(),
-        report.getToSnapshot(), report.getDiffListList().stream()
-        .map(DiffReportEntry::fromProtobuf).collect(Collectors.toList()));
+        report.getBucketName(),
+        report.getFromSnapshot(),
+        report.getToSnapshot(),
+        report.getDiffListList().stream()
+            .map(DiffReportEntry::fromProtobuf)
+            .collect(Collectors.toList()),
+        report.getToken());
   }
 
 }

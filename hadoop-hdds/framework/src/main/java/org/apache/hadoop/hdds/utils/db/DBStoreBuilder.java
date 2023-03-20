@@ -74,7 +74,7 @@ public final class DBStoreBuilder {
   public static final Logger ROCKS_DB_LOGGER =
       LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
-  private static final String DEFAULT_COLUMN_FAMILY_NAME =
+  public static final String DEFAULT_COLUMN_FAMILY_NAME =
       StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.
@@ -324,6 +324,20 @@ public final class DBStoreBuilder {
   private ManagedColumnFamilyOptions getDefaultCfOptions() {
     return Optional.ofNullable(defaultCfOptions)
         .orElseGet(defaultCfProfile::getColumnFamilyOptions);
+  }
+
+  /**
+   * Pass true to disable auto compaction for Column Family by default.
+   * Sets Disable auto compaction flag for Default Column Family option
+   * @param defaultCFAutoCompaction
+   */
+  public DBStoreBuilder disableDefaultCFAutoCompaction(
+          boolean defaultCFAutoCompaction) {
+    ManagedColumnFamilyOptions defaultCFOptions =
+            getDefaultCfOptions();
+    defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
+    setDefaultCFOptions(defaultCFOptions);
+    return this;
   }
 
   /**
