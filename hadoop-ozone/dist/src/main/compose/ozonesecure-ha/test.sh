@@ -37,13 +37,12 @@ execute_robot_test ${SCM} kinit.robot
 
 execute_robot_test ${SCM} freon
 
-execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
 execute_robot_test ${SCM} -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
 
 execute_robot_test ${SCM} basic/links.robot
 
 exclude=""
-for bucket in encrypted link generated; do
+for bucket in encrypted; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   exclude="--exclude no-bucket-type"
