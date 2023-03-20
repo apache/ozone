@@ -1793,7 +1793,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2184,7 +2184,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2254,7 +2254,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig)
+        .setConfig(conf.getObject(OzoneClientConfig.class))
         .setClientMetrics(clientMetrics);
   }
 
