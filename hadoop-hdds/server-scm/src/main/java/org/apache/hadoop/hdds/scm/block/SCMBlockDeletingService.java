@@ -240,7 +240,8 @@ public class SCMBlockDeletingService extends BackgroundService
           (alreadyWaitTimeInMillis >= waitTimeInMillis);
       if (LOG.isDebugEnabled()) {
         LOG.debug(
-            "Check scm block delete run: {} serviceStatus: {} waitTimeInMillis: {} alreadyWaitTimeInMillis: {}",
+            "Check scm block delete run: {} serviceStatus: {}" +
+                " waitTimeInMillis: {} alreadyWaitTimeInMillis: {}",
             run, serviceStatus, waitTimeInMillis, alreadyWaitTimeInMillis);
       }
       return run;
