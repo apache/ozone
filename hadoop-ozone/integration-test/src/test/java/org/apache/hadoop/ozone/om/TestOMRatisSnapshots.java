@@ -71,7 +71,6 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -284,11 +283,14 @@ public class TestOMRatisSnapshots {
           if (!leaderActiveSST.toFile().exists()) {
             continue;
           }
-          // If it is a hard link on the leader, it should be a hard link on the follower
+          // If it is a hard link on the leader, it should be a hard
+          // link on the follower
           if (OmSnapshotManager.getINode(leaderActiveSST)
               .equals(OmSnapshotManager.getINode(leaderSnapshotSST))) {
-            Path followerSnapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
-            Path followerActiveSST =  Paths.get(followerActiveDir.toString(), fileName);
+            Path followerSnapshotSST =
+                Paths.get(followerSnapshotDir.toString(), fileName);
+            Path followerActiveSST =
+                Paths.get(followerActiveDir.toString(), fileName);
             Assertions.assertEquals(
                 OmSnapshotManager.getINode(followerActiveSST),
                 OmSnapshotManager.getINode(followerSnapshotSST),
@@ -617,8 +619,8 @@ public class TestOMRatisSnapshots {
                                                bucketName,
                                                "snap1");
     SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
-      .getSnapshotInfoTable()
-      .get(tableKey);
+        .getSnapshotInfoTable()
+        .get(tableKey);
     // Allow the snapshot to be written to disk
     String fileName =
         getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);

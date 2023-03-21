@@ -340,7 +340,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return new OmMetadataManagerImpl(conf, dir, name);
     // NPE check forced by findbugs NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE
     } catch (NullPointerException e) {
-      throw new IOException("Invalid database: " + checkpoint.getCheckpointLocation());
+      throw new IOException("Invalid database: " +
+                            checkpoint.getCheckpointLocation());
     }
   }
 
