@@ -481,7 +481,7 @@ public class TestDefaultCertificateClient {
             .newBuilder().setResponseCode(SCMSecurityProtocolProtos
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
-            .setX509CACertificate(pemCert)
+            .setX509RootCACertificate(pemCert)
             .build();
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
         .thenReturn(responseProto);
