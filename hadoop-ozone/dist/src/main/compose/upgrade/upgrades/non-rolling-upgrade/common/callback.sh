@@ -17,7 +17,6 @@
 
 source "$TEST_DIR"/testlib.sh
 
-
 ### HELPER METHODS ###
 
 ## @description Generates data on the cluster.
@@ -25,7 +24,7 @@ source "$TEST_DIR"/testlib.sh
 ## @param All parameters after the first one are passed directly to the robot command,
 ##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 generate() {
-    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/generate.robot
+    execute_robot_test "$SCM" -v PREFIX:"$1" ${@:2} upgrade/generate.robot
 }
 
 ## @description Validates that data exists on the cluster.
@@ -33,13 +32,13 @@ generate() {
 ## @param All parameters after the first one are passed directly to the robot command,
 ##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 validate() {
-    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/validate.robot
+    execute_robot_test "$SCM" -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
 
 ### CALLBACKS ###
 
 with_old_version() {
-  execute_robot_test scm --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   generate old1
   validate old1
 }
@@ -56,7 +55,7 @@ with_this_version_pre_finalized() {
 }
 
 with_old_version_downgraded() {
-  execute_robot_test scm --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
 
@@ -69,7 +68,7 @@ with_old_version_downgraded() {
 }
 
 with_this_version_finalized() {
-  execute_robot_test scm --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
   validate old2
