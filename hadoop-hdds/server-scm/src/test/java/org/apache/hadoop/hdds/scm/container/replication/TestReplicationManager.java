@@ -905,6 +905,37 @@ public class TestReplicationManager {
             1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
   }
 
+  @Test
+  public void testCreateThrottledDeleteContainerCommand()
+      throws AllSourcesOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> 0);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
+    Assert.assertEquals(commandsSent.size(), 1);
+  }
+
+  @Test(expected = AllSourcesOverloadedException.class)
+  public void testCreateThrottledDeleteContainerCommandThrowsWhenNoSources()
+      throws AllSourcesOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    int limit = replicationManager.getConfig().getDatanodeDeleteLimit();
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> limit + 1);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
+  }
+
   @SafeVarargs
   private final Set<ContainerReplica>  addReplicas(ContainerInfo container,
       ContainerReplicaProto.State replicaState,
