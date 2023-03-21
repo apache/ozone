@@ -268,29 +268,37 @@ public class TestOMRatisSnapshots {
     Path followerActiveDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
     Path followerSnapshotDir =
         Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo));
+    File leaderMetaDir = OMStorage.getOmDbDir(leaderOM.getConfiguration());
+    Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
     // Check snapshot hard links
 
-    // Get the list of sst files from the leader.  Then use those filenames to
-    //  compare the followers snapshot with the followers active fs for
-    //  hard links
-    int sstCount = 0;
+    // Get the list of hardlinks from the leader.  Then confirm those links
+    //  are on the follower
+    int hardLinkCount = 0;
     try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
       for (Path p: list.collect(Collectors.toList())) {
         String fileName = p.getFileName().toString();
         if (fileName.toLowerCase().endsWith(".sst")) {
-          Path snapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
-          Path activeSST =  Paths.get(followerActiveDir.toString(), fileName);
-          assertEquals("Snapshot sst file is supposed to be a hard link",
-              OmSnapshotManager.getINode(activeSST),
-              OmSnapshotManager.getINode(snapshotSST));
-          sstCount++;
+
+          Path leaderSnapshotSST = Paths.get(leaderSnapshotDir.toString(), fileName);
+          Path leaderActiveSST =  Paths.get(leaderActiveDir.toString(), fileName);
+          // If it is a hard link on the leader, it should be a hard link on the follower
+          if (OmSnapshotManager.getINode(leaderActiveSST)
+              .equals(OmSnapshotManager.getINode(leaderSnapshotSST))) {
+            Path followerSnapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
+            Path followerActiveSST =  Paths.get(followerActiveDir.toString(), fileName);
+            assertEquals("Snapshot sst file is supposed to be a hard link",
+                         OmSnapshotManager.getINode(followerActiveSST),
+                         OmSnapshotManager.getINode(followerSnapshotSST));
+            hardLinkCount++;
+          }
 
         }
       }
     }
-    assertTrue("No sst files were found", sstCount > 0);
+    assertTrue("No hard links were found", hardLinkCount > 0);
   }
 
   @Ignore("Enable this unit test after RATIS-1481 used")
