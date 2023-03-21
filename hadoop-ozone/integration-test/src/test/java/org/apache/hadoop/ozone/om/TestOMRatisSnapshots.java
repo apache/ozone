@@ -278,12 +278,16 @@ public class TestOMRatisSnapshots {
     //  are on the follower
     int hardLinkCount = 0;
     try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
-      for (Path p: list.collect(Collectors.toList())) {
-        String fileName = p.getFileName().toString();
+      for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
+        String fileName = leaderSnapshotSST.getFileName().toString();
         if (fileName.toLowerCase().endsWith(".sst")) {
 
-          Path leaderSnapshotSST = Paths.get(leaderSnapshotDir.toString(), fileName);
-          Path leaderActiveSST =  Paths.get(leaderActiveDir.toString(), fileName);
+          Path leaderActiveSST =
+              Paths.get(leaderActiveDir.toString(), fileName);
+          // Skip if not hard link on the leader
+          if (!leaderActiveSST.toFile().exists()) {
+            continue;
+          }
           // If it is a hard link on the leader, it should be a hard link on the follower
           if (OmSnapshotManager.getINode(leaderActiveSST)
               .equals(OmSnapshotManager.getINode(leaderSnapshotSST))) {

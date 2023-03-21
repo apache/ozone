@@ -43,7 +43,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -80,7 +79,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private static final String DURATION_TO_WAIT_FOR_DIRECTORY = "PT10S";
 
   @Override
   public void init() throws ServletException {
@@ -139,7 +137,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   Map<Object, Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
                                   boolean includeSnapshotData)
-      throws IOException, InterruptedException {
+      throws IOException {
 
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
@@ -163,7 +161,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @return Set of expected snapshot dirs.
    */
   private Set<Path> waitForSnapshotDirs(DBCheckpoint checkpoint)
-      throws IOException, InterruptedException {
+      throws IOException {
 
     OzoneConfiguration conf = getConf();
 
@@ -206,6 +204,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           String parent = f.getParent();
           if (parent != null && parent.endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
               && !snapshotPaths.contains(file)) {
+            LOG.debug("Skipping unneeded file: " + file);
             continue;
           }
           processDir(file, copyFiles, hardLinkFiles, snapshotPaths);
