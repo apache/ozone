@@ -214,7 +214,7 @@ public class TestContainerBalancer {
         InvalidContainerBalancerConfigurationException.class,
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
-            "be lesser than hdds.container.balancer.move.timeout.");
+            "be less than hdds.container.balancer.move.timeout.");
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)
