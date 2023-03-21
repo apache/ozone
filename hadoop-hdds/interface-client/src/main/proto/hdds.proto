@@ -459,3 +459,10 @@ message TransferLeadershipRequestProto {
 
 message TransferLeadershipResponseProto {
 }
+
+message DeletedBlocksTransactionInfo {
+    optional int64 txID = 1;
+    optional int64 containerID = 2;
+    repeated int64 localID = 3;
+    optional int32 count = 4;
+}

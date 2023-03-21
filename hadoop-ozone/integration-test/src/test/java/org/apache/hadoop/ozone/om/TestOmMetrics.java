@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -89,6 +91,7 @@ public class TestOmMetrics {
    */
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
+  private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -105,7 +108,8 @@ public class TestOmMetrics {
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
   }
 
@@ -114,6 +118,7 @@ public class TestOmMetrics {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -281,7 +286,7 @@ public class TestOmMetrics {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
@@ -474,7 +479,7 @@ public class TestOmMetrics {
     startCluster();
     try {
       // Create a volume.
-      cluster.getClient().getObjectStore().createVolume("volumeacl");
+      client.getObjectStore().createVolume("volumeacl");
 
       OzoneObj volObj = new OzoneObjInfo.Builder().setVolumeName("volumeacl")
           .setResType(VOLUME).setStoreType(OZONE).build();
@@ -502,7 +507,7 @@ public class TestOmMetrics {
       assertCounter("NumRemoveAcl", 1L, omMetrics);
 
     } finally {
-      cluster.getClient().getObjectStore().deleteVolume("volumeacl");
+      client.getObjectStore().deleteVolume("volumeacl");
     }
   }
 
@@ -513,7 +518,7 @@ public class TestOmMetrics {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
 
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     // Create a volume.
     objectStore.createVolume("volumeacl");
     // Create a bucket.

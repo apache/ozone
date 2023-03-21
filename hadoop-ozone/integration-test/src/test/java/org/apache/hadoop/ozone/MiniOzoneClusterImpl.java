@@ -28,8 +28,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -59,6 +61,7 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -126,6 +129,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
+  private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -317,12 +321,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
-  public OzoneClient getClient() throws IOException {
-    return OzoneClientFactory.getRpcClient(conf);
+  public OzoneClient newClient() throws IOException {
+    OzoneClient client = createClient();
+    clients.add(client);
+    return client;
   }
 
-  @Override
-  public OzoneClient getRpcClient() throws IOException {
+  protected OzoneClient createClient() throws IOException {
     return OzoneClientFactory.getRpcClient(conf);
   }
 
@@ -448,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
+      IOUtils.closeQuietly(clients.toArray(new AutoCloseable[0]));
       File baseDir = new File(GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" +
               getClusterId()));

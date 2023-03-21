@@ -2751,70 +2751,70 @@ public abstract class TestOzoneRpcClientAbstract {
     String userName = "test-user";
     UserGroupInformation remoteUser =
         UserGroupInformation.createRemoteUser(userName);
-    OzoneClient client =
-        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
-          return OzoneClientFactory.getRpcClient(cluster.getConf());
-        });
-    OzoneAcl acl5 = new OzoneAcl(USER, userName, ACLType.READ, DEFAULT);
-    OzoneAcl acl6 = new OzoneAcl(USER, userName, ACLType.READ, ACCESS);
-    OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
-        .setResType(OzoneObj.ResourceType.VOLUME).build();
-    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setResType(OzoneObj.ResourceType.BUCKET).build();
-    store.addAcl(volumeObj, acl5);
-    store.addAcl(volumeObj, acl6);
-    store.addAcl(bucketObj, acl5);
-    store.addAcl(bucketObj, acl6);
+    try (OzoneClient client =
+        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
+            () -> OzoneClientFactory.getRpcClient(cluster.getConf()))) {
+      OzoneAcl acl5 = new OzoneAcl(USER, userName, ACLType.READ, DEFAULT);
+      OzoneAcl acl6 = new OzoneAcl(USER, userName, ACLType.READ, ACCESS);
+      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.VOLUME).build();
+      OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.BUCKET).build();
+      store.addAcl(volumeObj, acl5);
+      store.addAcl(volumeObj, acl6);
+      store.addAcl(bucketObj, acl5);
+      store.addAcl(bucketObj, acl6);
 
-    // User without permission cannot start multi-upload
-    String keyName2 = UUID.randomUUID().toString();
-    OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
-        .getBucket(bucketName);
-    try {
-      initiateMultipartUpload(bucket2, keyName2, anyReplication());
-      fail("User without permission should fail");
-    } catch (Exception e) {
-      assertTrue(e instanceof OMException);
-      assertEquals(ResultCodes.PERMISSION_DENIED,
-          ((OMException) e).getResult());
-    }
+      // User without permission cannot start multi-upload
+      String keyName2 = UUID.randomUUID().toString();
+      OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
+      try {
+        initiateMultipartUpload(bucket2, keyName2, anyReplication());
+        fail("User without permission should fail");
+      } catch (Exception e) {
+        assertTrue(e instanceof OMException);
+        assertEquals(ResultCodes.PERMISSION_DENIED,
+            ((OMException) e).getResult());
+      }
 
-    // Add create permission for user, and try multi-upload init again
-    OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
-    OzoneAcl acl8 = new OzoneAcl(USER, userName, ACLType.CREATE, ACCESS);
-    OzoneAcl acl9 = new OzoneAcl(USER, userName, WRITE, DEFAULT);
-    OzoneAcl acl10 = new OzoneAcl(USER, userName, WRITE, ACCESS);
-    store.addAcl(volumeObj, acl7);
-    store.addAcl(volumeObj, acl8);
-    store.addAcl(volumeObj, acl9);
-    store.addAcl(volumeObj, acl10);
+      // Add create permission for user, and try multi-upload init again
+      OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
+      OzoneAcl acl8 = new OzoneAcl(USER, userName, ACLType.CREATE, ACCESS);
+      OzoneAcl acl9 = new OzoneAcl(USER, userName, WRITE, DEFAULT);
+      OzoneAcl acl10 = new OzoneAcl(USER, userName, WRITE, ACCESS);
+      store.addAcl(volumeObj, acl7);
+      store.addAcl(volumeObj, acl8);
+      store.addAcl(volumeObj, acl9);
+      store.addAcl(volumeObj, acl10);
 
-    store.addAcl(bucketObj, acl7);
-    store.addAcl(bucketObj, acl8);
-    store.addAcl(bucketObj, acl9);
-    store.addAcl(bucketObj, acl10);
-    String uploadId = initiateMultipartUpload(bucket2, keyName2,
-        anyReplication());
+      store.addAcl(bucketObj, acl7);
+      store.addAcl(bucketObj, acl8);
+      store.addAcl(bucketObj, acl9);
+      store.addAcl(bucketObj, acl10);
+      String uploadId = initiateMultipartUpload(bucket2, keyName2,
+          anyReplication());
 
-    // Upload part
-    byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)1);
-    String partName = uploadPart(bucket, keyName2, uploadId, 1, data);
-    Map<Integer, String> partsMap = new TreeMap<>();
-    partsMap.put(1, partName);
+      // Upload part
+      byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 1);
+      String partName = uploadPart(bucket, keyName2, uploadId, 1, data);
+      Map<Integer, String> partsMap = new TreeMap<>();
+      partsMap.put(1, partName);
 
-    // Complete multipart upload request
-    completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
+      // Complete multipart upload request
+      completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
 
-    // User without permission cannot read multi-uploaded object
-    try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-      fail("User without permission should fail");
-    } catch (Exception e) {
-      assertTrue(e instanceof OMException);
-      assertEquals(ResultCodes.PERMISSION_DENIED,
-          ((OMException) e).getResult());
+      // User without permission cannot read multi-uploaded object
+      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+        fail("User without permission should fail");
+      } catch (Exception e) {
+        assertTrue(e instanceof OMException);
+        assertEquals(ResultCodes.PERMISSION_DENIED,
+            ((OMException) e).getResult());
+      }
     }
   }
 

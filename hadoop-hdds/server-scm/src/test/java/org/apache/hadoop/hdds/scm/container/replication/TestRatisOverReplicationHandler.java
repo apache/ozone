@@ -29,11 +29,11 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,6 +42,7 @@ import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,6 +51,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests for {@link RatisOverReplicationHandler}.
@@ -59,10 +61,11 @@ public class TestRatisOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
-  private NodeManager nodeManager;
+  private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @Before
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException, NotLeaderException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
         RATIS_REPLICATION_CONFIG);
 
@@ -71,9 +74,17 @@ public class TestRatisOverReplicationHandler {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
 
-    nodeManager = Mockito.mock(NodeManager.class);
-    Mockito.when(nodeManager.getNodeStatus(Mockito.any()))
-        .thenReturn(NodeStatus.inServiceHealthy());
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY, 0);
+        });
+
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
+        commandsSent);
 
     GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
   }
@@ -106,8 +117,9 @@ public class TestRatisOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
 
     ContainerReplica stale = replicas.stream().findFirst().get();
-    Mockito.when(nodeManager.getNodeStatus(stale.getDatanodeDetails()))
-        .thenReturn(NodeStatus.inServiceStale());
+    Mockito.when(replicationManager.getNodeStatus(stale.getDatanodeDetails()))
+        .thenAnswer(invocation ->
+            NodeStatus.inServiceStale());
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
@@ -274,14 +286,13 @@ public class TestRatisOverReplicationHandler {
       ContainerHealthResult healthResult,
       int expectNumCommands) throws IOException {
     RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(policy, nodeManager);
+        new RatisOverReplicationHandler(policy, replicationManager);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndSendCommands(replicas, pendingOps,
             healthResult, 2);
-    Assert.assertEquals(expectNumCommands, commands.size());
+    Assert.assertEquals(expectNumCommands, commandsSent.size());
 
-    return commands;
+    return commandsSent;
   }
 
   private ContainerHealthResult.OverReplicatedHealthResult

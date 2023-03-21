@@ -67,7 +67,7 @@ public class GrpcReplicationService extends
           responseObserver, containerID, BUFFER_SIZE);
       source.copyData(containerID, outputStream, compression);
     } catch (IOException e) {
-      LOG.error("Error streaming container {}", containerID, e);
+      LOG.warn("Error streaming container {}", containerID, e);
       responseObserver.onError(e);
     } finally {
       // output may have already been closed, ignore such errors

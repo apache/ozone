@@ -50,6 +50,8 @@ import static org.apache.hadoop.ozone.container.keyvalue
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -217,6 +219,7 @@ public final class ContainerDataYaml {
     private List<String> yamlFields;
 
     ContainerDataRepresenter(List<String> yamlFields) {
+      super(new DumperOptions());
       this.yamlFields = yamlFields;
     }
 
@@ -257,6 +260,7 @@ public final class ContainerDataYaml {
    */
   private static class ContainerDataConstructor extends SafeConstructor {
     ContainerDataConstructor() {
+      super(new LoaderOptions());
       //Adding our own specific constructors for tags.
       // When a new Container type is added, we need to add yamlConstructor
       // for that

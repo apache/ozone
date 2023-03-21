@@ -109,19 +109,21 @@ public class TestOzoneManagerListVolumes {
     cluster.waitForClusterToBeReady();
 
     // Create volumes with non-default owners and ACLs
-    OzoneClient client = cluster.getClient();
-    ObjectStore objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
 
-    /* r = READ, w = WRITE, c = CREATE, d = DELETE
-       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
-    String aclUser1All = "user:user1:a";
-    String aclUser2All = "user:user2:a";
-    String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+      /* r = READ, w = WRITE, c = CREATE, d = DELETE
+         l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
+      String aclUser1All = "user:user1:a";
+      String aclUser2All = "user:user2:a";
+      String aclWorldAll = "world::a";
+      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+    }
+
     OzoneManager om = cluster.getOzoneManager();
     om.stop();
     om.join();
@@ -185,8 +187,16 @@ public class TestOzoneManagerListVolumes {
   private void checkUser(UserGroupInformation user,
       List<String> expectVol, boolean expectListAllSuccess,
                          boolean expectListByUserSuccess) throws IOException {
+    try (OzoneClient client = cluster.newClient()) {
+      checkUser(client, user,
+          expectVol, expectListAllSuccess, expectListByUserSuccess);
+    }
+  }
 
-    OzoneClient client = cluster.getClient();
+  private static void checkUser(OzoneClient client, UserGroupInformation user,
+      List<String> expectVol, boolean expectListAllSuccess,
+      boolean expectListByUserSuccess) throws IOException {
+
     ObjectStore objectStore = client.getObjectStore();
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.

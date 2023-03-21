@@ -48,9 +48,9 @@ import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -159,7 +159,6 @@ public class TestContainerCommandsEC {
     config.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
     startCluster(config);
     prepareData(KEY_SIZE_RANGES);
-    rpcClient = OzoneClientFactory.getRpcClient(config);
   }
 
   @AfterAll
