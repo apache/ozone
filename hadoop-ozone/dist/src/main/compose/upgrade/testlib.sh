@@ -56,7 +56,7 @@ prepare_for_image() {
   # Load docker compose setup.
   source "$OZONE_COMPOSE_DIR"/load.sh
 
-  if [[ "$image_version" = 'current' ]]; then
+  if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
       prepare_for_runner_image
   else
       prepare_for_binary_image "$image_version"
