@@ -82,6 +82,7 @@ public class TestOmKeyInfo {
 
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
+    Assert.assertFalse(key.isHsync());
     omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     Assert.assertEquals(3, omKeyProto.getEcReplicationConfig().getData());
@@ -112,6 +113,7 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .setHSync(false)
         .build();
   }
 

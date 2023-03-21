@@ -1017,6 +1017,7 @@ message KeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
     optional bool isFile = 19;
+    optional bool isHsync = 20;
 }
 
 message DirectoryInfo {
