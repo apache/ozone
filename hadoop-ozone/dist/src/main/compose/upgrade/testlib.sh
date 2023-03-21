@@ -77,32 +77,22 @@ callback() {
 
   local common_callback="$TEST_DIR"/upgrades/"$UPGRADE_TYPE"/common/callback.sh
   (
-    set +e
-    source "$common_callback" || exit 1
+    # Common callback always exists.
+    source "$common_callback"
     if [[ "$(type -t "$func")" = function ]]; then
       "$func"
-    else
-      exit 1
     fi
-    set -e
   )
-  common_callback_rc="$?"
 
   (
-    set +e
-    source "$OZONE_UPGRADE_CALLBACK" || exit 1
-    if [[ "$(type -t "$func")" = function ]]; then
-      "$func"
-    else
-      exit 1
+    # Version specific callback is optional.
+    if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
+      source "$OZONE_UPGRADE_CALLBACK"
+      if [[ "$(type -t "$func")" = function ]]; then
+        "$func"
+      fi
     fi
-    set -e
   )
-  callback_rc="$?"
-
-  if [[ ! "$common_callback_rc" ]] && [[ ! "$callback_rc" ]]; then
-    echo "Failed to execute callback for $func in $common_callback or $OZONE_UPGRADE_CALLBACK" 1>&2
-  fi
 }
 
 ## @description Sets up and runs the test defined by "$1"/test.sh.
