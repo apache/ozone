@@ -23,16 +23,18 @@ x-common-config:
     - docker-config
   image: ${OZONE_IMAGE}
 
-x-replication:
-  &replication
+x-environment:
+  &environment
   OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-3}
+  OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
+  OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
 
 x-datanode:
   &datanode
   command: ["ozone","datanode"]
   <<: *common-config
   environment:
-    <<: *replication
+    <<: *environment
   ports:
     - 9864
     - 9882
@@ -43,7 +45,7 @@ x-om:
   <<: *common-config
   environment:
     ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-    <<: *replication
+    <<: *environment
   ports:
     - 9862
     - 9872
@@ -87,7 +89,7 @@ services:
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.14
@@ -146,7 +148,7 @@ services:
     command: ["ozone","recon"]
     <<: *common-config
     environment:
-      <<: *replication
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.20
@@ -160,7 +162,7 @@ services:
     command: ["ozone","s3g"]
     <<: *common-config
     environment:
-      <<: *replication
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.21
