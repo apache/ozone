@@ -91,8 +91,9 @@ public final class OMClientRequestUtils {
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
           cacheIter.next();
-      String key = cacheKeyValue.getKey().getCacheKey();
-      if (key.startsWith(dbSnapshotBucketKey)) {
+      String cacheKey = cacheKeyValue.getKey().getCacheKey();
+      SnapshotInfo cacheValue = cacheKeyValue.getValue().getCacheValue();
+      if (cacheKey.startsWith(dbSnapshotBucketKey) && cacheValue != null) {
         return true;
       }
     }
