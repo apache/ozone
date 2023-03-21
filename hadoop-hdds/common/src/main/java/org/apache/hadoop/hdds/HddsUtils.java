@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
 import javax.management.ObjectName;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -31,7 +30,6 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
