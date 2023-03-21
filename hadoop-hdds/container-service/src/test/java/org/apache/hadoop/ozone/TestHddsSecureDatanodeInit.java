@@ -366,7 +366,7 @@ public class TestHddsSecureDatanodeInit {
         Duration.ofSeconds(CERT_LIFETIME));
     String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
     // provide an invalid SCMGetCertResponseProto. Without
-    // setX509CACertificate(pemCert), signAndStoreCert will throw exception.
+    // setX509RootCACertificate(pemCert), signAndStoreCert will throw exception.
     SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
         SCMSecurityProtocolProtos.SCMGetCertResponseProto
             .newBuilder().setResponseCode(SCMSecurityProtocolProtos
@@ -402,7 +402,7 @@ public class TestHddsSecureDatanodeInit {
         .newBuilder().setResponseCode(SCMSecurityProtocolProtos
             .SCMGetCertResponseProto.ResponseCode.success)
         .setX509Certificate(pemCert)
-        .setX509CACertificate(pemCert)
+        .setX509RootCACertificate(pemCert)
         .build();
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
         .thenReturn(responseProto);

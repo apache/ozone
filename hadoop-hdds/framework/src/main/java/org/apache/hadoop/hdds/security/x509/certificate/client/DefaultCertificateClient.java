@@ -523,10 +523,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         codecPath);
     try {
       String pemEncodedCert = response.getX509Certificate();
-      String pemEncodedRootCert = response.getX509RootCACertificate();
-      if (pemEncodedRootCert == null) {
-        throw new RuntimeException("Unable to find SCM root certificate");
+      if (!response.hasX509RootCACertificate()) {
+        throw new CertificateException("Unable to find SCM root certificate");
       }
+      String pemEncodedRootCert = response.getX509RootCACertificate();
       X509Certificate rootCert =
           CertificateCodec.getX509Certificate(pemEncodedRootCert);
       CertPath path =
