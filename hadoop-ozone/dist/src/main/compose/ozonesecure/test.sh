@@ -37,6 +37,8 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
+execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
+
 #expects 4 pipelines, should be run before
 #admincli which creates STANDALONE pipeline
 execute_robot_test scm recon
