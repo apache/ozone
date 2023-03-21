@@ -106,8 +106,8 @@ callback() {
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
-  export UPGRADE_TYPE="$1"
-  local compose_dir="$2"
+  local compose_dir="$1"
+  export UPGRADE_TYPE="$2"
   export OZONE_UPGRADE_FROM="$3"
   export OZONE_UPGRADE_TO="$4"
 
