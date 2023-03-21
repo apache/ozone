@@ -451,6 +451,7 @@ message ContainerBalancerConfigurationProto {
 
     required bool shouldRun = 18;
     optional int32 nextIterationIndex = 19;
+    optional int64 moveReplicationTimeout = 20;
 }
 
 message TransferLeadershipRequestProto {
