@@ -22,7 +22,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -50,7 +49,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -67,9 +65,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -97,7 +92,6 @@ public class TestOzoneManagerSnapshotAcl {
       OzoneObj.ResourceType.KEY;
   private static MiniOzoneCluster cluster;
   private static ObjectStore objectStore;
-  private static File metaDir;
   private static OzoneManager ozoneManager;
   private static OzoneClient client;
   private String volumeName;
@@ -140,7 +134,7 @@ public class TestOzoneManagerSnapshotAcl {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(ozoneManagerConf);
+    OMStorage.getOmDbDir(ozoneManagerConf);
   }
 
   @AfterEach
@@ -193,7 +187,7 @@ public class TestOzoneManagerSnapshotAcl {
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testGeyKeyInfoWithAllowedUser(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
@@ -207,7 +201,7 @@ public class TestOzoneManagerSnapshotAcl {
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testGeyKeyInfoWithNotAllowedUser(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyOmKeyArgs = getOmKeyArgs(true);
@@ -233,7 +227,7 @@ public class TestOzoneManagerSnapshotAcl {
   @MethodSource("getListStatusArguments")
   public void testListStatusWithAllowedUser(BucketLayout bucketLayout,
       boolean recursive, boolean allowPartialPrefixes)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
@@ -250,7 +244,7 @@ public class TestOzoneManagerSnapshotAcl {
   @MethodSource("getListStatusArguments")
   public void testListStatusWithNotAllowedUser(BucketLayout bucketLayout,
       boolean recursive, boolean allowPartialPrefixes)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
@@ -394,7 +388,7 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void setup(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     UserGroupInformation.setLoginUser(UGI1);
 
     createVolume();
@@ -470,7 +464,7 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
         snapshotPrefix + RandomStringUtils.randomNumeric(5);

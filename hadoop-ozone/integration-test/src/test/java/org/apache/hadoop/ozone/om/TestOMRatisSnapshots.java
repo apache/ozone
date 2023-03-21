@@ -65,12 +65,10 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertEquals;
@@ -180,7 +178,7 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
-    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM, keys);
+    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM);
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -258,7 +256,7 @@ public class TestOMRatisSnapshots {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
-    OmKeyInfo omKeyInfo = null;
+    OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
@@ -272,8 +270,6 @@ public class TestOMRatisSnapshots {
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
-    // Check snapshot hard links
-
     // Get the list of hardlinks from the leader.  Then confirm those links
     //  are on the follower
     int hardLinkCount = 0;
@@ -293,16 +289,16 @@ public class TestOMRatisSnapshots {
               .equals(OmSnapshotManager.getINode(leaderSnapshotSST))) {
             Path followerSnapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =  Paths.get(followerActiveDir.toString(), fileName);
-            assertEquals("Snapshot sst file is supposed to be a hard link",
-                         OmSnapshotManager.getINode(followerActiveSST),
-                         OmSnapshotManager.getINode(followerSnapshotSST));
+            Assertions.assertEquals(
+                OmSnapshotManager.getINode(followerActiveSST),
+                OmSnapshotManager.getINode(followerSnapshotSST),
+                "Snapshot sst file is supposed to be a hard link");
             hardLinkCount++;
           }
-
         }
       }
     }
-    assertTrue("No hard links were found", hardLinkCount > 0);
+    Assertions.assertTrue(hardLinkCount > 0, "No hard links were found");
   }
 
   @Ignore("Enable this unit test after RATIS-1481 used")
@@ -613,7 +609,7 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM)
       throws IOException {
     objectStore.createSnapshot(volumeName, bucketName, "snap1");
 

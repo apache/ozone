@@ -190,14 +190,13 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
-   * Write checkpoint to the stream
+   * Write checkpoint to the stream.
    *
    * @param checkpoint The checkpoint to be written.
-   * @param ignoredRequest The httpRequest which generated this checkpoint
+   * @param ignoredRequest The httpRequest which generated this checkpoint.
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
    */
-  @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest ignoredRequest,
                                   OutputStream destination)
