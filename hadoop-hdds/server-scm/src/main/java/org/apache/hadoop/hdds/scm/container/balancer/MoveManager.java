@@ -112,8 +112,8 @@ public final class MoveManager implements
   /*
   moveTimeout and replicationTimeout are set by ContainerBalancer.
    */
-  private long moveTimeout = 1000 * 90 * 60;
-  private long replicationTimeout = 1000 * 60 * 60;
+  private long moveTimeout = 1000 * 65 * 60;
+  private long replicationTimeout = 1000 * 50 * 60;
   private static final double MOVE_DEADLINE_FACTOR = 0.95;
 
   private final ReplicationManager replicationManager;

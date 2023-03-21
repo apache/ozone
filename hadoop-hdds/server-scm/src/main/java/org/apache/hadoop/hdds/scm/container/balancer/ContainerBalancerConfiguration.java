@@ -93,24 +93,24 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
-  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "90m",
+  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
           "from source to target.")
-  private long moveTimeout = Duration.ofMinutes(90).toMillis();
+  private long moveTimeout = Duration.ofMinutes(65).toMillis();
 
   @Config(key = "move.replication.timeout", type = ConfigType.TIME,
-      defaultValue = "60m", tags = {ConfigTag.BALANCER}, description = "The " +
+      defaultValue = "50m", tags = {ConfigTag.BALANCER}, description = "The " +
       "amount of time to allow a single container's replication from source " +
       "to target as part of container move. For example, if \"hdds.container" +
-      ".balancer.move.timeout\" is 90 minutes, then out of those 90 minutes " +
-      "60 minutes will be the deadline for replication to complete.")
-  private long moveReplicationTimeout = Duration.ofMinutes(60).toMillis();
+      ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
+      "50 minutes will be the deadline for replication to complete.")
+  private long moveReplicationTimeout = Duration.ofMinutes(50).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
-      defaultValue = "160m", tags = {ConfigTag.BALANCER}, description =
+      defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
       "The interval period between each iteration of Container Balancer.")
-  private long balancingInterval = Duration.ofMinutes(160).toMillis();
+  private long balancingInterval = Duration.ofMinutes(70).toMillis();
 
   @Config(key = "include.datanodes", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "A list of Datanode " +
