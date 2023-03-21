@@ -452,7 +452,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // This metadata reader points to the active filesystem
   private OmMetadataReader omMetadataReader;
   private OmSnapshotManager omSnapshotManager;
-  private SnapshotChainManager snapshotChainManager;
 
   /** A list of property that are reconfigurable at runtime. */
   private final SortedSet<String> reconfigurableProperties =
@@ -770,7 +769,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
     omSnapshotManager = new OmSnapshotManager(this);
-    snapshotChainManager = new SnapshotChainManager(metadataManager);
 
     // Snapshot metrics
     updateActiveSnapshotMetrics();
@@ -1508,15 +1506,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OmSnapshotManager getOmSnapshotManager() {
     return omSnapshotManager;
-  }
-
-  /**
-   * Get Snapshot Chain Manager.
-   *
-   * @return SnapshotChainManager.
-   */
-  public SnapshotChainManager getSnapshotChainManager() {
-    return snapshotChainManager;
   }
 
   /**
