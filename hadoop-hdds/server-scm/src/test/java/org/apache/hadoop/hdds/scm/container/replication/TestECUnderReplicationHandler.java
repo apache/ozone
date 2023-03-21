@@ -186,7 +186,8 @@ public class TestECUnderReplicationHandler {
   }
 
 
-  // Test used to reproduce the issue reported in HDDS-8171
+  // Test used to reproduce the issue reported in HDDS-8171 and then adjusted
+  // to ensure only a single command is sent for HDDS-8172.
   @Test
   public void testUnderReplicationWithDecomIndexAndMaintOnSameIndex()
       throws IOException {
@@ -214,10 +215,13 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5)));
 
+    // Note that maintenanceIndexes is set to zero as we do not expect any
+    // maintenance commands to be created, as they are solved by the earlier
+    // decommission command.
     Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(
-            Lists.emptyList(), availableReplicas, 1, 2, policy);
-    Assertions.assertEquals(2, cmds.size());
+            Lists.emptyList(), availableReplicas, 1, 0, policy);
+    Assertions.assertEquals(1, cmds.size());
     // Check the replicate command has index 1 set
     for (Pair<DatanodeDetails, SCMCommand<?>> c : cmds) {
       // Ensure neither of the commands are for the dead maintenance node
