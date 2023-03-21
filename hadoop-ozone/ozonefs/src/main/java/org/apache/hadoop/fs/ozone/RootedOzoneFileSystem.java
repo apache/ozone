@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.Optional;
 
 /**
  * The Rooted Ozone Filesystem (OFS) implementation.
@@ -110,6 +111,13 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   @Override
   public boolean hasPathCapability(final Path path, final String capability)
       throws IOException {
-    return false;
+    // qualify the path to make sure that it refers to the current FS.
+    final Path p = makeQualified(path);
+    Optional<Boolean> cap =
+        OzonePathCapabilities.hasPathCapability(p, capability);
+    if (cap.isPresent()) {
+      return cap.get();
+    }
+    return super.hasPathCapability(p, capability);
   }
 }
