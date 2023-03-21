@@ -75,9 +75,9 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 - This is primarily for testing upgrades from versions before the non-rolling upgrade framework was introduced.
 
 - Supported Callbacks:
-    1. `setup_with_old_version`: Run before ozone is started in the old version.
+    1. `setup_old_version`: Run before ozone is started in the old version.
     3. `with_old_version`: Run while ozone is running in the old version.
-    3. `setup_with_this_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
+    3. `setup_this_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
     4. `with_this_version`: Run while ozone is running in the new version.
 
 ### compose
