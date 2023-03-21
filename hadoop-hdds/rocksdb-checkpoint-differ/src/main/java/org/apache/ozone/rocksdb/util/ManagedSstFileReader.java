@@ -18,9 +18,10 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.CloseableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.rocksdb.ReadOptions;
@@ -29,10 +30,14 @@ import org.rocksdb.SstFileReader;
 import org.rocksdb.SstFileReaderIterator;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -48,18 +53,30 @@ public class ManagedSstFileReader {
     this.sstFiles = sstFiles;
   }
 
+  public static <T> Stream<T> getStreamFromIterator(
+          CloseableIterator<T> itr) {
+    final Spliterator<T> spliterator = Spliterators
+            .spliteratorUnknownSize(itr, 0);
+    return StreamSupport.stream(spliterator, false).onClose(() -> {
+      try {
+        itr.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+  }
+
   public Stream<String> getKeyStream() throws RocksDBException,
           NativeLibraryNotLoadedException, IOException {
-    //TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
+    // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     ManagedOptions options = new ManagedOptions();
-    ReadOptions readOptions = new ReadOptions();
+    ReadOptions readOptions = new ManagedReadOptions();
     final MultipleSstFileIterator<String> itr =
             new MultipleSstFileIterator<String>(sstFiles) {
           @Override
-          protected HddsUtils.CloseableIterator<String>
-              initNewKeyIteratorForFile(String file) throws RocksDBException {
-            return new ManagedSstFileIterator<String>(file, options,
-                    readOptions) {
+          protected CloseableIterator<String>
+          getKeyIteratorForFile(String file) throws RocksDBException {
+            return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
                       SstFileReaderIterator iterator) {
@@ -75,18 +92,18 @@ public class ManagedSstFileReader {
             readOptions.close();
           }
         };
-    return RdbUtil.getStreamFromIterator(itr);
+    return getStreamFromIterator(itr);
   }
   public Stream<String> getKeyStreamWithTombstone(
           ManagedSSTDumpTool sstDumpTool) throws IOException, RocksDBException,
           NativeLibraryNotLoadedException {
-    //TODO: [SNAPSHOT] Check if default Options is enough.
-    ManagedOptions options = new ManagedOptions();
     final MultipleSstFileIterator<String> itr =
             new MultipleSstFileIterator<String>(sstFiles) {
+          //TODO: [SNAPSHOT] Check if default Options is enough.
+          private ManagedOptions options = new ManagedOptions();
           @Override
-          protected HddsUtils.CloseableIterator<String>
-              initNewKeyIteratorForFile(String file)
+          protected CloseableIterator<String>
+          getKeyIteratorForFile(String file)
                   throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                     options) {
@@ -103,11 +120,11 @@ public class ManagedSstFileReader {
             options.close();
           }
         };
-    return RdbUtil.getStreamFromIterator(itr);
+    return getStreamFromIterator(itr);
   }
 
-  private abstract static class ManagedSstFileIterator<T> implements
-          HddsUtils.CloseableIterator<T> {
+  private abstract static class ManagedSstFileIterator implements
+          CloseableIterator<String> {
     private SstFileReader fileReader;
     private SstFileReaderIterator fileReaderIterator;
 
@@ -131,24 +148,23 @@ public class ManagedSstFileReader {
       return fileReaderIterator.isValid();
     }
 
-    protected abstract T getIteratorValue(SstFileReaderIterator iterator);
+    protected abstract String getIteratorValue(SstFileReaderIterator iterator);
 
     @Override
-    public T next() {
-      T value = getIteratorValue(fileReaderIterator);
+    public String next() {
+      String value = getIteratorValue(fileReaderIterator);
       fileReaderIterator.next();
       return value;
     }
   }
 
   private abstract static class MultipleSstFileIterator<T> implements
-          HddsUtils.CloseableIterator<T> {
+          CloseableIterator<T> {
 
     private final Iterator<String> fileNameIterator;
 
     private String currentFile;
-    private SstFileReader currentFileReader;
-    private HddsUtils.CloseableIterator<T> currentFileIterator;
+    private CloseableIterator<T> currentFileIterator;
 
     private MultipleSstFileIterator(Collection<String> files)
             throws IOException, RocksDBException,
@@ -157,9 +173,9 @@ public class ManagedSstFileReader {
       moveToNextFile();
     }
 
-    protected abstract HddsUtils.CloseableIterator<T> initNewKeyIteratorForFile(
-            String file) throws RocksDBException,
-            NativeLibraryNotLoadedException, IOException;
+    protected abstract CloseableIterator<T> getKeyIteratorForFile(String file)
+            throws RocksDBException, NativeLibraryNotLoadedException,
+            IOException;
 
     @Override
     public boolean hasNext() {
@@ -171,7 +187,7 @@ public class ManagedSstFileReader {
         } while (moveToNextFile());
       } catch (IOException | RocksDBException |
                NativeLibraryNotLoadedException e) {
-        // TODO: This exception has to be handled by the caller.
+        // TODO: [Snapshot] This exception has to be handled by the caller.
         //  We have to do better exception handling.
         throw new RuntimeException(e);
       }
@@ -182,9 +198,8 @@ public class ManagedSstFileReader {
     public T next() {
       if (hasNext()) {
         return currentFileIterator.next();
-//        final String value = new String(currentFileIterator.key(), UTF_8);
       }
-      throw new NoSuchElementException("No more keys");
+      throw new NoSuchElementException("No more elements found.");
     }
 
     @Override
@@ -197,7 +212,7 @@ public class ManagedSstFileReader {
       if (fileNameIterator.hasNext()) {
         closeCurrentFile();
         currentFile = fileNameIterator.next();
-        this.currentFileIterator = initNewKeyIteratorForFile(currentFile);
+        this.currentFileIterator = getKeyIteratorForFile(currentFile);
         return true;
       }
       return false;

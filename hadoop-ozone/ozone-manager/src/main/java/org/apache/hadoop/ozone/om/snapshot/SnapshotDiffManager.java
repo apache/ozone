@@ -202,7 +202,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         initSSTDumpTool(configuration);
         isNativeRocksToolsLoaded = true;
       } catch (NativeLibraryNotLoadedException e) {
-        LOG.error("Unable to load SSTDumpTool ", e);
+        LOG.error("Unable to load SSTDumpTool", e);
         isNativeRocksToolsLoaded = false;
       }
     }
@@ -214,7 +214,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
             OzoneConfigKeys
                     .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-    int bufferSize = (int)conf.getStorageSize(
+    int bufferSize = (int) conf.getStorageSize(
             OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
             OzoneConfigKeys
                 .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
@@ -567,8 +567,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                   objectIDsToCheckMap,
                   tablePrefixes);
         } catch (NativeLibraryNotLoadedException ex) {
-          //This code should never be never executed.
-          throw new RuntimeException(ex);
+          //This code should be never executed.
+          throw new IllegalStateException(ex);
         }
       }
 
@@ -609,8 +609,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                     objectIDsToCheckMap,
                     tablePrefixes);
           } catch (NativeLibraryNotLoadedException ex) {
-            //This code should never be never executed.
-            throw new RuntimeException(ex);
+            //This code should be never executed.
+            throw new IllegalStateException(ex);
           }
         }
       }

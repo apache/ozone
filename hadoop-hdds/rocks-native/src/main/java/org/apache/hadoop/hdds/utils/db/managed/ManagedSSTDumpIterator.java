@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.CloseableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 
@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * Iterator to Parse output of RocksDBSSTDumpTool.
  */
 public abstract class ManagedSSTDumpIterator<T> implements
-        HddsUtils.CloseableIterator<T> {
+        CloseableIterator<T> {
 
   private static final String PATTERN_REGEX =
           "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
@@ -117,9 +117,9 @@ public abstract class ManagedSSTDumpIterator<T> implements
   }
 
   /**
-   * Transform function to transform key to a certain value.
+   * Transforms Key to a certain value.
    * @param value
-   * @return
+   * @return transformed Value
    */
   protected abstract T getTransformedValue(KeyValue value);
 
@@ -148,7 +148,7 @@ public abstract class ManagedSSTDumpIterator<T> implements
                     Math.max(stdoutString.length() - 1, 0)));
             return getTransformedValue(currentKey);
           }
-          throw new NoSuchElementException("No more records found");
+          throw new NoSuchElementException("No more elements found");
         }
         stdoutString.append(charBuffer, 0, numberOfCharsRead);
         currentMatcher.reset();
