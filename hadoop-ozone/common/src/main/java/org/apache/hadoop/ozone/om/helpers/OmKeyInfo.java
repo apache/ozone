@@ -78,7 +78,6 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   private List<OzoneAcl> acls;
 
-
   private boolean isHsync;
 
   @SuppressWarnings("parameternumber")
@@ -502,6 +501,8 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     public Builder addAllMetadata(Map<String, String> newMetadata) {
       metadata.putAll(newMetadata);
+
+      setHSync(metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
       return this;
     }
 
@@ -667,8 +668,6 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
-    kb.setIsFile(isFile);
-    kb.setIsHsync(isHsync);
     return kb.build();
   }
 
@@ -683,6 +682,9 @@ public final class OmKeyInfo extends WithParentObjectId {
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }
 
+    Map<String, String> newMetadata =
+        KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList());
+
     Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
@@ -694,7 +696,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setReplicationConfig(ReplicationConfig
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
                 keyInfo.getEcReplicationConfig()))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
+        .addAllMetadata(newMetadata)
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
@@ -716,9 +718,7 @@ public final class OmKeyInfo extends WithParentObjectId {
       builder.setFile(keyInfo.getIsFile());
     }
 
-    if (keyInfo.hasIsHsync()) {
-      builder.setHSync(keyInfo.getIsHsync());
-    }
+    builder.setHSync(newMetadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
 
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
@@ -804,6 +804,8 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
+
+      builder.setHSync(metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
     }
 
     if (fileChecksum != null) {
