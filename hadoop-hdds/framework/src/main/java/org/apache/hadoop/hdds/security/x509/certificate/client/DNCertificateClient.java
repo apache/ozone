@@ -41,7 +41,7 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 /**
  * Certificate client for DataNodes.
  */
-public class DNCertificateClient extends CommonCertificateClient {
+public class DNCertificateClient extends DefaultCertificateClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DNCertificateClient.class);
