@@ -338,16 +338,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   @Override
   public synchronized List<X509Certificate> getCACertificates() {
-    CertPath certPath = getCertPath();
-    if (certPath == null || certPath.getCertificates() == null) {
+    CertPath path = getCertPath();
+    if (path == null || path.getCertificates() == null) {
       return null;
     }
 
     List<X509Certificate> caList = new ArrayList<>();
     // certificate bundle case
-    if (certPath.getCertificates().size() > 1) {
-      for (int i = 1; i < certPath.getCertificates().size(); i++) {
-        caList.add((X509Certificate) certPath.getCertificates().get(i));
+    if (path.getCertificates().size() > 1) {
+      for (int i = 1; i < path.getCertificates().size(); i++) {
+        caList.add((X509Certificate) path.getCertificates().get(i));
       }
     } else {
       // case before certificate bundle is supported
