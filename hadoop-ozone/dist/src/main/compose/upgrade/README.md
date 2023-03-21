@@ -104,6 +104,9 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
     - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
     - `OZONE_UPGRADE_TO`: The version of ozone being upgraded to.
     - `TEST_DIR`: The top level *upgrade* directory containing all files for upgrade testing.
+    - `SCM`: The name of the SCM container to run robot tests from.
+        - This can be passed as the first argument to `execute_robot_test`.
+        - This allows the same tests to work with and without SCM HA.
 
 ### Testing New Versions
 

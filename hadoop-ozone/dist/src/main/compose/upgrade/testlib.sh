@@ -77,22 +77,26 @@ callback() {
 
   local common_callback="$TEST_DIR"/upgrades/"$UPGRADE_TYPE"/common/callback.sh
   (
+    set +e
     source "$common_callback" || exit 1
     if [[ "$(type -t "$func")" = function ]]; then
       "$func"
     else
       exit 1
     fi
+    set -e
   )
   common_callback_rc="$?"
 
   (
+    set +e
     source "$OZONE_UPGRADE_CALLBACK" || exit 1
     if [[ "$(type -t "$func")" = function ]]; then
       "$func"
     else
       exit 1
     fi
+    set -e
   )
   callback_rc="$?"
 

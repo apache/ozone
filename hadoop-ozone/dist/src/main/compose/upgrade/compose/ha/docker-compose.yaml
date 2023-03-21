@@ -28,6 +28,7 @@ x-environment:
   OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-3}
   OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
   OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
+  OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
 
 x-datanode:
   &datanode
@@ -43,9 +44,6 @@ x-scm:
   &scm
   command: ["ozone","scm"]
   <<: *common-config
-  environment:
-    <<: *environment
-    OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
   ports:
     - 9876
 
@@ -97,6 +95,7 @@ services:
     <<: *scm
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.14
@@ -109,6 +108,7 @@ services:
     environment:
       WAITFOR: scm1:9894
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.15
@@ -121,6 +121,7 @@ services:
     environment:
       WAITFOR: scm2:9894
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      <<: *environment
     networks:
       net:
         ipv4_address: 10.9.0.16
