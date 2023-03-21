@@ -72,14 +72,14 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private BatchOperation batchOperation;
   private List<Path> checkpointPaths = new ArrayList<>();
 
-  private static OzoneManager ozoneManager;
-  private static OMMetrics omMetrics;
-  private static OMMetadataManager omMetadataManager;
-  private static AuditLogger auditLogger;
+  private OzoneManager ozoneManager;
+  private OMMetrics omMetrics;
+  private OMMetadataManager omMetadataManager;
+  private AuditLogger auditLogger;
 
-  private static String volumeName;
-  private static String bucketName;
-  private static String keyName;
+  private String volumeName;
+  private String bucketName;
+  private String keyName;
 
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
