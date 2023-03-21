@@ -64,27 +64,29 @@ public final class OMClientRequestUtils {
   public static boolean isSnapshotBucket(OMMetadataManager omMetadataManager,
       OmKeyInfo keyInfo) throws IOException {
 
-    boolean status;
-    TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        iterator = omMetadataManager.getSnapshotInfoTable().iterator();
     String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
         keyInfo.getVolumeName(), keyInfo.getBucketName())
         + OM_KEY_PREFIX;
 
-    iterator.seek(dbSnapshotBucketKey);
-    status = iterator.hasNext() && iterator.next().getKey()
-        .startsWith(dbSnapshotBucketKey);
-
-    return status || checkSnapshotCache(omMetadataManager, keyInfo);
+    return checkInSnapshotCache(omMetadataManager, dbSnapshotBucketKey) ||
+        checkInSnapshotDB(omMetadataManager, dbSnapshotBucketKey);
   }
 
-  private static boolean checkSnapshotCache(OMMetadataManager omMetadataManager,
-      OmKeyInfo keyInfo) {
+  private static boolean checkInSnapshotDB(OMMetadataManager omMetadataManager,
+      String dbSnapshotBucketKey) throws IOException {
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
+      iterator.seek(dbSnapshotBucketKey);
+      return iterator.hasNext() && iterator.next().getKey()
+          .startsWith(dbSnapshotBucketKey);
+    }
+  }
+
+  private static boolean checkInSnapshotCache(
+      OMMetadataManager omMetadataManager,
+      String dbSnapshotBucketKey) {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> cacheIter =
         omMetadataManager.getSnapshotInfoTable().cacheIterator();
-    String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
-        keyInfo.getVolumeName(), keyInfo.getBucketName())
-        + OM_KEY_PREFIX;
 
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =

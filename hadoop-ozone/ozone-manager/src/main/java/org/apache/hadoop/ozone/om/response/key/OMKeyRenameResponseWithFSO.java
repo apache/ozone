@@ -34,13 +34,13 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
 
 /**
  * Response for RenameKey request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
-    RENAMED_KEY_TABLE})
+    SNAPSHOT_RENAMED_KEY_TABLE})
 public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   private boolean isRenameDirectory;
@@ -99,10 +99,10 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
           getRenameKeyInfo().getBucketName(),
           getRenameKeyInfo().getObjectID());
 
-      String renamedKey = omMetadataManager.getRenamedKeyTable()
+      String renamedKey = omMetadataManager.getSnapshotRenamedKeyTable()
           .get(renameDbKey);
       if (isSnapshotBucket && renamedKey == null) {
-        omMetadataManager.getRenamedKeyTable().putWithBatch(
+        omMetadataManager.getSnapshotRenamedKeyTable().putWithBatch(
             batchOperation, renameDbKey, getFromKeyName());
       }
     }
