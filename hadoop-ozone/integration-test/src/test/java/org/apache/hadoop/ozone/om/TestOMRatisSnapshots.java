@@ -51,8 +51,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -164,7 +162,6 @@ public class TestOMRatisSnapshots {
 
   @Test
   public void testInstallSnapshot() throws Exception {
-    int numSnapshotsToCreate = 10;
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -181,18 +178,9 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Do some transactions so that the log index increases
-    int keyIncrement = 200;
-    int keyCount = 0;
-    String snapshotNamePrefix = "snapshot";
-    String snapshotName = "";
-    List<String> keys = new ArrayList<>();
-    SnapshotInfo snapshotInfo = null;
-    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate; snapshotCount++) {
-      keyCount += keyIncrement;
-      snapshotName = snapshotNamePrefix + snapshotCount;
-      keys = writeKeys(keyIncrement);
-      snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
-    }
+    List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
+
+    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM, keys);
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -210,11 +198,11 @@ public class TestOMRatisSnapshots {
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 10s
+    // Timeout error if follower does not load update within 3s
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
-    }, 100, 10000);
+    }, 100, 3000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -265,12 +253,12 @@ public class TestOMRatisSnapshots {
         volumeName, bucketName, newKeys.get(0))));
      */
 
-    // Read back data from the last OM snapshot.
+    // Read back data from the OM snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(".snapshot/"+ snapshotName + "/" + keys.get(0)).build();
-    OmKeyInfo omKeyInfo;
+        .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
+    OmKeyInfo omKeyInfo = null;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
@@ -294,9 +282,6 @@ public class TestOMRatisSnapshots {
         if (fileName.toLowerCase().endsWith(".sst")) {
           Path snapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
           Path activeSST =  Paths.get(followerActiveDir.toString(), fileName);
-          if (!activeSST.toFile().exists()) {
-            throw new RuntimeException("gbjfix");
-          }
           assertEquals("Snapshot sst file is supposed to be a hard link",
               OmSnapshotManager.getINode(activeSST),
               OmSnapshotManager.getINode(snapshotSST));
@@ -616,14 +601,13 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM,
-                                           String snapshotName)
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
       throws IOException {
-    objectStore.createSnapshot(volumeName, bucketName, snapshotName);
+    objectStore.createSnapshot(volumeName, bucketName, "snap1");
 
     String tableKey = SnapshotInfo.getTableKey(volumeName,
                                                bucketName,
-                                               snapshotName);
+                                               "snap1");
     SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
       .getSnapshotInfoTable()
       .get(tableKey);
