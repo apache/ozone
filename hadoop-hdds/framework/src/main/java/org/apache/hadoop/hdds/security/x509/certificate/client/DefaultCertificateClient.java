@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -329,6 +330,38 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return null;
     }
     return firstCertificateFrom(caCertPath);
+  }
+
+  /**
+   * Return all CA certificates in this component's trust chain, with the same
+   * order as trust chain, the last one is the root CA certificate.
+   */
+  @Override
+  public synchronized List<X509Certificate> getCACertificates() {
+    CertPath certPath = getCertPath();
+    if (certPath == null || certPath.getCertificates() == null) {
+      return null;
+    }
+
+    List<X509Certificate> caList = new ArrayList<>();
+    // certificate bundle case
+    if (certPath.getCertificates().size() > 1) {
+      for (int i = 1; i < certPath.getCertificates().size(); i++) {
+        caList.add((X509Certificate) certPath.getCertificates().get(i));
+      }
+    } else {
+      // case before certificate bundle is supported
+      X509Certificate cert = getCACertificate();
+      if (cert != null) {
+        caList.add(cert);
+      }
+      cert = getRootCACertificate();
+      if (cert != null) {
+        caList.add(cert);
+      }
+    }
+
+    return caList;
   }
 
   @Override

@@ -31,6 +31,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -205,6 +206,13 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public CertPath getCACertPath() {
     return null;
+  }
+
+  @Override
+  public List<X509Certificate> getCACertificates() {
+    List<X509Certificate> list = new ArrayList<>();
+    list.add(rootCert);
+    return list;
   }
 
   @Override

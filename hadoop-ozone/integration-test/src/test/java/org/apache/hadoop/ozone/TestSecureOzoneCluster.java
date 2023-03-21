@@ -359,6 +359,7 @@ public final class TestSecureOzoneCluster {
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
     assertEquals(scmId, scmInfo.getScmId());
+    assertEquals(1, scm.getScmCertificateClient().getCACertificates().size());
   }
 
   @Test
@@ -867,6 +868,7 @@ public final class TestSecureOzoneCluster {
       assertNotNull(om.getCertificateClient().getPublicKey());
       assertNotNull(om.getCertificateClient().getPrivateKey());
       assertNotNull(om.getCertificateClient().getCertificate());
+      assertEquals(2, om.getCertificateClient().getCACertificates().size());
       assertTrue(omLogs.getOutput().contains("Init response: GETCERT"));
       assertTrue(omLogs.getOutput().contains("Successfully stored " +
           "SCM signed certificate"));
@@ -902,7 +904,6 @@ public final class TestSecureOzoneCluster {
     OzoneManager.setTestSecureOmFlag(true);
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
-
 
     // save first cert
     final int certificateLifetime = 20; // seconds

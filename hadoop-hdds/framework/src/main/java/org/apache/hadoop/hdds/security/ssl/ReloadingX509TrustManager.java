@@ -31,6 +31,8 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -51,9 +53,9 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   private final String type;
   private final AtomicReference<X509TrustManager> trustManagerRef;
   /**
-   * Current CA cert in trustManager, to detect if certificate is changed.
+   * Current CA certs in trustManager, to detect if certificates are changed.
    */
-  private String currentCACertId = null;
+  private List<String> currentCACertIds = new ArrayList<>();
 
   /**
    * Creates a reloadable trustmanager. The trustmanager reloads itself
@@ -124,17 +126,34 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
 
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
-    X509Certificate cert = caClient.getCACertificate();
-    String certId = cert.getSerialNumber().toString();
-    // Certificate keeps the same.
-    if (currentCACertId != null && currentCACertId.equals(certId)) {
+    List<X509Certificate> newCertList = caClient.getCACertificates();
+
+    boolean match = true;
+    if (currentCACertIds != null && currentCACertIds.size() > 0) {
+      if (newCertList.size() == currentCACertIds.size()) {
+        for (int i = 0; i < newCertList.size(); i++) {
+          if (!newCertList.get(i).getSerialNumber().toString().equals(
+              currentCACertIds.get(i))) {
+            match = false;
+            break;
+          }
+        }
+      }
+    } else {
+      match = false;
+    }
+
+    if (match) {
+      // Certificates keeps the same.
       return null;
     }
 
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    ks.setCertificateEntry(certId, cert);
+    for (X509Certificate caCert: newCertList) {
+      ks.setCertificateEntry(caCert.getSerialNumber().toString(), caCert);
+    }
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -146,7 +165,11 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
         break;
       }
     }
-    currentCACertId = certId;
+
+    currentCACertIds.clear();
+    for (X509Certificate caCert: newCertList) {
+      currentCACertIds.add(caCert.getSerialNumber().toString());
+    }
     return trustManager;
   }
 }
