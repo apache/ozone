@@ -133,6 +133,7 @@ enum Type {
   SnapshotMoveDeletedKeys = 116;
 
   TransferLeadership = 117;
+  SnapshotPurge = 118;
 }
 
 message OMRequest {
@@ -248,6 +249,7 @@ message OMRequest {
   optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
 }
 
@@ -357,6 +359,7 @@ message OMResponse {
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
 }
 
 enum Status {
@@ -1718,6 +1721,10 @@ message SnapshotMoveKeyInfos {
   repeated KeyInfo keyInfos = 2;
 }
 
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1781,6 +1788,10 @@ message DeleteSnapshotResponse {
 }
 
 message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
 
 }
 
