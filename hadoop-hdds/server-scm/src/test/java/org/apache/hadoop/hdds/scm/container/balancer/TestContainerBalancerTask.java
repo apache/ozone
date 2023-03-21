@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -71,6 +72,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -725,16 +727,28 @@ public class TestContainerBalancerTask {
     ozoneConfiguration.set("ozone.scm.container.size", "5GB");
     ozoneConfiguration.setDouble(
         "hdds.container.balancer.utilization.threshold", 1);
+    long maxSizeLeavingSource = 26;
+    ozoneConfiguration.setStorageSize(
+        "hdds.container.balancer.size.leaving.source.max", maxSizeLeavingSource,
+        StorageUnit.GB);
+    long moveTimeout = 90;
+    ozoneConfiguration.setTimeDuration("hdds.container.balancer.move.timeout",
+        moveTimeout, TimeUnit.MINUTES);
+    long replicationTimeout = 60;
+    ozoneConfiguration.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout",
+        replicationTimeout, TimeUnit.MINUTES);
 
     ContainerBalancerConfiguration cbConf =
         ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
     Assertions.assertEquals(1, cbConf.getThreshold(), 0.001);
 
-    Assertions.assertEquals(26 * 1024 * 1024 * 1024L,
+    // Expected is 26 GB
+    Assertions.assertEquals(maxSizeLeavingSource * 1024 * 1024 * 1024,
         cbConf.getMaxSizeLeavingSource());
-
-    Assertions.assertEquals(30 * 60 * 1000,
-        cbConf.getMoveTimeout().toMillis());
+    Assertions.assertEquals(moveTimeout, cbConf.getMoveTimeout().toMinutes());
+    Assertions.assertEquals(replicationTimeout,
+        cbConf.getMoveReplicationTimeout().toMinutes());
   }
 
   @Test
