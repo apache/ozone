@@ -51,6 +51,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -160,8 +162,9 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @Test
-  public void testInstallSnapshot() throws Exception {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 10})
+  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -178,9 +181,18 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Do some transactions so that the log index increases
-    List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
-
-    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM, keys);
+    int keyIncrement = 200;
+    int keyCount = 0;
+    String snapshotNamePrefix = "snapshot";
+    String snapshotName = "";
+    List<String> keys = new ArrayList<>();
+    SnapshotInfo snapshotInfo = null;
+    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate; snapshotCount++) {
+      keyCount += keyIncrement;
+      snapshotName = snapshotNamePrefix + snapshotCount;
+      keys = writeKeysToIncreaseLogIndex(leaderRatisServer, keyCount);
+      snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
+    }
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -198,11 +210,11 @@ public class TestOMRatisSnapshots {
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 3s
+    // Timeout error if follower does not load update within 10s
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
-    }, 100, 3000);
+    }, 100, 10000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -253,12 +265,12 @@ public class TestOMRatisSnapshots {
         volumeName, bucketName, newKeys.get(0))));
      */
 
-    // Read back data from the OM snapshot.
+    // Read back data from the last OM snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
-    OmKeyInfo omKeyInfo = null;
+        .setKeyName(".snapshot/"+ snapshotName + "/" + keys.get(0)).build();
+    OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
     Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
@@ -601,13 +613,14 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(msg));
   }
 
-  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, List<String> keys)
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM,
+                                           String snapshotName)
       throws IOException {
-    objectStore.createSnapshot(volumeName, bucketName, "snap1");
+    objectStore.createSnapshot(volumeName, bucketName, snapshotName);
 
     String tableKey = SnapshotInfo.getTableKey(volumeName,
                                                bucketName,
-                                               "snap1");
+                                               snapshotName);
     SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
       .getSnapshotInfoTable()
       .get(tableKey);
