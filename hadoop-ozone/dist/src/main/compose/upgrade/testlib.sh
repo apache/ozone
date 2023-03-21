@@ -120,7 +120,7 @@ run_test() {
   export OZONE_COMPOSE_DIR="$_upgrade_dir"/compose/"$compose_dir"
   # The container to run test commands from. Use one of the SCM containers,
   # but SCM HA may or may not be used.
-  export SCM="$(docker compose --project-directory="$OZONE_COMPOSE_DIR" config --services | grep -c1 scm)"
+  export SCM="$(docker compose --project-directory="$OZONE_COMPOSE_DIR" config --services | grep --max-count=1 scm)"
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
