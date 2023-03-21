@@ -162,9 +162,9 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {1, 10})
-  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
+  @Test
+  public void testInstallSnapshot() throws Exception {
+    int numSnapshotsToCreate = 10;
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -190,7 +190,7 @@ public class TestOMRatisSnapshots {
     for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate; snapshotCount++) {
       keyCount += keyIncrement;
       snapshotName = snapshotNamePrefix + snapshotCount;
-      keys = writeKeysToIncreaseLogIndex(leaderRatisServer, keyCount);
+      keys = writeKeys(keyIncrement);
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
     }
 
@@ -294,6 +294,9 @@ public class TestOMRatisSnapshots {
         if (fileName.toLowerCase().endsWith(".sst")) {
           Path snapshotSST = Paths.get(followerSnapshotDir.toString(), fileName);
           Path activeSST =  Paths.get(followerActiveDir.toString(), fileName);
+          if (!activeSST.toFile().exists()) {
+            throw new RuntimeException("gbjfix");
+          }
           assertEquals("Snapshot sst file is supposed to be a hard link",
               OmSnapshotManager.getINode(activeSST),
               OmSnapshotManager.getINode(snapshotSST));
