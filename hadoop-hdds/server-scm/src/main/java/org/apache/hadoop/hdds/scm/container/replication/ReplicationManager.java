@@ -507,7 +507,7 @@ public class ReplicationManager implements SCMService {
    * the datanode has sufficient capacity to accept the container command, and
    * then the command is sent to the datanode with the fewest pending commands.
    * If all sources are overloaded, an AllSourcesOverloadedException is thrown.
-   * @param containerID The containerID to be replicated
+   * @param containerInfo The container to be replicated
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
@@ -515,10 +515,10 @@ public class ReplicationManager implements SCMService {
    *         the command created.
    * @throws AllSourcesOverloadedException
    */
-  public Pair<DatanodeDetails, SCMCommand<?>>
-      createThrottledReplicationCommand(long containerID,
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
-      throws AllSourcesOverloadedException {
+      throws AllSourcesOverloadedException, NotLeaderException {
+    long containerID = containerInfo.getContainerID();
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds = getAvailableDatanodes(
         sources, Type.replicateContainerCommand, datanodeReplicationLimit);
     if (sourceWithCmds.isEmpty()) {
@@ -532,16 +532,7 @@ public class ReplicationManager implements SCMService {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
     cmd.setReplicaIndex(replicaIndex);
-    return Pair.of(sourceWithCmds.get(0).getRight(), cmd);
-  }
-
-  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
-      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
-      throws AllSourcesOverloadedException, NotLeaderException {
-    Pair<DatanodeDetails, SCMCommand<?>> cmdPair =
-        createThrottledReplicationCommand(containerInfo.getContainerID(),
-            sources, target, replicaIndex);
-    sendDatanodeCommand(cmdPair.getRight(), containerInfo, cmdPair.getLeft());
+    sendDatanodeCommand(cmd, containerInfo, sourceWithCmds.get(0).getRight());
   }
 
   /**

@@ -858,7 +858,8 @@ public class TestReplicationManager {
 
   @Test
   public void testCreateThrottledReplicateContainerCommand()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws AllSourcesOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
     sourceNodes.put(cmdTarget, 0);
@@ -873,11 +874,15 @@ public class TestReplicationManager {
           return sourceNodes.get(dn);
         });
 
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    Pair<DatanodeDetails, SCMCommand<?>> cmd = replicationManager
-        .createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
-    Assertions.assertEquals(cmdTarget, cmd.getLeft());
+    replicationManager.sendThrottledReplicationCommand(
+        container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+
+    Assertions.assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
     Assertions.assertEquals(destination,
         ((ReplicateContainerCommand) cmd.getRight()).getTargetDatanode());
     Assertions.assertEquals(0,
@@ -886,7 +891,8 @@ public class TestReplicationManager {
 
   @Test(expected = AllSourcesOverloadedException.class)
   public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws AllSourcesOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     for (int i = 0; i < 3; i++) {
@@ -901,8 +907,10 @@ public class TestReplicationManager {
         });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    replicationManager.createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledReplicationCommand(
+            container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
   }
 
   @Test
