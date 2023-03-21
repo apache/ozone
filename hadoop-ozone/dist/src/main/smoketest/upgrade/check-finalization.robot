@@ -21,15 +21,15 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 
 *** Test Cases ***
 Check OM Finalized
-    Pass Execution If    %{OZONE_UPGRADE_FROM} == 1.1.0 OM finalization not supported in version %{OZONE_UPGRADE_FROM}
     [Tags]    om    finalized
+    Pass Execution If    %{OZONE_UPGRADE_FROM} == 1.1.0    OM finalization not supported in version %{OZONE_UPGRADE_FROM}
     ${result} =        Execute      ozone admin om finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
 Check SCM Finalized
-    Pass Execution If    %{OZONE_UPGRADE_FROM} == 1.1.0 HDDS finalization not supported in version %{OZONE_UPGRADE_FROM}
     [Tags]    scm    finalized
+    Pass Execution If    %{OZONE_UPGRADE_FROM} == 1.1.0    HDDS finalization not supported in version %{OZONE_UPGRADE_FROM}
     ${result} =        Execute      ozone admin scm finalizationstatus
                        Log    ${result}
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
