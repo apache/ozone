@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.server.DivisionInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -60,9 +62,11 @@ class TestSCMHAManagerImpl {
   private String storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
+  private final int waitForClusterToBeReadyTimeout = 10000;
 
   @BeforeEach
-  public void setup() throws IOException, InterruptedException {
+  public void setup() throws IOException, InterruptedException,
+      TimeoutException {
     storageBaseDir = GenericTestUtils.getTempPath(
         TestSCMHAManagerImpl.class.getSimpleName() + "-" +
             UUID.randomUUID());
@@ -73,8 +77,10 @@ class TestSCMHAManagerImpl {
         scm.getScmNodeDetails(), conf);
     scm.getScmHAManager().start();
     primarySCMHAManager = scm.getScmHAManager();
+    final DivisionInfo ratisDivision = primarySCMHAManager.getRatisServer()
+        .getDivision().getInfo();
     // Wait for Ratis Server to be ready
-    Thread.sleep(5000);
+    waitForSCMToBeReady(ratisDivision);
   }
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
@@ -85,6 +91,13 @@ class TestSCMHAManagerImpl {
         + File.separator + scmId + File.separator + "metadata");
     conf.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, String.valueOf(ratisPort));
     return conf;
+  }
+
+  public void waitForSCMToBeReady(DivisionInfo ratisDivision)
+      throws TimeoutException,
+      InterruptedException {
+    GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
+          1000, waitForClusterToBeReadyTimeout);
   }
 
   @AfterEach
@@ -102,8 +115,6 @@ class TestSCMHAManagerImpl {
         getConfig("scm2", 9898));
     try {
       scm2.getScmHAManager().getRatisServer().start();
-      // Wait for Ratis Server to be ready
-      Thread.sleep(5000);
       final AddSCMRequest request = new AddSCMRequest(
           clusterID, scm2.getScmId(),
           "localhost:" + scm2.getScmHAManager().getRatisServer()
@@ -126,8 +137,6 @@ class TestSCMHAManagerImpl {
         getConfig("scm2", 9898));
     try {
       scm2.getScmHAManager().getRatisServer().start();
-      // Wait for Ratis Server to be ready
-      Thread.sleep(5000);
       final AddSCMRequest addSCMRequest = new AddSCMRequest(
           clusterID, scm2.getScmId(),
           "localhost:" + scm2.getScmHAManager().getRatisServer()
