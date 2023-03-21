@@ -27,8 +27,9 @@ an older release of Ozone and a later release (which may be the local build).
     - To do this, uncomment all lines that contain `run_test` in the *test.sh* file, and execute *test.sh* either locally or on GitHub actions.
 
 2. After the release is finished and its docker image is published, add the new version to the test matrix.
-    1. Comment out all `run_test` lines in *test.sh*
-    2. Add a new line: `run_test non-rolling-upgrade <newly-released-version> current` after the commented out lines.
+    1. Change the `OZONE_CURRENT_VERSION` variable to `OZONE_CURRENT_VERSION=<newly-released-version>`.
+    2. Comment out all `run_test` lines in *test.sh*.
+    3. Add a new line: `run_test ha non-rolling-upgrade <newly-released-version> "$OZONE_CURRENT_VERSION"` before the commented out lines.
 
 ## Important Notes on Test Scope
 
@@ -48,7 +49,7 @@ Non-rolling upgrades and downgrades are supported from 1.1.0 to any later versio
 
 ### upgrades
 
-Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *driver.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-from>* directory. After the test is run, results and docker volume data for the upgrade for these versions will be placed in *upgrades/\<upgrade-type>/\<upgrade-from>/\<upgrade-to>*. This allows a suite of upgrades from the same starting version to different target versions to be run without conflicting directory names. The results of all upgrades run as part of the tests will be copied to a *results* folder in the top level upgrade directory.
+Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *driver.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will be placed in *upgrades/\<upgrade-type>/\<upgrade-from>/\<upgrade-to>*. This allows a suite of upgrades from the same starting version to different target versions to be run without conflicting directory names. The results of all upgrades run as part of the tests will be copied to a *results* directory in the top level upgrade directory.
 
 #### non-rolling-upgrade
 
@@ -59,12 +60,10 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 - The *common* directory contains callbacks used for all upgrade tests regardless of the version.
 
 - Supported Callbacks:
-    1. `get_cluster_setup_file`: Outputs the path of the docker compose file specifying the cluster to use.
-        - A full HA cluster is the default provided in *common/callback.sh*. Other versions can override this with a different cluster if needed.
-    3. `with_this_version`: Run while ozone is running in the version specified by the *callback.sh* parent directory. This is the "old version" that the upgrade is starting from.
-    4. `with_new_version_pre_finalized`: Run after ozone is stopped in the old version, and brought back up and running in the new version pre-finalized.
-    5. `with_this_version_downgraded`: Run after ozone is stopped in the new version pre-finalized, and restarted in the old version again.
-    6. `with_new_version_finalized`: Run after ozone is stopped in the old version after donwgrade, started again in the new version pre-finalized, and then finalized.
+    1. `with_old_version`: Run while ozone is in the original version to start the upgrade from, before any upgrade steps have been done.
+    2. `with_this_version_pre_finalized`: Run after ozone is stopped in the old version, and brought back up and running in the new version pre-finalized.
+    3. `with_old_version_downgraded`: Run after ozone is stopped in the new version pre-finalized, and restarted in the old version again.
+    4. `with_this_version_finalized`: Run after ozone is stopped in the old version after donwgrade, started again in the new version pre-finalized, and then finalized.
         - The upgrade is complete when this callback runs.
 
 #### manual-upgrade
@@ -76,14 +75,14 @@ Each type of upgrade has a subdirectory under the *upgrades* directory. Each upg
 - This is primarily for testing upgrades from versions before the non-rolling upgrade framework was introduced.
 
 - Supported Callbacks:
-    1. `setup_with_this_version`: Run before ozone is started in the old version.
-    3. `with_this_version`: Run while ozone is running in the old version.
-    3. `setup_with_new_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
-    4. `with_new_version`: Run while ozone is running in the new version.
+    1. `setup_with_old_version`: Run before ozone is started in the old version.
+    3. `with_old_version`: Run while ozone is running in the old version.
+    3. `setup_with_this_version`: Run after ozone is stopped in the old version, but before it is restarted in the new version.
+    4. `with_this_version`: Run while ozone is running in the new version.
 
 ### compose
 
-Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. A compose cluster can be selected by sourcing the *load.sh* script in the compose cluster's directory on the setup callback for the upgrade test.
+Docker compose cluster definitions to be used in upgrade testing are defined in the *compose* directory. A compose cluster can be selected by specifying the name of its subdirectory as the first argument to `run_test`. `run_test` will then source the `load.sh` script in the cluster's directory so it is used during the test. For manual testing, docker compose can be used normally from the compose cluster directory. Note that some clusters may not work with older versions. Ozone 1.1.0, for example, does not support SCM HA.
 
 ## Persisting Data
 
@@ -99,7 +98,7 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
 
 ### Adding New Tests
 
-- To add tests to an existing upgrade type, edit its *compose/upgrade/\<upgrade-type>/\<old-versions>/callback.sh* file and add commands in the callback function when they should be run.
+- To add tests to an existing upgrade type, edit its *compose/upgrade/\<upgrade-type>/\<version>/callback.sh* file and add commands in the callback function when they should be run.
 
 - Each callback file will have access to the following environment variables:
     - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
@@ -108,8 +107,9 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
 
 ### Testing New Versions
 
-- To test upgrade between different versions, add a line `run_test <upgrade-type> <old-version> <new-version>` to the top level *test.sh* file.
-    -  The `run_test` function will execute *upgrades/\<upgrade-type>/driver.sh* with the callbacks defined in *upgrades/\<upgrade-type>/common/callback.sh* and *upgrades/\<upgrade-type>/\<old-version>/callback.sh*.
+- To test upgrade between different versions, add a line `run_test <compose-cluster-directory> <upgrade-type> <old-version> <new-version>` to the top level *test.sh* file.
+    -  The `run_test` function will execute *upgrades/\<upgrade-type>/driver.sh* with the callbacks defined in *upgrades/\<upgrade-type>/common/callback.sh* and *upgrades/\<upgrade-type>/\<new-version>/callback.sh*.
 
-- The placeholder version `current` can be used as the new version to upgrade to the locally built source code in the `apache/ozone-runner` image.
+- The variable `OZONE_CURRENT_VERSION` is used to define the version corresponding to the locally built source code in the `apache/ozone-runner` image.
     - All other versions will be treated as tags specifying a version of the `apache/ozone` docker image to use.
+
