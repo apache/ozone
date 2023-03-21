@@ -2928,6 +2928,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       try {
         leaderId = omRatisServer.getLeader();
+        if (leaderId == null) {
+          LOG.error("No leader found");
+          return "Exception: Not a leader";
+        }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
