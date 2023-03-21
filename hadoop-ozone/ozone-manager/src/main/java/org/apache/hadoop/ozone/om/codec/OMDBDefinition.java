@@ -230,13 +230,16 @@ public class OMDBDefinition implements DBDefinition {
           SnapshotInfo.class,
           new OmDBSnapshotInfoCodec());
 
-  /** <p> SnapshotRenamedKeyTable that complements the keyTable (or fileTable)
+  /** <p>
+   * SnapshotRenamedKeyTable that complements the keyTable (or fileTable)
    * entries of the immediately previous snapshot in the same snapshot
-   * scope. (bucket or volume) </p>
-   * <p> Key renames between the two subsequent snapshots are captured, this
+   * scope. (bucket or volume)
+   * </p><p>
+   * Key renames between the two subsequent snapshots are captured, this
    * information is used in {@link SnapshotDeletingService} to check if the
    * renamedKey is present in the previous snapshot's keyTable
-   * (or fileTable)</p>
+   * (or fileTable)
+   * </p>
    */
   public static final DBColumnFamilyDefinition<String, String>
       SNAPSHOT_RENAMED_KEY_TABLE =

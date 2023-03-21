@@ -30,11 +30,9 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -72,12 +70,12 @@ public class TestOMSnapshotCreateRequest {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
-  private OMMetadataManager omMetadataManager;
+  private OmMetadataManagerImpl omMetadataManager;
   private BatchOperation batchOperation;
 
   private String volumeName;
   private String bucketName;
-  private String snapshotName;
+  private String snapshotName1;
   private String snapshotName2;
 
   // Just setting ozoneManagerDoubleBuffer which does nothing.
@@ -110,7 +108,7 @@ public class TestOMSnapshotCreateRequest {
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
-    snapshotName = UUID.randomUUID().toString();
+    snapshotName1 = UUID.randomUUID().toString();
     snapshotName2 = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(
         volumeName, bucketName, omMetadataManager);
@@ -132,7 +130,7 @@ public class TestOMSnapshotCreateRequest {
     when(ozoneManager.isOwner(any(), any())).thenReturn(true);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
-        volumeName, bucketName, snapshotName);
+        volumeName, bucketName, snapshotName1);
     // should not throw
     doPreExecute(omRequest);
   }
@@ -142,7 +140,7 @@ public class TestOMSnapshotCreateRequest {
     // owner not set
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
-        volumeName, bucketName, snapshotName);
+        volumeName, bucketName, snapshotName1);
     // Check bad owner
     LambdaTestUtils.intercept(OMException.class,
         "Only bucket owners and Ozone admins can create snapshots",
@@ -214,18 +212,14 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    SnapshotChainManager snapshotChainManager =
-        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
-    when(ozoneManager.getSnapshotChainManager())
-        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
-        volumeName, bucketName, snapshotName);
+        volumeName, bucketName, snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         doPreExecute(omRequest);
     String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+        bucketName, snapshotName1);
 
     // As we have not still called validateAndUpdateCache, get() should
     // return null.
@@ -257,11 +251,7 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testEmptySnapshotRenamedKeyTable() throws Exception {
-    SnapshotChainManager snapshotChainManager =
-        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
-    when(ozoneManager.getSnapshotChainManager())
-        .thenReturn(snapshotChainManager);
 
     renameKey("key1", "key2");
     // Rename table should be empty as there is no rename happening in
@@ -269,9 +259,9 @@ public class TestOMSnapshotCreateRequest {
     Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
 
     // Create snapshot
-    createSnapshot(snapshotName);
+    createSnapshot(snapshotName1);
     String snapKey = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+        bucketName, snapshotName1);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(snapKey);
     Assert.assertNotNull(snapshotInfo);
@@ -289,17 +279,13 @@ public class TestOMSnapshotCreateRequest {
 
   @Test
   public void testEntryExists() throws Exception {
-    SnapshotChainManager snapshotChainManager =
-        new SnapshotChainManager(omMetadataManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
-    when(ozoneManager.getSnapshotChainManager())
-        .thenReturn(snapshotChainManager);
     OMRequest omRequest =
         OMRequestTestUtils.createSnapshotRequest(
-        volumeName, bucketName, snapshotName);
+        volumeName, bucketName, snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+        bucketName, snapshotName1);
 
     Assert.assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
@@ -313,7 +299,7 @@ public class TestOMSnapshotCreateRequest {
     // Now try to create again to verify error
     omRequest =
         OMRequestTestUtils.createSnapshotRequest(
-        volumeName, bucketName, snapshotName);
+        volumeName, bucketName, snapshotName1);
     omSnapshotCreateRequest = doPreExecute(omRequest);
     OMClientResponse omClientResponse =
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2,
