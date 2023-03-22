@@ -69,13 +69,12 @@ callback() {
 
   set -u
   : "${OZONE_UPGRADE_CALLBACK}"
-  : "${TEST_DIR}"
+  : "${OZONE_COMMON_CALLBACK}"
   set +u
 
-  local common_callback="$TEST_DIR"/upgrades/"$UPGRADE_TYPE"/common/callback.sh
   (
     # Common callback always exists.
-    source "$common_callback"
+    source "$OZONE_COMMON_CALLBACK"
     if [[ "$(type -t "$func")" = function ]]; then
       "$func"
     fi
@@ -92,23 +91,28 @@ callback() {
   )
 }
 
-## @description Sets up and runs the test defined by "$1"/test.sh.
-## @param The directory for the upgrade type whose test.sh file will be run.
+## @description Sets up and runs the upgrade test using the provided ozone
+#     versions and docker compose cluster.
+## @param The directory with a load.sh file that can be sourced to load the
+#     docker compose cluster to run the test in.
+## @param The directory of the upgrade type to run.
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
   local compose_cluster="$1"
-  export UPGRADE_TYPE="$2"
+  local upgrade_type="$2"
   export OZONE_UPGRADE_FROM="$3"
   export OZONE_UPGRADE_TO="$4"
 
-  # Export variables needed by test, since it is run in a subshell.
-  local test_dir="$_upgrade_dir/upgrades/$UPGRADE_TYPE"
-  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"
-  export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
-  export OZONE_VOLUME="$test_subdir"/"$OZONE_UPGRADE_TO"/data
-  export RESULT_DIR="$test_subdir"/"$OZONE_UPGRADE_TO"/result
+  local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
+  local callback_dir="$test_dir"/callbacks
+  local execution_dir="$test_dir"/execution/"${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
   local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
+  # Export variables needed by test, since it is run in a subshell.
+  export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh
+  export OZONE_COMMON_CALLBACK="$callback_dir"/common/callback.sh
+  export OZONE_VOLUME="$execution_dir"/data
+  export RESULT_DIR="$execution_dir"/result
 
   # Load docker compose setup.
   source "$compose_dir"/load.sh
@@ -121,5 +125,5 @@ run_test() {
     RESULT=1
   fi
 
-  copy_results "$test_subdir" "$ALL_RESULT_DIR"
+  copy_results "$execution_dir" "$ALL_RESULT_DIR"
 }

@@ -49,7 +49,13 @@ Non-rolling upgrades and downgrades are supported from 1.1.0 to any later versio
 
 ### upgrades
 
-Each type of upgrade has a subdirectory under the *upgrades* directory. Each upgrade's steps are controlled by a *driver.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-to>* directory. After the test is run, results and docker volume data for the upgrade for these versions will be placed in *upgrades/\<upgrade-type>/\<upgrade-from>/\<upgrade-to>*. This allows a suite of upgrades from the same starting version to different target versions to be run without conflicting directory names. The results of all upgrades run as part of the tests will be copied to a *results* directory in the top level upgrade directory.
+Each type of upgrade has a subdirectory under the *upgrades* directory.
+
+- Each upgrade's steps are controlled by a *driver.sh* script in its *upgrades/\<upgrade-type>* directory. Callbacks to execute throughout the upgrade are called by this script and should be placed in a file called *callback.sh* in the *upgrades/\<upgrade-type>/\<upgrade-to>* directory.
+
+- As the test is run, result logs and docker volume data for the upgrade for these versions will be placed in *upgrades/\<upgrade-type>/execution/\<upgrade-from>-\<upgrade-to>*. This allows a suite of upgrades to be run without conflicting directory names.
+
+- The result logs of all upgrades run as part of the tests will be copied to a *result* directory in the top level upgrade directory.
 
 #### non-rolling-upgrade
 
@@ -88,7 +94,7 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
 
 - Data for each container is persisted in a mounted volume.
 
-- By default it's `data` under the *upgrades/\<upgrade-type>/\<from-version>/\<to-version>* directory, but can be overridden with the `OZONE_VOLUME` environment variable.
+- By default it's *data* under the *upgrades/\<upgrade-type>/execution/\<from-version>-\<to-version>* directory, but can be overridden with the `OZONE_VOLUME` environment variable.
 
 - Mounting volumes allows data to be persisted in the cluster throughout container restarts, meaning that tests can check that data written in older versions is still readable in newer versions.
 
@@ -98,15 +104,17 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
 
 ### Adding New Tests
 
-- To add tests to an existing upgrade type, edit its *compose/upgrade/\<upgrade-type>/\<version>/callback.sh* file and add commands in the callback function when they should be run.
+- Tests that should run for all upgrades, regardless of the version being tested, can be added to *compose/upgrade/\<upgrade-type>/common/callback.sh*.
 
-- Each callback file will have access to the following environment variables:
-    - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
-    - `OZONE_UPGRADE_TO`: The version of ozone being upgraded to.
-    - `TEST_DIR`: The top level *upgrade* directory containing all files for upgrade testing.
-    - `SCM`: The name of the SCM container to run robot tests from.
-        - This can be passed as the first argument to `execute_robot_test`.
-        - This allows the same tests to work with and without SCM HA.
+- Tests that should run only for an upgrade to a specific version can be added to *compose/upgrade/\<upgrade-type>/\<ending-upgrade-version>/callback.sh*.
+
+- Add commands in the callback function when they should be run. Each callback file will have access to the following environment variables:
+  - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
+  - `OZONE_UPGRADE_TO`: The version of ozone being upgraded to.
+  - `TEST_DIR`: The top level *upgrade* directory containing all files for upgrade testing.
+  - `SCM`: The name of the SCM container to run robot tests from.
+    - This can be passed as the first argument to `execute_robot_test`.
+    - This allows the same tests to work with and without SCM HA.
 
 ### Testing New Versions
 
@@ -114,5 +122,5 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
     -  The `run_test` function will execute *upgrades/\<upgrade-type>/driver.sh* with the callbacks defined in *upgrades/\<upgrade-type>/common/callback.sh* and *upgrades/\<upgrade-type>/\<new-version>/callback.sh*.
 
 - The variable `OZONE_CURRENT_VERSION` is used to define the version corresponding to the locally built source code in the `apache/ozone-runner` image.
-    - All other versions will be treated as tags specifying a version of the `apache/ozone` docker image to use.
+    - All other versions will be treated as tags specifying a released version of the `apache/ozone` docker image to use.
 

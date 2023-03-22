@@ -45,7 +45,7 @@ set_downgrade_om_args() {
 }
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
-OUTPUT_NAME="$OZONE_UPGRADE_FROM"
+OUTPUT_NAME="$OZONE_UPGRADE_FROM"-original
 export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"
 
