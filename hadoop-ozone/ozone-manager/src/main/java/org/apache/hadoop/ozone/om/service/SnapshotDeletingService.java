@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -37,12 +38,14 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -57,6 +60,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -84,6 +89,7 @@ public class SnapshotDeletingService extends BackgroundService {
   private final OzoneConfiguration conf;
   private final AtomicLong successRunCount;
   private final long snapshotDeletionPerTask;
+  private final int keyLimitPerSnapshot;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager) throws IOException {
@@ -92,7 +98,9 @@ public class SnapshotDeletingService extends BackgroundService {
         serviceTimeout);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
-    this.chainManager = ozoneManager.getSnapshotChainManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    this.chainManager = omMetadataManager.getSnapshotChainManager();
     this.runCount = new AtomicLong(0);
     this.successRunCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
@@ -100,6 +108,9 @@ public class SnapshotDeletingService extends BackgroundService {
     this.snapshotDeletionPerTask = conf
         .getLong(SNAPSHOT_DELETING_LIMIT_PER_TASK,
         SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT);
+    this.keyLimitPerSnapshot = conf.getInt(
+        OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
+        OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -118,6 +129,7 @@ public class SnapshotDeletingService extends BackgroundService {
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         long snapshotLimit = snapshotDeletionPerTask;
+        List<String> purgeSnapshotKeys = new ArrayList<>();
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
@@ -142,6 +154,11 @@ public class SnapshotDeletingService extends BackgroundService {
             continue;
           }
 
+          Table<String, OmKeyRenameInfo> renamedKeyTable =
+              omSnapshot.getMetadataManager().getRenamedKeyTable();
+
+          long volumeId = ozoneManager.getMetadataManager()
+              .getVolumeId(snapInfo.getVolumeName());
           // Get bucketInfo for the snapshot bucket to get bucket layout.
           String dbBucketKey = ozoneManager.getMetadataManager().getBucketKey(
               snapInfo.getVolumeName(), snapInfo.getBucketName());
@@ -182,13 +199,19 @@ public class SnapshotDeletingService extends BackgroundService {
             String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
             iterator.seek(snapshotBucketKey);
 
-            while (deletedIterator.hasNext()) {
+            int deletionCount = 0;
+            while (deletedIterator.hasNext() &&
+                deletionCount <= keyLimitPerSnapshot) {
               Table.KeyValue<String, RepeatedOmKeyInfo>
                   deletedKeyValue = deletedIterator.next();
               String deletedKey = deletedKeyValue.getKey();
 
               // Exit if it is out of the bucket scope.
               if (!deletedKey.startsWith(snapshotBucketKey)) {
+                // If snapshot deletedKeyTable doesn't have any
+                // entry in the snapshot scope it can be reclaimed
+                // TODO: [SNAPSHOT] Check deletedDirTable to be empty.
+                purgeSnapshotKeys.add(snapInfo.getTableKey());
                 break;
               }
 
@@ -203,7 +226,8 @@ public class SnapshotDeletingService extends BackgroundService {
 
               for (OmKeyInfo keyInfo: repeatedOmKeyInfo.getOmKeyInfoList()) {
                 splitRepeatedOmKeyInfo(toReclaim, toNextDb,
-                    keyInfo, previousKeyTable);
+                    keyInfo, previousKeyTable, renamedKeyTable,
+                    bucketInfo, volumeId);
               }
 
               // If all the KeyInfos are reclaimable in RepeatedOmKeyInfo
@@ -213,7 +237,7 @@ public class SnapshotDeletingService extends BackgroundService {
                 toReclaimList.add(toReclaim.build());
               }
               toNextDBList.add(toNextDb.build());
-
+              deletionCount++;
             }
             // Submit Move request to OM.
             submitSnapshotMoveDeletedKeys(snapInfo, toReclaimList,
@@ -224,6 +248,8 @@ public class SnapshotDeletingService extends BackgroundService {
             LOG.error("Error while running Snapshot Deleting Service", ex);
           }
         }
+
+        submitSnapshotPurgeRequest(purgeSnapshotKeys);
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
       }
@@ -231,10 +257,32 @@ public class SnapshotDeletingService extends BackgroundService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
+    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
+      if (!purgeSnapshotKeys.isEmpty()) {
+        SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
+            .newBuilder()
+            .addAllSnapshotDBKeys(purgeSnapshotKeys)
+            .build();
+
+        OMRequest omRequest = OMRequest.newBuilder()
+            .setCmdType(Type.SnapshotPurge)
+            .setSnapshotPurgeRequest(snapshotPurgeRequest)
+            .setClientId(clientId.toString())
+            .build();
+
+        // TODO: [SNAPSHOT] Submit request once KeyDeletingService,
+        //  DirectoryDeletingService for snapshots are modified.
+        // submitRequest(omRequest);
+      }
+    }
+
     private void splitRepeatedOmKeyInfo(SnapshotMoveKeyInfos.Builder toReclaim,
         SnapshotMoveKeyInfos.Builder toNextDb, OmKeyInfo keyInfo,
-        Table<String, OmKeyInfo> previousKeyTable) throws IOException {
-      if (checkKeyReclaimable(previousKeyTable, keyInfo)) {
+        Table<String, OmKeyInfo> previousKeyTable,
+        Table<String, OmKeyRenameInfo> renamedKeyTable,
+        OmBucketInfo bucketInfo, long volumeId) throws IOException {
+      if (checkKeyReclaimable(previousKeyTable, renamedKeyTable,
+          keyInfo, bucketInfo, volumeId)) {
         // Move to next non deleted snapshot's deleted table
         toNextDb.addKeyInfos(keyInfo.getProtobuf(
             ClientVersion.CURRENT_VERSION));
@@ -268,9 +316,12 @@ public class SnapshotDeletingService extends BackgroundService {
     }
 
     private boolean checkKeyReclaimable(
-        Table<String, OmKeyInfo> previousKeyTable, OmKeyInfo deletedKeyInfo)
-        throws IOException {
+        Table<String, OmKeyInfo> previousKeyTable,
+        Table<String, OmKeyRenameInfo> renamedKeyTable,
+        OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
+        long volumeId) throws IOException {
 
+      String dbKey;
       // Handle case when the deleted snapshot is the first snapshot.
       if (previousKeyTable == null) {
         return false;
@@ -281,17 +332,48 @@ public class SnapshotDeletingService extends BackgroundService {
         return false;
       }
 
-      //TODO: [SNAPSHOT] Handle Renamed Keys
-      String dbKey = ozoneManager.getMetadataManager()
-          .getOzoneKey(deletedKeyInfo.getVolumeName(),
-              deletedKeyInfo.getBucketName(), deletedKeyInfo.getKeyName());
-
-      OmKeyInfo prevKeyInfo = previousKeyTable.get(dbKey);
-      if (prevKeyInfo != null &&
-          prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID()) {
-        return true;
+      // Construct keyTable or fileTable DB key depending on the bucket type
+      if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+        dbKey = ozoneManager.getMetadataManager().getOzonePathKey(
+            volumeId,
+            bucketInfo.getObjectID(),
+            deletedKeyInfo.getParentObjectID(),
+            deletedKeyInfo.getKeyName());
+      } else {
+        dbKey = ozoneManager.getMetadataManager().getOzoneKey(
+            deletedKeyInfo.getVolumeName(),
+            deletedKeyInfo.getBucketName(),
+            deletedKeyInfo.getKeyName());
       }
-      return false;
+
+      // renamedKeyTable: volumeName/bucketName/objectID -> OMRenameKeyInfo
+      String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
+          deletedKeyInfo.getVolumeName(), deletedKeyInfo.getBucketName(),
+          deletedKeyInfo.getObjectID());
+
+      OmKeyRenameInfo renamedKeyInfo = renamedKeyTable.getIfExist(dbRenameKey);
+
+      boolean isKeyRenamed = false;
+      String dbOriginalKey = null;
+      // Condition: key should not exist in renamedKeyTable of the current
+      // snapshot and keyTable of the previous snapshot.
+      // Check key exists in renamedKeyTable of the Snapshot
+      if (renamedKeyInfo != null && !renamedKeyInfo
+          .getOmKeyRenameInfoList().isEmpty()) {
+        isKeyRenamed = true;
+        dbOriginalKey = renamedKeyInfo.getOmKeyRenameInfoList().get(0);
+      }
+
+      // previousKeyTable is fileTable if the bucket is FSO,
+      // otherwise it is the keyTable.
+      OmKeyInfo prevKeyInfo = isKeyRenamed ? previousKeyTable
+          .get(dbOriginalKey) : previousKeyTable.get(dbKey);
+
+      if (prevKeyInfo == null) {
+        return false;
+      }
+
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
     }
 
     private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
