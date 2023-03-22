@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -154,8 +153,8 @@ public class SnapshotDeletingService extends BackgroundService {
             continue;
           }
 
-          Table<String, OmKeyRenameInfo> renamedKeyTable =
-              omSnapshot.getMetadataManager().getRenamedKeyTable();
+          Table<String, String> renamedKeyTable =
+              omSnapshot.getMetadataManager().getSnapshotRenamedKeyTable();
 
           long volumeId = ozoneManager.getMetadataManager()
               .getVolumeId(snapInfo.getVolumeName());
@@ -279,7 +278,7 @@ public class SnapshotDeletingService extends BackgroundService {
     private void splitRepeatedOmKeyInfo(SnapshotMoveKeyInfos.Builder toReclaim,
         SnapshotMoveKeyInfos.Builder toNextDb, OmKeyInfo keyInfo,
         Table<String, OmKeyInfo> previousKeyTable,
-        Table<String, OmKeyRenameInfo> renamedKeyTable,
+        Table<String, String> renamedKeyTable,
         OmBucketInfo bucketInfo, long volumeId) throws IOException {
       if (checkKeyReclaimable(previousKeyTable, renamedKeyTable,
           keyInfo, bucketInfo, volumeId)) {
@@ -317,7 +316,7 @@ public class SnapshotDeletingService extends BackgroundService {
 
     private boolean checkKeyReclaimable(
         Table<String, OmKeyInfo> previousKeyTable,
-        Table<String, OmKeyRenameInfo> renamedKeyTable,
+        Table<String, String> renamedKeyTable,
         OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
         long volumeId) throws IOException {
 
@@ -351,23 +350,15 @@ public class SnapshotDeletingService extends BackgroundService {
           deletedKeyInfo.getVolumeName(), deletedKeyInfo.getBucketName(),
           deletedKeyInfo.getObjectID());
 
-      OmKeyRenameInfo renamedKeyInfo = renamedKeyTable.getIfExist(dbRenameKey);
-
-      boolean isKeyRenamed = false;
-      String dbOriginalKey = null;
-      // Condition: key should not exist in renamedKeyTable of the current
-      // snapshot and keyTable of the previous snapshot.
+      // Condition: key should not exist in snapshotRenamedKeyTable
+      // of the current snapshot and keyTable of the previous snapshot.
       // Check key exists in renamedKeyTable of the Snapshot
-      if (renamedKeyInfo != null && !renamedKeyInfo
-          .getOmKeyRenameInfoList().isEmpty()) {
-        isKeyRenamed = true;
-        dbOriginalKey = renamedKeyInfo.getOmKeyRenameInfoList().get(0);
-      }
+      String renamedKey = renamedKeyTable.getIfExist(dbRenameKey);
 
       // previousKeyTable is fileTable if the bucket is FSO,
       // otherwise it is the keyTable.
-      OmKeyInfo prevKeyInfo = isKeyRenamed ? previousKeyTable
-          .get(dbOriginalKey) : previousKeyTable.get(dbKey);
+      OmKeyInfo prevKeyInfo = renamedKey != null ? previousKeyTable
+          .get(renamedKey) : previousKeyTable.get(dbKey);
 
       if (prevKeyInfo == null) {
         return false;
