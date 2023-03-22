@@ -19,6 +19,7 @@ CORE-SITE.XML_hadoop.proxyuser.httpfs.hosts=*
 CORE-SITE.XML_hadoop.proxyuser.httpfs.groups=*
 
 CORE-SITE.XML_fs.defaultFS=ofs://id1
+CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.service.ids=id1
 OZONE-SITE.XML_ozone.om.internal.service.id=id1
@@ -56,6 +57,7 @@ OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
+OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
@@ -142,6 +144,9 @@ HTTPFS-SITE.XML_hadoop.http.authentication.kerberos.principal=HTTP/httpfs@EXAMPL
 HTTPFS-SITE.XML_httpfs.hadoop.authentication.type=kerberos
 HTTPFS-SITE.XML_httpfs.hadoop.authentication.kerberos.keytab=/etc/security/keytabs/httpfs.keytab
 HTTPFS-SITE.XML_httpfs.hadoop.authentication.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.users=*
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.groups=*
+KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm

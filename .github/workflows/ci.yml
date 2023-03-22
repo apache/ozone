@@ -248,7 +248,8 @@ jobs:
           - secure
           - unsecure
           - compat
-          - HA
+          - HA-secure
+          - HA-unsecure
           - MR
           - misc
       fail-fast: false
