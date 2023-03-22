@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -69,7 +70,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -157,10 +157,6 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getStore()
         .getRocksDBCheckpointDiffer();
 
-    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
-        ozoneManager.getConfiguration(), snapDiffJobCf, snapDiffReportCf,
-        columnFamilyOptions);
-
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
         OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
@@ -230,6 +226,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         .maximumSize(cacheSize)
         .removalListener(removalListener)
         .build(loader);
+
+    this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
+        ozoneManager, snapshotCache, snapDiffJobCf, snapDiffReportCf,
+        columnFamilyOptions);
   }
 
   /**
@@ -391,27 +391,8 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  public SnapshotInfo getSnapshotInfo(String volumeName,
-                                      String bucketName, String snapshotName)
-      throws IOException {
-    return getSnapshotInfo(SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName));
-  }
-
   public SnapshotInfo getSnapshotInfo(String key) throws IOException {
-    SnapshotInfo snapshotInfo;
-    try {
-      snapshotInfo = ozoneManager.getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(key);
-    } catch (IOException e) {
-      LOG.error("Snapshot {}: not found: {}", key, e);
-      throw e;
-    }
-    if (snapshotInfo == null) {
-      throw new OMException(KEY_NOT_FOUND);
-    }
-    return snapshotInfo;
+    return SnapshotUtils.getSnapshotInfo(ozoneManager, key);
   }
 
   public static String getSnapshotPrefix(String snapshotName) {
@@ -433,8 +414,10 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     boolean forceFullDiff)
       throws IOException {
     // Validate fromSnapshot and toSnapshot
-    final SnapshotInfo fsInfo = getSnapshotInfo(volume, bucket, fromSnapshot);
-    final SnapshotInfo tsInfo = getSnapshotInfo(volume, bucket, toSnapshot);
+    final SnapshotInfo fsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volume, bucket, fromSnapshot);
+    final SnapshotInfo tsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volume, bucket, toSnapshot);
     verifySnapshotInfoForSnapDiff(fsInfo, tsInfo);
 
     int index = getIndexFromToken(token);

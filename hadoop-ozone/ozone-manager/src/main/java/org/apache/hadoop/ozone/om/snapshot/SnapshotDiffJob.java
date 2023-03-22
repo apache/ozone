@@ -30,15 +30,31 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 public class SnapshotDiffJob {
   private String jobId;
   private JobStatus status;
+  private String volume;
+  private String bucket;
+  private String fromSnapshot;
+  private String toSnapshot;
+  private boolean forceFullDiff;
 
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
 
   }
 
-  public SnapshotDiffJob(String jobId, JobStatus jobStatus) {
+  public SnapshotDiffJob(String jobId,
+                         JobStatus jobStatus,
+                         String volume,
+                         String bucket,
+                         String fromSnapshot,
+                         String toSnapshot,
+                         boolean forceFullDiff) {
     this.jobId = jobId;
     this.status = jobStatus;
+    this.volume = volume;
+    this.bucket = bucket;
+    this.fromSnapshot = fromSnapshot;
+    this.toSnapshot = toSnapshot;
+    this.forceFullDiff = forceFullDiff;
   }
 
   public String getJobId() {
@@ -55,6 +71,46 @@ public class SnapshotDiffJob {
 
   public void setStatus(JobStatus status) {
     this.status = status;
+  }
+
+  public String getVolume() {
+    return volume;
+  }
+
+  public void setVolume(String volume) {
+    this.volume = volume;
+  }
+
+  public String getBucket() {
+    return bucket;
+  }
+
+  public void setBucket(String bucket) {
+    this.bucket = bucket;
+  }
+
+  public String getFromSnapshot() {
+    return fromSnapshot;
+  }
+
+  public void setFromSnapshot(String fromSnapshot) {
+    this.fromSnapshot = fromSnapshot;
+  }
+
+  public String getToSnapshot() {
+    return toSnapshot;
+  }
+
+  public void setToSnapshot(String toSnapshot) {
+    this.toSnapshot = toSnapshot;
+  }
+
+  public boolean isForceFullDiff() {
+    return forceFullDiff;
+  }
+
+  public void setForceFullDiff(boolean forceFullDiff) {
+    this.forceFullDiff = forceFullDiff;
   }
 
   /**
