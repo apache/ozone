@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 /**
  * Represents statistics related to containers in the Ozone cluster.
  */
-public class ContainerStats {
+public class ContainerStateCounts {
 
   private int totalContainerCount;
   private int missingContainerCount;
