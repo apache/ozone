@@ -135,6 +135,9 @@ public class ContainerBalancerTask implements Runnable {
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
     this.moveManager = scm.getMoveManager();
+    this.moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
+    this.moveManager.setReplicationTimeout(
+        config.getMoveReplicationTimeout().toMillis());
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;

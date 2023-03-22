@@ -750,13 +750,15 @@ public final class OzoneManagerRatisServer {
   public RaftPeer getLeader() {
     try {
       RaftServer.Division division = server.getDivision(raftGroupId);
-      if (division.getInfo().isLeader()) {
-        return division.getPeer();
-      } else {
-        ByteString leaderId = division.getInfo().getRoleInfoProto()
-            .getFollowerInfo().getLeaderInfo().getId().getId();
-        return leaderId.isEmpty() ? null :
-            division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+      if (division != null) {
+        if (division.getInfo().isLeader()) {
+          return division.getPeer();
+        } else {
+          ByteString leaderId = division.getInfo().getRoleInfoProto()
+                  .getFollowerInfo().getLeaderInfo().getId().getId();
+          return leaderId.isEmpty() ? null :
+                  division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+        }
       }
     } catch (IOException e) {
       // In this case we return not a leader.

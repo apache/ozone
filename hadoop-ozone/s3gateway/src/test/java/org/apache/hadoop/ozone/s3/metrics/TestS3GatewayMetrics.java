@@ -157,7 +157,10 @@ public class TestS3GatewayMetrics {
           null, "random", null,
           null, null);
       fail();
-    } catch (OS3Exception e) {
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          ex.getErrorMessage());
     }
 
     long curMetric = metrics.getGetBucketFailure();

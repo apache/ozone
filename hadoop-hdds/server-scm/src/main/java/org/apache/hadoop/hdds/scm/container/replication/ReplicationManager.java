@@ -61,7 +61,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -441,6 +440,35 @@ public class ReplicationManager implements SCMService {
   }
 
   /**
+   * Send a delete command with a deadline for the specified container.
+   * @param container container to be deleted
+   * @param replicaIndex index of the replica to be deleted
+   * @param datanode datanode that hosts the replica to be deleted
+   * @param force true to force delete a container that is open or not empty
+   * @param scmDeadlineEpochMs The epoch time in ms, after which the command
+   *                           will be discarded from the SCMPendingOps table.
+   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
+   *                                command will be discarded on the datanode if
+   *                                it has not been processed.
+   * @throws NotLeaderException when this SCM is not the leader
+   */
+  public void sendDeleteCommand(final ContainerInfo container,
+      int replicaIndex, final DatanodeDetails datanode, boolean force,
+      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      throws NotLeaderException {
+    LOG.debug("Sending delete command for container {} and index {} on {} " +
+            "with SCM deadline {} and Datanode deadline {}.",
+        container, replicaIndex, datanode, scmDeadlineEpochMs,
+        datanodeDeadlineEpochMs);
+
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(container.containerID(), force);
+    deleteCommand.setReplicaIndex(replicaIndex);
+    sendDatanodeCommand(deleteCommand, container, datanode,
+        scmDeadlineEpochMs, datanodeDeadlineEpochMs);
+  }
+
+  /**
    * Create a ReplicateContainerCommand for the given container and to push the
    * container to the target datanode. The list of sources are checked to ensure
    * the datanode has sufficient capacity to accept the container command, and
@@ -568,9 +596,7 @@ public class ReplicationManager implements SCMService {
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadlineEpochMs);
-    final CommandForDatanode<?> datanodeCommand =
-        new CommandForDatanode<>(target.getUuid(), command);
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    nodeManager.addDatanodeCommand(target.getUuid(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
