@@ -111,24 +111,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         scm.getScmContext(),
         scm.getSequenceIdGen(),
         metrics);
-    Duration svcInterval = conf.getObject(
-            ScmConfig.class).getBlockDeletionInterval();
-    long serviceTimeout =
-        conf.getTimeDuration(
-            OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
-            OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
-
-    long waitTimeInMillis = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-        TimeUnit.MILLISECONDS);
 
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
-            scm.getSCMServiceManager(), svcInterval, serviceTimeout, conf,
-            metrics, waitTimeInMillis, scm.getSystemClock());
+            scm.getSCMServiceManager(), conf,
+            metrics, scm.getSystemClock());
   }
 
   /**
