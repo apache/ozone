@@ -42,10 +42,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -122,10 +124,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // Check metrics for all OMs
     checkOMHAMetricsForAllOMs(omList, leaderOMId);
 
-    // Restart current leader OM
-    leaderOM.stop();
-    leaderOM.restart();
-
+    // Restart leader OM
+    getCluster().shutdownOzoneManager(leaderOM);
+    getCluster().restartOzoneManager(leaderOM, true);
     waitForLeaderToBeReady();
 
     // Get the new leader
@@ -175,13 +176,16 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
    */
   private void waitForLeaderToBeReady()
       throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return getCluster().getOMLeader().isLeaderReady();
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, 300000);
+    // Check number of nodes
+    Assertions.assertEquals(3, getCluster().getOzoneManagersList().size());
+    for (OzoneManager om : getCluster().getOzoneManagersList()) {
+      Assertions.assertTrue(om.isRunning());
+    }
+    // Wait for Leader Election timeout
+    int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
+        .toIntExact(TimeUnit.MILLISECONDS);
+    GenericTestUtils.waitFor(() ->
+        getCluster().getOMLeader() != null, 500, timeout);
   }
 
   @Test
