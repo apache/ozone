@@ -83,7 +83,7 @@ public class TestECOverReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException, NotLeaderException,
-      AllSourcesOverloadedException {
+      CommandTargetOverloadedException {
     staleNode = null;
 
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -116,7 +116,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testNoOverReplication()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -127,7 +127,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationFixedByPendingDelete()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -145,7 +145,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithDecommissionIndexes()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -157,7 +157,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithStaleIndexes()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -175,7 +175,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithOpenReplica()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -195,7 +195,7 @@ public class TestECOverReplicationHandler {
    */
   @Test
   public void testOverReplicationButPolicyReturnsWrongIndexes()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5),
@@ -213,7 +213,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithOneSameIndexes()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -228,7 +228,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithMultiSameIndexes()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -252,7 +252,7 @@ public class TestECOverReplicationHandler {
    */
   @Test
   public void testOverReplicationWithUnderReplication()
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -295,7 +295,7 @@ public class TestECOverReplicationHandler {
     doAnswer((Answer<Void>) invocationOnMock -> {
       if (shouldThrow.get()) {
         shouldThrow.set(false);
-        throw new AllSourcesOverloadedException("Test exception");
+        throw new CommandTargetOverloadedException("Test exception");
       }
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       int replicaIndex = invocationOnMock.getArgument(1);
@@ -315,8 +315,8 @@ public class TestECOverReplicationHandler {
     try {
       ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
           health, 1);
-      Assertions.fail("Expected AllSourcesOverloadedException");
-    } catch (AllSourcesOverloadedException e) {
+      Assertions.fail("Expected CommandTargetOverloadedException");
+    } catch (CommandTargetOverloadedException e) {
       // This is expected.
     }
     Assert.assertEquals(1, commandsSent.size());
@@ -326,7 +326,7 @@ public class TestECOverReplicationHandler {
       Set<ContainerReplica> availableReplicas,
       Map<Integer, Integer> index2excessNum,
       List<ContainerReplicaOp> pendingOps) throws NotLeaderException,
-      AllSourcesOverloadedException {
+      CommandTargetOverloadedException {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =

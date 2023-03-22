@@ -482,17 +482,17 @@ public class ReplicationManager implements SCMService {
    * @param datanode  The datanode on which the replica should be deleted
    * @param force true to force delete a container that is open or not empty
    * @throws NotLeaderException when this SCM is not the leader
-   * @throws AllSourcesOverloadedException If the target datanode is has too
-   *                                       many pending commands.
+   * @throws CommandTargetOverloadedException If the target datanode is has too
+   *                                          many pending commands.
    */
   public void sendThrottledDeleteCommand(final ContainerInfo container,
       int replicaIndex, final DatanodeDetails datanode, boolean force)
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount =
         getAvailableDatanodes(Collections.singletonList(datanode),
             Type.deleteContainerCommand, datanodeDeleteLimit);
     if (datanodeWithCommandCount.isEmpty()) {
-      throw new AllSourcesOverloadedException("Cannot schedule a delete " +
+      throw new CommandTargetOverloadedException("Cannot schedule a delete " +
           "container command for container " + container.containerID() +
           " on datanode " + datanode + " as it has too many pending delete " +
           "commands");
@@ -506,23 +506,24 @@ public class ReplicationManager implements SCMService {
    * container to the target datanode. The list of sources are checked to ensure
    * the datanode has sufficient capacity to accept the container command, and
    * then the command is sent to the datanode with the fewest pending commands.
-   * If all sources are overloaded, an AllSourcesOverloadedException is thrown.
+   * If all sources are overloaded, a CommandTargetOverloadedException is
+   * thrown.
    * @param containerInfo The container to be replicated
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
    * @return A pair containing the datanode that the command was sent to, and
    *         the command created.
-   * @throws AllSourcesOverloadedException
+   * @throws CommandTargetOverloadedException
    */
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
-      throws AllSourcesOverloadedException, NotLeaderException {
+      throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds = getAvailableDatanodes(
         sources, Type.replicateContainerCommand, datanodeReplicationLimit);
     if (sourceWithCmds.isEmpty()) {
-      throw new AllSourcesOverloadedException("No sources with capacity " +
+      throw new CommandTargetOverloadedException("No sources with capacity " +
           "available for replication of container " + containerID + " to " +
           target);
     }

@@ -248,7 +248,7 @@ public class RatisOverReplicationHandler
 
   private int createCommands(
       ContainerInfo containerInfo, List<ContainerReplica> replicas,
-      int excess) throws NotLeaderException, AllSourcesOverloadedException {
+      int excess) throws NotLeaderException, CommandTargetOverloadedException {
 
     /*
     Being in the over replication queue means we have enough replicas that
@@ -257,7 +257,7 @@ public class RatisOverReplicationHandler
      */
     int commandsSent = 0;
     int initialExcess = excess;
-    AllSourcesOverloadedException firstOverloadedException = null;
+    CommandTargetOverloadedException firstOverloadedException = null;
     List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
@@ -275,7 +275,7 @@ public class RatisOverReplicationHandler
           replicationManager.sendThrottledDeleteCommand(containerInfo,
               replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
           commandsSent++;
-        } catch (AllSourcesOverloadedException e) {
+        } catch (CommandTargetOverloadedException e) {
           LOG.debug("Unable to send delete command for a mis-matched state " +
               "container {} to {} as it has too many pending delete commands",
               containerInfo.containerID(), replica.getDatanodeDetails());
@@ -306,7 +306,7 @@ public class RatisOverReplicationHandler
               replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
           commandsSent++;
           excess--;
-        } catch (AllSourcesOverloadedException e) {
+        } catch (CommandTargetOverloadedException e) {
           LOG.debug("Unable to send delete command for container {} to {} as " +
               "it has too many pending delete commands",
               containerInfo.containerID(), replica.getDatanodeDetails());

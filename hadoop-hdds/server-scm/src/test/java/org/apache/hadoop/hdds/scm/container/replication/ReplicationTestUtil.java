@@ -325,11 +325,11 @@ public final class ReplicationTestUtil {
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
    * @throws NotLeaderException
-   * @throws AllSourcesOverloadedException
+   * @throws CommandTargetOverloadedException
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
@@ -397,7 +397,7 @@ public final class ReplicationTestUtil {
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       int replicaIndex = invocationOnMock.getArgument(1);

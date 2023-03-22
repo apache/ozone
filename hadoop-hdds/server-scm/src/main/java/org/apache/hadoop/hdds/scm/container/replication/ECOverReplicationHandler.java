@@ -68,7 +68,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     ContainerInfo container = result.getContainerInfo();
 
     // We are going to check for over replication, so we should filter out any
@@ -154,7 +154,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       replicaIndexCounts.put(r.getReplicaIndex(),
           replicaIndexCounts.getOrDefault(r.getReplicaIndex(), 0) + 1);
     }
-    AllSourcesOverloadedException firstException = null;
+    CommandTargetOverloadedException firstException = null;
     for (ContainerReplica r : replicasToRemove) {
       int currentCount = replicaIndexCounts.getOrDefault(
           r.getReplicaIndex(), 0);
@@ -168,7 +168,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
             r.getReplicaIndex(), r.getDatanodeDetails(), true);
         replicaIndexCounts.put(r.getReplicaIndex(), currentCount - 1);
         commandsSent++;
-      } catch (AllSourcesOverloadedException e) {
+      } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to send delete command for container {} replica " +
             "index {} to {}",
             container.getContainerID(), r.getReplicaIndex(),

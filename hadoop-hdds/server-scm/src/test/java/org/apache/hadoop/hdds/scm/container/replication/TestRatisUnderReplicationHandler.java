@@ -69,7 +69,7 @@ public class TestRatisUnderReplicationHandler {
 
   @Before
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 

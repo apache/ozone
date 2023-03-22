@@ -858,7 +858,7 @@ public class TestReplicationManager {
 
   @Test
   public void testCreateThrottledReplicateContainerCommand()
-      throws AllSourcesOverloadedException, NodeNotFoundException,
+      throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
@@ -889,9 +889,9 @@ public class TestReplicationManager {
         ((ReplicateContainerCommand) cmd.getRight()).getReplicaIndex());
   }
 
-  @Test(expected = AllSourcesOverloadedException.class)
+  @Test(expected = CommandTargetOverloadedException.class)
   public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
-      throws AllSourcesOverloadedException, NodeNotFoundException,
+      throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
@@ -915,7 +915,7 @@ public class TestReplicationManager {
 
   @Test
   public void testCreateThrottledDeleteContainerCommand()
-      throws AllSourcesOverloadedException, NodeNotFoundException,
+      throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
             eq(SCMCommandProto.Type.deleteContainerCommand)))
@@ -928,9 +928,9 @@ public class TestReplicationManager {
     Assert.assertEquals(commandsSent.size(), 1);
   }
 
-  @Test(expected = AllSourcesOverloadedException.class)
+  @Test(expected = CommandTargetOverloadedException.class)
   public void testCreateThrottledDeleteContainerCommandThrowsWhenNoSources()
-      throws AllSourcesOverloadedException, NodeNotFoundException,
+      throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     int limit = replicationManager.getConfig().getDatanodeDeleteLimit();
 

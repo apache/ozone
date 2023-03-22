@@ -75,7 +75,7 @@ public class TestRatisOverReplicationHandler {
 
   @Before
   public void setup() throws NodeNotFoundException, NotLeaderException,
-      AllSourcesOverloadedException {
+      CommandTargetOverloadedException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
         RATIS_REPLICATION_CONFIG);
 
@@ -293,7 +293,7 @@ public class TestRatisOverReplicationHandler {
     // When processing the quasi closed replica, simulate an overloaded
     // exception so that it does not get deleted. Then we can ensure that only
     // one of the CLOSED replicas is removed.
-    doThrow(AllSourcesOverloadedException.class)
+    doThrow(CommandTargetOverloadedException.class)
         .when(replicationManager)
         .sendThrottledDeleteCommand(Mockito.any(ContainerInfo.class),
             anyInt(),
@@ -310,8 +310,8 @@ public class TestRatisOverReplicationHandler {
     try {
       handler.processAndSendCommands(replicas, Collections.emptyList(),
           getOverReplicatedHealthResult(), 2);
-      fail("Expected AllSourcesOverloadedException");
-    } catch (AllSourcesOverloadedException e) {
+      fail("Expected CommandTargetOverloadedException");
+    } catch (CommandTargetOverloadedException e) {
       // Expected
     }
     Assert.assertEquals(1, commandsSent.size());
@@ -331,7 +331,7 @@ public class TestRatisOverReplicationHandler {
     doAnswer((Answer<Void>) invocationOnMock -> {
       if (shouldThrow.get()) {
         shouldThrow.set(false);
-        throw new AllSourcesOverloadedException("Test exception");
+        throw new CommandTargetOverloadedException("Test exception");
       }
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       int replicaIndex = invocationOnMock.getArgument(1);

@@ -94,7 +94,7 @@ public class TestECUnderReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
@@ -237,11 +237,11 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    doThrow(new AllSourcesOverloadedException("Overloaded"))
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
             any(), anyList(), any(), anyInt());
 
-    Assertions.assertThrows(AllSourcesOverloadedException.class, () ->
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(
             Lists.emptyList(), availableReplicas, 1, 0, policy));
   }

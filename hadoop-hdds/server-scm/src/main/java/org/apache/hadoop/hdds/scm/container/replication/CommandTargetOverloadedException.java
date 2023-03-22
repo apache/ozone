@@ -22,9 +22,9 @@ import java.io.IOException;
 /**
  * Exception class used to indicate that all sources are overloaded.
  */
-public class AllSourcesOverloadedException extends IOException {
+public class CommandTargetOverloadedException extends IOException {
 
-  public AllSourcesOverloadedException(String message) {
+  public CommandTargetOverloadedException(String message) {
     super(message);
   }
 
