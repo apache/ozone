@@ -1034,10 +1034,6 @@ message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
 }
 
-message KeyRenameInfo {
-  repeated string keyNames = 1;
-}
-
 message OzoneFileStatusProto {
     optional KeyInfo keyInfo = 2;
     optional uint64 blockSize = 3;
