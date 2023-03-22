@@ -131,7 +131,7 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadWhenKeyIsNotAFileAndKeyPathDoesNotEndWithASlash()
+  public void testHeadWhenKeyIsDirectoryAndKeyPathDoesNotEndWithASlash()
       throws IOException, OS3Exception {
     // GIVEN
     final String keyPath = "keyDir";
@@ -149,7 +149,7 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadWhenKeyIsNotAFileAndKeyPathEndsWithASlash()
+  public void testHeadWhenKeyIsDirectoryAndKeyPathEndsWithASlash()
       throws IOException, OS3Exception {
     // GIVEN
     final String keyPath = "keyDir/";

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
@@ -66,20 +65,6 @@ public class OzoneKey {
    * Indicator if key is a file.
    */
   private final boolean isFile;
-  /**
-   * Constructs OzoneKey from OmKeyInfo.
-   *
-   */
-  @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationType type,
-                  int replicationFactor) {
-    this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
-            ReplicationConfig.fromTypeAndFactor(type,
-                    ReplicationFactor.valueOf(replicationFactor)), true);
-  }
 
   /**
    * Constructs OzoneKey from OmKeyInfo.

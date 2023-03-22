@@ -229,7 +229,7 @@ public class TestObjectGet {
   }
 
   @Test
-  public void testGetWhenKeyIsNotAFileAndDoesNotEndWithASlash()
+  public void testGetWhenKeyIsDirectoryAndDoesNotEndWithASlash()
       throws IOException {
     // GIVEN
     final String bucketName = "b1";

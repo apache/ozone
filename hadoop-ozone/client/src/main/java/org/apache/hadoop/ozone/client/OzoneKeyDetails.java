@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 
@@ -42,40 +41,6 @@ public class OzoneKeyDetails extends OzoneKey {
   private FileEncryptionInfo feInfo;
 
   private SupplierWithIOException<OzoneInputStream> contentSupplier;
-
-  /**
-   * Constructs OzoneKeyDetails from OmKeyInfo.
-   */
-  @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-                         long size, long creationTime, long modificationTime,
-                         List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationType type, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo, int replicationFactor) {
-    super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
-    this.ozoneKeyLocations = ozoneKeyLocations;
-    this.feInfo = feInfo;
-    this.setMetadata(metadata);
-  }
-
-
-  /**
-   * Constructs OzoneKeyDetails from OmKeyInfo.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-      long size, long creationTime, long modificationTime,
-      List<OzoneKeyLocation> ozoneKeyLocations,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata,
-      FileEncryptionInfo feInfo,
-      SupplierWithIOException<OzoneInputStream> contentSupplier) {
-    this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, ozoneKeyLocations, replicationConfig, metadata,
-        feInfo, contentSupplier, true);
-  }
 
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
