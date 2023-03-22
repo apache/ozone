@@ -56,7 +56,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     ECReplicationConfig repConfig = new ECReplicationConfig(DATA, PARITY);
     setup(repConfig);
   }
@@ -172,14 +172,14 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
-    Mockito.doThrow(new AllSourcesOverloadedException("Overloaded"))
+    Mockito.doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
             anyList(), any(), anyInt());
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    assertThrows(AllSourcesOverloadedException.class,
+    assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),
             0, 1, 1));
   }

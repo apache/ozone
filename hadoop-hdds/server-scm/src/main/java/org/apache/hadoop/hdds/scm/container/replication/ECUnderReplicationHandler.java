@@ -446,7 +446,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private void createReplicateCommand(
       ContainerInfo container, Iterator<DatanodeDetails> iterator,
       ContainerReplica replica, ECContainerReplicaCount replicaCount)
-      throws AllSourcesOverloadedException, NotLeaderException {
+      throws CommandTargetOverloadedException, NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
