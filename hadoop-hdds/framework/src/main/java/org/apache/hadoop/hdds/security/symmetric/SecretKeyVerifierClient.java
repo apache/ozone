@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 
+import javax.annotation.Nullable;
 import java.util.UUID;
 
 /**
@@ -26,5 +27,6 @@ import java.util.UUID;
  * retrieve the relevant secret key to validate token authority.
  */
 public interface SecretKeyVerifierClient {
+  @Nullable
   ManagedSecretKey getSecretKey(UUID id) throws SCMSecurityException;
 }
