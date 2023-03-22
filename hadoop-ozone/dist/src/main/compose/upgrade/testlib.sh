@@ -53,9 +53,6 @@ create_data_dirs() {
 prepare_for_image() {
   local image_version="$1"
 
-  # Load docker compose setup.
-  source "$OZONE_COMPOSE_DIR"/load.sh
-
   if [[ "$image_version" = "$OZONE_CURRENT_VERSION" ]]; then
       prepare_for_runner_image
   else
@@ -100,7 +97,7 @@ callback() {
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
-  local compose_dir="$1"
+  local compose_cluster="$1"
   export UPGRADE_TYPE="$2"
   export OZONE_UPGRADE_FROM="$3"
   export OZONE_UPGRADE_TO="$4"
@@ -111,10 +108,14 @@ run_test() {
   export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
   export OZONE_VOLUME="$test_subdir"/"$OZONE_UPGRADE_TO"/data
   export RESULT_DIR="$test_subdir"/"$OZONE_UPGRADE_TO"/result
-  export OZONE_COMPOSE_DIR="$_upgrade_dir"/compose/"$compose_dir"
+  local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
+
+  # Load docker compose setup.
+  source "$compose_dir"/load.sh
+
   # The container to run test commands from. Use one of the SCM containers,
   # but SCM HA may or may not be used.
-  export SCM="$(docker compose --project-directory="$OZONE_COMPOSE_DIR" config --services | grep --max-count=1 scm)"
+  export SCM="$(docker compose --project-directory="$compose_dir" config --services | grep --max-count=1 scm)"
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
