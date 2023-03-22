@@ -77,22 +77,22 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
     // Remove all entries from snapshotRenamedKeyTable
-    TableIterator<String, ? extends Table.KeyValue<String, String>>
-        iterator = omMetadataManager.getSnapshotRenamedKeyTable().iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+        iterator = omMetadataManager.getSnapshotRenamedKeyTable().iterator()) {
 
-    String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
-        + OM_KEY_PREFIX;
-    iterator.seek(dbSnapshotBucketKey);
+      String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
+          + OM_KEY_PREFIX;
+      iterator.seek(dbSnapshotBucketKey);
 
-    while (iterator.hasNext()) {
-      String renameDbKey = iterator.next().getKey();
-      if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
-        break;
+      while (iterator.hasNext()) {
+        String renameDbKey = iterator.next().getKey();
+        if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
+          break;
+        }
+        omMetadataManager.getSnapshotRenamedKeyTable()
+            .deleteWithBatch(batchOperation, renameDbKey);
       }
-      omMetadataManager.getSnapshotRenamedKeyTable()
-          .deleteWithBatch(batchOperation, renameDbKey);
     }
-
   }
 }
