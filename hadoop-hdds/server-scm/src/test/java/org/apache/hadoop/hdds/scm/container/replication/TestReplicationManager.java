@@ -786,7 +786,7 @@ public class TestReplicationManager {
     ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
-            rmConf.getDatanodeTimeout();
+            rmConf.getDatanodeTimeoutOffset();
     Assert.assertEquals(expectedDeadline, command.getDeadline());
 
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
@@ -838,7 +838,7 @@ public class TestReplicationManager {
     ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long scmDeadline = clock.millis() + rmConf.getEventTimeout();
-    long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeout();
+    long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
 
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         0, src, target, scmDeadline);

@@ -620,7 +620,8 @@ public class ReplicationManager implements SCMService {
       ContainerInfo containerInfo, DatanodeDetails target,
       long scmDeadlineEpochMs)
       throws NotLeaderException {
-    long datanodeDeadline = scmDeadlineEpochMs - rmConf.getDatanodeTimeout();
+    long datanodeDeadline =
+        scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset();
     LOG.info("Sending command [{}] for container {} to {} with datanode "
         + "deadline {} and scm deadline {}",
         command, containerInfo, target, datanodeDeadline,
@@ -1077,9 +1078,9 @@ public class ReplicationManager implements SCMService {
     /**
      * When a command has a deadline in SCM, the datanode timeout should be
      * slightly less. This duration is the number of seconds to subtract from
-     * the SCM deadline to give a datanode deadline.Time a command
+     * the SCM deadline to give a datanode deadline.
      */
-    @Config(key = "event.timeout.on.datanode.before.scm",
+    @Config(key = "event.timeout.datanode.offset",
         type = ConfigType.TIME,
         defaultValue = "30s",
         tags = {SCM, OZONE},
@@ -1088,13 +1089,13 @@ public class ReplicationManager implements SCMService {
             + "datanodes which is less than the SCM timeout. This ensures "
             + "the datanodes will not process a command after SCM believes it "
             + "should have expired.")
-    private long datanodeTimeout = Duration.ofSeconds(30).toMillis();
-    public long getDatanodeTimeout() {
-      return datanodeTimeout;
+    private long datanodeTimeoutOffset = Duration.ofSeconds(30).toMillis();
+    public long getDatanodeTimeoutOffset() {
+      return datanodeTimeoutOffset;
     }
 
     public void setDatanodeTimeout(long val) {
-      datanodeTimeout = val;
+      datanodeTimeoutOffset = val;
     }
 
     /**
