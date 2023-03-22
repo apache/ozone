@@ -146,7 +146,7 @@ public class SstFilteringService extends BackgroundService {
 
           try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
               .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
-                  dbName, true, Optional.of(Boolean.TRUE))) {
+                  dbName, true, Optional.of(Boolean.TRUE), false)) {
             RocksDatabase db = rdbStore.getDb();
             db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
           }

@@ -83,7 +83,7 @@ public class RDBStore implements DBStore {
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1));
+        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1), true);
   }
 
   @SuppressWarnings("parameternumber")
@@ -92,7 +92,8 @@ public class RDBStore implements DBStore {
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanNameName, boolean enableCompactionLog,
                   long maxTimeAllowedForSnapshotInDag,
-                  long compactionDagDaemonInterval)
+                  long compactionDagDaemonInterval,
+                  boolean createCheckpointDirs)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -133,28 +134,35 @@ public class RDBStore implements DBStore {
       }
 
       //create checkpoints directory if not exists.
-      checkpointsParentDir =
+      if (!createCheckpointDirs) {
+        checkpointsParentDir = null;
+      } else {
+        checkpointsParentDir =
           Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
-      File checkpointsDir = new File(checkpointsParentDir);
-      if (!checkpointsDir.exists()) {
-        boolean success = checkpointsDir.mkdir();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB checkpoint directory: " +
-              checkpointsParentDir);
+        File checkpointsDir = new File(checkpointsParentDir);
+        if (!checkpointsDir.exists()) {
+          boolean success = checkpointsDir.mkdir();
+          if (!success) {
+            throw new IOException(
+                "Unable to create RocksDB checkpoint directory: " +
+                    checkpointsParentDir);
+          }
         }
       }
-
       //create snapshot directory if does not exist.
-      snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_DIR).toString();
-      File snapshotsDir = new File(snapshotsParentDir);
-      if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdir();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB snapshot directory: " +
-              snapshotsParentDir);
+      if (!createCheckpointDirs) {
+        snapshotsParentDir = null;
+      } else {
+        snapshotsParentDir = Paths.get(dbLocation.getParent(),
+                                       OM_SNAPSHOT_DIR).toString();
+        File snapshotsDir = new File(snapshotsParentDir);
+        if (!snapshotsDir.exists()) {
+          boolean success = snapshotsDir.mkdir();
+          if (!success) {
+            throw new IOException(
+                "Unable to create RocksDB snapshot directory: " +
+                    snapshotsParentDir);
+          }
         }
       }
 
@@ -187,10 +195,6 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] createIfMissing = {}", dbOptions.createIfMissing());
       LOG.debug("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
     }
-  }
-
-  public String getSnapshotsParentDir() {
-    return snapshotsParentDir;
   }
 
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {

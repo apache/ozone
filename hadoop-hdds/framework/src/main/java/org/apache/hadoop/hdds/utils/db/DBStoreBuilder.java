@@ -105,7 +105,7 @@ public final class DBStoreBuilder {
   private boolean enableCompactionLog;
   private long maxTimeAllowedForSnapshotInDag;
   private long pruneCompactionDagDaemonRunInterval;
-
+  private boolean createCheckpointDirs = true;
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
    */
@@ -219,7 +219,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
           registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionLog, maxTimeAllowedForSnapshotInDag,
-          pruneCompactionDagDaemonRunInterval);
+          pruneCompactionDagDaemonRunInterval, createCheckpointDirs);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -281,6 +281,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
+  public DBStoreBuilder setCreateCheckpointDirs(boolean createCheckpointDirs) {
+    this.createCheckpointDirs = createCheckpointDirs;
+    return this;
+  }
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
