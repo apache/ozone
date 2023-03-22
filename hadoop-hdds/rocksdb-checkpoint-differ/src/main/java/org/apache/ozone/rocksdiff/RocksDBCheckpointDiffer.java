@@ -666,7 +666,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return a list of SST files (without extension) in the DB.
    */
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
-    ManagedRocksDB managedRocksDB = null;
+    ManagedRocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
 
     final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
@@ -676,12 +676,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     try (ManagedDBOptions managedDBOptions = new ManagedDBOptions()) {
       managedDBOptions.setParanoidChecks(true);
-      managedRocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
+      rocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
           cfDescriptors, columnFamilyHandles);
       // Note it retrieves only the selected column families by the descriptor
       // i.e. keyTable, directoryTable, fileTable
       List<LiveFileMetaData> liveFileMetaDataList =
-          managedRocksDB.get().getLiveFilesMetaData();
+          rocksDB.get().getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
       for (LiveFileMetaData m : liveFileMetaDataList) {
         LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
@@ -692,8 +692,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       LOG.error("Error during RocksDB operation: {}", e.getMessage());
       e.printStackTrace();
     } finally {
-      if (managedRocksDB != null) {
-        managedRocksDB.close();
+      if (rocksDB != null) {
+        rocksDB.close();
       }
       cfOpts.close();
     }

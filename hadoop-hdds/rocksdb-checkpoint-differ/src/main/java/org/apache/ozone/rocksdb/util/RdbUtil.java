@@ -51,9 +51,9 @@ public final class RdbUtil {
     cfd.add(
         new ColumnFamilyDescriptor("default".getBytes(StandardCharsets.UTF_8)));
     try (ManagedDBOptions options = new ManagedDBOptions();
-         ManagedRocksDB managedRocksDB = ManagedRocksDB.openReadOnly(options,
+         ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(options,
              dbLocation, cfd, columnFamilyHandles)) {
-      return managedRocksDB.get().getLiveFilesMetaData().stream()
+      return rocksDB.get().getLiveFilesMetaData().stream()
           .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
           .collect(Collectors.toCollection(HashSet::new));
     }
