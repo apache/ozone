@@ -858,7 +858,8 @@ public class TestReplicationManager {
 
   @Test
   public void testCreateThrottledReplicateContainerCommand()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
     sourceNodes.put(cmdTarget, 0);
@@ -873,20 +874,25 @@ public class TestReplicationManager {
           return sourceNodes.get(dn);
         });
 
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    Pair<DatanodeDetails, SCMCommand<?>> cmd = replicationManager
-        .createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
-    Assertions.assertEquals(cmdTarget, cmd.getLeft());
+    replicationManager.sendThrottledReplicationCommand(
+        container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+
+    Assertions.assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
     Assertions.assertEquals(destination,
         ((ReplicateContainerCommand) cmd.getRight()).getTargetDatanode());
     Assertions.assertEquals(0,
         ((ReplicateContainerCommand) cmd.getRight()).getReplicaIndex());
   }
 
-  @Test(expected = AllSourcesOverloadedException.class)
+  @Test(expected = CommandTargetOverloadedException.class)
   public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     for (int i = 0; i < 3; i++) {
@@ -901,8 +907,41 @@ public class TestReplicationManager {
         });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    replicationManager.createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledReplicationCommand(
+            container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+  }
+
+  @Test
+  public void testCreateThrottledDeleteContainerCommand()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> 0);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
+    Assert.assertEquals(commandsSent.size(), 1);
+  }
+
+  @Test(expected = CommandTargetOverloadedException.class)
+  public void testCreateThrottledDeleteContainerCommandThrowsWhenNoSources()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    int limit = replicationManager.getConfig().getDatanodeDeleteLimit();
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> limit + 1);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
   }
 
   @SafeVarargs
