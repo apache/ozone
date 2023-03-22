@@ -668,6 +668,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
+    kb.setIsFile(isFile);
     return kb.build();
   }
 
