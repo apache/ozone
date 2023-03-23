@@ -435,7 +435,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       return false;
     }
 
-    // SnapshotInfoTable has table cache, but it wouldn't matter in this case.
+    // SnapshotInfoTable has table cache. But that wouldn't matter in this case
+    // because the first SnapshotInfo entry would have been written to the DB
+    // right before checkpoint happens in OMSnapshotCreateResponse.
+    //
+    // Note the goal of compaction DAG is to track all compactions that happened
+    // _after_ a DB checkpoint is taken.
 
     try (ManagedRocksIterator it = ManagedRocksIterator.managed(
         db.newIterator(snapshotInfoTableCFHandle))) {
