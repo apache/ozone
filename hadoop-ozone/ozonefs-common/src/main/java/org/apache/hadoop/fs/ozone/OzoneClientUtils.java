@@ -80,6 +80,7 @@ public final class OzoneClientUtils {
         if (ex.getResult().equals(VOLUME_NOT_FOUND)
             || ex.getResult().equals(BUCKET_NOT_FOUND)) {
           // for orphan link bucket, return layout as link bucket
+          bucket.setSourcePathExist(false);
           return bucket.getBucketLayout();
         }
         // other case throw exception
