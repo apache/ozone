@@ -141,13 +141,12 @@ public class SCMBlockDeletingService extends BackgroundService
         // When DN node is healthy and in-service, and previous commands 
         // are handled for deleteBlocks Type, then it will be considered
         // in this iteration
-        Map<UUID, DatanodeDetails> dnUUIDMap = datanodes.stream().filter(
+        final Set<DatanodeDetails> included = datanodes.stream().filter(
             dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
-                Type.deleteBlocksCommand) == 0).collect(
-            Collectors.toMap(DatanodeDetails::getUuid, dn -> dn));
+                Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeleteLimitSize, dnUUIDMap);
+              deletedBlockLog.getTransactions(blockDeleteLimitSize, included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
