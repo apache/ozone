@@ -136,6 +136,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -358,6 +359,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
     builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
+    builder.setDbUpdateSuccess(dbUpdatesWrapper.isDBUpdateSuccess());
     return builder.build();
   }
 

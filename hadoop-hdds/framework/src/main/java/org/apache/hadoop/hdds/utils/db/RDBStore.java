@@ -78,12 +78,33 @@ public class RDBStore implements DBStore {
    */
   private final String dbCompactionLogDirName = "compaction-log";
 
+  // this is to track the total size of dbUpdates data since sequence
+  // number in request to avoid increase in heap memory.
+  private long maxDbUpdatesSizeThreshold;
+
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
                   Set<TableConfig> families) throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
         TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1));
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  @VisibleForTesting
+  public RDBStore(File dbFile, ManagedDBOptions rocksDBOption,
+                  ManagedWriteOptions writeOptions,
+                  Set<TableConfig> tableConfigs, CodecRegistry registry,
+                  boolean openReadOnly, int maxFSSnapshots,
+                  String dbJmxBeanNameName, boolean enableCompactionLog,
+                  long maxTimeAllowedForSnapshotInDag,
+                  long pruneCompactionDagDaemonRunInterval,
+                  long maxDbUpdatesSizeThreshold) throws IOException {
+    this(dbFile, rocksDBOption, writeOptions, tableConfigs, registry,
+        openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
+        enableCompactionLog, maxTimeAllowedForSnapshotInDag,
+        pruneCompactionDagDaemonRunInterval);
+    this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
   }
 
   @SuppressWarnings("parameternumber")
@@ -188,6 +209,8 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] maxOpenFiles= {}", dbOptions.maxOpenFiles());
     }
   }
+
+
 
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
@@ -363,6 +386,7 @@ public class RDBStore implements DBStore {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
+    long cumulativeDBUpdateLogBatchSize = 0L;
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
     try (ManagedTransactionLogIterator logIterator =
         db.getUpdatesSince(sequenceNumber)) {
@@ -407,6 +431,10 @@ public class RDBStore implements DBStore {
           if (currSequenceNumber - sequenceNumber >= limitCount) {
             break;
           }
+          cumulativeDBUpdateLogBatchSize += result.writeBatch().getDataSize();
+          if (cumulativeDBUpdateLogBatchSize >= maxDbUpdatesSizeThreshold) {
+            break;
+          }
         } finally {
           result.writeBatch().close();
         }
@@ -416,6 +444,7 @@ public class RDBStore implements DBStore {
       LOG.warn("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will be thrown to the client",
           sequenceNumber, e);
+      dbUpdatesWrapper.setDBUpdateSuccess(false);
       // Throw the exception back to Recon. Expect Recon to fall back to
       // full snapshot.
       throw e;
@@ -423,6 +452,7 @@ public class RDBStore implements DBStore {
       LOG.error("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
+      dbUpdatesWrapper.setDBUpdateSuccess(false);
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;
