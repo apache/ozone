@@ -333,11 +333,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   * Return all CA certificates in this component's trust chain, with the same
-   * order as trust chain, the last one is the root CA certificate.
+   * Return all certificates in this component's trust chain,
+   * the last one is the root CA certificate.
    */
-  @Override
-  public synchronized List<X509Certificate> getCACertificates() {
+  public List<X509Certificate> getTrustChain() {
     CertPath path = getCertPath();
     if (path == null || path.getCertificates() == null) {
       return null;

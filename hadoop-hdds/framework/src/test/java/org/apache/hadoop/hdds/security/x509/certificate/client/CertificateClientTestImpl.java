@@ -209,7 +209,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public List<X509Certificate> getCACertificates() {
+  public List<X509Certificate> getTrustChain() {
     List<X509Certificate> list = new ArrayList<>();
     list.add(rootCert);
     return list;

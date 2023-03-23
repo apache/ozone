@@ -31,8 +31,6 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -53,9 +51,9 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   private final String type;
   private final AtomicReference<X509TrustManager> trustManagerRef;
   /**
-   * Current CA certs in trustManager, to detect if certificates are changed.
+   * Current Root CA cert in trustManager, to detect if certificate is changed.
    */
-  private List<String> currentCACertIds = new ArrayList<>();
+  private String currentRootCACertId = null;
 
   /**
    * Creates a reloadable trustmanager. The trustmanager reloads itself
@@ -126,23 +124,18 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
 
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
-    List<X509Certificate> newCertList = caClient.getCACertificates();
-
-    if (currentCACertIds.size() > 0 &&
-        newCertList.size() == currentCACertIds.size() &&
-        !newCertList.stream().filter(
-            c -> !currentCACertIds.contains(c.getSerialNumber().toString()))
-            .findAny().isPresent()) {
-      // Certificates keep the same.
+    X509Certificate rootCACert = caClient.getRootCACertificate();
+    String rootCACertId = rootCACert.getSerialNumber().toString();
+    // Certificate keeps the same.
+    if (currentRootCACertId != null &&
+        currentRootCACertId.equals(rootCACertId)) {
       return null;
     }
 
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    for (X509Certificate caCert: newCertList) {
-      ks.setCertificateEntry(caCert.getSerialNumber().toString(), caCert);
-    }
+    ks.setCertificateEntry(rootCACertId, rootCACert);
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -154,11 +147,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
         break;
       }
     }
-
-    currentCACertIds.clear();
-    for (X509Certificate caCert: newCertList) {
-      currentCACertIds.add(caCert.getSerialNumber().toString());
-    }
+    currentRootCACertId = rootCACertId;
     return trustManager;
   }
 }
