@@ -296,10 +296,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
+      // Disk needs replacement.
       throw ex;
     } catch (IOException ex) {
-      // TODO : An I/O error during delete can leave partial artifacts on the
-      // disk. We will need the cleaner thread to cleanup this information.
+      // Container will be removed from tmp directory under the volume.
+      // On datanode shutdown/restart any partial artifacts left
+      // will be wiped from volume's tmp directory.
       onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);

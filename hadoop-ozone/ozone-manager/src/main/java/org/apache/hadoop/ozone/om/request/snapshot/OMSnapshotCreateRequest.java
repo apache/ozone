@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -115,9 +115,10 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
-        ozoneManager.getSnapshotChainManager();
+        omMetadataManager.getSnapshotChainManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -137,7 +138,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName);
 
-      //Check if snapshot already exists
+      // Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
@@ -178,7 +179,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           CreateSnapshotResponse.newBuilder()
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
-          omResponse.build(), volumeName, bucketName, snapshotName);
+          omResponse.build(), snapshotInfo);
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(

@@ -278,7 +278,8 @@ public final class RocksDatabase {
       return codec.fromPersistedFormat(nameBytes);
     }
 
-    protected ColumnFamilyHandle getHandle() {
+    @VisibleForTesting
+    public ColumnFamilyHandle getHandle() {
       return handle;
     }
 
@@ -786,6 +787,22 @@ public final class RocksDatabase {
     } catch (RocksDBException e) {
       closeOnError(e, true);
       final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().deleteRange(family.getHandle(), beginKey, endKey);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "delete range " + bytes2String(beginKey) +
+          " to " + bytes2String(endKey) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
       counter.decrementAndGet();

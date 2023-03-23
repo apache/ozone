@@ -41,11 +41,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
@@ -287,6 +289,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMHANodeDetails scmHANodeDetails;
 
   private ContainerBalancer containerBalancer;
+  // MoveManager is used by ContainerBalancer to schedule container moves
+  private final MoveManager moveManager;
   private StatefulServiceStateManager statefulServiceStateManager;
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
@@ -403,6 +407,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     initializeEventHandlers();
 
+    moveManager = new MoveManager(replicationManager, containerManager);
+    containerReplicaPendingOps.registerSubscriber(moveManager);
     containerBalancer = new ContainerBalancer(this);
     LOG.info(containerBalancer.toString());
 
@@ -1768,6 +1774,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return containerBalancer;
   }
 
+  public MoveManager getMoveManager() {
+    return moveManager;
+  }
+
   /**
    * Check if the current scm is the leader and ready for accepting requests.
    * @return - if the current scm is the leader and is ready.
@@ -2069,5 +2079,28 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
+  }
+
+  /**
+   * This will remove the given SCM node from HA Ring by removing it from
+   * Ratis Ring and deleting the related certificates from certificate store.
+   *
+   * @return true if remove was successful, else false.
+   */
+  public boolean removePeerFromHARing(RemoveSCMRequest request)
+      throws IOException {
+    // We cannot remove a node if it's currently leader.
+    if (scmContext.isLeader() && request.getScmId().equals(getScmId())) {
+      throw new IOException("Cannot remove current leader.");
+    }
+
+    // Currently we don't support removal of primordial node.
+    if (request.getScmId().equals(primaryScmNodeId)) {
+      throw new IOException("Removal of primordial node is not supported.");
+    }
+
+    // TODO: Remove the certificate from certificate store.
+    return scmHAManager.removeSCM(request);
+
   }
 }

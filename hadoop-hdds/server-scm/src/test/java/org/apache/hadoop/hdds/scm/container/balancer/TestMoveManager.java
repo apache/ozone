@@ -110,7 +110,6 @@ public class TestMoveManager {
     Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
     moveManager = new MoveManager(replicationManager, containerManager);
-    moveManager.onLeaderReady();
   }
 
   @Test
@@ -313,6 +312,22 @@ public class TestMoveManager {
   }
 
   @Test
+  public void testDeleteCommandFails() throws Exception {
+    CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
+
+    Mockito.doThrow(new ContainerNotFoundException("test"))
+        .when(containerManager).getContainer(any(ContainerID.class));
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, 0, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult moveResult = res.get();
+    Assert.assertEquals(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+        moveResult);
+  }
+
+  @Test
   public void testSuccessfulMove() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
@@ -321,7 +336,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -359,7 +374,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(true));
+        eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -391,7 +406,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong(), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);

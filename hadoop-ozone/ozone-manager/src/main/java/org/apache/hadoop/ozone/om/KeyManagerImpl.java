@@ -619,7 +619,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
-    return  metadataManager.getPendingDeletionKeys(count);
+    return metadataManager.getPendingDeletionKeys(count);
   }
 
   @Override

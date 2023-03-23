@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -61,7 +62,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -75,6 +75,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -169,6 +170,7 @@ public class ReplicationManager implements SCMService {
   private final ECMisReplicationHandler ecMisReplicationHandler;
   private final RatisUnderReplicationHandler ratisUnderReplicationHandler;
   private final RatisOverReplicationHandler ratisOverReplicationHandler;
+  private final RatisMisReplicationHandler ratisMisReplicationHandler;
   private final int maintenanceRedundancy;
   private final int ratisMaintenanceMinReplicas;
   private Thread underReplicatedProcessorThread;
@@ -177,6 +179,7 @@ public class ReplicationManager implements SCMService {
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
   private final int datanodeReplicationLimit;
+  private final int datanodeDeleteLimit;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -228,17 +231,20 @@ public class ReplicationManager implements SCMService {
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
+    this.datanodeDeleteLimit = rmConf.getDatanodeDeleteLimit();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
     ecOverReplicationHandler =
-        new ECOverReplicationHandler(ecContainerPlacement, nodeManager);
+        new ECOverReplicationHandler(ecContainerPlacement, this);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
         conf, this, rmConf.isPush());
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
-        new RatisOverReplicationHandler(ratisContainerPlacement, nodeManager);
+        new RatisOverReplicationHandler(ratisContainerPlacement, this);
+    ratisMisReplicationHandler = new RatisMisReplicationHandler(
+        ratisContainerPlacement, conf, this, rmConf.isPush());
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -438,41 +444,86 @@ public class ReplicationManager implements SCMService {
   }
 
   /**
+   * Send a delete command with a deadline for the specified container.
+   * @param container container to be deleted
+   * @param replicaIndex index of the replica to be deleted
+   * @param datanode datanode that hosts the replica to be deleted
+   * @param force true to force delete a container that is open or not empty
+   * @param scmDeadlineEpochMs The epoch time in ms, after which the command
+   *                           will be discarded from the SCMPendingOps table.
+   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
+   *                                command will be discarded on the datanode if
+   *                                it has not been processed.
+   * @throws NotLeaderException when this SCM is not the leader
+   */
+  public void sendDeleteCommand(final ContainerInfo container,
+      int replicaIndex, final DatanodeDetails datanode, boolean force,
+      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      throws NotLeaderException {
+    LOG.debug("Sending delete command for container {} and index {} on {} " +
+            "with SCM deadline {} and Datanode deadline {}.",
+        container, replicaIndex, datanode, scmDeadlineEpochMs,
+        datanodeDeadlineEpochMs);
+
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(container.containerID(), force);
+    deleteCommand.setReplicaIndex(replicaIndex);
+    sendDatanodeCommand(deleteCommand, container, datanode,
+        scmDeadlineEpochMs, datanodeDeadlineEpochMs);
+  }
+
+  /**
+   * Sends delete container command for the given container to the given
+   * datanode, provided that the datanode is not overloaded with delete
+   * container commands. If the datanode is overloaded, an exception will be
+   * thrown.
+   * @param container Container to be deleted
+   * @param replicaIndex Index of the container replica to be deleted
+   * @param datanode  The datanode on which the replica should be deleted
+   * @param force true to force delete a container that is open or not empty
+   * @throws NotLeaderException when this SCM is not the leader
+   * @throws CommandTargetOverloadedException If the target datanode is has too
+   *                                          many pending commands.
+   */
+  public void sendThrottledDeleteCommand(final ContainerInfo container,
+      int replicaIndex, final DatanodeDetails datanode, boolean force)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount =
+        getAvailableDatanodes(Collections.singletonList(datanode),
+            Type.deleteContainerCommand, datanodeDeleteLimit);
+    if (datanodeWithCommandCount.isEmpty()) {
+      throw new CommandTargetOverloadedException("Cannot schedule a delete " +
+          "container command for container " + container.containerID() +
+          " on datanode " + datanode + " as it has too many pending delete " +
+          "commands");
+    }
+    sendDeleteCommand(container, replicaIndex, datanodeWithCommandCount.get(0)
+        .getRight(), force);
+  }
+
+  /**
    * Create a ReplicateContainerCommand for the given container and to push the
    * container to the target datanode. The list of sources are checked to ensure
    * the datanode has sufficient capacity to accept the container command, and
    * then the command is sent to the datanode with the fewest pending commands.
-   * If all sources are overloaded, an AllSourcesOverloadedException is thrown.
-   * @param containerID The containerID to be replicated
+   * If all sources are overloaded, a CommandTargetOverloadedException is
+   * thrown.
+   * @param containerInfo The container to be replicated
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
    * @return A pair containing the datanode that the command was sent to, and
    *         the command created.
-   * @throws AllSourcesOverloadedException
+   * @throws CommandTargetOverloadedException
    */
-  public Pair<DatanodeDetails, SCMCommand<?>>
-      createThrottledReplicationCommand(long containerID,
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
-      throws AllSourcesOverloadedException {
-    List<Pair<Integer, DatanodeDetails>> sourceWithCmds = new ArrayList<>();
-    for (DatanodeDetails source : sources)  {
-      try {
-        int commandCount = nodeManager.getTotalDatanodeCommandCount(source,
-            Type.replicateContainerCommand);
-        if (commandCount >= datanodeReplicationLimit) {
-          LOG.debug("Source {} has reached the maximum number of queued " +
-              "replication commands ({})", source, datanodeReplicationLimit);
-          continue;
-        }
-        sourceWithCmds.add(Pair.of(commandCount, source));
-      } catch (NodeNotFoundException e) {
-        LOG.error("Node {} not found in NodeManager. Should not happen",
-            source, e);
-      }
-    }
+      throws CommandTargetOverloadedException, NotLeaderException {
+    long containerID = containerInfo.getContainerID();
+    List<Pair<Integer, DatanodeDetails>> sourceWithCmds = getAvailableDatanodes(
+        sources, Type.replicateContainerCommand, datanodeReplicationLimit);
     if (sourceWithCmds.isEmpty()) {
-      throw new AllSourcesOverloadedException("No sources with capacity " +
+      throw new CommandTargetOverloadedException("No sources with capacity " +
           "available for replication of container " + containerID + " to " +
           target);
     }
@@ -482,7 +533,42 @@ public class ReplicationManager implements SCMService {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
     cmd.setReplicaIndex(replicaIndex);
-    return Pair.of(sourceWithCmds.get(0).getRight(), cmd);
+    sendDatanodeCommand(cmd, containerInfo, sourceWithCmds.get(0).getRight());
+  }
+
+  /**
+   * For the given datanodes and command type, lookup the current queue command
+   * count and return a list of datanodes with the current command count. If
+   * any datanode is at or beyond the limit, then it will not be included in the
+   * returned list.
+   * @param datanodes List of datanodes to check for available capacity
+   * @param commandType The Type of datanode command to check the capacity for.
+   * @param limit The limit of commands of that type.
+   * @return List of datanodes with the current command count that are not over
+   *         the limit.
+   */
+  private List<Pair<Integer, DatanodeDetails>> getAvailableDatanodes(
+      List<DatanodeDetails> datanodes,
+      StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type commandType,
+      int limit) {
+    List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount
+        = new ArrayList<>();
+    for (DatanodeDetails dn : datanodes) {
+      try {
+        int commandCount = nodeManager.getTotalDatanodeCommandCount(dn,
+            commandType);
+        if (commandCount >= limit) {
+          LOG.debug("Datanode {} has reached the maximum number of queued " +
+              "{} commands ({})", dn, commandType, limit);
+          continue;
+        }
+        datanodeWithCommandCount.add(Pair.of(commandCount, dn));
+      } catch (NodeNotFoundException e) {
+        LOG.error("Node {} not found in NodeManager. Should not happen",
+            dn, e);
+      }
+    }
+    return datanodeWithCommandCount;
   }
 
   /**
@@ -556,9 +642,7 @@ public class ReplicationManager implements SCMService {
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
     command.setDeadline(datanodeDeadlineEpochMs);
-    final CommandForDatanode<?> datanodeCommand =
-        new CommandForDatanode<>(target.getUuid(), command);
-    eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    nodeManager.addDatanodeCommand(target.getUuid(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
   }
@@ -652,7 +736,7 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-  Set<Pair<DatanodeDetails, SCMCommand<?>>> processUnderReplicatedContainer(
+  int processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -662,22 +746,32 @@ public class ReplicationManager implements SCMService {
     if (result.getContainerInfo().getReplicationType() == EC) {
       if (result.getHealthState()
           == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-        return ecUnderReplicationHandler.processAndCreateCommands(replicas,
+        return ecUnderReplicationHandler.processAndSendCommands(replicas,
             pendingOps, result, maintenanceRedundancy);
       } else if (result.getHealthState()
           == ContainerHealthResult.HealthState.MIS_REPLICATED) {
-        return ecMisReplicationHandler.processAndCreateCommands(replicas,
+        return ecMisReplicationHandler.processAndSendCommands(replicas,
             pendingOps, result, maintenanceRedundancy);
       } else {
         throw new IllegalArgumentException("Unexpected health state: "
             + result.getHealthState());
       }
     }
-    return ratisUnderReplicationHandler.processAndCreateCommands(replicas,
-        pendingOps, result, ratisMaintenanceMinReplicas);
+    if (result.getHealthState()
+        == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
+      return ratisUnderReplicationHandler.processAndSendCommands(replicas,
+          pendingOps, result, ratisMaintenanceMinReplicas);
+    } else if (result.getHealthState()
+        == ContainerHealthResult.HealthState.MIS_REPLICATED) {
+      return ratisMisReplicationHandler.processAndSendCommands(replicas,
+          pendingOps, result, ratisMaintenanceMinReplicas);
+    } else {
+      throw new IllegalArgumentException("Unexpected health state: "
+          + result.getHealthState());
+    }
   }
 
-  Set<Pair<DatanodeDetails, SCMCommand<?>>> processOverReplicatedContainer(
+  int processOverReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
@@ -685,10 +779,10 @@ public class ReplicationManager implements SCMService {
     List<ContainerReplicaOp> pendingOps =
         containerReplicaPendingOps.getPendingOps(containerID);
     if (result.getContainerInfo().getReplicationType() == EC) {
-      return ecOverReplicationHandler.processAndCreateCommands(replicas,
+      return ecOverReplicationHandler.processAndSendCommands(replicas,
           pendingOps, result, maintenanceRedundancy);
     }
-    return ratisOverReplicationHandler.processAndCreateCommands(replicas,
+    return ratisOverReplicationHandler.processAndSendCommands(replicas,
         pendingOps, result, ratisMaintenanceMinReplicas);
   }
 
@@ -1097,6 +1191,21 @@ public class ReplicationManager implements SCMService {
 
     public int getDatanodeReplicationLimit() {
       return datanodeReplicationLimit;
+    }
+
+    @Config(key = "datanode.delete.container.limit",
+        type = ConfigType.INT,
+        defaultValue = "40",
+        tags = { SCM, DATANODE },
+        description = "A limit to restrict the total number of delete " +
+            "container commands queued on a datanode. Note this is intended " +
+            "to be a temporary config until we have a more dynamic way of " +
+            "limiting load"
+    )
+    private int datanodeDeleteLimit = 40;
+
+    public int getDatanodeDeleteLimit() {
+      return datanodeDeleteLimit;
     }
 
     public void setDatanodeReplicationLimit(int limit) {

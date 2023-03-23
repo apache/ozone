@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 import java.util.List;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -92,6 +93,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
 public class TestOmSnapshot {
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static String volumeName;
   private static String bucketName;
   private static OzoneManagerProtocol writeClient;
@@ -164,9 +166,10 @@ public class TestOmSnapshot {
         .setNumOfOzoneManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, bucketLayout);
+        .createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -176,7 +179,6 @@ public class TestOmSnapshot {
     OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
 
-    OzoneClient client = cluster.getClient();
     store = client.getObjectStore();
     writeClient = store.getClientProxy().getOzoneManagerClient();
 
@@ -190,6 +192,7 @@ public class TestOmSnapshot {
 
   @AfterClass
   public static void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -547,7 +550,7 @@ public class TestOmSnapshot {
     SnapshotDiffResponse response;
     do {
       response = store.snapshotDiff(volume, bucket, fromSnapshot,
-          toSnapshot, null, 0);
+          toSnapshot, null, 0, false);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
 
@@ -571,11 +574,13 @@ public class TestOmSnapshot {
     // Destination snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap1, snap2,
+                null, 0, false));
     // From snapshot is invalid
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap2, snap1,
+                null, 0, false));
   }
 
   @Test
@@ -600,15 +605,18 @@ public class TestOmSnapshot {
     // Bucket is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
+                null, 0, false));
     // Volume is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
+                null, 0, false));
     // Both volume and bucket are nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1, null, 0));
+            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
+                null, 0, false));
   }
 
   @Test
@@ -630,17 +638,21 @@ public class TestOmSnapshot {
     // Destination snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, nullstr, null, 0));
+            () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
+                null, 0, false));
     // From snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, nullstr, snap1, null, 0));
+            () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
+                null, 0, false));
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(volume, nullstr, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
+                null, 0, false));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2, null, 0));
+            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2,
+                null, 0, false));
   }
 
   @Test
@@ -713,7 +725,8 @@ public class TestOmSnapshot {
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
     SnapshotDiffReport diff1 =
-        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2, null, 0)
+        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2,
+                null, 0, false)
             .getSnapshotDiffReport();
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
@@ -856,7 +869,6 @@ public class TestOmSnapshot {
 
     String snapshotName = UUID.randomUUID().toString();
     store.createSnapshot(volumeName, bucketName, snapshotName);
-
     List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
         .getOzoneManagersList();
     List<String> snapshotIds = new ArrayList<>();
@@ -888,4 +900,20 @@ public class TestOmSnapshot {
 
     assertEquals(1, snapshotIds.stream().distinct().count());
   }
+
+  @Test
+  public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    String snapPrefix = createSnapshot(volumeName, bucketName);
+    RDBStore snapshotDBStore = (RDBStore)
+            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            .getMetadataManager().getStore();
+
+    for (String table : snapshotDBStore.getTableNames().values()) {
+      Assertions.assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
+              .getHandle().getDescriptor()
+              .getOptions().disableAutoCompactions());
+    }
+  }
+
 }

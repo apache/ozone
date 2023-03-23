@@ -492,6 +492,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.key.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of deleted keys to be scanned by Snapshot
+      Deleting Service per snapshot run.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.service.ids</name>
     <value/>
     <tag>OM, HA</tag>
@@ -2455,24 +2464,6 @@
     <description>
       Comma separated list of users and groups allowed to access
       client scm container protocol.
-    </description>
-  </property>
-  <property>
-    <name>hdds.security.ssl.keystore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the keystore
-      certificates file has changed and needs reloading. Default is 60s. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>hdds.security.ssl.truststore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the truststore
-      certificates file has changed and needs reloading. Default is 60s. Unit could
-      be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>

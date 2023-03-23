@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,7 +65,6 @@ import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
@@ -84,7 +84,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -190,13 +189,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    *
    * Snapshot Tables:
-   * |----------------------------------------------------------------------|
-   * |  Column Family     |        VALUE                                    |
-   * |----------------------------------------------------------------------|
-   * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
-   * |----------------------------------------------------------------------|
-   * |  renamedKeyTable | /volumeName/bucketName/objectID -> OmKeyRenameInfo|
-   * |----------------------------------------------------------------------|
+   * |-------------------------------------------------------------------------|
+   * |  Column Family        |        VALUE                                    |
+   * |-------------------------------------------------------------------------|
+   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * |-------------------------------------------------------------------------|
+   * |snapshotRenamedKeyTable| /volumeName/bucketName/objectID -> /v/b/origKey |
+   * |-------------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -223,7 +222,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  public static final String RENAMED_KEY_TABLE = "renamedKeyTable";
+  public static final String SNAPSHOT_RENAMED_KEY_TABLE =
+      "snapshotRenamedKeyTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -246,7 +246,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      RENAMED_KEY_TABLE
+      SNAPSHOT_RENAMED_KEY_TABLE
   };
 
   private DBStore store;
@@ -275,11 +275,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table tenantStateTable;
 
   private Table snapshotInfoTable;
-  private Table renamedKeyTable;
+  private Table snapshotRenamedKeyTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
   private Table deletedDirTable;
+
+  // Table-level locks that protects table read/write access. Note:
+  // Don't use this lock for tables other than deletedTable and deletedDirTable.
+  // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
+  private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
+
+  @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return tableLockMap.get(tableName);
+  }
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -292,6 +302,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Map<String, Table> tableMap = new HashMap<>();
   private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
+  private SnapshotChainManager snapshotChainManager;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
@@ -333,7 +344,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
       RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
     }
-    setStore(loadDB(conf, metaDir, dbName, true));
+    setStore(loadDB(conf, metaDir, dbName, true,
+            java.util.Optional.of(Boolean.TRUE)));
     initializeOmTables(false);
   }
 
@@ -464,16 +476,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       initializeOmTables(true);
     }
+
+    snapshotChainManager = new SnapshotChainManager(this);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
-    return loadDB(configuration, metaDir, OM_DB_NAME, false);
+    return loadDB(configuration, metaDir, OM_DB_NAME, false,
+            java.util.Optional.empty());
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, boolean readOnly) throws IOException {
-
+                               String dbName, boolean readOnly,
+                               java.util.Optional<Boolean>
+                                       disableAutoCompaction)
+          throws IOException {
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
@@ -484,8 +501,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
         .setEnableCompactionLog(true);
-    DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
-    return dbStore;
+    disableAutoCompaction.ifPresent(
+            dbStoreBuilder::disableDefaultCFAutoCompaction);
+    return addOMTablesAndCodecs(dbStoreBuilder).build();
   }
 
   public static DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
@@ -510,7 +528,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
-        .addTable(RENAMED_KEY_TABLE)
+        .addTable(SNAPSHOT_RENAMED_KEY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -526,8 +544,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
         .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
-        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec())
-        .addCodec(OmKeyRenameInfo.class, new OmKeyRenameInfoCodec());
+        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec());
   }
 
   /**
@@ -561,6 +578,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE, addCacheMetrics);
+    // Currently, deletedTable is the only table that will need the table lock
+    tableLockMap.put(DELETED_TABLE, new ReentrantReadWriteLock(true));
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class,
@@ -630,11 +649,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
-    // objectID -> renamedKeys (renamed keys for key table)
-    renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
-        String.class, OmKeyRenameInfo.class);
-    checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
-    // TODO: [SNAPSHOT] Initialize table lock for renamedKeyTable.
+    // volumeName/bucketName/objectID -> renamedKey (renamed key for key table)
+    snapshotRenamedKeyTable = this.store.getTable(SNAPSHOT_RENAMED_KEY_TABLE,
+        String.class, String.class);
+    checkTableStatus(snapshotRenamedKeyTable, SNAPSHOT_RENAMED_KEY_TABLE,
+        addCacheMetrics);
+    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedKeyTable.
   }
 
   /**
@@ -1385,8 +1405,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (keyIter.hasNext() && currentCount < keyCount) {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
+          // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
+            // Skip the key if it exists in the previous snapshot (of the same
+            // scope) as in this case its blocks should not be reclaimed
+
+            // TODO: [SNAPSHOT] HDDS-7968
+            //  1. If previous snapshot keyTable has key info.getObjectID(),
+            //  skip it. Pending HDDS-7740 merge to reuse the util methods to
+            //  check previousSnapshot.
+            //  2. For efficient lookup, the addition in design doc 4.b)1.b
+            //  is critical.
+            //  3. With snapshot it is possible that only some of the keys in
+            //  the DB key's RepeatedOmKeyInfo list can be reclaimed,
+            //  make sure to update deletedTable accordingly in this case.
+            //  4. Further optimization: Skip all snapshotted keys altogether
+            //  e.g. by prefixing all unreclaimable keys, then calling seek
+
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
                 info.getKeyLocationVersions()) {
@@ -1628,8 +1664,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
-    return renamedKeyTable;
+  public Table<String, String> getSnapshotRenamedKeyTable() {
+    return snapshotRenamedKeyTable;
+  }
+
+  /**
+   * Get Snapshot Chain Manager.
+   *
+   * @return SnapshotChainManager.
+   */
+  public SnapshotChainManager getSnapshotChainManager() {
+    return snapshotChainManager;
   }
 
   /**

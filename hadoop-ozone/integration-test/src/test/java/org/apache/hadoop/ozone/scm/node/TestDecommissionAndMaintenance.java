@@ -36,10 +36,12 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -105,6 +107,7 @@ public class TestDecommissionAndMaintenance {
   private PipelineManager pm;
   private StorageContainerManager scm;
 
+  private OzoneClient client;
   private ContainerOperationClient scmClient;
 
   private static MiniOzoneClusterProvider clusterProvider;
@@ -156,12 +159,15 @@ public class TestDecommissionAndMaintenance {
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
+    client = cluster.newClient();
+    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @AfterEach
   public void tearDown() throws InterruptedException, IOException {
+    IOUtils.close(LOG, client);
+    IOUtils.close(LOG, scmClient);
     if (cluster != null) {
       clusterProvider.destroy(cluster);
     }

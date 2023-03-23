@@ -20,13 +20,11 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
@@ -84,12 +82,7 @@ public class TestContainerBalancer {
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
     when(scm.getSCMServiceManager()).thenReturn(mock(SCMServiceManager.class));
-
-    ReplicationManager replicationManager =
-        Mockito.mock(ReplicationManager.class);
-    when(scm.getReplicationManager()).thenReturn(replicationManager);
-    when(replicationManager.getClock()).thenReturn(
-        Clock.system(ZoneId.systemDefault()));
+    when(scm.getMoveManager()).thenReturn(Mockito.mock(MoveManager.class));
 
     /*
     When StatefulServiceStateManager#saveConfiguration is called, save to
@@ -198,6 +191,30 @@ public class TestContainerBalancer {
     containerBalancer.stop();
     Assertions.assertTrue(containerBalancer.getBalancerStatus()
         == ContainerBalancerTask.Status.STOPPED);
+  }
+
+  /**
+   * This tests that ContainerBalancer rejects certain invalid configurations
+   * while starting. It should fail to start in some cases.
+   */
+  @Test
+  public void testValidationOfConfigurations() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    conf.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout", 60,
+        TimeUnit.MINUTES);
+
+    conf.setTimeDuration("hdds.container.balancer.move.timeout", 59,
+        TimeUnit.MINUTES);
+
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    Assertions.assertThrowsExactly(
+        InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration),
+        "hdds.container.balancer.move.replication.timeout should " +
+            "be less than hdds.container.balancer.move.timeout.");
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)

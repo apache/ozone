@@ -92,7 +92,7 @@ public abstract class EndpointBase implements Auditor {
     try {
       bucket = volume.getBucket(bucketName);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,

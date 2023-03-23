@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -39,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -283,6 +283,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
       BucketLayout bucketLayout) throws IOException;
 
   /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
+
+  /**
    * Returns the user Table.
    *
    * @return UserTable.
@@ -375,7 +382,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
 
-  Table<String, OmKeyRenameInfo> getRenamedKeyTable();
+  Table<String, String> getSnapshotRenamedKeyTable();
 
   /**
    * Gets the OM Meta table.
@@ -488,7 +495,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in
-   * renamedKeyTable.
+   * snapshotRenamedKeyTable.
    *
    * @param volume   - volume name
    * @param bucket   - bucket name
