@@ -675,6 +675,10 @@ public class TestOzoneShellHA {
           "-skipTrash", hostPrefix + "/vol1"});
       Assert.assertEquals(0, res);
 
+      res = ToolRunner.run(shell, new String[]{"-ls", "-R",
+          hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
           "-skipTrash", hostPrefix + "/linkvol"});
       Assert.assertEquals(0, res);
