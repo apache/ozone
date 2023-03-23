@@ -22,7 +22,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -113,13 +113,14 @@ public class TestRocksDbPersistentList {
       List<String> testList = Arrays.asList("e1", "e2", "e3", "e1", "e2");
       testList.forEach(persistentList::add);
 
-      Iterator<String> iterator = persistentList.iterator();
-      int index = 0;
+      try (ClosableIterator<String> iterator = persistentList.iterator()) {
+        int index = 0;
 
-      while (iterator.hasNext()) {
-        assertEquals(iterator.next(), testList.get(index++));
+        while (iterator.hasNext()) {
+          assertEquals(iterator.next(), testList.get(index++));
+        }
+        assertEquals(testList.size(), index);
       }
-      assertEquals(testList.size(), index);
     } finally {
       if (columnFamily != null) {
         db.get().dropColumnFamily(columnFamily);
