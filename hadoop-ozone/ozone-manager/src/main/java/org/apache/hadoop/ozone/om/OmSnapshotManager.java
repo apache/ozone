@@ -115,6 +115,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
+  private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
+  private final List<ColumnFamilyHandle> columnFamilyHandles;
 
   // TODO: [SNAPSHOT] create config for max allowed page size.
   private final int maxPageSize = 1000;
@@ -123,9 +125,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
+    this.columnFamilyDescriptors = new ArrayList<>();
+    this.columnFamilyHandles = new ArrayList<>();
 
-    List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
-    List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     String dbPath = getDbPath(ozoneManager.getConfiguration());
@@ -147,11 +149,7 @@ public final class OmSnapshotManager implements AutoCloseable {
               columnFamilyDescriptors, columnFamilyHandles);
 
     } catch (RuntimeException exception) {
-      closeRocksDbObjects(options,
-          columnFamilyOptions,
-          columnFamilyDescriptors,
-          columnFamilyHandles,
-          snapshotDiffDb);
+      close();
       throw exception;
     }
 
@@ -572,32 +570,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  private void closeRocksDbObjects(
-      final ManagedDBOptions managedDBOptions,
-      final ManagedColumnFamilyOptions managedColumnFamilyOptions,
-      final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
-      final List<ColumnFamilyHandle> columnFamilyHandles,
-      final ManagedRocksDB managedRocksDB) {
-
-    if (columnFamilyHandles != null) {
-      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
-    }
-    if (managedRocksDB != null) {
-      managedRocksDB.close();
-    }
-    if (columnFamilyDescriptors != null) {
-      columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
-          closeColumnFamilyOptions((ManagedColumnFamilyOptions)
-              columnFamilyDescriptor.getOptions()));
-    }
-    if (managedColumnFamilyOptions != null) {
-      closeColumnFamilyOptions(managedColumnFamilyOptions);
-    }
-    if (managedDBOptions != null) {
-      managedDBOptions.close();
-    }
-  }
-
   private void closeColumnFamilyOptions(
       final ManagedColumnFamilyOptions managedColumnFamilyOptions) {
     Preconditions.checkArgument(!managedColumnFamilyOptions.isReused());
@@ -606,12 +578,20 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (columnFamilyOptions != null) {
-      closeColumnFamilyOptions(columnFamilyOptions);
-    }
 
+    if (columnFamilyHandles != null) {
+      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
+    }
     if (snapshotDiffDb != null) {
       snapshotDiffDb.close();
+    }
+    if (columnFamilyDescriptors != null) {
+      columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
+          closeColumnFamilyOptions((ManagedColumnFamilyOptions)
+              columnFamilyDescriptor.getOptions()));
+    }
+    if (columnFamilyOptions != null) {
+      closeColumnFamilyOptions(columnFamilyOptions);
     }
     if (options != null) {
       options.close();
