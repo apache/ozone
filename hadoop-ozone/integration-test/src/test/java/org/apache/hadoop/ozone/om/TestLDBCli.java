@@ -116,7 +116,7 @@ public class TestLDBCli {
       keyTable.put(key.getBytes(UTF_8), arr);
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    DBScanner.setParent(rdbParser);
+    dbScanner.setParent(rdbParser);
     DBScanner.setLimit(100);
     Assert.assertEquals(5, getKeyNames(dbScanner).size());
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
@@ -248,7 +248,7 @@ public class TestLDBCli {
     }
 
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    DBScanner.setParent(rdbParser);
+    dbScanner.setParent(rdbParser);
     dbScanner.setTableName("block_data");
     DBScanner.setDnDBSchemaVersion("V3");
     DBScanner.setWithKey(true);
@@ -314,7 +314,7 @@ public class TestLDBCli {
     }
 
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    DBScanner.setParent(rdbParser);
+    dbScanner.setParent(rdbParser);
     dbScanner.setTableName("block_data");
     DBScanner.setDnDBSchemaVersion("V2");
     DBScanner.setWithKey(true);
