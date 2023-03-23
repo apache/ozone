@@ -28,7 +28,6 @@ import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.rocksdb.RocksDBException;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
