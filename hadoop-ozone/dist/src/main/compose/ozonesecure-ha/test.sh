@@ -21,7 +21,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=true
-export OM_SERVICE_ID="id1"
+export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
@@ -49,6 +49,9 @@ for bucket in encrypted link; do
 done
 
 execute_robot_test ${SCM} admincli
+
+execute_robot_test ${SCM} omha/om-leader-transfer.robot
+execute_robot_test ${SCM} scmha/scm-leader-transfer.robot
 
 execute_robot_test ${SCM} httpfs
 
