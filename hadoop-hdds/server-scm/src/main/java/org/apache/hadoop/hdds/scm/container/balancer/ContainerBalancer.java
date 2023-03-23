@@ -409,6 +409,18 @@ public class ContainerBalancer extends StatefulService {
               "should be greater than hdds.datanode.du.refresh.period {}",
           conf.getBalancingInterval(), refreshPeriod);
     }
+
+    // "move.replication.timeout" should be lesser than "move.timeout"
+    if (conf.getMoveReplicationTimeout().toMillis() >=
+        conf.getMoveTimeout().toMillis()) {
+      LOG.warn("hdds.container.balancer.move.replication.timeout {} should " +
+              "be less than hdds.container.balancer.move.timeout {}.",
+          conf.getMoveReplicationTimeout().toMinutes(),
+          conf.getMoveTimeout().toMinutes());
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.move.replication.timeout should " +
+          "be less than hdds.container.balancer.move.timeout.");
+    }
   }
 
   public ContainerBalancerMetrics getMetrics() {

@@ -60,8 +60,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Parser for scm.db, om.db or container db file.
  */
 @CommandLine.Command(
-        name = "scan",
-        description = "Parse specified metadataTable"
+    name = "scan",
+    description = "Parse specified metadataTable"
 )
 @MetaInfServices(SubcommandWithParent.class)
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
@@ -237,19 +237,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private ColumnFamilyHandle getColumnFamilyHandle(
-            byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
+      byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
     return columnFamilyHandles
-            .stream()
-            .filter(
-              handle -> {
-                try {
-                  return Arrays.equals(handle.getName(), name);
-                } catch (Exception ex) {
-                  throw new RuntimeException(ex);
-                }
-              })
-            .findAny()
-            .orElse(null);
+        .stream()
+        .filter(
+            handle -> {
+              try {
+                return Arrays.equals(handle.getName(), name);
+              } catch (Exception ex) {
+                throw new RuntimeException(ex);
+              }
+            })
+        .findAny()
+        .orElse(null);
   }
 
   /**
@@ -263,8 +263,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
-              "List length should be a positive number. Only allowed negative" +
-                  " number is -1 which is to dump entire table");
+          "List length should be a positive number. Only allowed negative" +
+              " number is -1 which is to dump entire table");
     }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     DBDefinitionFactory.setDnDBSchemaVersion(dnDBSchemaVersion);

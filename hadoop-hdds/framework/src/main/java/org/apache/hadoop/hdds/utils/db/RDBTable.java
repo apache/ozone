@@ -210,7 +210,7 @@ class RDBTable implements Table<byte[], byte[]> {
       throws IOException {
     try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
       while (iter.hasNext()) {
-        deleteWithBatch(batch, iter.next().getValue());
+        deleteWithBatch(batch, iter.next().getKey());
       }
     }
   }

@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -134,14 +135,18 @@ public class SCMBlockDeletingService extends BackgroundService
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running DeletedBlockTransactionScanner");
       }
-      // TODO - DECOMM - should we be deleting blocks from decom nodes
-      //        and what about entering maintenance.
       List<DatanodeDetails> datanodes =
           nodeManager.getNodes(NodeStatus.inServiceHealthy());
       if (datanodes != null) {
+        // When DN node is healthy and in-service, and previous commands 
+        // are handled for deleteBlocks Type, then it will be considered
+        // in this iteration
+        final Set<DatanodeDetails> included = datanodes.stream().filter(
+            dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
+                Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeleteLimitSize);
+              deletedBlockLog.getTransactions(blockDeleteLimitSize, included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -156,10 +161,6 @@ public class SCMBlockDeletingService extends BackgroundService
               processedTxIDs.addAll(dnTXs.stream()
                   .map(DeletedBlocksTransaction::getTxID)
                   .collect(Collectors.toSet()));
-              // TODO commandQueue needs a cap.
-              // We should stop caching new commands if num of un-processed
-              // command is bigger than a limit, e.g 50. In case datanode goes
-              // offline for sometime, the cached commands be flooded.
               SCMCommand<?> command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
@@ -176,7 +177,6 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
-          // TODO: Fix ME!!!
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),

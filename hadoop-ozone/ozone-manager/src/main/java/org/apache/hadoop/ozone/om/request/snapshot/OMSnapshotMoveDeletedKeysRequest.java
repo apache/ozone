@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -57,8 +58,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
-        ozoneManager.getSnapshotChainManager();
+        omMetadataManager.getSnapshotChainManager();
 
     SnapshotMoveDeletedKeysRequest moveDeletedKeysRequest =
         getOmRequest().getSnapshotMoveDeletedKeysRequest();

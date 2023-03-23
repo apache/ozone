@@ -52,9 +52,6 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   public static final Logger LOG =
       LoggerFactory.getLogger(ReloadingX509KeyManager.class);
 
-  static final String RELOAD_ERROR_MESSAGE =
-      "Could not reload keystore (keep using existing one) : ";
-
   private final String type;
   /**
    * Default password. KeyStore and trustStore will not persist to disk, just in

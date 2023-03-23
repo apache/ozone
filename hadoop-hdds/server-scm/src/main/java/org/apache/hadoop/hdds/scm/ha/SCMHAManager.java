@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -62,12 +63,20 @@ public interface SCMHAManager {
   void stop() throws IOException;
 
   /**
-   * Adds the SC M instance to the SCM HA group.
+   * Adds the SCM instance to the SCM HA Ring.
    * @param request AddSCM request
    * @return status signying whether the AddSCM request succeeded or not.
    * @throws IOException
    */
   boolean addSCM(AddSCMRequest request) throws IOException;
+
+  /** Remove the SCM instance from the SCM HA Ring.
+   * @param request RemoveSCM request
+   *
+   * @return status signaling whether the RemoveSCM request succeeded or not.
+   * @throws IOException
+   */
+  boolean removeSCM(RemoveSCMRequest request) throws IOException;
 
   /**
    * Download the latest checkpoint from leader SCM.
