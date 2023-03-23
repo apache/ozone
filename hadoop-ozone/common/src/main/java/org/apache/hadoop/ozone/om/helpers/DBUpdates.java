@@ -72,7 +72,7 @@ public class DBUpdates {
     return isDBUpdateSuccess;
   }
 
-  public void setDBUpdateSuccess(boolean isDBUpdateSuccess) {
-    isDBUpdateSuccess = isDBUpdateSuccess;
+  public void setDBUpdateSuccess(boolean dbUpdateSuccess) {
+    this.isDBUpdateSuccess = dbUpdateSuccess;
   }
 }

@@ -63,8 +63,8 @@ public class DBUpdatesWrapper {
     return isDBUpdateSuccess;
   }
 
-  public void setDBUpdateSuccess(boolean DBUpdateSuccess) {
-    isDBUpdateSuccess = DBUpdateSuccess;
+  public void setDBUpdateSuccess(boolean dbUpdateSuccess) {
+    this.isDBUpdateSuccess = dbUpdateSuccess;
   }
 }
 
