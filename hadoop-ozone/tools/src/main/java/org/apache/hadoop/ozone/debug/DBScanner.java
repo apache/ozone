@@ -101,7 +101,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
-      defaultValue = "V2")
+      defaultValue = "V3")
   private String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "--cid"},
@@ -122,9 +122,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
     final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
 
+    final boolean schemaV3 = dnDBSchemaVersion != null &&
+        dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3) &&
+        parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
+
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
         parent.getDbPath(), cfDescList, cfHandleList)) {
-      printTable(cfHandleList, db, parent.getDbPath());
+      printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
     }
 
     return null;
@@ -157,19 +161,23 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private void displayTable(ManagedRocksIterator iterator,
-      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+                            DBColumnFamilyDefinition dbColumnFamilyDefinition,
+                            boolean schemaV3)
+      throws IOException {
 
     if (fileName != null) {
       try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
-        displayTable(iterator, dbColumnFamilyDefinition, out);
+        displayTable(iterator, dbColumnFamilyDefinition, out, schemaV3);
       }
     } else {
-      displayTable(iterator, dbColumnFamilyDefinition, out());
+      displayTable(iterator, dbColumnFamilyDefinition, out(), schemaV3);
     }
   }
 
   private void displayTable(ManagedRocksIterator iterator,
-      DBColumnFamilyDefinition dbColumnFamilyDefinition, PrintWriter out)
+                            DBColumnFamilyDefinition dbColumnFamilyDefinition,
+                            PrintWriter out,
+                            boolean schemaV3)
       throws IOException {
 
     if (startKey != null) {
@@ -183,9 +191,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       // Start JSON array
       out.print("[ ");
     }
-
-    boolean schemaV3 = dnDBSchemaVersion != null &&
-        dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3);
 
     // Count number of keys printed so far
     long count = 0;
@@ -258,7 +263,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
    * parsed by picocli.
    */
   private void printTable(List<ColumnFamilyHandle> columnFamilyHandleList,
-                          ManagedRocksDB rocksDB, String dbPath)
+                          ManagedRocksDB rocksDB,
+                          String dbPath,
+                          boolean schemaV3)
       throws IOException, RocksDBException {
 
     if (limit < 1 && limit != -1) {
@@ -303,8 +310,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
     ManagedRocksIterator iterator = null;
     try {
-      if (containerId > 0L && dnDBSchemaVersion != null
-          && dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3)) {
+      if (containerId > 0L && schemaV3) {
         // Handle SchemaV3 DN DB
         ManagedReadOptions readOptions = new ManagedReadOptions();
         readOptions.setIterateUpperBound(new ManagedSlice(
@@ -322,7 +328,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         iterator.get().seekToFirst();
       }
 
-      displayTable(iterator, columnFamilyDefinition);
+      displayTable(iterator, columnFamilyDefinition, schemaV3);
     } finally {
       if (iterator != null) {
         iterator.close();
