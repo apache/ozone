@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -354,6 +355,26 @@ public class SCMHAManagerImpl implements SCMHAManager {
         getRatisServer().getDivision().getGroup().getGroupId());
     return getRatisServer().addSCM(request);
   }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+    // Currently we don't support decommission of Primordial SCM
+    // The caller should make sure that the requested node is not Primordial SCM
+
+    String clusterId = scm.getClusterId();
+    if (!request.getClusterId().equals(scm.getClusterId())) {
+      throw new IOException("SCM " + request.getScmId() +
+          " with address " + request.getRatisAddr() +
+          " has cluster Id " + request.getClusterId() +
+          " but leader SCM cluster id is " + clusterId);
+    }
+    Preconditions.checkNotNull(ratisServer.getDivision().getGroup());
+    return ratisServer.removeSCM(request);
+  }
+
 
   void stopServices() throws Exception {
 
