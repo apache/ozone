@@ -64,16 +64,22 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // Create the snapshot checkpoint
-    // Also cleans up deletedTable
-    OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
-        snapshotInfo);
-
-    String key = snapshotInfo.getTableKey();
+    // Note: It is intentional that we write SnapshotInfo to DB _before_
+    // creating snapshot DB checkpoint. Otherwise there could be a
+    // small chance that the DB listeners in RocksDBCheckpointDiffer could skip
+    // the compaction tracking when the checkpoint is _just_ created and another
+    // compaction happens. Even though the worst case if that happens it
+    // would just negatively impact SnapDiff performance because of the missing
+    // compaction DAG nodes. SnapDiff correctness will not be impacted by this.
 
     // Add to db
+    String key = snapshotInfo.getTableKey();
     omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
         key, snapshotInfo);
+
+    // Create the snapshot checkpoint. Also cleans up some tables.
+    OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
+        snapshotInfo);
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
     // Remove all entries from snapshotRenamedKeyTable
