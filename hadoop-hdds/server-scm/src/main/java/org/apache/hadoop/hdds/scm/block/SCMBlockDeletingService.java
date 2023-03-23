@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
