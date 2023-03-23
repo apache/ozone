@@ -248,12 +248,15 @@ public class TestECContainerRecovery {
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     // Check container is over replicated.
     waitForContainerCount(6, container.containerID(), scm);
+
+    // Resume RM and wait the over replicated replica deleted.
+    // ReplicationManager fix container replica state if different
+    scm.getReplicationManager().start();
+
     // Wait for all the replicas to be closed.
     container = scm.getContainerInfo(container.getContainerID());
     waitForDNContainerState(container, scm);
 
-    // Resume RM and wait the over replicated replica deleted.
-    scm.getReplicationManager().start();
     waitForContainerCount(5, container.containerID(), scm);
   }
 
