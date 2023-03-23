@@ -119,8 +119,6 @@ public class LegacyBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
     long totalDU = 0L;
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
 
     String seekPrefix = OM_KEY_PREFIX +
         vol +
@@ -141,31 +139,34 @@ public class LegacyBucketHandler extends BucketHandler {
     }
 
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    iterator.seek(seekPrefix);
-    // handle direct keys
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      // since the RocksDB is ordered, seek until the prefix isn't matched
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = keyTable.iterator()) {
+      iterator.seek(seekPrefix);
+      // handle direct keys
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
+        // since the RocksDB is ordered, seek until the prefix isn't matched
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
+        }
 
-      String[] keys = dbKey.split(OM_KEY_PREFIX);
+        String[] keys = dbKey.split(OM_KEY_PREFIX);
 
-      // iteration moved to the next level
-      // and not handling direct keys
-      if (keys.length - seekKeys.length > 1) {
-        continue;
-      }
-
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        // skip directory markers, just include directKeys
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+        // iteration moved to the next level
+        // and not handling direct keys
+        if (keys.length - seekKeys.length > 1) {
           continue;
         }
-        totalDU += keyInfo.getReplicatedSize();
+
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          // skip directory markers, just include directKeys
+          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+            continue;
+          }
+          totalDU += keyInfo.getReplicatedSize();
+        }
       }
     }
 
