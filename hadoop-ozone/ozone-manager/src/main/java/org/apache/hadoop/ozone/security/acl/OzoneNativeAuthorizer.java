@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -103,43 +104,16 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // Refined the parent context
-    // OP         |CHILD       |PARENT
-
-    // CREATE      NONE        WRITE     (parent:'CREATE' when 'create bucket')
-    // DELETE      DELETE      READ
-    // WRITE       WRITE       WRITE     (For key/prefix, volume is READ)
-    // WRITE_ACL   WRITE_ACL   READ      (V1 WRITE_ACL=>WRITE)
-
-    // READ        READ        READ
-    // LIST        LIST        READ      (V1 LIST=>READ)
-    // READ_ACL    READ_ACL    READ      (V1 READ_ACL=>READ)
-
-    ACLType aclRight = context.getAclRights();
-    ACLType parentAclRight = aclRight;
-
-    if (aclRight == ACLType.CREATE) {
-      parentAclRight = ACLType.WRITE;
-    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST
-        || aclRight == ACLType.WRITE_ACL || aclRight == ACLType.DELETE) {
-      parentAclRight = ACLType.READ;
-    }
-    // To prevent ACL enlargement, parent should be 'CREATE'
-    // when op is 'create bucket'. see HDDS-7461.
-    if (objInfo.getResourceType() == BUCKET) {
-      if (aclRight == ACLType.CREATE) {
-        parentAclRight = ACLType.CREATE;
-      } else if (aclRight == ACLType.WRITE) {
-        parentAclRight = ACLType.READ;
-      }
-    }
+    ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
+        context.getAclRights(), objInfo.getResourceType());
+    
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
         .setAclRights(parentAclRight).build();
     
-    // Volume will be always read in case of bucket,
+    // Volume will be always read in case of key and prefix
     parentVolContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())

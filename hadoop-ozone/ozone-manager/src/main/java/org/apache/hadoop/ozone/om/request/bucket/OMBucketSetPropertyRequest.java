@@ -278,7 +278,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (!ozoneManager.isAdmin(ugi) &&
           !ozoneManager.isOwner(ugi, bucketOwner)) {
         throw new OMException(
-            "Only bucket owners and Ozone admins can set Bucket property",
+            "Bucket properties are allowed to changed by Admin and Owner",
             OMException.ResultCodes.PERMISSION_DENIED);
       }
     } else { // ranger acl
