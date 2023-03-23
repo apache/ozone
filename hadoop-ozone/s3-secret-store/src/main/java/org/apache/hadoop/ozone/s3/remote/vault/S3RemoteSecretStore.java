@@ -35,16 +35,16 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Objects;
 
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.ADDRESS;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.ENGINE_VER;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.KEY_STORE_PASSWORD;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.KEY_STORE_PATH;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.KEY_STORE_TYPE;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.NAMESPACE;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.SECRET_PATH;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.TRUST_STORE_PASSWORD;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.TRUST_STORE_PATH;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.TRUST_STORE_TYPE;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.ADDRESS;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.ENGINE_VER;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.KEY_STORE_PASSWORD;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.KEY_STORE_PATH;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.KEY_STORE_TYPE;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.NAMESPACE;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.SECRET_PATH;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.TRUST_STORE_PASSWORD;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.TRUST_STORE_PATH;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.TRUST_STORE_TYPE;
 
 /**
  * Based on HashiCorp Vault secret storage.

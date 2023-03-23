@@ -18,12 +18,12 @@
 package org.apache.hadoop.ozone.s3.remote.vault.auth;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys;
+import org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys;
 
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_ID;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_PATH;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.APP_ROLE_SECRET;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.AUTH_TYPE;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.APP_ROLE_ID;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.APP_ROLE_PATH;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.APP_ROLE_SECRET;
+import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.AUTH_TYPE;
 
 /**
  * Type of authentication method.
@@ -46,7 +46,7 @@ public enum AuthType {
     AuthType authType = AuthType.valueOf(conf.get(AUTH_TYPE));
     switch (authType) {
     case TOKEN:
-      String token = conf.get(S3SecretStoreConfigurationKeys.TOKEN);
+      String token = conf.get(S3SecretRemoteStoreConfigurationKeys.TOKEN);
       return new DirectTokenAuth(() -> token);
     case APP_ROLE:
       String rolePath = conf.get(APP_ROLE_PATH);

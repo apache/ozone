@@ -20,13 +20,9 @@ package org.apache.hadoop.ozone.s3.remote;
 /**
  * Configuration keys for S3 secret store.
  */
-public final class S3SecretStoreConfigurationKeys {
-  public static final String S3_SECRET_STORAGE_TYPE = "ozone.secret.s3.store";
-  public static final String DEFAULT_SECRET_STORAGE_TYPE
-      = S3SecretStoreType.ROCKSDB.getType();
-
+public final class S3SecretRemoteStoreConfigurationKeys {
   //Vault configs
-  public static final String PREFIX = "ozone.secret.s3.store.vault.";
+  public static final String PREFIX = "ozone.secret.s3.store.remote.vault.";
 
   public static final String ADDRESS = PREFIX + "address";
   public static final String NAMESPACE = PREFIX + "namespace";
@@ -52,19 +48,10 @@ public final class S3SecretStoreConfigurationKeys {
   public static final String KEY_STORE_PATH = PREFIX + "key.store.path";
   public static final String KEY_STORE_PASSWORD = PREFIX + "key.store.password";
 
-  //Cache configuration
-  public static final String CACHE_PREFIX = PREFIX + "cache";
-
-  public static final String CACHE_LIFETIME = CACHE_PREFIX + "expireTime";
-  public static final long DEFAULT_CACHE_LIFETIME = 600;
-
-  public static final String CACHE_MAX_SIZE = CACHE_PREFIX + "capacity";
-  public static final long DEFAULT_CACHE_MAX_SIZE = Long.MAX_VALUE;
-
   /**
    * Never constructed.
    */
-  private S3SecretStoreConfigurationKeys() {
+  private S3SecretRemoteStoreConfigurationKeys() {
 
   }
 

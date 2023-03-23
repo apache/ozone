@@ -16,16 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.s3;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ozone.om.S3SecretStore;
 
 import java.io.IOException;
 
 /**
  * S3 secret store provider.
  */
-public interface SecretStoreProvider {
+public interface S3SecretStoreProvider {
   /**
    * Create and return S3 secret store implementation
    *    from provided configuration.

@@ -16,21 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.s3;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ozone.om.S3InMemoryCache;
+import org.apache.hadoop.ozone.om.S3SecretCache;
 
 import java.time.temporal.ChronoUnit;
 
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.CACHE_MAX_SIZE;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.s3.remote.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_MAX_SIZE;
+import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_LIFETIME;
+import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_MAX_SIZE;
+import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_LIFETIME;
+import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_MAX_SIZE;
 
 /**
  * Provider of {@link S3SecretCache}.
  */
-public interface SecretCacheProvider {
+public interface S3SecretCacheProvider {
 
   /**
    * Returns S3 secret cache instance constructed by provided configuration.
@@ -43,7 +45,7 @@ public interface SecretCacheProvider {
   /**
    * In-memory cache implementation.
    */
-  SecretCacheProvider IN_MEMORY = conf -> {
+  S3SecretCacheProvider IN_MEMORY = conf -> {
     long expireTime = conf
         .getLong(CACHE_LIFETIME, DEFAULT_CACHE_LIFETIME);
     return S3InMemoryCache.builder()
