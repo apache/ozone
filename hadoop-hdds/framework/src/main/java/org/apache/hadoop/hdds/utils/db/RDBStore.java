@@ -49,7 +49,10 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -67,18 +70,6 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
-  /**
-   * Name of the SST file backup directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
-  /**
-   * Name of the compaction log directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionLogDirName = "compaction-log";
-  // Can't import OmMetadataManagerImpl (circular dependency otherwise)
-  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
@@ -107,8 +98,8 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName, dbLocation.toString(),
+            dbLocation.getParent(), DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR, dbLocation.toString(),
             maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
