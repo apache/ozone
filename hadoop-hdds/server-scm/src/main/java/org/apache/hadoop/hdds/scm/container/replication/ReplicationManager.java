@@ -451,25 +451,21 @@ public class ReplicationManager implements SCMService {
    * @param force true to force delete a container that is open or not empty
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
-   *                                command will be discarded on the datanode if
-   *                                it has not been processed.
    * @throws NotLeaderException when this SCM is not the leader
    */
   public void sendDeleteCommand(final ContainerInfo container,
       int replicaIndex, final DatanodeDetails datanode, boolean force,
-      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      long scmDeadlineEpochMs)
       throws NotLeaderException {
     LOG.debug("Sending delete command for container {} and index {} on {} " +
-            "with SCM deadline {} and Datanode deadline {}.",
-        container, replicaIndex, datanode, scmDeadlineEpochMs,
-        datanodeDeadlineEpochMs);
+        "with SCM deadline {}.",
+        container, replicaIndex, datanode, scmDeadlineEpochMs);
 
     final DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(container.containerID(), force);
     deleteCommand.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(deleteCommand, container, datanode,
-        scmDeadlineEpochMs, datanodeDeadlineEpochMs);
+        scmDeadlineEpochMs);
   }
 
   /**
@@ -584,22 +580,17 @@ public class ReplicationManager implements SCMService {
    * @param target The target to push container replica to
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
-   *                                command will be discarded on the data if
-   *                                it has not been processed. In general should
-   *                                be less than scmDeadlineEpochMs.
    * @throws NotLeaderException
    */
   public void sendLowPriorityReplicateContainerCommand(
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
-      DatanodeDetails target, long scmDeadlineEpochMs,
-      long datanodeDeadlineEpochMs) throws NotLeaderException {
+      DatanodeDetails target, long scmDeadlineEpochMs)
+      throws NotLeaderException {
     final ReplicateContainerCommand command = ReplicateContainerCommand
         .toTarget(container.getContainerID(), target);
     command.setReplicaIndex(replicaIndex);
     command.setPriority(ReplicationCommandPriority.LOW);
-    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs,
-        datanodeDeadlineEpochMs);
+    sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
   /**
    * Sends a command to a datanode with the command deadline set to the default
@@ -613,10 +604,7 @@ public class ReplicationManager implements SCMService {
       ContainerInfo containerInfo, DatanodeDetails target)
       throws NotLeaderException {
     long scmDeadline = clock.millis() + rmConf.eventTimeout;
-    long datanodeDeadline = clock.millis() +
-        Math.round(rmConf.eventTimeout * rmConf.commandDeadlineFactor);
-    sendDatanodeCommand(command, containerInfo, target, scmDeadline,
-        datanodeDeadline);
+    sendDatanodeCommand(command, containerInfo, target, scmDeadline);
   }
 
   /**
@@ -627,21 +615,20 @@ public class ReplicationManager implements SCMService {
    * @param target The datanode which will receive the command.
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @param datanodeDeadlineEpochMs The epoch time in ms, after which the
-   *                                command will be discarded on the datanode if
-   *                                it has not been processed.
    * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target,
-      long scmDeadlineEpochMs, long datanodeDeadlineEpochMs)
+      long scmDeadlineEpochMs)
       throws NotLeaderException {
+    long datanodeDeadline =
+        scmDeadlineEpochMs - rmConf.getDatanodeTimeoutOffset();
     LOG.info("Sending command [{}] for container {} to {} with datanode "
         + "deadline {} and scm deadline {}",
-        command, containerInfo, target, datanodeDeadlineEpochMs,
+        command, containerInfo, target, datanodeDeadline,
         scmDeadlineEpochMs);
     command.setTerm(getScmTerm());
-    command.setDeadline(datanodeDeadlineEpochMs);
+    command.setDeadline(datanodeDeadline);
     nodeManager.addDatanodeCommand(target.getUuid(), command);
     adjustPendingOpsAndMetrics(containerInfo, command, target,
         scmDeadlineEpochMs);
@@ -1078,7 +1065,7 @@ public class ReplicationManager implements SCMService {
         defaultValue = "30m",
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
-            + "sent  to datanodes. After this timeout the command will be "
+            + "sent to datanodes. After this timeout the command will be "
             + "retried.")
     private long eventTimeout = Duration.ofMinutes(30).toMillis();
     public void setInterval(Duration interval) {
@@ -1090,27 +1077,26 @@ public class ReplicationManager implements SCMService {
     }
 
     /**
-     * Deadline which should be set on commands sent from ReplicationManager
-     * to the datanodes, as a percentage of the event.timeout. If the command
-     * has not been processed on the datanode by this time, it will be dropped
-     * by the datanode and Replication Manager will need to resend it.
+     * When a command has a deadline in SCM, the datanode timeout should be
+     * slightly less. This duration is the number of seconds to subtract from
+     * the SCM deadline to give a datanode deadline.
      */
-    @Config(key = "command.deadline.factor",
-        type = ConfigType.DOUBLE,
-        defaultValue = "0.9",
+    @Config(key = "event.timeout.datanode.offset",
+        type = ConfigType.TIME,
+        defaultValue = "30s",
         tags = {SCM, OZONE},
-        description = "Fraction of the hdds.scm.replication.event.timeout "
-            + "from the current time which should be set as a deadline for "
-            + "commands sent from ReplicationManager to datanodes. "
-            + "Commands which are not processed before this deadline will be "
-            + "dropped by the datanodes. Should be a value > 0 and <= 1.")
-    private double commandDeadlineFactor = 0.9;
-    public double getCommandDeadlineFactor() {
-      return commandDeadlineFactor;
+        description = "The amount of time to subtract from "
+            + "hdds.scm.replication.event.timeout to give a deadline on the "
+            + "datanodes which is less than the SCM timeout. This ensures "
+            + "the datanodes will not process a command after SCM believes it "
+            + "should have expired.")
+    private long datanodeTimeoutOffset = Duration.ofSeconds(30).toMillis();
+    public long getDatanodeTimeoutOffset() {
+      return datanodeTimeoutOffset;
     }
 
-    public void setCommandDeadlineFactor(double val) {
-      commandDeadlineFactor = val;
+    public void setDatanodeTimeoutOffset(long val) {
+      datanodeTimeoutOffset = val;
     }
 
     /**
@@ -1168,15 +1154,6 @@ public class ReplicationManager implements SCMService {
             "push to the target node."
     )
     private boolean push = true;
-
-    @PostConstruct
-    public void validate() {
-      if (!(commandDeadlineFactor > 0) || (commandDeadlineFactor > 1)) {
-        throw new IllegalArgumentException("command.deadline.factor is set to "
-            + commandDeadlineFactor
-            + " and must be greater than 0 and less than equal to 1");
-      }
-    }
 
     @Config(key = "datanode.replication.limit",
         type = ConfigType.INT,
@@ -1250,6 +1227,19 @@ public class ReplicationManager implements SCMService {
 
     public boolean isPush() {
       return push;
+    }
+
+    @PostConstruct
+    public void validate() {
+      if (datanodeTimeoutOffset < 0) {
+        throw new IllegalArgumentException("event.timeout.datanode.offset is"
+            + " set to " + datanodeTimeoutOffset + " and must be >= 0");
+      }
+      if (datanodeTimeoutOffset >= eventTimeout) {
+        throw new IllegalArgumentException("event.timeout.datanode.offset is"
+            + " set to " + datanodeTimeoutOffset + " and must be <"
+            + " event.timeout, which is set to " + eventTimeout);
+      }
     }
   }
 
