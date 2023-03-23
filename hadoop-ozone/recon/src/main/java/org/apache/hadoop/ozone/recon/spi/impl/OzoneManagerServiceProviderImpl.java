@@ -447,6 +447,7 @@ public class OzoneManagerServiceProviderImpl
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
+    boolean isOmDBUpdateSuccess = false;
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
     int numUpdates = 0;
     long latestSequenceNumberOfOM = -1L;
@@ -469,6 +470,7 @@ public class OzoneManagerServiceProviderImpl
           }
         }
       }
+      isOmDBUpdateSuccess = dbUpdates.isDBUpdateSuccess();
     }
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
@@ -476,7 +478,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Number of updates received from OM : {}, " +
             "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
         numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
-    return dbUpdates.isDBUpdateSuccess();
+    return isOmDBUpdateSuccess;
   }
 
   /**
