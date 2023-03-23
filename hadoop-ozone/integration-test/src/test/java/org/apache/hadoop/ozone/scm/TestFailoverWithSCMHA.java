@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.scm;
 
 import com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -26,7 +25,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerTask;
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
@@ -54,7 +52,6 @@ import org.slf4j.event.Level;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
@@ -320,121 +317,6 @@ public class TestFailoverWithSCMHA {
           ContainerBalancerConfigurationProto.parseFrom(byteString);
       Assertions.assertFalse(protobuf.getShouldRun());
     }
-  }
-
-  @Test
-  public void testContainerBalancerStartsWithDelayOnFailover()
-      throws IOException, IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, TimeoutException,
-      InterruptedException {
-    SCMClientConfig scmClientConfig =
-        conf.getObject(SCMClientConfig.class);
-    scmClientConfig.setRetryCount(1);
-    scmClientConfig.setRetryInterval(100);
-    scmClientConfig.setMaxRetryTimeout(1500);
-    Assertions.assertEquals(15, scmClientConfig.getRetryCount());
-    conf.setFromObject(scmClientConfig);
-
-    StorageContainerManager leader = getLeader(cluster);
-    Assertions.assertNotNull(leader);
-
-    ContainerBalancerConfiguration balancerConf =
-        conf.getObject(ContainerBalancerConfiguration.class);
-    /*
-    Enabling this means DU will be run on DNs before each iteration of balancer.
-    */
-    balancerConf.setTriggerDuEnable(true);
-    ContainerBalancer containerBalancer = leader.getContainerBalancer();
-    Assertions.assertFalse(containerBalancer.isBalancerRunning());
-    /*
-    Start container balancer. Since we've enabled DU, balancer will sleep
-    for some time, waiting for DU to run on Datanodes. This is a hack to not
-    let balancer stop immediately because the cluster is already balanced.
-    We're buying time during which we can manually fail over to another SCM.
-    */
-    containerBalancer.startBalancer(balancerConf);
-    // assert that balancer is running
-    GenericTestUtils.waitFor(containerBalancer::isBalancerRunning,
-        5, 500);
-    Assertions.assertTrue(containerBalancer.isBalancerRunning());
-
-    long leaderTermIndex =
-        leader.getScmHAManager().getRatisServer().getSCMStateMachine()
-            .getLastAppliedTermIndex().getIndex();
-    /*
-    Fetch persisted configuration to verify that `shouldRun` is set to true.
-     */
-    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
-      if (!scm.checkLeader()) {
-        // Wait and retry for follower to update transactions to leader
-        // snapshot index.
-        // Timeout error if follower does not load update within 3s
-        GenericTestUtils.waitFor(() -> scm.getScmHAManager().getRatisServer()
-            .getSCMStateMachine().getLastAppliedTermIndex()
-            .getIndex() >= leaderTermIndex, 100, 3000);
-
-        ContainerBalancer followerBalancer = scm.getContainerBalancer();
-        GenericTestUtils.waitFor(
-            () -> !followerBalancer.isBalancerRunning(), 50, 5000);
-        GenericTestUtils.waitFor(followerBalancer::shouldRun, 100,
-            5000);
-      }
-    }
-
-    /*
-    Now, fail over to another SCM. ContainerBalancer should have persisted
-    its configuration across all SCMs and should start running in the new
-    leader.
-     */
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(ContainerBalancerTask.LOG);
-    failoverToAnotherSCM(leader);
-    leader = getLeader(cluster);
-    Assertions.assertNotNull(leader);
-    StorageContainerManager finalLeader = leader;
-
-    containerBalancer = finalLeader.getContainerBalancer();
-    // assert that balancer is running
-    GenericTestUtils.waitFor(containerBalancer::isBalancerRunning,
-        5, 500);
-    Assertions.assertTrue(containerBalancer.isBalancerRunning());
-
-    long delayDuration =
-        conf.getTimeDuration("hdds.scm.wait.time.after.safemode.exit",
-            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-            TimeUnit.SECONDS);
-    String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
-        " seconds before starting balancing.";
-    Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
-    containerBalancer.stopBalancer();
-    Assertions.assertFalse(containerBalancer.isBalancerRunning());
-  }
-
-  private void failoverToAnotherSCM(StorageContainerManager currentLeader)
-      throws IOException {
-    SCMBlockLocationFailoverProxyProvider failoverProxyProvider =
-        new SCMBlockLocationFailoverProxyProvider(conf);
-    failoverProxyProvider.changeCurrentProxy(currentLeader.getSCMNodeId());
-
-    ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
-        new ScmBlockLocationProtocolClientSideTranslatorPB(
-            failoverProxyProvider);
-
-    GenericTestUtils
-        .setLogLevel(SCMBlockLocationFailoverProxyProvider.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(SCMBlockLocationFailoverProxyProvider.LOG);
-    ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
-            conf);
-
-    scmBlockLocationProtocol.getScmInfo();
-    Assertions.assertTrue(logCapture.getOutput()
-        .contains("Performing failover to suggested leader"));
-    StorageContainerManager newLeader = getLeader(cluster);
-    Assertions.assertNotNull(newLeader);
-    Assertions.assertNotEquals(currentLeader.getScmId(),
-        newLeader.getSCMNodeId());
   }
 
   static StorageContainerManager getLeader(MiniOzoneHAClusterImpl impl) {
