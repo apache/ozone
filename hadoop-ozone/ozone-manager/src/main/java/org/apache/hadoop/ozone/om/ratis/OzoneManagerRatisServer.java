@@ -95,7 +95,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
-import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createTlsConfig;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -877,7 +877,7 @@ public final class OzoneManagerRatisServer {
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
-    GrpcTlsConfig config = createTlsConfig(conf, caClient, true);
+    GrpcTlsConfig config = createServerTlsConfig(conf, caClient, true);
     return config == null ? null : RatisHelper.setServerTlsConf(config);
   }
 }
