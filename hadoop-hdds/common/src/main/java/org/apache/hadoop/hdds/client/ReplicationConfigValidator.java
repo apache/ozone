@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -41,21 +42,38 @@ public class ReplicationConfigValidator {
       tags = ConfigTag.STORAGE)
   private String validationPattern;
 
-  private Pattern validationRegexp;
+  private Pattern compiledValidationPattern;
+
+  public void disableValidation() {
+    setValidationPattern("");
+  }
+
+  public void setValidationPattern(String pattern) {
+    if (!Objects.equals(pattern, validationPattern)) {
+      validationPattern = pattern;
+      compilePattern();
+    }
+  }
 
   @PostConstruct
   public void init() {
+    compilePattern();
+  }
+
+  private void compilePattern() {
     if (validationPattern != null && !validationPattern.equals("")) {
-      validationRegexp = Pattern.compile(validationPattern);
+      compiledValidationPattern = Pattern.compile(validationPattern);
+    } else {
+      compiledValidationPattern = null;
     }
   }
 
   public ReplicationConfig validate(ReplicationConfig replicationConfig) {
-    if (validationRegexp == null) {
+    if (compiledValidationPattern == null) {
       return replicationConfig;
     }
     String input = replicationConfig.configFormat();
-    if (!validationRegexp.matcher(input).matches()) {
+    if (!compiledValidationPattern.matcher(input).matches()) {
       throw new IllegalArgumentException("Invalid replication config " +
           input + ". Config must match the pattern defined by " +
           "ozone.replication.allowed-configs (" + validationPattern + ")");

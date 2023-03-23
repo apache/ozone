@@ -155,7 +155,7 @@ public class TestReplicationConfig {
         codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
-            + chunkSize/1024 + "k", config.getReplication());
+            + chunkSize / 1024 + "k", config.getReplication());
   }
 
   @ParameterizedTest
