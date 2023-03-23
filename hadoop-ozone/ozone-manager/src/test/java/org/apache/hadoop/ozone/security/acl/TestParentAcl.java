@@ -202,7 +202,7 @@ public class TestParentAcl {
     testParentChild(bucketObj, READ, LIST);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, CREATE, CREATE);
+    testParentChild(bucketObj, WRITE, CREATE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
     testParentChild(bucketObj, READ, READ);
