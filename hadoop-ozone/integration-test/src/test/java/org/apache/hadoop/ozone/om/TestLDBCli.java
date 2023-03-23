@@ -76,6 +76,7 @@ public class TestLDBCli {
   @TempDir
   private File tempDir;
   private StringWriter stdout, stderr;
+  private PrintWriter pstdout, pstderr;
   private CommandLine cmd;
   private NavigableMap<String, Map<String, ?>> dbMap;
 
@@ -83,12 +84,14 @@ public class TestLDBCli {
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
     stdout = new StringWriter();
+    pstdout = new PrintWriter(stdout);
     stderr = new StringWriter();
+    pstderr = new PrintWriter(stderr);
 
     cmd = new CommandLine(new RDBParser())
         .addSubcommand(new DBScanner())
-        .setOut(new PrintWriter(stdout))
-        .setErr(new PrintWriter(stderr));
+        .setOut(pstdout)
+        .setErr(pstderr);
 
     dbMap = new TreeMap<>();
   }
@@ -98,6 +101,10 @@ public class TestLDBCli {
     if (dbStore != null) {
       dbStore.close();
     }
+    pstderr.close();
+    stderr.close();
+    pstdout.close();
+    stdout.close();
   }
 
   /**

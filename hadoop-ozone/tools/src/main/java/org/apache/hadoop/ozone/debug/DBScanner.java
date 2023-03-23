@@ -117,13 +117,15 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @Override
   public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs =
-        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
 
-    final List<ColumnFamilyHandle> columnFamilyHandleList = new ArrayList<>();
-    ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
-        cfs, columnFamilyHandleList);
-    printTable(columnFamilyHandleList, rocksDB, parent.getDbPath());
+    List<ColumnFamilyDescriptor> cfDescList =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+    final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+
+    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
+        parent.getDbPath(), cfDescList, cfHandleList)) {
+      printTable(cfHandleList, db, parent.getDbPath());
+    }
 
     return null;
   }
@@ -252,10 +254,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   /**
    * Main table printing logic.
-   * User-provided args are not in the arg list.
+   * User-provided args are not in the arg list. Those are instance variables
+   * parsed by picocli.
    */
   private void printTable(List<ColumnFamilyHandle> columnFamilyHandleList,
-      ManagedRocksDB rocksDB, String dbPath)
+                          ManagedRocksDB rocksDB, String dbPath)
       throws IOException, RocksDBException {
 
     if (limit < 1 && limit != -1) {
@@ -292,30 +295,39 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     if (showCount) {
-      long keyCount = rocksDB.get().getLongProperty(columnFamilyHandle,
-          RocksDatabase.ESTIMATE_NUM_KEYS);
+      long keyCount = rocksDB.get()
+          .getLongProperty(columnFamilyHandle, RocksDatabase.ESTIMATE_NUM_KEYS);
       out().println(keyCount);
       return;
     }
-    ManagedRocksIterator iterator;
-    if (containerId > 0L && dnDBSchemaVersion != null
-        && dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3)) {
-      ManagedReadOptions readOptions = new ManagedReadOptions();
-      readOptions.setIterateUpperBound(new ManagedSlice(
-          FixedLengthStringUtils.string2Bytes(
-              DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                  containerId + 1L))));
-      iterator = new ManagedRocksIterator(
-          rocksDB.get().newIterator(columnFamilyHandle, readOptions));
-      iterator.get().seek(FixedLengthStringUtils.string2Bytes(
-          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId)));
-    } else {
-      iterator = new ManagedRocksIterator(
-          rocksDB.get().newIterator(columnFamilyHandle));
-      iterator.get().seekToFirst();
-    }
 
-    displayTable(iterator, columnFamilyDefinition);
+    ManagedRocksIterator iterator = null;
+    try {
+      if (containerId > 0L && dnDBSchemaVersion != null
+          && dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3)) {
+        // Handle SchemaV3 DN DB
+        ManagedReadOptions readOptions = new ManagedReadOptions();
+        readOptions.setIterateUpperBound(new ManagedSlice(
+            FixedLengthStringUtils.string2Bytes(
+                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                    containerId + 1L))));
+        iterator = new ManagedRocksIterator(
+            rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+        iterator.get().seek(FixedLengthStringUtils.string2Bytes(
+            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
+                containerId)));
+      } else {
+        iterator = new ManagedRocksIterator(
+            rocksDB.get().newIterator(columnFamilyHandle));
+        iterator.get().seekToFirst();
+      }
+
+      displayTable(iterator, columnFamilyDefinition);
+    } finally {
+      if (iterator != null) {
+        iterator.close();
+      }
+    }
   }
 
   private String removeTrailingSlashIfNeeded(String dbPath) {
