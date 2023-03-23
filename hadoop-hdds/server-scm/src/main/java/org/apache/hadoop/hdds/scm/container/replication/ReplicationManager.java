@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -1226,6 +1227,19 @@ public class ReplicationManager implements SCMService {
 
     public boolean isPush() {
       return push;
+    }
+
+    @PostConstruct
+    public void validate() {
+      if (datanodeTimeoutOffset < 0) {
+        throw new IllegalArgumentException("event.timeout.datanode.offset is"
+            + " set to " + datanodeTimeoutOffset + " and must be >= 0");
+      }
+      if (datanodeTimeoutOffset >= eventTimeout) {
+        throw new IllegalArgumentException("event.timeout.datanode.offset is"
+            + " set to " + datanodeTimeoutOffset + " and must be <"
+            + " event.timeout, which is set to " + eventTimeout);
+      }
     }
   }
 
