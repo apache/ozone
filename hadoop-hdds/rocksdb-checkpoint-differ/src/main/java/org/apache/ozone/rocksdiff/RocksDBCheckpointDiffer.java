@@ -28,6 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -165,6 +166,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
   private final ScheduledExecutorService executor;
   private final long maxAllowedTimeInDag;
+
+  private ColumnFamilyHandle snapshotInfoTableCFHandle;
 
   /**
    * Constructor.
@@ -400,13 +403,63 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
   }
 
+  /**
+   * Set SnapshotInfoTable DB column family handle to be used in DB listener.
+   * @param snapshotInfoTableCFHandle ColumnFamilyHandle
+   */
+  public void setSnapshotInfoTableCFHandle(
+      ColumnFamilyHandle snapshotInfoTableCFHandle) {
+    Preconditions.checkNotNull(snapshotInfoTableCFHandle,
+        "Column family handle should not be null");
+    this.snapshotInfoTableCFHandle = snapshotInfoTableCFHandle;
+  }
+
+  /**
+   * Helper method to check whether the SnapshotInfoTable column family is empty
+   * in a given DB instance.
+   * @param db RocksDB instance
+   * @return true when column family is empty, false otherwise
+   */
+  private boolean isSnapshotInfoTableEmpty(RocksDB db) {
+    // Can't use metadataManager.getSnapshotInfoTable().isEmpty() or use
+    // any wrapper classes here. Any of those introduces circular dependency.
+    // The solution here is to use raw RocksDB API.
+
+    // There is this small gap when the db is open but the handle is not yet set
+    // in RDBStore. Compaction could theoretically happen during that small
+    // window. This condition here aims to handle that (falls back to not
+    // skipping compaction tracking).
+    if (snapshotInfoTableCFHandle == null) {
+      LOG.warn("Snapshot info table column family handle is not set!");
+      // Proceed to log compaction in this case
+      return false;
+    }
+
+    // SnapshotInfoTable has table cache. But that wouldn't matter in this case
+    // because the first SnapshotInfo entry would have been written to the DB
+    // right before checkpoint happens in OMSnapshotCreateResponse.
+    //
+    // Note the goal of compaction DAG is to track all compactions that happened
+    // _after_ a DB checkpoint is taken.
+
+    try (ManagedRocksIterator it = ManagedRocksIterator.managed(
+        db.newIterator(snapshotInfoTableCFHandle))) {
+      it.get().seekToFirst();
+      return !it.get().isValid();
+    }
+  }
+
   private AbstractEventListener newCompactionBeginListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionBegin(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        // TODO: Skip (return) if no snapshot has been taken yet
+        // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+        // i.e. No snapshot exists in OM.
+        if (isSnapshotInfoTableEmpty(db)) {
+          return;
+        }
 
         // Note the current compaction listener implementation does not
         // differentiate which column family each SST store. It is tracking
@@ -452,7 +505,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        // TODO: Skip (return) if no snapshot has been taken yet
+        // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+        // i.e. No snapshot exists in OM.
+        if (isSnapshotInfoTableEmpty(db)) {
+          return;
+        }
 
         synchronized (compactionListenerWriteLock) {
 
