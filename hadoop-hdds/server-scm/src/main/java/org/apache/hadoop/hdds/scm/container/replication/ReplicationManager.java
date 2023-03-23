@@ -1095,7 +1095,7 @@ public class ReplicationManager implements SCMService {
       return datanodeTimeoutOffset;
     }
 
-    public void setDatanodeTimeout(long val) {
+    public void setDatanodeTimeoutOffset(long val) {
       datanodeTimeoutOffset = val;
     }
 
