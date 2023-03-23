@@ -34,6 +34,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * A {@link TrustManager} implementation that exposes a method,
@@ -128,23 +129,12 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
       throws GeneralSecurityException, IOException {
     List<X509Certificate> newCertList = caClient.getCACertificates();
 
-    boolean match = true;
-    if (currentCACertIds != null && currentCACertIds.size() > 0) {
-      if (newCertList.size() == currentCACertIds.size()) {
-        for (int i = 0; i < newCertList.size(); i++) {
-          if (!newCertList.get(i).getSerialNumber().toString().equals(
-              currentCACertIds.get(i))) {
-            match = false;
-            break;
-          }
-        }
-      }
-    } else {
-      match = false;
-    }
-
-    if (match) {
-      // Certificates keeps the same.
+    if (currentCACertIds.size() > 0 &&
+        newCertList.size() == currentCACertIds.size() &&
+        !newCertList.stream().filter(
+            c -> !currentCACertIds.contains(c.getSerialNumber().toString()))
+            .findAny().isPresent()) {
+      // Certificates keep the same.
       return null;
     }
 
