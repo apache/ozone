@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -539,8 +538,8 @@ public class SnapshotDiffManager {
            *    missing in oldKeyTable and present in newKeyTable.
            * -> Deleted after the old snapshot was taken, which means it will be
            *    present in oldKeyTable and missing in newKeyTable.
-           * -> Modified after the old snapshot was taken, which means it will be
-           *    present in oldKeyTable and present in newKeyTable with same
+           * -> Modified after the old snapshot was taken, which means it will
+           *    be present in oldKeyTable and present in newKeyTable with same
            *    Object ID but with different metadata.
            * -> Renamed after the old snapshot was taken, which means it will be
            *    present in oldKeyTable and present in newKeyTable but with
