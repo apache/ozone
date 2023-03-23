@@ -417,12 +417,12 @@ public class ContainerBalancer extends StatefulService {
     if (conf.getMoveReplicationTimeout().toMillis() >=
         conf.getMoveTimeout().toMillis()) {
       LOG.warn("hdds.container.balancer.move.replication.timeout {} should " +
-              "be lesser than hdds.container.balancer.move.timeout {}.",
+              "be less than hdds.container.balancer.move.timeout {}.",
           conf.getMoveReplicationTimeout().toMinutes(),
           conf.getMoveTimeout().toMinutes());
       throw new InvalidContainerBalancerConfigurationException(
           "hdds.container.balancer.move.replication.timeout should " +
-          "be lesser than hdds.container.balancer.move.timeout.");
+          "be less than hdds.container.balancer.move.timeout.");
     }
   }
 

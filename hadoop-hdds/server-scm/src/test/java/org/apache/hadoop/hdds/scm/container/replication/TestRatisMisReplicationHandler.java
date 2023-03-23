@@ -55,7 +55,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     RatisReplicationConfig repConfig = RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE);
     setup(repConfig);
@@ -177,14 +177,14 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
-    Mockito.doThrow(new AllSourcesOverloadedException("Overloaded"))
+    Mockito.doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
             anyList(), any(), anyInt());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
-    assertThrows(AllSourcesOverloadedException.class,
+    assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),
             0, 1, 1));
   }

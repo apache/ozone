@@ -24,6 +24,8 @@ ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
 ${KEY_NAME}                    key1
+${OZONE_S3_TESTS_SET_UP}       ${FALSE}
+${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -88,6 +90,13 @@ Setup dummy credentials for S3
                         Execute                    aws configure set aws_secret_access_key dlfknslnfslf
                         Execute                    aws configure set region us-west-1
 
+Save AWS access key
+    ${OZONE_AWS_ACCESS_KEY_ID} =      Execute     aws configure get aws_access_key_id
+    Set Test Variable     ${OZONE_AWS_ACCESS_KEY_ID}
+
+Restore AWS access key
+    Execute    aws configure set aws_access_key_id ${OZONE_AWS_ACCESS_KEY_ID}
+
 Generate Ozone String
     ${randStr} =         Generate Random String     10  [NUMBERS]
     [Return]             ozone-test-${randStr}
@@ -105,15 +114,15 @@ Create bucket with name
                          Should contain              ${result}         ${bucket}
 
 Setup s3 tests
+    Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
-    ...                ELSE                                      Set Variable    ${BUCKET}
-                       Set Suite Variable                        ${BUCKET}
-                       Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
-                       Run Keyword if                            '${BUCKET}' == 'encrypted'            Create encrypted bucket
-                       Run Keyword if                            '${BUCKET}' == 'erasure'              Create EC bucket
+    Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket
+    Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
+    Run Keyword if    '${BUCKET}' == 'encrypted'            Create encrypted bucket
+    Run Keyword if    '${BUCKET}' == 'erasure'              Create EC bucket
+    Set Global Variable  ${OZONE_S3_TESTS_SET_UP}    ${TRUE}
 
 Setup links for S3 tests
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
@@ -121,6 +130,10 @@ Setup links for S3 tests
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
     Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
     Create link        link
+
+Create generated bucket
+    ${BUCKET} =          Create bucket
+    Set Global Variable   ${BUCKET}
 
 Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
@@ -140,7 +153,7 @@ Create EC bucket
 
 Generate random prefix
     ${random} =          Generate Ozone String
-                         Set Suite Variable  ${PREFIX}  ${random}
+                         Set Global Variable  ${PREFIX}  ${random}
 
 Perform Multipart Upload
     [arguments]    ${bucket}    ${key}    @{files}

@@ -461,6 +461,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
             return;
           }
 
+          if (new HashSet<>(compactionJobInfo.inputFiles())
+              .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
+            LOG.info("Skipped the compaction entry. Compaction input files: " +
+                "{} and output files: {} are same.",
+                compactionJobInfo.inputFiles(),
+                compactionJobInfo.outputFiles());
+            return;
+          }
+
           final StringBuilder sb = new StringBuilder();
 
           if (LOG.isDebugEnabled()) {

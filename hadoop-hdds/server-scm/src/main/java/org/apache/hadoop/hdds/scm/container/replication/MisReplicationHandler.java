@@ -122,7 +122,7 @@ public abstract class MisReplicationHandler implements
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
       List<DatanodeDetails> targetDns)
-      throws AllSourcesOverloadedException, NotLeaderException {
+      throws CommandTargetOverloadedException, NotLeaderException {
     int commandsSent = 0;
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
