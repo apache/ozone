@@ -26,8 +26,6 @@ import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.closeIterator;
-
 /**
  * Persistent list backed by RocksDB.
  */

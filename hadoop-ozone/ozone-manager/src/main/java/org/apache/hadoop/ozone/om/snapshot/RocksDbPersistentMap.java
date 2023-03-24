@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
@@ -84,17 +85,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   }
 
   @Override
-  public CloseableIterator<Map.Entry<K, V>> iterator() {
+  public ClosableIterator<Map.Entry<K, V>> iterator() {
     ManagedRocksIterator iterator =
         new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
     iterator.get().seekToFirst();
 
-    return new CloseableIterator<Map.Entry<K, V>>() {
-      @Override
-      public void close() {
-        iterator.close();
-      }
-
+    return new ClosableIterator<Map.Entry<K, V>>() {
       @Override
       public boolean hasNext() {
         return iterator.get().isValid();
@@ -132,6 +128,11 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
             throw new IllegalStateException("setValue is not implemented.");
           }
         };
+      }
+
+      @Override
+      public void close() {
+        iterator.close();
       }
     };
   }
