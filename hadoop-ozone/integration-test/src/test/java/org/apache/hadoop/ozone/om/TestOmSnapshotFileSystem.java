@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -58,7 +59,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -414,19 +414,15 @@ public class TestOmSnapshotFileSystem {
     deleteSnapshot(snapshotName);
 
     // Can't access keys in snapshot anymore with FS API. Should throw exception
-    final String listErrorMsg = "no longer active";
-    LambdaTestUtils.intercept(FileNotFoundException.class, listErrorMsg,
+    final String errorMsg = "no longer active";
+    LambdaTestUtils.intercept(OMException.class, errorMsg,
         () -> o3fs.listStatus(snapshotRoot));
-    LambdaTestUtils.intercept(FileNotFoundException.class, listErrorMsg,
+    LambdaTestUtils.intercept(OMException.class, errorMsg,
         () -> o3fs.listStatus(snapshotParent));
 
-    final String getErrorMsg = "No such file or directory";
-    // Exceptions are thrown from the same check in getFileStatus as in
-    // listStatus, but the error message returned to the user is slightly
-    // different due to OM handling.
-    LambdaTestUtils.intercept(FileNotFoundException.class, getErrorMsg,
+    LambdaTestUtils.intercept(OMException.class, errorMsg,
         () -> o3fs.getFileStatus(snapshotKey1));
-    LambdaTestUtils.intercept(FileNotFoundException.class, getErrorMsg,
+    LambdaTestUtils.intercept(OMException.class, errorMsg,
         () -> o3fs.getFileStatus(snapshotKey2));
   }
 

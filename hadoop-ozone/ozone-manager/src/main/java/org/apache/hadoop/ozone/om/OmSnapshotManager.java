@@ -69,6 +69,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
@@ -182,6 +183,14 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
+        // Block snapshot from loading when it is no longer active. e.g. DELETED
+        if (!snapshotInfo.getSnapshotStatus().equals(
+            SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          throw new OMException("Unable to load snapshot. " +
+              "Snapshot with table key '" + snapshotTableKey +
+              "' is no longer active", FILE_NOT_FOUND);
+        }
+
         CacheValue<SnapshotInfo> cacheValue =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .getCacheValue(new CacheKey<>(snapshotTableKey));
@@ -222,6 +231,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         = notification -> {
           try {
             // close snapshot's rocksdb on eviction
+            LOG.debug("Closing snapshot: {}", notification.getKey());
+            // TODO: [SNAPSHOT] HDDS-7935.Close only when refcount reaches zero?
             notification.getValue().close();
           } catch (IOException e) {
             LOG.error("Failed to close snapshot: {} {}",
@@ -234,6 +245,14 @@ public final class OmSnapshotManager implements AutoCloseable {
         .maximumSize(cacheSize)
         .removalListener(removalListener)
         .build(loader);
+  }
+
+  /**
+   * Get snapshot instance LRU cache.
+   * @return LoadingCache
+   */
+  public LoadingCache<String, OmSnapshot> getSnapshotCache() {
+    return snapshotCache;
   }
 
   /**
