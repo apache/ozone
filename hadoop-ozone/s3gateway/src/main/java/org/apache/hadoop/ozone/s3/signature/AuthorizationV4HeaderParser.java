@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Collection;
 
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
@@ -176,9 +177,10 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
           "AWS region shouldn't be empty. credential: " + credential,
           authHeader);
     }
-    if (credentialObj.getAwsRequest().isEmpty()) {
+    if (credentialObj.getAwsRequest().isEmpty() ||
+            !(credentialObj.getAwsRequest().equals("aws4_request"))) {
       throw new MalformedResourceException(
-          "AWS request shouldn't be empty. credential:" + credential,
+          "AWS request shouldn't be empty or invalid. credential:" + credential,
           authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
@@ -189,7 +191,14 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
 
     // Date should not be empty and within valid range.
     if (!credentialObj.getDate().isEmpty()) {
-      validateDateRange(credentialObj);
+      try {
+        validateDateRange(credentialObj);
+      } catch (DateTimeParseException ex) {
+        throw new MalformedResourceException(
+                "AWS date format is invalid. credential:" + credential,
+                authHeader);
+      }
+
     } else {
       throw new MalformedResourceException(
           "AWS date shouldn't be empty. credential:{}" + credential,
@@ -200,7 +209,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
 
   @VisibleForTesting
   public void validateDateRange(Credential credentialObj)
-      throws MalformedResourceException {
+      throws MalformedResourceException, DateTimeParseException {
     LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
     LocalDate now = LocalDate.now();
     if (date.isBefore(now.minus(1, DAYS)) ||
