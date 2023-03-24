@@ -39,6 +39,7 @@ public class TestOFSPath {
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     Assert.assertEquals("dir3/key4 space", ofsPath.getKeyName());
+    Assert.assertEquals("key4 space", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/bucket2/dir3/key4 space", ofsPath.toString());
@@ -52,6 +53,7 @@ public class TestOFSPath {
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     Assert.assertEquals("dir3/key4", ofsPath.getKeyName());
+    Assert.assertEquals("key4", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/bucket2/dir3/key4", ofsPath.toString());
@@ -63,6 +65,7 @@ public class TestOFSPath {
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     // Check the key must end with '/' (dir5 is a directory)
     Assert.assertEquals("dir3/dir5/", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/bucket2/dir3/dir5/", ofsPath.toString());
@@ -77,6 +80,7 @@ public class TestOFSPath {
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/bucket2/", ofsPath.toString());
@@ -88,6 +92,7 @@ public class TestOFSPath {
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/bucket2/", ofsPath.toString());
@@ -102,6 +107,7 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/volume1/", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("/volume1/", ofsPath.toString());
@@ -113,6 +119,7 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     // Note: currently getNonKeyPath() returns with '/' if input is volume only.
     //  There is no use case for this for now.
     //  The behavior might change in the future.
@@ -128,6 +135,7 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getVolumeName());
     Assert.assertEquals("", ofsPath.getBucketName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("", ofsPath.getNonKeyPath());
     Assert.assertEquals("", ofsPath.getNonKeyPathNoPrefixDelim());
     Assert.assertFalse(ofsPath.isMount());
@@ -142,6 +150,7 @@ public class TestOFSPath {
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
     Assert.assertEquals("bucket2", ofsPath.getBucketName());
     Assert.assertEquals("dir3/", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
     Assert.assertEquals("ofs://svc1:9876/volume1/bucket2/dir3/",
@@ -166,6 +175,7 @@ public class TestOFSPath {
     Assert.assertEquals(bucketName, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
+    Assert.assertEquals("", ofsPath.getFileName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
     Assert.assertTrue(ofsPath.isMount());
     Assert.assertEquals("/tmp/", ofsPath.toString());
@@ -178,6 +188,7 @@ public class TestOFSPath {
     Assert.assertEquals(bucketName, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("key1", ofsPath.getKeyName());
+    Assert.assertEquals("key1", ofsPath.getFileName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
     Assert.assertTrue(ofsPath.isMount());
     Assert.assertEquals("/tmp/key1", ofsPath.toString());

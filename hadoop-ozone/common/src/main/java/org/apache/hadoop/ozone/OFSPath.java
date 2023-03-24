@@ -163,6 +163,14 @@ public class OFSPath {
     return keyName;
   }
 
+  /**
+   * Returns the last element of the KeyName, which can either be a file name
+   * or the leaf directory/bucket.
+   */
+  public String getFileName() {
+    return keyName.substring(keyName.lastIndexOf(OZONE_URI_DELIMITER) + 1);
+  }
+
   private boolean isEmpty() {
     return getAuthority().isEmpty()
         && getMountName().isEmpty()
