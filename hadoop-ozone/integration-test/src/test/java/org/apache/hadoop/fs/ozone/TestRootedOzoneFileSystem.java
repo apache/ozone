@@ -337,7 +337,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
@@ -2058,7 +2058,7 @@ public class TestRootedOzoneFileSystem {
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
-            new ECReplicationConfig("RS-3-2-1024")));
+            new ECReplicationConfig("RS-3-2-1024k")));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
@@ -2117,7 +2117,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
