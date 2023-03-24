@@ -48,7 +48,7 @@
                 </property>
             </activation>
             <properties>
-                <cmake.standards>23</cmake.standards>
+                <cmake.standards>20</cmake.standards>
                 <sstDump.include>true</sstDump.include>
             </properties>
             <build>
