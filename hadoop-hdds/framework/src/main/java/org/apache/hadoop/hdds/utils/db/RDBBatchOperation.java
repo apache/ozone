@@ -36,6 +36,8 @@ import java.util.function.Supplier;
 
 /**
  * Batch operation implementation for rocks db.
+ * Note that a {@link RDBBatchOperation} object only for one batch.
+ * Also, this class is not threadsafe.
  */
 public class RDBBatchOperation implements BatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
@@ -67,9 +69,11 @@ public class RDBBatchOperation implements BatchOperation {
    */
   private static final class ByteArray {
     private final byte[] bytes;
+    private final int hash;
 
     ByteArray(byte[] bytes) {
       this.bytes = bytes;
+      this.hash = Arrays.hashCode(bytes);
     }
 
     @Override
@@ -85,7 +89,7 @@ public class RDBBatchOperation implements BatchOperation {
 
     @Override
     public int hashCode() {
-      return Arrays.hashCode(bytes);
+      return hash;
     }
   }
 
