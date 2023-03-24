@@ -138,6 +138,19 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Test
+  public void testKeyToBucketLevel() throws IOException {
+    final String dir = "dir1";
+    final String key = dir + "/key1";
+    final Path source = new Path(getBucketPath(), key);
+    final Path dest = new Path(String.valueOf(getBucketPath()));
+    LOG.info("Will move {} to {}", source, dest);
+    getFs().rename(source, dest);
+    assertTrue("Key rename failed", getFs().exists(dest));
+    // cleanup
+    getFs().delete(dest, true);
+  }
+
+  @Test
   public void testRenameDir() throws Exception {
     final String dir = "dir1";
     final Path source = new Path(getBucketPath(), dir);

@@ -430,8 +430,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // construct src and dst key paths
     String srcKeyPath = srcPath.getNonKeyPathNoPrefixDelim() +
         OZONE_URI_DELIMITER + srcPath.getKeyName();
-    String dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
-        OZONE_URI_DELIMITER + dstPath.getKeyName();
+    String dstKeyPath;
+    if (dstPath.isBucket()) {
+      dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
+          OZONE_URI_DELIMITER + srcPath.getFileName();
+    } else {
+      dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
+          OZONE_URI_DELIMITER + dstPath.getKeyName();
+    }
     try {
       adapterImpl.rename(bucket, srcKeyPath, dstKeyPath);
     } catch (OMException ome) {
