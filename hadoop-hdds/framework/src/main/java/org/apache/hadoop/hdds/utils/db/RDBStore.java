@@ -57,6 +57,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 public class RDBStore implements DBStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStore.class);
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 1024 * 1024;
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;
@@ -88,6 +89,7 @@ public class RDBStore implements DBStore {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
         TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1));
+    this.maxDbUpdatesSizeThreshold = MAX_DB_UPDATES_SIZE_THRESHOLD;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
