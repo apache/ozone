@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -340,6 +341,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       ratisServer.stop();
       grpcServer.stop();
     }
+    IOUtils.close(LOG, transactionBuffer);
   }
 
   @Override
