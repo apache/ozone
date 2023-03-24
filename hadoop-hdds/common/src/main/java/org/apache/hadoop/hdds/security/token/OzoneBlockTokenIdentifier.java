@@ -35,7 +35,6 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * Block token identifier for Ozone/HDDS. Ozone block access token is similar
@@ -67,8 +66,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   }
 
   public OzoneBlockTokenIdentifier(String ownerId, String blockId,
-                                   Set<AccessModeProto> modes, long expiryDate,
-                                   long maxLength) {
+      Set<AccessModeProto> modes, long expiryDate, long maxLength) {
     super(ownerId, Instant.ofEpochMilli(expiryDate));
     this.blockId = blockId;
     this.modes = modes == null
