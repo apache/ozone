@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -528,46 +528,49 @@ public class SnapshotDiffManager {
       final PersistentList<byte[]> modifyDiffs =
           createDiffReportPersistentList(modifyDiffColumnFamily);
 
-      Iterator<byte[]> objectIdsIterator = objectIDsToCheck.iterator();
-      while (objectIdsIterator.hasNext()) {
-        byte[] id = objectIdsIterator.next();
-        /*
-         * This key can be
-         * -> Created after the old snapshot was taken, which means it will be
-         *    missing in oldKeyTable and present in newKeyTable.
-         * -> Deleted after the old snapshot was taken, which means it will be
-         *    present in oldKeyTable and missing in newKeyTable.
-         * -> Modified after the old snapshot was taken, which means it will be
-         *    present in oldKeyTable and present in newKeyTable with same
-         *    Object ID but with different metadata.
-         * -> Renamed after the old snapshot was taken, which means it will be
-         *    present in oldKeyTable and present in newKeyTable but with
-         *    different name and same Object ID.
-         */
+      try (ClosableIterator<byte[]>
+               objectIdsIterator = objectIDsToCheck.iterator()) {
+        while (objectIdsIterator.hasNext()) {
+          byte[] id = objectIdsIterator.next();
+          /*
+           * This key can be
+           * -> Created after the old snapshot was taken, which means it will be
+           *    missing in oldKeyTable and present in newKeyTable.
+           * -> Deleted after the old snapshot was taken, which means it will be
+           *    present in oldKeyTable and missing in newKeyTable.
+           * -> Modified after the old snapshot was taken, which means it will
+           *    be present in oldKeyTable and present in newKeyTable with same
+           *    Object ID but with different metadata.
+           * -> Renamed after the old snapshot was taken, which means it will be
+           *    present in oldKeyTable and present in newKeyTable but with
+           *    different name and same Object ID.
+           */
 
-        byte[] oldKeyName = oldObjIdToKeyMap.get(id);
-        byte[] newKeyName = newObjIdToKeyMap.get(id);
+          byte[] oldKeyName = oldObjIdToKeyMap.get(id);
+          byte[] newKeyName = newObjIdToKeyMap.get(id);
 
-        if (oldKeyName == null && newKeyName == null) {
-          // This cannot happen.
-          throw new IllegalStateException("Old and new key name both are null");
-        } else if (oldKeyName == null) { // Key Created.
-          String key = codecRegistry.asObject(newKeyName, String.class);
-          DiffReportEntry entry = DiffReportEntry.of(DiffType.CREATE, key);
-          createDiffs.add(codecRegistry.asRawData(entry));
-        } else if (newKeyName == null) { // Key Deleted.
-          String key = codecRegistry.asObject(oldKeyName, String.class);
-          DiffReportEntry entry = DiffReportEntry.of(DiffType.DELETE, key);
-          deleteDiffs.add(codecRegistry.asRawData(entry));
-        } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
-          String key = codecRegistry.asObject(newKeyName, String.class);
-          DiffReportEntry entry = DiffReportEntry.of(DiffType.MODIFY, key);
-          modifyDiffs.add(codecRegistry.asRawData(entry));
-        } else { // Key Renamed.
-          String oldKey = codecRegistry.asObject(oldKeyName, String.class);
-          String newKey = codecRegistry.asObject(newKeyName, String.class);
-          renameDiffs.add(codecRegistry.asRawData(
-              DiffReportEntry.of(DiffType.RENAME, oldKey, newKey)));
+          if (oldKeyName == null && newKeyName == null) {
+            // This cannot happen.
+            throw new IllegalStateException(
+                "Old and new key name both are null");
+          } else if (oldKeyName == null) { // Key Created.
+            String key = codecRegistry.asObject(newKeyName, String.class);
+            DiffReportEntry entry = DiffReportEntry.of(DiffType.CREATE, key);
+            createDiffs.add(codecRegistry.asRawData(entry));
+          } else if (newKeyName == null) { // Key Deleted.
+            String key = codecRegistry.asObject(oldKeyName, String.class);
+            DiffReportEntry entry = DiffReportEntry.of(DiffType.DELETE, key);
+            deleteDiffs.add(codecRegistry.asRawData(entry));
+          } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
+            String key = codecRegistry.asObject(newKeyName, String.class);
+            DiffReportEntry entry = DiffReportEntry.of(DiffType.MODIFY, key);
+            modifyDiffs.add(codecRegistry.asRawData(entry));
+          } else { // Key Renamed.
+            String oldKey = codecRegistry.asObject(oldKeyName, String.class);
+            String newKey = codecRegistry.asObject(newKeyName, String.class);
+            renameDiffs.add(codecRegistry.asRawData(
+                DiffReportEntry.of(DiffType.RENAME, oldKey, newKey)));
+          }
         }
       }
 
@@ -655,13 +658,15 @@ public class SnapshotDiffManager {
   private int addToReport(String jobId, int index,
                           PersistentList<byte[]> diffReportEntries)
       throws IOException {
-    Iterator<byte[]> diffReportIterator = diffReportEntries.iterator();
-    while (diffReportIterator.hasNext()) {
+    try (ClosableIterator<byte[]>
+             diffReportIterator = diffReportEntries.iterator()) {
+      while (diffReportIterator.hasNext()) {
 
-      snapDiffReportTable.put(
-          codecRegistry.asRawData(jobId + DELIMITER + index),
-          diffReportIterator.next());
-      index++;
+        snapDiffReportTable.put(
+            codecRegistry.asRawData(jobId + DELIMITER + index),
+            diffReportIterator.next());
+        index++;
+      }
     }
     return index;
   }

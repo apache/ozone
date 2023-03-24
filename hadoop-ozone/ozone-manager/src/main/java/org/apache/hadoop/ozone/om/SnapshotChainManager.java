@@ -262,21 +262,22 @@ public class SnapshotChainManager {
           throws IOException {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
-    TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        keyIter = metadataManager.getSnapshotInfoTable().iterator();
-    Map<Long, SnapshotInfo> snaps = new TreeMap<>();
-    Table.KeyValue< String, SnapshotInfo > kv;
-    snapshotChainGlobal.clear();
-    snapshotChainPath.clear();
-    latestPathSnapshotID.clear();
-    snapshotIdToTableKey.clear();
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
+      Map<Long, SnapshotInfo> snaps = new TreeMap<>();
+      Table.KeyValue<String, SnapshotInfo> kv;
+      snapshotChainGlobal.clear();
+      snapshotChainPath.clear();
+      latestPathSnapshotID.clear();
+      snapshotIdToTableKey.clear();
 
-    while (keyIter.hasNext()) {
-      kv = keyIter.next();
-      snaps.put(kv.getValue().getCreationTime(), kv.getValue());
-    }
-    for (SnapshotInfo sinfo : snaps.values()) {
-      addSnapshot(sinfo);
+      while (keyIter.hasNext()) {
+        kv = keyIter.next();
+        snaps.put(kv.getValue().getCreationTime(), kv.getValue());
+      }
+      for (SnapshotInfo sinfo : snaps.values()) {
+        addSnapshot(sinfo);
+      }
     }
   }
 
