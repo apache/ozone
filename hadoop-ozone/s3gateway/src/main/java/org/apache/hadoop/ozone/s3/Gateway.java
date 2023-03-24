@@ -17,18 +17,20 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -42,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
-import static org.apache.hadoop.hdds.StringUtils.*;
+import static org.apache.hadoop.hdds.StringUtils.startupShutdownMessage;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_PRINCIPAL_KEY;
@@ -76,12 +78,20 @@ public class Gateway extends GenericCli {
     UserGroupInformation.setConfiguration(ozoneConfiguration);
     loginS3GUser(ozoneConfiguration);
 
-    if (org.apache.commons.lang3.StringUtils.isEmpty(
-            ozoneConfiguration.get(HddsConfigKeys.OZONE_METADATA_DIRS))) {
+    if (StringUtils.isEmpty(ozoneConfiguration.get(
+            OzoneConfigKeys.OZONE_METADATA_DIRS))) {
       //Setting ozone.metadata.dirs if not set so that server setup doesn't
       // fail.
-      Path tmpMetaDir = Files.createTempDirectory("ozone_s3g_tmpdir");
-      tmpMetaDir.toFile().deleteOnExit();
+      Path tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+              "ozone_s3g_tmp_meta_dir");
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        try {
+          FileUtils.deleteDirectory(tmpMetaDir.toFile());
+        } catch (IOException e) {
+          LOG.error("Failed to cleanup temporary S3 Gateway Metadir {}",
+                  tmpMetaDir.toFile().getAbsolutePath(), e);
+        }
+      }));
       ozoneConfiguration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
               tmpMetaDir.toFile().getAbsolutePath());
     }
