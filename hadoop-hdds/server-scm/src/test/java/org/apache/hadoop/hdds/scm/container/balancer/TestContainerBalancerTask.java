@@ -994,11 +994,11 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getBalancerStatus());
 
     /*
-     Wait for the thread to sleep and assert that it's sleeping. This is the
-     delay before it starts balancing.
+     Wait for the thread to start sleeping and assert that it's sleeping.
+     This is the delay before it starts balancing.
      */
     GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
     Assertions.assertEquals(Thread.State.TIMED_WAITING,
         balancingThread.getState());
 
@@ -1006,12 +1006,12 @@ public class TestContainerBalancerTask {
     // STOPPED
     balancingThread.interrupt();
     GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
-        ContainerBalancerTask.Status.STOPPED, 2, 20);
+        ContainerBalancerTask.Status.STOPPED, 1, 20);
     Assertions.assertEquals(ContainerBalancerTask.Status.STOPPED,
         containerBalancerTask.getBalancerStatus());
 
     // ensure the thread dies
-    GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 2, 20);
+    GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
     Assertions.assertFalse(balancingThread.isAlive());
   }
 

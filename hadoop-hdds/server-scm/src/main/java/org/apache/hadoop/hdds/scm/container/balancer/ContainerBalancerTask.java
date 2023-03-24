@@ -169,7 +169,7 @@ public class ContainerBalancerTask implements Runnable {
     try {
       if (delayStart) {
         long delayDuration = ozoneConfiguration.getTimeDuration(
-            "hdds.scm.wait.time.after.safemode.exit",
+            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
             TimeUnit.SECONDS);
         LOG.info("ContainerBalancer will sleep for {} seconds before starting" +
@@ -225,9 +225,10 @@ public class ContainerBalancerTask implements Runnable {
           // one for sending command , one for running du, and one for
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
-          LOG.info("ContainerBalancer will sleep for some time while waiting " +
-              "for updated usage information from Datanodes.");
-          Thread.sleep(3 * nodeReportInterval);
+          long sleepTime = 3 * nodeReportInterval;
+          LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
+              "for updated usage information from Datanodes.", sleepTime);
+          Thread.sleep(nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");

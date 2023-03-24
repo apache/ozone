@@ -238,7 +238,7 @@ public class TestContainerBalancer {
 
     // Start the ContainerBalancer service.
     containerBalancer.startBalancer(balancerConfiguration);
-    GenericTestUtils.waitFor(() -> containerBalancer.isBalancerRunning(), 2,
+    GenericTestUtils.waitFor(() -> containerBalancer.isBalancerRunning(), 1,
         20);
     Assertions.assertTrue(containerBalancer.isBalancerRunning());
 
