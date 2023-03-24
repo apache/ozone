@@ -61,7 +61,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
@@ -93,7 +93,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist -Psrc -Drocks_tools_native
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
