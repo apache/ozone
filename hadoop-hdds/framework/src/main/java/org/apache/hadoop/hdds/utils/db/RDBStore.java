@@ -22,6 +22,8 @@ package org.apache.hadoop.hdds.utils.db;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -137,37 +139,19 @@ public class RDBStore implements DBStore {
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
       } else {
-      // Create checkpoints directory if not exists.
-      Path checkpointsParentDirPath =
-          Paths.get(dbLocation.getParent(), "db.checkpoints");
-      checkpointsParentDir = checkpointsParentDirPath.toString();
-      Files.createDirectories(checkpointsParentDirPath);
-          Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
-        File checkpointsDir = new File(checkpointsParentDir);
-        if (!checkpointsDir.exists()) {
-          boolean success = checkpointsDir.mkdir();
-          if (!success) {
-            throw new IOException(
-                "Unable to create RocksDB checkpoint directory: " +
-                    checkpointsParentDir);
-          }
-        }
+        Path checkpointsParentDirPath =
+            Paths.get(dbLocation.getParent(), "db.checkpoints");
+        checkpointsParentDir = checkpointsParentDirPath.toString();
+        Files.createDirectories(checkpointsParentDirPath);
       }
       //create snapshot directory if does not exist.
       if (!createCheckpointDirs) {
         snapshotsParentDir = null;
       } else {
-        snapshotsParentDir = Paths.get(dbLocation.getParent(),
-                                       OM_SNAPSHOT_DIR).toString();
-        File snapshotsDir = new File(snapshotsParentDir);
-        if (!snapshotsDir.exists()) {
-          boolean success = snapshotsDir.mkdir();
-          if (!success) {
-            throw new IOException(
-                "Unable to create RocksDB snapshot directory: " +
-                    snapshotsParentDir);
-          }
-        }
+        Path snapshotsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_DIR);
+        snapshotsParentDir = snapshotsParentDirPath.toString();
+        Files.createDirectories(snapshotsParentDirPath);
       }
 
       if (enableCompactionLog) {
