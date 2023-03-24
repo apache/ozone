@@ -104,12 +104,8 @@ public final class OzoneAclUtils {
       // only READ access on parent level access. OzoneNativeAuthorizer has
       // different parent level access based on the child level access type
       IAccessAuthorizer.ACLType parentAclRight = IAccessAuthorizer.ACLType.READ;
-      if (omMetadataReader.isNativeAuthorizerEnabled()) {
+      if (omMetadataReader.isNativeAuthorizerEnabled() && resType == BUCKET) {
         parentAclRight = getParentNativeAcl(aclType, resType);
-        if (!(resType == BUCKET)) {
-          // for key and prefix, volume is always READ
-          parentAclRight = IAccessAuthorizer.ACLType.READ;
-        }
       }
       
       omMetadataReader.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
