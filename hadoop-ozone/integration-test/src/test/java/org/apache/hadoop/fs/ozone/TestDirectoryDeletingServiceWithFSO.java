@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -168,9 +169,11 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
-    assertTrue(dirTable.iterator().hasNext());
-    assertEquals(root.getName(),
-        dirTable.iterator().next().getValue().getName());
+    try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
+        iterator = dirTable.iterator()) {
+      assertTrue(iterator.hasNext());
+      assertEquals(root.getName(), iterator.next().getValue().getName());
+    }
 
     assertTrue(dirDeletingService.getRunCount() > 1);
   }
