@@ -57,7 +57,7 @@ public class TestContainerBalancer {
   private ContainerBalancerConfiguration balancerConfiguration;
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private StatefulServiceStateManager serviceStateManager;
-  OzoneConfiguration conf;
+  private OzoneConfiguration conf;
 
   /**
    * Sets up configuration values and creates a mock cluster.
@@ -201,7 +201,7 @@ public class TestContainerBalancer {
    */
   @Test
   public void testValidationOfConfigurations() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
 
     conf.setTimeDuration(
         "hdds.container.balancer.move.replication.timeout", 60,
