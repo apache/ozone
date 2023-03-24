@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -115,6 +116,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private boolean showCount;
 
+  private String keySeparatorSchemaV3 =
+      new OzoneConfiguration().getObject(DatanodeConfiguration.class)
+          .getContainerSchemaV3KeySeparator();
+
   @Override
   public Void call() throws Exception {
 
@@ -126,9 +131,17 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         dnDBSchemaVersion.equalsIgnoreCase(SCHEMA_V3) &&
         parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
 
+    boolean success;
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(
         parent.getDbPath(), cfDescList, cfHandleList)) {
-      printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
+      success = printTable(cfHandleList, db, parent.getDbPath(), schemaV3);
+    }
+
+    if (!success) {
+      // Trick to set exit code to 1 on error.
+      // TODO: Properly set exit code hopefully by refactoring GenericCli
+      throw new Exception(
+          "Exit code is non-zero. Check the error message above");
     }
 
     return null;
@@ -160,28 +173,30 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
   }
 
-  private void displayTable(ManagedRocksIterator iterator,
-                            DBColumnFamilyDefinition dbColumnFamilyDefinition,
-                            boolean schemaV3)
+  private boolean displayTable(ManagedRocksIterator iterator,
+                               DBColumnFamilyDefinition dbColumnFamilyDef,
+                               boolean schemaV3)
       throws IOException {
 
-    if (fileName != null) {
-      try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
-        displayTable(iterator, dbColumnFamilyDefinition, out, schemaV3);
-      }
-    } else {
-      displayTable(iterator, dbColumnFamilyDefinition, out(), schemaV3);
+    if (fileName == null) {
+      // Print to stdout
+      return displayTable(iterator, dbColumnFamilyDef, out(), schemaV3);
+    }
+
+    // Write to file output
+    try (PrintWriter out = new PrintWriter(fileName, UTF_8.name())) {
+      return displayTable(iterator, dbColumnFamilyDef, out, schemaV3);
     }
   }
 
-  private void displayTable(ManagedRocksIterator iterator,
-                            DBColumnFamilyDefinition dbColumnFamilyDefinition,
-                            PrintWriter out,
-                            boolean schemaV3)
+  private boolean displayTable(ManagedRocksIterator iterator,
+                               DBColumnFamilyDefinition dbColumnFamilyDef,
+                               PrintWriter out,
+                               boolean schemaV3)
       throws IOException {
 
     if (startKey != null) {
-      iterator.get().seek(getValueObject(dbColumnFamilyDefinition));
+      iterator.get().seek(getValueObject(dbColumnFamilyDef));
     }
 
     if (withKey) {
@@ -197,16 +212,24 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     while (withinLimit(count) && iterator.get().isValid()) {
       StringBuilder sb = new StringBuilder();
       if (withKey) {
-        Object key = dbColumnFamilyDefinition.getKeyCodec()
+        Object key = dbColumnFamilyDef.getKeyCodec()
             .fromPersistedFormat(iterator.get().key());
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         if (schemaV3) {
           int index =
               DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
-          String cid = key.toString().substring(0, index);
-          String blockId = key.toString().substring(index);
+          String keyStr = key.toString();
+          if (index > keyStr.length()) {
+            err().println("Error: Invalid SchemaV3 table key length. "
+                + "Is this a V2 table? Try again with --dn-schema=V2");
+            return false;
+          }
+          String cid = keyStr.substring(0, index);
+          String blockId = keyStr.substring(index);
           sb.append(gson.toJson(Longs.fromByteArray(
-              FixedLengthStringUtils.string2Bytes(cid)) + ": " + blockId));
+              FixedLengthStringUtils.string2Bytes(cid)) +
+              keySeparatorSchemaV3 +
+              blockId));
         } else {
           sb.append(gson.toJson(key));
         }
@@ -214,7 +237,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       }
 
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      Object o = dbColumnFamilyDefinition.getValueCodec()
+      Object o = dbColumnFamilyDef.getValueCodec()
           .fromPersistedFormat(iterator.get().value());
       sb.append(gson.toJson(o));
 
@@ -235,6 +258,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       // End JSON array
       out.println(" ]");
     }
+
+    return true;
   }
 
   private boolean withinLimit(long i) {
@@ -262,10 +287,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
    * User-provided args are not in the arg list. Those are instance variables
    * parsed by picocli.
    */
-  private void printTable(List<ColumnFamilyHandle> columnFamilyHandleList,
-                          ManagedRocksDB rocksDB,
-                          String dbPath,
-                          boolean schemaV3)
+  private boolean printTable(List<ColumnFamilyHandle> columnFamilyHandleList,
+                             ManagedRocksDB rocksDB,
+                             String dbPath,
+                             boolean schemaV3)
       throws IOException, RocksDBException {
 
     if (limit < 1 && limit != -1) {
@@ -279,7 +304,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         Paths.get(dbPath), new OzoneConfiguration());
     if (dbDefinition == null) {
       err().println("Error: Incorrect DB Path");
-      return;
+      return false;
     }
 
     Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
@@ -289,7 +314,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
     if (!columnFamilyMap.containsKey(tableName)) {
       err().print("Error: Table with name '" + tableName + "' not found");
-      return;
+      return false;
     }
 
     DBColumnFamilyDefinition columnFamilyDefinition =
@@ -302,10 +327,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     if (showCount) {
+      // Only prints estimates key count
       long keyCount = rocksDB.get()
           .getLongProperty(columnFamilyHandle, RocksDatabase.ESTIMATE_NUM_KEYS);
       out().println(keyCount);
-      return;
+      return true;
     }
 
     ManagedRocksIterator iterator = null;
@@ -328,7 +354,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         iterator.get().seekToFirst();
       }
 
-      displayTable(iterator, columnFamilyDefinition, schemaV3);
+      return displayTable(iterator, columnFamilyDefinition, schemaV3);
     } finally {
       if (iterator != null) {
         iterator.close();

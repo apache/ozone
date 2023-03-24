@@ -79,6 +79,9 @@ public class TestLDBCli {
   private PrintWriter pstdout, pstderr;
   private CommandLine cmd;
   private NavigableMap<String, Map<String, ?>> dbMap;
+  private String keySeparatorSchemaV3 =
+      new OzoneConfiguration().getObject(DatanodeConfiguration.class)
+          .getContainerSchemaV3KeySeparator();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -140,7 +143,13 @@ public class TestLDBCli {
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
             Named.of("Default", Pair.of(0, "")),
             Named.of("V3", Arrays.asList("--dn-schema", "V3")),
-            Named.of("Expect '1: 1'-'2: 4'", Pair.of("1: 1", "3: 5"))
+            Named.of("Expect '1|1'-'2|4'", Pair.of("1|1", "3|5"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("Specify", Pair.of(0, "")),
+            Named.of("V3", Collections.emptyList()),
+            Named.of("Expect '1|1'-'2|4'", Pair.of("1|1", "3|5"))
         ),
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
@@ -149,7 +158,7 @@ public class TestLDBCli {
                 "--dn-schema", "V3",
                 "--container-id", "1",
                 "--length", "2")),
-            Named.of("Expect '1: 1' and '1: 2'", Pair.of("1: 1", "2: 3"))
+            Named.of("Expect '1|1' and '1|2'", Pair.of("1|1", "2|3"))
         ),
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
@@ -158,7 +167,7 @@ public class TestLDBCli {
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "2")),
-            Named.of("Expect '2: 3' and '2: 4'", Pair.of("2: 3", "3: 5"))
+            Named.of("Expect '2|3' and '2|4'", Pair.of("2|3", "3|5"))
         ),
         Arguments.of(
             Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
@@ -167,13 +176,14 @@ public class TestLDBCli {
                 "--dn-schema", "V3",
                 "--container-id", "2",
                 "--length", "1")),
-            Named.of("Expect '2: 3' only", Pair.of("2: 3", "2: 4"))
+            Named.of("Expect '2|3' only", Pair.of("2|3", "2|4"))
         ),
         Arguments.of(
             Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
-            Named.of("Default", Pair.of(0, "")),
-            Named.of("V2", Collections.emptyList()),
-            Named.of("Expect 1-4", Pair.of("1", "5"))
+            Named.of("Erroneously parse V2 table as V3",
+                Pair.of(1, "Error: Invalid")),
+            Named.of("Default to V3", Collections.emptyList()),
+            Named.of("Expect exception", null)
         ),
         Arguments.of(
             Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
@@ -218,11 +228,9 @@ public class TestLDBCli {
       expectedMap = new TreeMap<>();
     }
 
-    // Verify result
     if (exitCode == 0) {
+      // Verify stdout on success
       assertContents(expectedMap, stdout.toString());
-    } else {
-      Assertions.assertEquals(0, stdout.toString().length());
     }
 
     // Check stderr
@@ -297,7 +305,7 @@ public class TestLDBCli {
                 .getContainerKeyPrefix(cid) + blockId;
             dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
             // Schema V3 ldb scan output key is "containerId: blockId"
-            mapKey = cid + ": " + blockId;
+            mapKey = cid + keySeparatorSchemaV3 + blockId;
           } else {
             String dbKeyStr = String.valueOf(blockId);
             dbKey = StringUtils.string2Bytes(dbKeyStr);
