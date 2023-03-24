@@ -303,6 +303,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           OZONE_ADMINISTRATORS
       );
 
+  private Clock systemClock;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -597,7 +599,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMConfigurator configurator) throws IOException {
     // Use SystemClock when data is persisted
     // and used again after system restarts.
-    Clock systemClock = Clock.system(ZoneOffset.UTC);
+    systemClock = Clock.system(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -904,6 +906,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setScmCertificateClient(CertificateClient client) {
     scmCertificateClient = client;
+  }
+
+  public Clock getSystemClock() {
+    return systemClock;
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
