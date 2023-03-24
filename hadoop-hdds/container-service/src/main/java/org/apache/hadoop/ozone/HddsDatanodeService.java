@@ -294,7 +294,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         dnCertClient = initializeCertificateClient(dnCertClient);
 
-        if (OzoneSecurityUtil.isTokenEnable(conf)) {
+        if (secConf.isTokenEnabled()) {
           secretKeyClient = DefaultSecretKeyClient.create(conf);
           secretKeyClient.start(conf);
         }

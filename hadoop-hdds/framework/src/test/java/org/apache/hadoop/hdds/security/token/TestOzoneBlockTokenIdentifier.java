@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.security.token;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
 import org.apache.hadoop.io.Text;
@@ -56,14 +56,15 @@ public class TestOzoneBlockTokenIdentifier {
   public void testSignToken() {
     OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier(
         "testUser", "84940",
-        EnumSet.allOf(HddsProtos.BlockTokenSecretProto.AccessModeProto.class),
-        expiryTime, secretKey.getId(), 128L);
+        EnumSet.allOf(AccessModeProto.class),
+        expiryTime, 128L);
+    tokenId.setSecretKeyId(secretKey.getId());
     byte[] signedToken = secretKey.sign(tokenId);
 
     // Verify a valid signed OzoneMaster Token with Ozone Master.
     assertTrue(secretKey.isValidSignature(tokenId.getBytes(), signedToken));
 
-    // // Verify an invalid signed OzoneMaster Token with Ozone Master.
+    // Verify an invalid signed OzoneMaster Token with Ozone Master.
     assertFalse(secretKey.isValidSignature(tokenId.getBytes(),
         RandomUtils.nextBytes(128)));
   }
@@ -75,8 +76,9 @@ public class TestOzoneBlockTokenIdentifier {
 
     OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier(
         "testUser", "84940",
-        EnumSet.allOf(HddsProtos.BlockTokenSecretProto.AccessModeProto.class),
-        expiryTime, secretKey.getId(), maxLength);
+        EnumSet.allOf(AccessModeProto.class),
+        expiryTime, maxLength);
+    tokenId.setSecretKeyId(secretKey.getId());
     byte[] signedToken = secretKey.sign(tokenId);
 
     Token<OzoneBlockTokenIdentifier> token = new Token<>(tokenId.getBytes(),

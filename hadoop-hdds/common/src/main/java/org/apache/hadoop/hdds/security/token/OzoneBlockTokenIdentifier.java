@@ -53,20 +53,6 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
   private EnumSet<AccessModeProto> modes;
   private long maxLength;
 
-  public OzoneBlockTokenIdentifier(
-      String ownerId, String blockId, Set<AccessModeProto> modes,
-      long expiryDate, UUID secretKeyid, long maxLength) {
-    this(ownerId, blockId, modes, expiryDate, maxLength);
-    this.setSecretKeyId(secretKeyid);
-  }
-
-  public OzoneBlockTokenIdentifier(
-      String ownerId, BlockID blockId, Set<AccessModeProto> modes,
-      long expiryDate, UUID secretKeyid, long maxLength) {
-    this(ownerId, blockId, modes, expiryDate, maxLength);
-    this.setSecretKeyId(secretKeyid);
-  }
-
   public static String getTokenService(BlockID blockID) {
     return String.valueOf(blockID.getContainerBlockID());
   }
@@ -162,11 +148,13 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
       throws IOException {
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
-    return new OzoneBlockTokenIdentifier(token.getOwnerId(),
-        token.getBlockId(), EnumSet.copyOf(token.getModesList()),
-        token.getExpiryDate(),
-        ProtobufUtils.fromProtobuf(token.getSecretKeyId()),
-        token.getMaxLength());
+    OzoneBlockTokenIdentifier tokenId =
+        new OzoneBlockTokenIdentifier(token.getOwnerId(),
+            token.getBlockId(), EnumSet.copyOf(token.getModesList()),
+            token.getExpiryDate(),
+            token.getMaxLength());
+    tokenId.setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
+    return tokenId;
   }
 
   @Override

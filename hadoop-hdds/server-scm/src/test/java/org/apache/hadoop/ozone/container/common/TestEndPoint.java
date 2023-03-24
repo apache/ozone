@@ -182,7 +182,7 @@ public class TestEndPoint {
         serverAddress, 1000)) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails), null, null);
+          datanodeDetails, conf, getContext(datanodeDetails));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
 
       String clusterId = scmServerImpl.getClusterId();

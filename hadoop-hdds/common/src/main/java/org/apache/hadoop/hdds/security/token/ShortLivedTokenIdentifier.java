@@ -46,12 +46,6 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
     this.expiry = expiry;
   }
 
-  protected ShortLivedTokenIdentifier(String ownerId, Instant expiry,
-                                      UUID secretKeyId) {
-    this(ownerId, expiry);
-    this.secretKeyId = secretKeyId;
-  }
-
   @Override
   public UserGroupInformation getUser() {
     if (Strings.isNullOrEmpty(this.getOwnerId())) {

@@ -67,10 +67,12 @@ public class TestBlockTokenVerifier
 
   @Override
   protected OzoneBlockTokenIdentifier newTokenId() {
-    return new OzoneBlockTokenIdentifier("any user",
-        new BlockID(1, 0),
-        EnumSet.allOf(AccessModeProto.class),
-        Instant.now().plusSeconds(3600).toEpochMilli(),
-        SECRET_KEY_ID, 100);
+    OzoneBlockTokenIdentifier tokenId =
+        new OzoneBlockTokenIdentifier("any user",
+            new BlockID(1, 0),
+            EnumSet.allOf(AccessModeProto.class),
+            Instant.now().plusSeconds(3600).toEpochMilli(), 100);
+    tokenId.setSecretKeyId(SECRET_KEY_ID);
+    return tokenId;
   }
 }

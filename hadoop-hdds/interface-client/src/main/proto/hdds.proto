@@ -360,7 +360,7 @@ message BlockTokenSecretProto {
     optional string omCertSerialId = 4 [deprecated=true];
     repeated AccessModeProto modes = 5;
     required uint64 maxLength = 6;
-    required UUID secretKeyId = 7;
+    optional UUID secretKeyId = 7;
 }
 
 message BlockID {

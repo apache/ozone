@@ -50,8 +50,8 @@ public class ManagedSecretKeyTest {
 
     // Token can be sign and verified by the same key.
     OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier("owner",
-        new BlockID(1L, 1L), of(AccessModeProto.READ), 0L,
-        secretKey.getId(), 1L);
+        new BlockID(1L, 1L), of(AccessModeProto.READ), 0L, 1L);
+    tokenId.setSecretKeyId(secretKey.getId());
 
     signature = secretKey.sign(tokenId);
     assertTrue(secretKey.isValidSignature(tokenId, signature));

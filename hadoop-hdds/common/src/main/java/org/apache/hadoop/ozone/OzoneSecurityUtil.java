@@ -38,10 +38,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import org.apache.commons.validator.routines.InetAddressValidator;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
@@ -76,20 +72,6 @@ public final class OzoneSecurityUtil {
     return isSecurityEnabled(conf) &&
         conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
         OZONE_HTTP_SECURITY_ENABLED_DEFAULT);
-  }
-
-  public static boolean isBlockTokenEnabled(ConfigurationSource conf) {
-    return conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED,
-        HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-  }
-
-  public static boolean isContainerTokenEnabled(ConfigurationSource conf) {
-    return conf.getBoolean(HDDS_CONTAINER_TOKEN_ENABLED,
-        HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
-  }
-
-  public static boolean isTokenEnable(ConfigurationSource conf) {
-    return isBlockTokenEnabled(conf) || isContainerTokenEnabled(conf);
   }
 
   /**

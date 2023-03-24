@@ -23,7 +23,6 @@ import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,9 +54,8 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
 
     CacheLoader<UUID, ManagedSecretKey> loader =
         new CacheLoader<UUID, ManagedSecretKey>() {
-          @NotNull
           @Override
-          public ManagedSecretKey load(@NotNull UUID id) throws Exception {
+          public ManagedSecretKey load(UUID id) throws Exception {
             ManagedSecretKey secretKey = scmSecurityProtocol.getSecretKey(id);
             LOG.info("Secret key fetched from SCM: {}", secretKey);
             return secretKey;
@@ -78,23 +76,19 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
     try {
       return cache.get(id);
     } catch (ExecutionException e) {
-      return handleCacheException(e, id);
-    }
-  }
-
-  private <T> T handleCacheException(ExecutionException e, UUID id)
-      throws SCMSecurityException {
-    if (e.getCause() instanceof IOException) {
-      IOException cause = (IOException) e.getCause();
-      if (cause instanceof SCMSecurityException) {
-        throw (SCMSecurityException) cause;
-      } else {
-        throw new SCMSecurityException(
-            "Error fetching secret key " + id + " from SCM", cause);
+      // handle cache load exception.
+      if (e.getCause() instanceof IOException) {
+        IOException cause = (IOException) e.getCause();
+        if (cause instanceof SCMSecurityException) {
+          throw (SCMSecurityException) cause;
+        } else {
+          throw new SCMSecurityException(
+              "Error fetching secret key " + id + " from SCM", cause);
+        }
       }
+      throw new IllegalStateException("Unexpected exception fetching secret " +
+          "key " + id + " from SCM", e.getCause());
     }
-    throw new IllegalStateException("Unexpected exception fetching secret " +
-        "key " + id + " from SCM", e.getCause());
   }
 
   public static DefaultSecretKeyVerifierClient create(ConfigurationSource conf)

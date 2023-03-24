@@ -510,4 +510,8 @@ public class SecurityConfig {
   public long getSslTruststoreReloadInterval() {
     return truststoreReloadInterval;
   }
+
+  public boolean isTokenEnabled() {
+    return blockTokenEnabled || containerTokenEnabled;
+  }
 }
