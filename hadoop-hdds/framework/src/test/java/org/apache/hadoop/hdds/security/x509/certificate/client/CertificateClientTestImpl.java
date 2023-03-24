@@ -211,6 +211,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public List<X509Certificate> getTrustChain() {
     List<X509Certificate> list = new ArrayList<>();
+    list.add(x509Certificate);
     list.add(rootCert);
     return list;
   }
@@ -270,7 +271,7 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public X509Certificate getRootCACertificate() {
-    return x509Certificate;
+    return rootCert;
   }
 
   @Override
