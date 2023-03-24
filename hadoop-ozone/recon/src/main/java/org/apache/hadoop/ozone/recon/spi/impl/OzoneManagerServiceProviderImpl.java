@@ -476,7 +476,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Number of updates received from OM : {}, " +
             "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
         numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
-    return dbUpdates.isDBUpdateSuccess();
+    return null != dbUpdates ? dbUpdates.isDBUpdateSuccess() : false;
   }
 
   /**
