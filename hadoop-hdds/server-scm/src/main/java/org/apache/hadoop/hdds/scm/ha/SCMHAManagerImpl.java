@@ -340,7 +340,15 @@ public class SCMHAManagerImpl implements SCMHAManager {
     if (ratisServer != null) {
       ratisServer.stop();
       grpcServer.stop();
+      close();
     }
+  }
+
+  /**
+   * Releases resources that are allocated even if not {@link #start()}ed.
+   */
+  @Override
+  public void close() {
     IOUtils.close(LOG, transactionBuffer);
   }
 
