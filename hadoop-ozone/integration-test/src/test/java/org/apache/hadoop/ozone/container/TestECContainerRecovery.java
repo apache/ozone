@@ -97,7 +97,7 @@ public class TestECContainerRecovery {
    */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024;
+    chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
