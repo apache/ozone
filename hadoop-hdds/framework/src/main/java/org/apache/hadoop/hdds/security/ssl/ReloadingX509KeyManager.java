@@ -182,8 +182,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
 
     currentPrivateKey = privateKey;
     currentCertList.clear();
-    for (X509Certificate caCert: newCertList) {
-      currentCertList.add(caCert.getSerialNumber().toString());
+    for (X509Certificate cert: newCertList) {
+      currentCertList.add(cert.getSerialNumber().toString());
     }
     return keyManager;
   }

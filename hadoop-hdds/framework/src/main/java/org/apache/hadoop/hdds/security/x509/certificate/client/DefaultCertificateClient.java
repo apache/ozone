@@ -351,8 +351,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     } else {
       // case before certificate bundle is supported
       chain.add(getCertificate());
-      chain.add(getCACertificate());
-      X509Certificate cert = getRootCACertificate();
+      X509Certificate cert = getCACertificate();
+      if (cert != null) {
+        chain.add(getCACertificate());
+      }
+      cert = getRootCACertificate();
       if (cert != null) {
         chain.add(cert);
       }
