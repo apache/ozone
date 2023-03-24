@@ -123,7 +123,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 11 ]
+        java: [ 11, 17 ]
       fail-fast: false
     steps:
       - name: Download Ozone source tarball
