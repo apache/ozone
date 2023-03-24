@@ -137,7 +137,11 @@ public class RDBStore implements DBStore {
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
       } else {
-        checkpointsParentDir =
+      // Create checkpoints directory if not exists.
+      Path checkpointsParentDirPath =
+          Paths.get(dbLocation.getParent(), "db.checkpoints");
+      checkpointsParentDir = checkpointsParentDirPath.toString();
+      Files.createDirectories(checkpointsParentDirPath);
           Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
         File checkpointsDir = new File(checkpointsParentDir);
         if (!checkpointsDir.exists()) {
