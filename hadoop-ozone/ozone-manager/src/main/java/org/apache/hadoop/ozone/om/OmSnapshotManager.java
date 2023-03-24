@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -71,7 +70,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -92,11 +90,11 @@ public final class OmSnapshotManager implements AutoCloseable {
    * Contains all the snap diff job which are either queued, in_progress or
    * done. This table is used to make sure that there is only single job for
    * requests with the same snapshot pair at any point of time.
-   * |----------------------------------------------|
-   * |  KEY                         |  VALUE        |
-   * |----------------------------------------------|
-   * |  fromSnapshotId-toSnapshotId | snapDiffJobId |
-   * |----------------------------------------------|
+   * |------------------------------------------------|
+   * |  KEY                         |  VALUE          |
+   * |------------------------------------------------|
+   * |  fromSnapshotId-toSnapshotId | SnapshotDiffJob |
+   * |------------------------------------------------|
    */
   private static final String SNAP_DIFF_JOB_TABLE_NAME =
       "snap-diff-job-table";
@@ -449,11 +447,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     try {
       final OmSnapshot fs = snapshotCache.get(fsKey);
       final OmSnapshot ts = snapshotCache.get(tsKey);
-      SnapshotDiffReport snapshotDiffReport =
-          snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
+      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
               fsInfo, tsInfo, index, pageSize, forceFullDiff);
-      return new SnapshotDiffResponse(snapshotDiffReport, DONE, 0L);
-    } catch (ExecutionException | RocksDBException e) {
+    } catch (ExecutionException e) {
       throw new IOException(e.getCause());
     }
   }
