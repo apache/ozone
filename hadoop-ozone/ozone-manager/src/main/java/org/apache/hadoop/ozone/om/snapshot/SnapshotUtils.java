@@ -64,16 +64,4 @@ public final class SnapshotUtils {
     }
     return snapshotInfo;
   }
-
-  public static <E> void closeIterator(final CloseableIterator<E> iterator) {
-    if (iterator == null) {
-      return;
-    }
-
-    try {
-      iterator.close();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
 }

@@ -74,7 +74,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.closeIterator;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
@@ -168,6 +167,8 @@ public class SnapshotDiffManager implements AutoCloseable {
         new ThreadPoolExecutor.CallerRunsPolicy()
     );
 
+    // TODO: [SNAPSHOT] Load jobs only if it is leader node.
+    //  It could a event-triggered form OM when node is leader and up.
     this.loadJobsOnStartUp();
   }
 
@@ -368,7 +369,6 @@ public class SnapshotDiffManager implements AutoCloseable {
           null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
   }
-
 
   /**
    * Check if there is an existing request for the same `fromSnapshot` and
@@ -888,12 +888,9 @@ public class SnapshotDiffManager implements AutoCloseable {
    * execute it.
    */
   private void loadJobsOnStartUp() {
-    CloseableIterator<Map.Entry<String, SnapshotDiffJob>> iterator = null;
 
-    try {
-      iterator = (CloseableIterator<Map.Entry<String, SnapshotDiffJob>>)
-          snapDiffJobTable.iterator();
-
+    try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
+             snapDiffJobTable.iterator()) {
       while (iterator.hasNext()) {
         Map.Entry<String, SnapshotDiffJob> next = iterator.next();
         String jobKey = next.getKey();
@@ -911,10 +908,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     } catch (IOException e) {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e.getCause());
-    } finally {
-      if (iterator != null) {
-        closeIterator(iterator);
-      }
     }
   }
 

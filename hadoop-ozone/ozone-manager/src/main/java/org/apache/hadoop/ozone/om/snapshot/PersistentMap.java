@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.util.Iterator;
 import java.util.Map;
+import org.apache.hadoop.util.ClosableIterator;
 
 /**
  * Define an interface for persistent map.
@@ -32,5 +32,5 @@ public interface PersistentMap<K, V> {
 
   void remove(K key);
 
-  Iterator<Map.Entry<K, V>> iterator();
+  ClosableIterator<Map.Entry<K, V>> iterator();
 }
