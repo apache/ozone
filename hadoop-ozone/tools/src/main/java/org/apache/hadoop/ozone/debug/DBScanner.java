@@ -95,7 +95,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--dnSchema", "-d", "--dn-schema"},
       description = "Datanode DB Schema Version : V1/V2/V3",
-      defaultValue = "V2")
+      defaultValue = "V3")
   private static String dnDBSchemaVersion;
 
   @CommandLine.Option(names = {"--container-id", "-cid"},
@@ -137,7 +137,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   private static List<Object> displayTable(ManagedRocksIterator iterator,
-      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+      DBColumnFamilyDefinition dbColumnFamilyDefinition, boolean schemaV3)
+          throws IOException {
     List<Object> outputs = new ArrayList<>();
 
     if (startKey != null) {
@@ -153,8 +154,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         printWriter = new PrintWriter(fileWriter);
       }
 
-      boolean schemaV3 = dnDBSchemaVersion != null &&
-          dnDBSchemaVersion.equals("V3");
       while (iterator.get().isValid()) {
         StringBuilder result = new StringBuilder();
         if (withKey) {
@@ -279,14 +278,17 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         new ArrayList<>();
     ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
+    final boolean schemaV3 = DBScanner.dnDBSchemaVersion != null &&
+            DBScanner.dnDBSchemaVersion.equals("V3") &&
+            parent.getDbPath().contains(OzoneConsts.CONTAINER_DB_NAME);
     this.printAppropriateTable(columnFamilyHandleList,
-           rocksDB, parent.getDbPath());
+           rocksDB, parent.getDbPath(), schemaV3);
     return null;
   }
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          ManagedRocksDB rocksDB, String dbPath)
+          ManagedRocksDB rocksDB, String dbPath, boolean schemaV3)
       throws IOException, RocksDBException {
     if (limit < 1 && limit != -1) {
       throw new IllegalArgumentException(
@@ -317,8 +319,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           return;
         }
         ManagedRocksIterator iterator;
-        if (containerId > 0 && dnDBSchemaVersion != null &&
-            dnDBSchemaVersion.equals("V3")) {
+        if (containerId > 0 && schemaV3) {
           ManagedReadOptions readOptions = new ManagedReadOptions();
           readOptions.setIterateUpperBound(new ManagedSlice(
               FixedLengthStringUtils.string2Bytes(
@@ -334,7 +335,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
               rocksDB.get().newIterator(columnFamilyHandle));
           iterator.get().seekToFirst();
         }
-        scannedObjects = displayTable(iterator, columnFamilyDefinition);
+        scannedObjects = displayTable(iterator,
+                columnFamilyDefinition, schemaV3);
       }
     } else {
       System.out.println("Incorrect db Path");

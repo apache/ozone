@@ -325,11 +325,11 @@ public final class ReplicationTestUtil {
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
    * @throws NotLeaderException
-   * @throws AllSourcesOverloadedException
+   * @throws CommandTargetOverloadedException
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
-      throws NotLeaderException, AllSourcesOverloadedException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
@@ -385,5 +385,30 @@ public final class ReplicationTestUtil {
       commandsSent.add(Pair.of(target, deleteCommand));
       return null;
     }).when(mock).sendDeleteCommand(any(), anyInt(), any(), anyBoolean());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendThrottledDeleteCommand method so that it adds the command created to
+   * the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   */
+  public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      int replicaIndex = invocationOnMock.getArgument(1);
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      boolean forceDelete = invocationOnMock.getArgument(3);
+      DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+          containerInfo.getContainerID(), forceDelete);
+      deleteCommand.setReplicaIndex(replicaIndex);
+      commandsSent.add(Pair.of(target, deleteCommand));
+      return null;
+    }).when(mock)
+        .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
   }
 }

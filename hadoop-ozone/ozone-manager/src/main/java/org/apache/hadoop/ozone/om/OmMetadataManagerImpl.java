@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBTenantStateCodec;
 import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
 import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyRenameInfoCodec;
 import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
@@ -85,7 +84,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -191,13 +189,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    *
    * Snapshot Tables:
-   * |----------------------------------------------------------------------|
-   * |  Column Family     |        VALUE                                    |
-   * |----------------------------------------------------------------------|
-   * |  snapshotInfoTable | /volume/bucket/snapshotName -> SnapshotInfo     |
-   * |----------------------------------------------------------------------|
-   * |  renamedKeyTable | /volumeName/bucketName/objectID -> OmKeyRenameInfo|
-   * |----------------------------------------------------------------------|
+   * |-------------------------------------------------------------------------|
+   * |  Column Family        |        VALUE                                    |
+   * |-------------------------------------------------------------------------|
+   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * |-------------------------------------------------------------------------|
+   * |snapshotRenamedKeyTable| /volumeName/bucketName/objectID -> /v/b/origKey |
+   * |-------------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -224,7 +222,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  public static final String RENAMED_KEY_TABLE = "renamedKeyTable";
+  public static final String SNAPSHOT_RENAMED_KEY_TABLE =
+      "snapshotRenamedKeyTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -247,7 +246,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      RENAMED_KEY_TABLE
+      SNAPSHOT_RENAMED_KEY_TABLE
   };
 
   private DBStore store;
@@ -276,7 +275,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table tenantStateTable;
 
   private Table snapshotInfoTable;
-  private Table renamedKeyTable;
+  private Table snapshotRenamedKeyTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -529,7 +528,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
-        .addTable(RENAMED_KEY_TABLE)
+        .addTable(SNAPSHOT_RENAMED_KEY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -545,8 +544,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, new OmDBAccessIdInfoCodec())
         .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
-        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec())
-        .addCodec(OmKeyRenameInfo.class, new OmKeyRenameInfoCodec());
+        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec());
   }
 
   /**
@@ -651,11 +649,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
-    // objectID -> renamedKeys (renamed keys for key table)
-    renamedKeyTable = this.store.getTable(RENAMED_KEY_TABLE,
-        String.class, OmKeyRenameInfo.class);
-    checkTableStatus(renamedKeyTable, RENAMED_KEY_TABLE, addCacheMetrics);
-    // TODO: [SNAPSHOT] Initialize table lock for renamedKeyTable.
+    // volumeName/bucketName/objectID -> renamedKey (renamed key for key table)
+    snapshotRenamedKeyTable = this.store.getTable(SNAPSHOT_RENAMED_KEY_TABLE,
+        String.class, String.class);
+    checkTableStatus(snapshotRenamedKeyTable, SNAPSHOT_RENAMED_KEY_TABLE,
+        addCacheMetrics);
+    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedKeyTable.
   }
 
   /**
@@ -1665,8 +1664,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, OmKeyRenameInfo> getRenamedKeyTable() {
-    return renamedKeyTable;
+  public Table<String, String> getSnapshotRenamedKeyTable() {
+    return snapshotRenamedKeyTable;
   }
 
   /**

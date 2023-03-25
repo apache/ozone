@@ -241,7 +241,7 @@ public class RatisUnderReplicationHandler
 
   private int sendReplicationCommands(
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) throws AllSourcesOverloadedException,
+      List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
       NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
     int commandsSent = 0;

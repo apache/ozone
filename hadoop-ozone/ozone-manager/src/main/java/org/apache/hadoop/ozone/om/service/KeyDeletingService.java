@@ -184,8 +184,8 @@ public class KeyDeletingService extends BackgroundService {
                 //  OMRequest model.
                 delCount = deleteAllKeys(results);
               }
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("Number of keys deleted: {}, elapsed time: {}ms",
+              if (delCount > 0) {
+                LOG.info("Number of keys deleted: {}, elapsed time: {}ms",
                     delCount, Time.monotonicNow() - startTime);
               }
               deletedKeyCount.addAndGet(delCount);

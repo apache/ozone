@@ -18,18 +18,18 @@
 CORE-SITE.XML_hadoop.proxyuser.httpfs.hosts=*
 CORE-SITE.XML_hadoop.proxyuser.httpfs.groups=*
 
-CORE-SITE.XML_fs.defaultFS=ofs://id1
+CORE-SITE.XML_fs.defaultFS=ofs://omservice
 CORE-SITE.XML_fs.trash.interval=1
 
-OZONE-SITE.XML_ozone.om.service.ids=id1
-OZONE-SITE.XML_ozone.om.internal.service.id=id1
-OZONE-SITE.XML_ozone.om.nodes.id1=om1,om2,om3
-OZONE-SITE.XML_ozone.om.address.id1.om1=om1
-OZONE-SITE.XML_ozone.om.address.id1.om2=om2
-OZONE-SITE.XML_ozone.om.address.id1.om3=om3
-OZONE-SITE.XML_ozone.om.http-address.id1.om1=om1
-OZONE-SITE.XML_ozone.om.http-address.id1.om2=om2
-OZONE-SITE.XML_ozone.om.http-address.id1.om3=om3
+OZONE-SITE.XML_ozone.om.service.ids=omservice
+OZONE-SITE.XML_ozone.om.internal.service.id=omservice
+OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3
+OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
+OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
+OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
+OZONE-SITE.XML_ozone.om.http-address.omservice.om1=om1
+OZONE-SITE.XML_ozone.om.http-address.omservice.om2=om2
+OZONE-SITE.XML_ozone.om.http-address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
@@ -154,7 +154,6 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 OZONE_DATANODE_SECURE_USER=root
 JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
-SLEEP_SECONDS=5
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

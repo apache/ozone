@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -34,14 +33,14 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for OMSnapshotCreateRequest.
  */
 @CleanupTableInfo(cleanupTables = {
-    DELETED_TABLE, RENAMED_KEY_TABLE, SNAPSHOT_INFO_TABLE})
+    DELETED_TABLE, SNAPSHOT_RENAMED_KEY_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
   private SnapshotInfo snapshotInfo;
@@ -65,35 +64,41 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // Create the snapshot checkpoint
-    // Also cleans up deletedTable
-    OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
-        snapshotInfo);
-
-    String key = snapshotInfo.getTableKey();
+    // Note: It is intentional that we write SnapshotInfo to DB _before_
+    // creating snapshot DB checkpoint. Otherwise there could be a
+    // small chance that the DB listeners in RocksDBCheckpointDiffer could skip
+    // the compaction tracking when the checkpoint is _just_ created and another
+    // compaction happens. Even though the worst case if that happens it
+    // would just negatively impact SnapDiff performance because of the missing
+    // compaction DAG nodes. SnapDiff correctness will not be impacted by this.
 
     // Add to db
+    String key = snapshotInfo.getTableKey();
     omMetadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
         key, snapshotInfo);
 
+    // Create the snapshot checkpoint. Also cleans up some tables.
+    OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
+        snapshotInfo);
+
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
-    // Remove all entries from renamedKeyTable
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyRenameInfo>>
-        iterator = omMetadataManager.getRenamedKeyTable().iterator();
+    // Remove all entries from snapshotRenamedKeyTable
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+        iterator = omMetadataManager.getSnapshotRenamedKeyTable().iterator()) {
 
-    String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
-        + OM_KEY_PREFIX;
-    iterator.seek(dbSnapshotBucketKey);
+      String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
+          + OM_KEY_PREFIX;
+      iterator.seek(dbSnapshotBucketKey);
 
-    while (iterator.hasNext()) {
-      String renameDbKey = iterator.next().getKey();
-      if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
-        break;
+      while (iterator.hasNext()) {
+        String renameDbKey = iterator.next().getKey();
+        if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
+          break;
+        }
+        omMetadataManager.getSnapshotRenamedKeyTable()
+            .deleteWithBatch(batchOperation, renameDbKey);
       }
-      omMetadataManager.getRenamedKeyTable()
-          .deleteWithBatch(batchOperation, renameDbKey);
     }
-
   }
 }

@@ -114,7 +114,6 @@ public final class MoveManager implements
    */
   private long moveTimeout = 1000 * 65 * 60;
   private long replicationTimeout = 1000 * 50 * 60;
-  private static final double MOVE_DEADLINE_FACTOR = 0.95;
 
   private final ReplicationManager replicationManager;
   private final ContainerManager containerManager;
@@ -448,8 +447,7 @@ public final class MoveManager implements
         containerInfo.containerID(), src);
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + replicationTimeout,
-        now + Math.round(replicationTimeout * MOVE_DEADLINE_FACTOR));
+        replicaIndex, src, tgt, now + replicationTimeout);
   }
 
   /**
@@ -468,8 +466,7 @@ public final class MoveManager implements
     long deleteTimeout = moveTimeout - replicationTimeout;
     long now = clock.millis();
     replicationManager.sendDeleteCommand(
-        containerInfo, replicaIndex, datanode, true, now + deleteTimeout,
-        now + Math.round(deleteTimeout * MOVE_DEADLINE_FACTOR));
+        containerInfo, replicaIndex, datanode, true, now + deleteTimeout);
   }
 
   private int getContainerReplicaIndex(
