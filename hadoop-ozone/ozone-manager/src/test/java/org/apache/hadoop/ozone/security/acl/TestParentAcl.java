@@ -119,17 +119,6 @@ public class TestParentAcl {
         new String[]{"test1"});
   }
 
-  // Refined the parent context
-  // OP         |CHILD       |PARENT
-
-  // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
-  // DELETE      DELETE       WRITE
-  // WRITE       WRITE        WRITE
-  // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
-
-  // READ        READ         READ
-  // LIST        LIST         READ      (V1 LIST=>READ)
-  // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
   @Test
   @Flaky("HDDS-6335")
   public void testKeyAcl()
