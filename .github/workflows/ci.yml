@@ -18,6 +18,7 @@ on:
 env:
   FAIL_FAST: ${{ github.event_name == 'pull_request' }}
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name != 'pull_request' }}
 jobs:
   build-info:
     runs-on: ubuntu-20.04
@@ -93,7 +94,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
@@ -148,6 +149,8 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Compile Ozone using Java ${{ matrix.java }}
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
+        env:
+          OZONE_WITH_COVERAGE: false
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -274,7 +277,6 @@ jobs:
         env:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
-          OZONE_WITH_COVERAGE: true
           OZONE_VOLUME_OWNER: 1000
       - name: Archive build results
         uses: actions/upload-artifact@v3
