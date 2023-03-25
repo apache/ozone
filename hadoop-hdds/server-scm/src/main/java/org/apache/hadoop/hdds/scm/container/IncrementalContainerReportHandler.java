@@ -94,10 +94,11 @@ public class IncrementalContainerReportHandler extends
                 ContainerReplicaProto.State.DELETED)) {
               nodeManager.removeContainer(dd, id);
             } else {
-              if (validateOpenContainerReplica(container, dd, nodeManager,
+              if (!validateOpenContainerReplica(container, dd, nodeManager,
                   publisher)) {
-                nodeManager.addContainer(dd, id);
+                continue;
               }
+              nodeManager.addContainer(dd, id);
             }
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {

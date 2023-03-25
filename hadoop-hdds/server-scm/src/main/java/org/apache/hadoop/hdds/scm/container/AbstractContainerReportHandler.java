@@ -413,6 +413,15 @@ public class AbstractContainerReportHandler {
   protected boolean validateOpenContainerReplica(
       ContainerInfo container, DatanodeDetails dd, NodeManager nodeManager,
       EventPublisher publisher) {
+    if (container == null) {
+      // container not present, no need validate, its validated outside
+      return true;
+    }
+    if (container.getReplicationConfig().getReplicationType()
+        == HddsProtos.ReplicationType.EC) {
+      // EC construction mechanism do not follow raits pipeline
+      return true;
+    }
     if (container.getState() == HddsProtos.LifeCycleState.OPEN) {
       if (!nodeManager.getPipelines(dd).contains(
           container.getPipelineID())) {
