@@ -288,6 +288,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -2917,6 +2918,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       try {
         leaderId = omRatisServer.getLeader();
+        if (leaderId == null) {
+          LOG.error("No leader found");
+          return "Exception: Not a leader";
+        }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
@@ -3088,8 +3093,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
+
+      final GrpcTlsConfig tlsConfig = OzoneManagerRatisUtils.createTlsConfig(
+          secConfig, certClient, true);
+
       RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
-          targetPeerId);
+          targetPeerId, tlsConfig);
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -4478,10 +4487,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize)
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   @Override // ReconfigureProtocol

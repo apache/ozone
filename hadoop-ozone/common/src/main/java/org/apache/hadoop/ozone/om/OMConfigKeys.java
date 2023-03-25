@@ -85,6 +85,10 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.key.deleting.limit.per.task";
+  public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
+      = 20000;
 
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.key.cleanup.service.interval";
@@ -332,6 +336,10 @@ public final class OMConfigKeys {
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
   public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
+
+  public static final String SNAPSHOT_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.deleting.limit.per.task";
+  public static final int SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT = 10;
 
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
       "ozone.snapshot.filtering.service.interval";

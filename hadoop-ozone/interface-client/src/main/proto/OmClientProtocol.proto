@@ -130,8 +130,10 @@ enum Type {
   ListSnapshot = 113;
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
+  SnapshotMoveDeletedKeys = 116;
 
-  TransferLeadership = 116;
+  TransferLeadership = 117;
+  SnapshotPurge = 118;
 }
 
 message OMRequest {
@@ -244,8 +246,10 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
-  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 116;
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
 }
 
@@ -352,8 +356,10 @@ message OMResponse {
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
   optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
-  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 116;
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
 }
 
 enum Status {
@@ -1028,10 +1034,6 @@ message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
 }
 
-message KeyRenameInfo {
-  repeated string keyNames = 1;
-}
-
 message OzoneFileStatusProto {
     optional KeyInfo keyInfo = 2;
     optional uint64 blockSize = 3;
@@ -1694,6 +1696,7 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7;
 }
 
 message DeleteSnapshotRequest {
@@ -1701,6 +1704,21 @@ message DeleteSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional uint64 deletionTime = 4;
+}
+
+message SnapshotMoveDeletedKeysRequest {
+  optional SnapshotInfo fromSnapshot = 1;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 2;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+}
+
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
 }
 
 message DeleteTenantRequest {
@@ -1762,6 +1780,14 @@ message SnapshotDiffResponse {
 }
 
 message DeleteSnapshotResponse {
+
+}
+
+message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
 
 }
 

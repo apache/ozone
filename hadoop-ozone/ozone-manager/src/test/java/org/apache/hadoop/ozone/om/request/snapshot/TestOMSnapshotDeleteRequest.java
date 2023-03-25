@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -67,7 +66,7 @@ public class TestOMSnapshotDeleteRequest {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
-  private OMMetadataManager omMetadataManager;
+  private OmMetadataManagerImpl omMetadataManager;
 
   private String volumeName;
   private String bucketName;

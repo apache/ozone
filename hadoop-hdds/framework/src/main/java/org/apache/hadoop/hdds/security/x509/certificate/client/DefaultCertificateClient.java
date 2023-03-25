@@ -922,7 +922,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     Date expireDate = certificate.getNotAfter();
     LocalDateTime gracePeriodStart = expireDate.toInstant()
-        .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+        .minus(gracePeriod).atZone(ZoneId.systemDefault()).toLocalDateTime();
     LocalDateTime currentTime = LocalDateTime.now();
     if (gracePeriodStart.isBefore(currentTime)) {
       // Cert is already in grace period time.
@@ -1195,7 +1195,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               getComponentName() + "-CertificateLifetimeMonitor")
               .setDaemon(true).build());
     }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
+    this.executorService.scheduleAtFixedRate(
+        new CertificateLifetimeMonitor(this),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1206,6 +1207,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *  Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateLifetimeMonitor implements Runnable {
+    private CertificateClient certClient;
+
+    public CertificateLifetimeMonitor(CertificateClient client) {
+      this.certClient = client;
+    }
+
     @Override
     public void run() {
 
@@ -1245,7 +1252,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           cleanBackupDir();
           // notify notification receivers
           notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-              currentCert.getSerialNumber().toString(), newCertId));
+              certClient, currentCert.getSerialNumber().toString(), newCertId));
         }
       } finally {
         renewLock.unlock();

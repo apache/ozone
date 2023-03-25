@@ -19,15 +19,17 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -113,8 +115,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
@@ -133,7 +138,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName);
 
-      //Check if snapshot already exists
+      // Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
@@ -146,6 +151,26 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
 
+      // Set previous path and global snapshot
+      String latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshot(snapshotPath);
+      String latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshot();
+
+      if (StringUtils.isEmpty(latestPathSnapshot)) {
+        snapshotInfo.setPathPreviousSnapshotID(null);
+      } else {
+        snapshotInfo.setPathPreviousSnapshotID(latestPathSnapshot);
+      }
+
+      if (StringUtils.isEmpty(latestGlobalSnapshot)) {
+        snapshotInfo.setGlobalPreviousSnapshotID(null);
+      } else {
+        snapshotInfo.setGlobalPreviousSnapshotID(latestGlobalSnapshot);
+      }
+
+      snapshotChainManager.addSnapshot(snapshotInfo);
+
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),
             new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
@@ -154,7 +179,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           CreateSnapshotResponse.newBuilder()
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
-          omResponse.build(), volumeName, bucketName, snapshotName);
+          omResponse.build(), snapshotInfo);
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(

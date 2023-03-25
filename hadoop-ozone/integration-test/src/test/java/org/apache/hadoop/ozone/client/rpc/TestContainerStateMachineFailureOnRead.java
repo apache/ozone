@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.RatisTestHelper;
@@ -74,6 +75,7 @@ public class TestContainerStateMachineFailureOnRead {
   private String volumeName;
   private String bucketName;
   private OzoneConfiguration conf;
+  private OzoneClient client;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -120,7 +122,7 @@ public class TestContainerStateMachineFailureOnRead {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
     bucketName = volumeName;
@@ -131,6 +133,7 @@ public class TestContainerStateMachineFailureOnRead {
 
   @AfterEach
   public void teardown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

@@ -25,6 +25,8 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -72,6 +74,8 @@ import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
@@ -87,10 +91,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.security.cert.X509Certificate;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -215,6 +222,10 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotCreateRequest(omRequest);
     case DeleteSnapshot:
       return new OMSnapshotDeleteRequest(omRequest);
+    case SnapshotMoveDeletedKeys:
+      return new OMSnapshotMoveDeletedKeysRequest(omRequest);
+    case SnapshotPurge:
+      return new OMSnapshotPurgeRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
@@ -450,5 +461,19 @@ public final class OzoneManagerRatisUtils {
       LOG.debug(e.getMessage());
       throw new ServiceException(e);
     }
+  }
+
+  public static GrpcTlsConfig createTlsConfig(SecurityConfig conf,
+      CertificateClient caClient, boolean mutualTls) throws IOException {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
+          conf.getConfiguration());
+      GrpcTlsConfig config = new GrpcTlsConfig(
+          caClient.getPrivateKey(), caClient.getCertificate(),
+          caList, mutualTls);
+      return config;
+    }
+
+    return null;
   }
 }

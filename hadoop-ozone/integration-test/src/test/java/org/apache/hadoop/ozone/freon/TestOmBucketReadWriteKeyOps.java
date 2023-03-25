@@ -18,10 +18,12 @@ package org.apache.hadoop.ozone.freon;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -57,6 +59,7 @@ public class TestOmBucketReadWriteKeyOps {
   private ObjectStore store = null;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
+  private OzoneClient client;
 
   @Before
   public void setup() {
@@ -72,6 +75,7 @@ public class TestOmBucketReadWriteKeyOps {
    * Shutdown MiniDFSCluster.
    */
   private void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -90,7 +94,8 @@ public class TestOmBucketReadWriteKeyOps {
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
 
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
   }
 
   private OzoneConfiguration getOzoneConfiguration() {

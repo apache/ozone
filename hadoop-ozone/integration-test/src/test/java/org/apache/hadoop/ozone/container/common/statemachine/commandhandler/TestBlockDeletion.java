@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.stream.Stream;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -43,7 +45,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -109,6 +111,7 @@ public class TestBlockDeletion {
   private Set<Long> containerIdsWithDeletedBlocks;
   private long maxTransactionId = 0;
   private ScmBlockDeletingServiceMetrics metrics;
+  private OzoneClient client;
 
   @BeforeEach
   public void init() throws Exception {
@@ -117,7 +120,8 @@ public class TestBlockDeletion {
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(LegacyReplicationManager.LOG, Level.DEBUG);
 
-    conf.set("ozone.replication.allowed-configs", "^(RATIS/THREE)|(EC/2-1)$");
+    conf.set("ozone.replication.allowed-configs",
+        "^(RATIS/THREE)|(EC/2-1-256k)$");
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
@@ -145,15 +149,19 @@ public class TestBlockDeletion {
     conf.setQuietMode(false);
     conf.setTimeDuration("hdds.scm.replication.event.timeout", 100,
         TimeUnit.MILLISECONDS);
+    conf.setTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
+        0,
+        TimeUnit.MILLISECONDS);
     conf.setInt("hdds.datanode.block.delete.threads.max", 5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
     om = cluster.getOzoneManager();
-    writeClient = cluster.getRpcClient().getObjectStore()
+    writeClient = store
         .getClientProxy().getOzoneManagerClient();
     scm = cluster.getStorageContainerManager();
     containerIdsWithDeletedBlocks = new HashSet<>();
@@ -163,6 +171,7 @@ public class TestBlockDeletion {
 
   @AfterEach
   public void cleanup() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

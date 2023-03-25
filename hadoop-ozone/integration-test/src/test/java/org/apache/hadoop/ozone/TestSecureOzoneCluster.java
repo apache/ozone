@@ -125,8 +125,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
@@ -1275,8 +1273,6 @@ public final class TestSecureOzoneCluster {
       int certLifetime = 30; // second
       conf.set(HDDS_X509_DEFAULT_DURATION,
           Duration.ofSeconds(certLifetime).toString());
-      conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
-      conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
       conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 2);
 
       // initialize OmStorage, save om Cert and CA Certs to disk
@@ -1335,25 +1331,25 @@ public final class TestSecureOzoneCluster {
       GenericTestUtils.waitFor(() -> om.isLeaderReady(), 500, 10000);
       String transportCls = GrpcOmTransportFactory.class.getName();
       conf.set(OZONE_OM_TRANSPORT_CLASS, transportCls);
-      OzoneClient client = OzoneClientFactory.getRpcClient(conf);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
 
-      ServiceInfoEx serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
+        ServiceInfoEx serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+            CertificateCodec.getPEMEncodedString(caCert)));
 
-      // Wait for OM certificate to renewed
-      GenericTestUtils.waitFor(() ->
-              !omCert.getSerialNumber().toString().equals(
-                  omCertClient.getCertificate().getSerialNumber().toString()),
-          500, certLifetime * 1000);
+        // Wait for OM certificate to renewed
+        GenericTestUtils.waitFor(() ->
+                !omCert.getSerialNumber().toString().equals(
+                    omCertClient.getCertificate().getSerialNumber().toString()),
+            500, certLifetime * 1000);
 
-      // rerun the command using old client, it should succeed
-      serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
-      client.close();
+        // rerun the command using old client, it should succeed
+        serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+            CertificateCodec.getPEMEncodedString(caCert)));
+      }
 
       // get new client, it should succeed.
       try {
@@ -1370,7 +1366,8 @@ public final class TestSecureOzoneCluster {
           500, certLifetime * 1000);
       // get new client, it should succeed too.
       try {
-        OzoneClientFactory.getRpcClient(conf);
+        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
+        client1.close();
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());

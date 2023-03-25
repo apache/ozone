@@ -17,7 +17,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.time.Duration;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,9 +29,11 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -54,6 +56,9 @@ import com.google.common.base.Preconditions;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
 /**
  * A background service running in SCM to delete blocks. This service scans
@@ -83,15 +88,29 @@ public class SCMBlockDeletingService extends BackgroundService
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
 
+  private long safemodeExitMillis = 0;
+  private final long safemodeExitRunDelayMillis;
+  private final Clock clock;
+
   @SuppressWarnings("parameternumber")
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
              NodeManager nodeManager, EventPublisher eventPublisher,
              SCMContext scmContext, SCMServiceManager serviceManager,
-             Duration interval, long serviceTimeout,
              ConfigurationSource conf,
-             ScmBlockDeletingServiceMetrics metrics) {
-    super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
-        BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
+             ScmBlockDeletingServiceMetrics metrics,
+             Clock clock) {
+    super("SCMBlockDeletingService",
+        conf.getObject(ScmConfig.class).getBlockDeletionInterval().toMillis(),
+        TimeUnit.MILLISECONDS, BLOCK_DELETING_SERVICE_CORE_POOL_SIZE,
+        conf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+            OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS));
+
+    this.safemodeExitRunDelayMillis = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.clock = clock;
     this.deletedBlockLog = deletedBlockLog;
     this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
@@ -134,14 +153,18 @@ public class SCMBlockDeletingService extends BackgroundService
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running DeletedBlockTransactionScanner");
       }
-      // TODO - DECOMM - should we be deleting blocks from decom nodes
-      //        and what about entering maintenance.
       List<DatanodeDetails> datanodes =
           nodeManager.getNodes(NodeStatus.inServiceHealthy());
       if (datanodes != null) {
+        // When DN node is healthy and in-service, and previous commands 
+        // are handled for deleteBlocks Type, then it will be considered
+        // in this iteration
+        final Set<DatanodeDetails> included = datanodes.stream().filter(
+            dn -> nodeManager.getCommandQueueCount(dn.getUuid(),
+                Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeleteLimitSize);
+              deletedBlockLog.getTransactions(blockDeleteLimitSize, included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -156,10 +179,6 @@ public class SCMBlockDeletingService extends BackgroundService
               processedTxIDs.addAll(dnTXs.stream()
                   .map(DeletedBlocksTransaction::getTxID)
                   .collect(Collectors.toSet()));
-              // TODO commandQueue needs a cap.
-              // We should stop caching new commands if num of un-processed
-              // command is bigger than a limit, e.g 50. In case datanode goes
-              // offline for sometime, the cached commands be flooded.
               SCMCommand<?> command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
@@ -176,7 +195,6 @@ public class SCMBlockDeletingService extends BackgroundService
               }
             }
           }
-          // TODO: Fix ME!!!
           LOG.info("Totally added {} blocks to be deleted for"
                   + " {} datanodes, task elapsed time: {}ms",
               transactions.getBlocksDeleted(),
@@ -211,7 +229,9 @@ public class SCMBlockDeletingService extends BackgroundService
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      if (scmContext.isLeaderReady()) {
+      if (scmContext.isLeaderReady() && !scmContext.isInSafeMode() &&
+          serviceStatus != ServiceStatus.RUNNING) {
+        safemodeExitMillis = clock.millis();
         serviceStatus = ServiceStatus.RUNNING;
       } else {
         serviceStatus = ServiceStatus.PAUSING;
@@ -225,7 +245,15 @@ public class SCMBlockDeletingService extends BackgroundService
   public boolean shouldRun() {
     serviceLock.lock();
     try {
-      return serviceStatus == ServiceStatus.RUNNING;
+      long alreadyWaitTimeInMillis = clock.millis() - safemodeExitMillis;
+      boolean run = serviceStatus == ServiceStatus.RUNNING &&
+          (alreadyWaitTimeInMillis >= safemodeExitRunDelayMillis);
+      LOG.debug(
+          "Check scm block delete run: {} serviceStatus: {} " +
+              "safemodeExitRunDelayMillis: {} alreadyWaitTimeInMillis: {}",
+          run, serviceStatus, safemodeExitRunDelayMillis,
+          alreadyWaitTimeInMillis);
+      return run;
     } finally {
       serviceLock.unlock();
     }
