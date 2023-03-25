@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -46,6 +47,9 @@ import java.io.IOException;
 
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -123,6 +127,51 @@ public class TestContainerStateMachineIdempotency {
       ContainerProtocolCalls.closeContainer(client, containerID, null);
     } catch (IOException ioe) {
       Assert.fail("Container operation failed" + ioe);
+    }
+    xceiverClientManager.releaseClient(client, false);
+  }
+
+  @Test
+  public void testContainerWriteDifferentDNThenActualDNPipeline()
+      throws Exception {
+    ContainerWithPipeline anotherContainer = storageContainerLocationClient
+        .allocateContainer(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+    long containerID = anotherContainer.getContainerInfo().getContainerID();
+    ContainerWithPipeline container = storageContainerLocationClient
+        .allocateContainer(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+    Pipeline pipeline = container.getPipeline();
+    XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
+    try {
+      final Logger log = LoggerFactory.getLogger(
+          "org.apache.hadoop.hdds.scm.container");
+      GenericTestUtils.setLogLevel(log, Level.DEBUG);
+      GenericTestUtils.LogCapturer logCapturer =
+          GenericTestUtils.LogCapturer.captureLogs(log);
+      
+      // call create Container while write to chunk to different DN
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      byte[] data =
+          RandomStringUtils.random(RandomUtils.nextInt(0, 1024))
+              .getBytes(UTF_8);
+      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+          ContainerTestHelper
+              .getWriteChunkRequest(container.getPipeline(), blockID,
+                  data.length);
+      client.sendCommand(writeChunkRequest);
+
+      GenericTestUtils.waitFor(() -> {
+        return logCapturer.getOutput().contains(
+            "Sending delete container command for open container " +
+                "pipeline does not belongs to DN");
+      }, 200, 20000);
+      logCapturer.stopCapturing();
+
+    } catch (IOException ioe) {
+      // container close exception at DN as its closed by SCM
+      // as pipeline do not belongs to DN
+      Assert.fail("No exception should be thrown" + ioe);
     }
     xceiverClientManager.releaseClient(client, false);
   }
