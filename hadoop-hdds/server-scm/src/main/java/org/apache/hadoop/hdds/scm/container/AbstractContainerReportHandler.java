@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -407,5 +408,26 @@ public class AbstractContainerReportHandler {
         new CommandForDatanode<>(dn.getUuid(), command));
     logger.info("Sending delete container command for " + reason +
         " container {} to datanode {}", containerID.getId(), dn);
+  }
+  
+  protected boolean validateOpenContainerReplica(
+      ContainerInfo container, DatanodeDetails dd, NodeManager nodeManager,
+      EventPublisher publisher) {
+    if (container.getState() == HddsProtos.LifeCycleState.OPEN) {
+      if (!nodeManager.getPipelines(dd).contains(
+          container.getPipelineID())) {
+        logger.error("Received container report for open container {} " +
+                "from datanode {} which does not participate in pipeline.",
+            container.getContainerID(), dd);
+        final ContainerID containerId = ContainerID
+            .valueOf(container.getContainerID());
+        // delete the replica as container from other DN can cause
+        // data corruption / deletion as having invalid content
+        deleteReplica(containerId, dd, publisher,
+            "open container pipeline does not belongs to DN");
+        return false;
+      }
+    }
+    return true;
   }
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
@@ -93,7 +94,10 @@ public class IncrementalContainerReportHandler extends
                 ContainerReplicaProto.State.DELETED)) {
               nodeManager.removeContainer(dd, id);
             } else {
-              nodeManager.addContainer(dd, id);
+              if (validateOpenContainerReplica(container, dd, nodeManager,
+                  publisher)) {
+                nodeManager.addContainer(dd, id);
+              }
             }
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {

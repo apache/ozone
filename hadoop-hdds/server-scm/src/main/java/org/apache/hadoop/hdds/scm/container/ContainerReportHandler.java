@@ -185,8 +185,11 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
           boolean alreadyInDn = expectedContainersInDatanode.remove(cid);
           if (!alreadyInDn) {
-            // This is a new Container not in the nodeManager -> dn map yet
-            nodeManager.addContainer(datanodeDetails, cid);
+            if (validateOpenContainerReplica(container, datanodeDetails,
+                nodeManager, publisher)) {
+              // This is a new Container not in the nodeManager -> dn map yet
+              nodeManager.addContainer(datanodeDetails, cid);
+            }
           }
           if (container == null || ContainerReportValidator
                   .validate(container, datanodeDetails, replica)) {
