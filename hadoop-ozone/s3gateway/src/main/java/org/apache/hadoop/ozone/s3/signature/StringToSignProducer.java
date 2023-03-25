@@ -203,13 +203,23 @@ public final class StringToSignProducer {
       }
     }
 
-    validateCanonicalHeaders(canonicalHeaders.toString(), headers);
+    validateCanonicalHeaders(canonicalHeaders.toString(), headers,
+            unsignedPayload);
 
     String payloadHash;
     if (UNSIGNED_PAYLOAD.equals(
         headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
+      // According to AWS Sig V4 documentation
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/
+      // sig-v4-header-based-auth.html
+      // Note: The x-amz-content-sha256 header is required
+      // for all AWS Signature Version 4 requests.(using Authorization header)
+      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
+        LOG.error("The request must include x-amz-content-sha256 header");
+        throw S3_AUTHINFO_CREATION_ERROR;
+      }
       payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
     }
     String canonicalRequest = method + NEWLINE
@@ -344,21 +354,20 @@ public final class StringToSignProducer {
    * you must add it to the CanonicalHeaders list.
    * Any x-amz-* headers that you plan to include
    * in your request must also be added.
-   * Note: The x-amz-content-sha256 header is required
-   * for all AWS Signature Version 4 requests.
    *
    * @param canonicalHeaders
    * @param headers
    */
   private static void validateCanonicalHeaders(
           String canonicalHeaders,
-          Map<String, String> headers
+          Map<String, String> headers,
+          Boolean unsignedPaylod
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
-    if (headers.containsKey("content-type")) {
+    if (!unsignedPaylod && headers.containsKey("content-type")) {
       if (!canonicalHeaders.contains("content-type:")) {
         LOG.error("The SignedHeaders list must include Content-Type " +
                 "header if it is in the request");
@@ -373,10 +382,6 @@ public final class StringToSignProducer {
                 "x-amz-* headers in the request");
         throw S3_AUTHINFO_CREATION_ERROR;
       }
-    }
-    if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
-      LOG.error("The request must include x-amz-content-sha256 header");
-      throw S3_AUTHINFO_CREATION_ERROR;
     }
   }
 

@@ -18,10 +18,14 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.kerby.util.Hex;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 
 import org.junit.Assert;
@@ -32,7 +36,9 @@ import org.junit.Test;
  */
 public class TestAuthorizationV4QueryParser {
 
-  @Test(expected = IllegalArgumentException.class)
+  private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
+          format(LocalDateTime.now());
+  @Test(expected = MalformedResourceException.class)
   public void testExpiredHeaders() throws Exception {
 
     //GIVEN
@@ -42,6 +48,7 @@ public class TestAuthorizationV4QueryParser {
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", "20160801T083241Z");
     parameters.put("X-Amz-Expires", "10000");
+    parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
 
@@ -66,6 +73,7 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-Date",
         ZonedDateTime.now().format(StringToSignProducer.TIME_FORMATTER));
     parameters.put("X-Amz-Expires", "10000");
+    parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
 
@@ -80,7 +88,7 @@ public class TestAuthorizationV4QueryParser {
     //passed
   }
 
-  @Test()
+  @Test(expected = MalformedResourceException.class)
   public void testWithoutExpiration() throws Exception {
 
     //GIVEN
@@ -89,6 +97,7 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", "20130524T000000Z");
+    parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
 
@@ -99,7 +108,8 @@ public class TestAuthorizationV4QueryParser {
     parser.parseSignature();
 
     //THEN
-    //passed
+    // X-Amz-Expires must be passed according to AWS documentation
+    Assert.fail("Expiration duration must be passed.");
   }
 
   /**
@@ -114,11 +124,22 @@ public class TestAuthorizationV4QueryParser {
     queryParams.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     queryParams.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
-    queryParams.put("X-Amz-Date", "20130524T000000Z");
+    queryParams.put("X-Amz-Date", DATETIME);
     queryParams.put("X-Amz-Expires", "86400");
     queryParams.put("X-Amz-SignedHeaders", "host");
     queryParams.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
+
+    String canonicalRequest = "GET\n"
+            + "/test.txt\n"
+            + "X-Amz-Algorithm=AWS4-HMAC-SHA256&"
+            + "X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2F"
+            + "us-east-1%2Fs3%2Faws4_request&X-Amz-Date=" + DATETIME
+            + "&X-Amz-Expires=86400&X-Amz-SignedHeaders=host\n"
+            + "host:localhost\n"
+            + "\n"
+            + "host\n"
+            + "UNSIGNED-PAYLOAD";
 
     AuthorizationV4QueryParser parser =
         new AuthorizationV4QueryParser(queryParams) {
@@ -138,11 +159,13 @@ public class TestAuthorizationV4QueryParser {
             "/test.txt", headers,
             queryParams);
 
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+    md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
+
     Assert.assertEquals("AWS4-HMAC-SHA256\n"
-            + "20130524T000000Z\n"
+            + DATETIME + "\n"
             + "20130524/us-east-1/s3/aws4_request\n"
-            +
-            "521c030411bb1ad61412d44aff2a1b0916e473d2dc275ada8e5569c16ecdee36",
+            + Hex.encode(md.digest()).toLowerCase(),
         stringToSign);
   }
 
