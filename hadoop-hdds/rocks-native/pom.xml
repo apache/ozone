@@ -274,6 +274,7 @@
                                             <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                                         </exec>
                                         <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                                            <arg line="DEBUG_LEVEL=0"/>
                                             <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                             <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                             <arg line="-j${system.numCores}"/>
