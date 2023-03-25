@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -183,12 +184,26 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        // Block snapshot from loading when it is no longer active. e.g. DELETED
+        // Block snapshot from loading when it is no longer active e.g. DELETED,
+        // unless this is called from SnapshotDeletingService.
+        // TODO: [SNAPSHOT] However, snapshotCache.get() from other requests
+        //  (not from SDS) would be able to piggyback off of this because
+        //  snapshot still in cache won't trigger loader again.
+        //  This needs proper addressal in e.g. HDDS-7935
+        //  by introducing another cache just for SDS.
+        //  While the snapshotCache would host ACTIVE snapshots only.
         if (!snapshotInfo.getSnapshotStatus().equals(
-            SnapshotStatus.SNAPSHOT_ACTIVE)) {
-          throw new OMException("Unable to load snapshot. " +
-              "Snapshot with table key '" + snapshotTableKey +
-              "' is no longer active", FILE_NOT_FOUND);
+                SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          if (isCalledFromSnapshotDeletingService()) {
+            LOG.debug("Permitting {} to load snapshot {} in status: {}",
+                SnapshotDeletingService.class.getSimpleName(),
+                snapshotInfo.getTableKey(),
+                snapshotInfo.getSnapshotStatus());
+          } else {
+            throw new OMException("Unable to load snapshot. " +
+                "Snapshot with table key '" + snapshotTableKey +
+                "' is no longer active", FILE_NOT_FOUND);
+          }
         }
 
         CacheValue<SnapshotInfo> cacheValue =
@@ -245,6 +260,24 @@ public final class OmSnapshotManager implements AutoCloseable {
         .maximumSize(cacheSize)
         .removalListener(removalListener)
         .build(loader);
+  }
+
+  /**
+   * Helper method to check whether the loader is called from
+   * SnapshotDeletingTask (return true) or not (return false).
+   */
+  private boolean isCalledFromSnapshotDeletingService() {
+
+    StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+    for (StackTraceElement elem : stackTrace) {
+      // Allow as long as loader is called from SDS. e.g. SnapshotDeletingTask
+      if (elem.getClassName().startsWith(
+          SnapshotDeletingService.class.getName())) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
