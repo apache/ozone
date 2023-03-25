@@ -600,6 +600,7 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
+      IOUtils.close(LOG, dbStore);
       deleteOldSCMDB();
       setDbStore(newStore);
       File newDb = new File(dbFile.getParent() +
@@ -633,7 +634,6 @@ public class ReconStorageContainerManagerFacade
   }
 
   private void setDbStore(DBStore dbStore) {
-    IOUtils.close(LOG, this.dbStore);
     this.dbStore = dbStore;
   }
 
