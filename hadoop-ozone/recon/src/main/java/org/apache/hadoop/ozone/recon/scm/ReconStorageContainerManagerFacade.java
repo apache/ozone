@@ -602,7 +602,7 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.NODES.getTable(newStore));
       IOUtils.close(LOG, dbStore);
       deleteOldSCMDB();
-      setDbStore(newStore);
+      dbStore = newStore;
       File newDb = new File(dbFile.getParent() +
           OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
       boolean success = dbFile.renameTo(newDb);
@@ -631,10 +631,6 @@ public class ReconStorageContainerManagerFacade
           columnFamily.getValueCodec());
     }
     return dbStoreBuilder.build();
-  }
-
-  private void setDbStore(DBStore dbStore) {
-    this.dbStore = dbStore;
   }
 
   @Override
