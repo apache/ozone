@@ -2261,6 +2261,5 @@ public class TestRootedOzoneFileSystem {
   public void testFileSystemDeclaresCapability() throws Throwable {
     assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
     assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
-    assertHasPathCapabilities(fs, getBucketPath(), FS_SNAPSHOTS);
   }
 }

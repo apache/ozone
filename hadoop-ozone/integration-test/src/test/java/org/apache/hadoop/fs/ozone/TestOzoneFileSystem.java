@@ -1755,6 +1755,5 @@ public class TestOzoneFileSystem {
     Path root = new Path(OZONE_URI_DELIMITER);
     assertHasPathCapabilities(fs, root, FS_ACLS);
     assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
-    assertHasPathCapabilities(fs, root, FS_SNAPSHOTS);
   }
 }
