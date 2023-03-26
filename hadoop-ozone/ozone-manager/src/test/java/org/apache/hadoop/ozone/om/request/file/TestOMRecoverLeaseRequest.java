@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -257,6 +258,8 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
         bucketName, keyName, replicationType, replicationFactor, 0, parentId,
         0, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
+    omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+        String.valueOf(clientID));
 
     OMRequestTestUtils.addFileToKeyTable(
         true, false, omKeyInfo.getFileName(),

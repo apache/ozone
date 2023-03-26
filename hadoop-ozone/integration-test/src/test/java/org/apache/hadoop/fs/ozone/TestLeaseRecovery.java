@@ -57,10 +57,10 @@ public class TestLeaseRecovery {
   @Rule
   public Timeout timeout = Timeout.seconds(300);
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneBucket bucket;
+  private MiniOzoneCluster cluster;
+  private OzoneBucket bucket;
 
-  private static OzoneClient client;
+  private OzoneClient client;
   private final OzoneConfiguration conf = new OzoneConfiguration();
 
   @Before

@@ -62,7 +62,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -208,8 +207,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     final String clientId = keyInfo.getMetadata().get(
         OzoneConsts.HSYNC_CLIENT_ID);
     if (clientId == null) {
-      throw new OMException("Key:" + keyName + " is closed",
-          KEY_ALREADY_EXISTS);
+      LOG.warn("Key:" + keyName + " is closed");
     }
     String openKeyEntryName = getOpenFileEntryName(volumeId, bucketId,
         parentID, fileName);
