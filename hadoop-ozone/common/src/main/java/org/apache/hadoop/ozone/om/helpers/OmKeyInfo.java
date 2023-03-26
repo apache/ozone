@@ -78,8 +78,6 @@ public final class OmKeyInfo extends WithParentObjectId {
    */
   private List<OzoneAcl> acls;
 
-  private boolean isHsync;
-
   @SuppressWarnings("parameternumber")
   OmKeyInfo(String volumeName, String bucketName, String keyName,
       List<OmKeyLocationInfoGroup> versions, long dataSize,
@@ -112,14 +110,13 @@ public final class OmKeyInfo extends WithParentObjectId {
             Map<String, String> metadata,
             FileEncryptionInfo encInfo, List<OzoneAcl> acls,
             long parentObjectID, long objectID, long updateID,
-            FileChecksum fileChecksum, boolean isFile, boolean isHsync) {
+            FileChecksum fileChecksum, boolean isFile) {
     this(volumeName, bucketName, keyName, versions, dataSize,
             creationTime, modificationTime, replicationConfig, metadata,
             encInfo, acls, objectID, updateID, fileChecksum);
     this.fileName = fileName;
     this.parentObjectID = parentObjectID;
     this.isFile = isFile;
-    this.isHsync = isHsync;
   }
 
   public String getVolumeName() {
@@ -193,12 +190,8 @@ public final class OmKeyInfo extends WithParentObjectId {
     return isFile;
   }
 
-  public void setHsync(boolean hsync) {
-    isHsync = hsync;
-  }
-
   public boolean isHsync() {
-    return isHsync;
+    return metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID);
   }
 
   /**
@@ -435,8 +428,6 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     private boolean isFile;
 
-    private boolean isHsync;
-
     public Builder() {
       this.metadata = new HashMap<>();
       omKeyLocationInfoGroups = new ArrayList<>();
@@ -501,8 +492,6 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     public Builder addAllMetadata(Map<String, String> newMetadata) {
       metadata.putAll(newMetadata);
-
-      setHSync(metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
       return this;
     }
 
@@ -555,18 +544,12 @@ public final class OmKeyInfo extends WithParentObjectId {
       return this;
     }
 
-    public Builder setHSync(boolean isHSync) {
-      this.isHsync = isHSync;
-      return this;
-    }
-
     public OmKeyInfo build() {
       return new OmKeyInfo(
               volumeName, bucketName, keyName, fileName,
               omKeyLocationInfoGroups, dataSize, creationTime,
               modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID, fileChecksum, isFile,
-              isHsync);
+              parentObjectID, objectID, updateID, fileChecksum, isFile);
     }
   }
 
@@ -683,9 +666,6 @@ public final class OmKeyInfo extends WithParentObjectId {
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }
 
-    Map<String, String> newMetadata =
-        KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList());
-
     Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
@@ -697,7 +677,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setReplicationConfig(ReplicationConfig
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
                 keyInfo.getEcReplicationConfig()))
-        .addAllMetadata(newMetadata)
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
@@ -719,8 +699,6 @@ public final class OmKeyInfo extends WithParentObjectId {
       builder.setFile(keyInfo.getIsFile());
     }
 
-    builder.setHSync(newMetadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
-
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();
@@ -737,8 +715,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         ", objectID='" + objectID + '\'' +
         ", parentID='" + parentObjectID + '\'' +
         ", replication='" + replicationConfig + '\'' +
-        ", fileChecksum='" + fileChecksum + '\'' +
-        ", isHsync='" + isHsync +
+        ", fileChecksum='" + fileChecksum +
         '}';
   }
 
@@ -764,8 +741,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
         updateID == omKeyInfo.updateID &&
-        parentObjectID == omKeyInfo.parentObjectID &&
-        isHsync == omKeyInfo.isHsync;
+        parentObjectID == omKeyInfo.parentObjectID;
   }
 
   @Override
@@ -790,8 +766,7 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
         .setFileName(fileName)
-        .setFile(isFile)
-        .setHSync(isHsync);
+        .setFile(isFile);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
@@ -805,8 +780,6 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
-
-      builder.setHSync(metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID));
     }
 
     if (fileChecksum != null) {

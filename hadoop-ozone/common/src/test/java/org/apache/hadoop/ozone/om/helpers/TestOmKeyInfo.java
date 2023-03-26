@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -59,6 +60,10 @@ public class TestOmKeyInfo {
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
+
+    Assert.assertFalse(key.isHsync());
+    key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+    Assert.assertTrue(key.isHsync());
   }
 
   @Test
@@ -113,7 +118,6 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
-        .setHSync(false)
         .build();
   }
 
