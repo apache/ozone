@@ -62,6 +62,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -77,8 +78,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String volumeName;
   private String bucketName;
   private String keyName;
-
-  private String normalizedKeyPath;
 
   private OMMetadataManager omMetadataManager;
 
@@ -99,9 +98,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         .getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();
-    normalizedKeyPath =
+    String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+            keyPath, getBucketLayout());
 
     return getOmRequest().toBuilder()
         .setRecoverLeaseRequest(
@@ -205,6 +204,12 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     OmKeyInfo keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
+    }
+    final String clientId = keyInfo.getMetadata().get(
+        OzoneConsts.HSYNC_CLIENT_ID);
+    if (clientId == null) {
+      throw new OMException("Key:" + keyName + " is closed",
+          KEY_ALREADY_EXISTS);
     }
     String openKeyEntryName = getOpenFileEntryName(volumeId, bucketId,
         parentID, fileName);

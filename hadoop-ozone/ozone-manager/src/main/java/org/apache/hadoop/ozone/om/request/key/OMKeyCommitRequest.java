@@ -422,7 +422,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CommitKey
   )
-  public static OMRequest disallowCreateBucketWithECReplicationConfig(
+  public static OMRequest disallowHsync(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
         .isAllowed(OMLayoutFeature.HSYNC)) {
