@@ -200,7 +200,11 @@ public class TestKeyValueContainerMetadataInspector
     final List<DeletedBlocksTransaction> deleteTransactions
         = GENERATOR.generate(container.getContainerData().getContainerID(),
         Arrays.asList(1, 6, 3));
+    final long numDeletedLocalIds = deleteTransactions.stream()
+        .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
+    Assert.assertEquals(deleteCount, numDeletedLocalIds);
 
     setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
@@ -220,6 +224,7 @@ public class TestKeyValueContainerMetadataInspector
     final long numDeletedLocalIds = deleteTransactions.stream()
         .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
 
     setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
@@ -240,6 +245,7 @@ public class TestKeyValueContainerMetadataInspector
     final long numDeletedLocalIds = deleteTransactions.stream()
         .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
     LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
 
     setDB(container.getContainerData(), createBlocks,
         setBytes, deleteCount, deleteTransactions);
@@ -266,6 +272,9 @@ public class TestKeyValueContainerMetadataInspector
    * @param createdBlocks Number of blocks to create in the container.
    * @param setBlocks total block count value set in the database.
    * @param setBytes total used bytes value set in the database.
+   * @param deleteCount total deleted block count value set in the database.
+   * @param numDeletedLocalIds total number of deleted block local id count
+   *                           in the transactions
    */
   public void inspectThenRepairOnIncorrectContainer(
       KeyValueContainerData containerData, int createdBlocks, int setBlocks,
@@ -294,7 +303,7 @@ public class TestKeyValueContainerMetadataInspector
         containerState, createdBlocks, setBlocks, createdBytes, setBytes,
         createdFiles, deleteCount, numDeletedLocalIds, false);
     // Container should not have been modified in inspect mode.
-    checkDBBlockAndByteCounts(containerData, setBlocks, setBytes);
+    checkDbCounts(containerData, setBlocks, setBytes, deleteCount);
 
     // Now repair the container.
     JsonObject repairJson = runInspectorAndGetReport(containerData,
@@ -303,7 +312,8 @@ public class TestKeyValueContainerMetadataInspector
         containerState, createdBlocks, setBlocks, createdBytes, setBytes,
         createdFiles, deleteCount, numDeletedLocalIds, true);
     // Metadata keys should have been fixed.
-    checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
+    checkDbCounts(containerData, createdBlocks, createdBytes,
+        numDeletedLocalIds);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -452,8 +462,9 @@ public class TestKeyValueContainerMetadataInspector
     }
   }
 
-  public void checkDBBlockAndByteCounts(KeyValueContainerData containerData,
-      long expectedBlockCount, long expectedBytesUsed) throws Exception {
+  void checkDbCounts(KeyValueContainerData containerData,
+      long expectedBlockCount, long expectedBytesUsed,
+      long expectedDeletedCount) throws Exception {
     try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
@@ -462,6 +473,10 @@ public class TestKeyValueContainerMetadataInspector
 
       long blockCount = metadataTable.get(containerData.getBlockCountKey());
       Assert.assertEquals(expectedBlockCount, blockCount);
+
+      final long deleteCount = metadataTable.get(
+          containerData.getPendingDeleteBlockCountKey());
+      Assert.assertEquals(expectedDeletedCount, deleteCount);
     }
   }
 

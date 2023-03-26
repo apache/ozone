@@ -425,8 +425,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       final BooleanSupplier deleteCountRepairAction = () -> {
         final String key = containerData.getPendingDeleteBlockCountKey();
         try {
-          // reset delete block count to 0 in metadata table
-          metadataTable.put(key, 0L);
+          // set delete block count metadata table to delete transaction count
+          metadataTable.put(key, deleteTransactionCount);
           return true;
         } catch (IOException ex) {
           LOG.error("Failed to reset {} for container {}.",
