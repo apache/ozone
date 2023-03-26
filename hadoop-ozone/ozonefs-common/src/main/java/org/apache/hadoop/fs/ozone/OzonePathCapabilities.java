@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import java.util.Optional;
-
 import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.Path;
 
@@ -40,15 +38,14 @@ public final class OzonePathCapabilities {
    * @return either a value to return or, if empty, a cue for the FS to
    * pass up to its superclass.
    */
-  public static Optional<Boolean> hasPathCapability(final Path path,
+  public static boolean hasPathCapability(final Path path,
       final String capability) {
     switch (validatePathCapabilityArgs(path, capability)) {
     case CommonPathCapabilities.FS_ACLS:
     case CommonPathCapabilities.FS_CHECKSUMS:
-    case CommonPathCapabilities.FS_SNAPSHOTS:
-      return Optional.of(true);
+      return true;
     default:
-      return Optional.empty();
+      return false;
     }
   }
 }
