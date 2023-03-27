@@ -495,6 +495,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return loadDB(configuration, metaDir, dbName, readOnly,
         disableAutoCompaction, true);
   }
+
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
