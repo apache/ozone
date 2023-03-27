@@ -344,7 +344,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
       RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
     }
-    setStore(loadDB(conf, metaDir, dbName, true,
+    setStore(loadDB(conf, metaDir, dbName, false,
             java.util.Optional.of(Boolean.TRUE)));
     initializeOmTables(false);
   }

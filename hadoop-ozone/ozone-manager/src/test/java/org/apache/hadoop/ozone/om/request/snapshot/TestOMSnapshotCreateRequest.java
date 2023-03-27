@@ -352,7 +352,7 @@ public class TestOMSnapshotCreateRequest {
   /**
    * Static helper method so this could be used in TestOMSnapshotDeleteRequest.
    */
-  static OMSnapshotCreateRequest doPreExecute(
+  public static OMSnapshotCreateRequest doPreExecute(
       OMRequest originalRequest, OzoneManager ozoneManager) throws Exception {
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         new OMSnapshotCreateRequest(originalRequest);
