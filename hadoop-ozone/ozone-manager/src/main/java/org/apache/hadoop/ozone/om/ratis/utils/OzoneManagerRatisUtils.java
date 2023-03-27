@@ -25,6 +25,7 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -96,8 +97,6 @@ import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.security.cert.X509Certificate;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -463,15 +462,12 @@ public final class OzoneManagerRatisUtils {
     }
   }
 
-  public static GrpcTlsConfig createTlsConfig(SecurityConfig conf,
+  public static GrpcTlsConfig createServerTlsConfig(SecurityConfig conf,
       CertificateClient caClient, boolean mutualTls) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
-          conf.getConfiguration());
-      GrpcTlsConfig config = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, mutualTls);
-      return config;
+      KeyStoresFactory serverKeyFactory = caClient.getServerKeyStoresFactory();
+      return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
+          serverKeyFactory.getTrustManagers()[0], mutualTls);
     }
 
     return null;

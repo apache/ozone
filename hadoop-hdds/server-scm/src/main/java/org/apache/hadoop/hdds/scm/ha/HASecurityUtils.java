@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCer
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
@@ -306,16 +307,19 @@ public final class HASecurityUtils {
 
   /**
    * Create GrpcTlsConfig.
+   *
    * @param conf
    * @param certificateClient
    * @return
    */
   public static GrpcTlsConfig createSCMRatisTLSConfig(SecurityConfig conf,
-      CertificateClient certificateClient) {
+      CertificateClient certificateClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      return new GrpcTlsConfig(
-          certificateClient.getPrivateKey(), certificateClient.getCertificate(),
-          certificateClient.getCACertificate(), true);
+      KeyStoresFactory serverKeyFactory =
+          certificateClient.getServerKeyStoresFactory();
+
+      return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
+          serverKeyFactory.getTrustManagers()[0], true);
     }
     return null;
   }
