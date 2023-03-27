@@ -23,12 +23,19 @@ import org.apache.hadoop.hdds.client.BlockID;
  * Abstract class used as an interface for input streams related to Ozone
  * blocks.
  */
-public abstract class BlockExtendedInputStream  extends ExtendedInputStream {
+public abstract class BlockExtendedInputStream extends ExtendedInputStream
+    implements PartInputStream {
 
   public abstract BlockID getBlockID();
 
-  public abstract long getRemaining();
+  @Override
+  public long getRemaining() {
+    return getLength() - getPos();
+  }
 
+  @Override
   public abstract long getLength();
 
+  @Override
+  public abstract long getPos();
 }

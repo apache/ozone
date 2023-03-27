@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -27,6 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -160,24 +160,28 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         final long bucketId = omMetadataManager
                 .getBucketId(volumeName, bucketName);
 
-        // prepare leafNode dir
-        OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
-                omPathInfo.getLeafNodeName(),
-                keyArgs, omPathInfo.getLeafNodeObjectId(),
-                omPathInfo.getLastKnownParentId(), trxnLogIndex,
-                OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-        OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-                volumeId, bucketId, trxnLogIndex,
-                Optional.of(missingParentInfos), Optional.of(dirInfo));
-
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
+        checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated);
+        omBucketInfo.incrUsedNamespace(numKeysCreated);
+
+        // prepare leafNode dir
+        OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
+            omPathInfo.getLeafNodeName(),
+            keyArgs, omPathInfo.getLeafNodeObjectId(),
+            omPathInfo.getLastKnownParentId(), trxnLogIndex,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+        OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+            volumeId, bucketId, trxnLogIndex,
+            missingParentInfos, dirInfo);
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
             new OMDirectoryCreateResponseWithFSO(omResponse.build(),
                 volumeId, bucketId, dirInfo, missingParentInfos, result,
-                getBucketLayout());
+                getBucketLayout(), omBucketInfo.copyObject());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);

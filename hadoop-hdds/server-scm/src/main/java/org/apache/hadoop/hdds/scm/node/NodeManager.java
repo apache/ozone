@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -299,15 +298,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                          LayoutVersionProto layoutReport);
 
   /**
-   * Process the Command Queue Report sent from datanodes as part of the
-   * heartbeat message.
-   * @param datanodeDetails
-   * @param commandReport
-   */
-  void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport);
-
-  /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
    * command type, -1 will be returned.
@@ -315,6 +305,30 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return The queued count or -1 if no data has been received from the DN.
    */
   int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException;
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
+
+  /**
+   * Get the total number of pending commands of the given type on the given
+   * datanode. This includes both the number of commands queued in SCM which
+   * will be sent to the datanode on the next heartbeat, and the number of
+   * commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The command Type To query.
+   * @return The number of commands of the given type pending on the datanode.
+   * @throws NodeNotFoundException
+   */
+  int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException;
 
   /**

@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -109,7 +109,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           // NEVER. Setting epoch value -1, so that when it is marked for
           // delete, this will be considered for cleanup.
           cache.loadInitial(new CacheKey<>(kv.getKey()),
-              new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
+              CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
     } else {
@@ -271,11 +271,16 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
     rawTable.deleteWithBatch(batch, codecRegistry.asRawData(key));
-
   }
 
   @Override
-  public TableIterator<KEY, TypedKeyValue> iterator() {
+  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+    rawTable.deleteRange(codecRegistry.asRawData(beginKey),
+        codecRegistry.asRawData(endKey));
+  }
+
+  @Override
+  public TableIterator<KEY, TypedKeyValue> iterator() throws IOException {
     TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
         rawTable.iterator();
     return new TypedTableIterator(iterator, keyType, valueType);
@@ -320,6 +325,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
+  }
+
+  @Override
+  public TableCacheMetrics createCacheMetrics() throws IOException {
+    return TableCacheMetrics.create(cache, getName());
   }
 
   @Override

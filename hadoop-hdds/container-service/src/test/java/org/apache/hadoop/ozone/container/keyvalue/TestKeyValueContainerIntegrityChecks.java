@@ -172,10 +172,10 @@ public class TestKeyValueContainerIntegrityChecks {
         blockData.setChunks(chunkList);
 
         // normal key
-        String key = containerData.blockKey(blockID.getLocalID());
+        String key = containerData.getBlockKey(blockID.getLocalID());
         if (i >= normalBlocks) {
           // deleted key
-          key = containerData.deletingBlockKey(blockID.getLocalID());
+          key = containerData.getDeletingBlockKey(blockID.getLocalID());
         }
         metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }

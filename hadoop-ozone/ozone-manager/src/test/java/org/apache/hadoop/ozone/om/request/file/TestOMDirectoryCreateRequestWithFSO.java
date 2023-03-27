@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -165,6 +164,45 @@ public class TestOMDirectoryCreateRequestWithFSO {
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
             == OzoneManagerProtocolProtos.Status.OK);
     verifyDirectoriesInDB(dirs, volumeId, bucketId);
+
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertEquals(OzoneFSUtils.getFileCount(keyName),
+        bucketInfo.getUsedNamespace());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<String>();
+    String keyName = createDirKey(dirs, 3);
+
+    // add volume and create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setQuotaInNamespace(1));
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+        keyName);
+    OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(omRequest,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMRequest modifiedOmReq =
+        omDirCreateRequestFSO.preExecute(ozoneManager);
+
+    omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    OMClientResponse omClientResponse =
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test
@@ -391,7 +429,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneFileName),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout())
         .put(ozoneFileName, omKeyInfo);
 
@@ -470,7 +508,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,

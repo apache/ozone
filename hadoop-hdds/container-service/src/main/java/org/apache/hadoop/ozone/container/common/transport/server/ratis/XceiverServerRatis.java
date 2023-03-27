@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -58,10 +57,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -98,6 +97,7 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.DataStreamServerRpc;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.RaftServerRpc;
@@ -129,6 +129,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int serverPort;
   private int adminPort;
   private int clientPort;
+  private int dataStreamPort;
   private final RaftServer server;
   private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
@@ -148,6 +149,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // Timeout used while calling submitRequest directly.
   private long requestTimeout;
   private boolean shouldDeleteRatisLogDirectory;
+  private boolean streamEnable;
 
   private XceiverServerRatis(DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -157,6 +159,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
     assignPorts();
+    this.streamEnable = conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
     RaftProperties serverProperties = newRaftProperties();
     this.context = context;
     this.dispatcher = dispatcher;
@@ -213,6 +218,33 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         chunkExecutors, this, conf);
   }
 
+  private void setUpRatisStream(RaftProperties properties) {
+    // set the datastream config
+    if (conf.getBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
+      dataStreamPort = 0;
+    } else {
+      dataStreamPort = conf.getInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
+    }
+    RatisHelper.enableNettyStreaming(properties);
+    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    int dataStreamAsyncRequestThreadPoolSize =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getStreamRequestThreads();
+    RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
+        dataStreamAsyncRequestThreadPoolSize);
+    int dataStreamClientPoolSize =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getClientPoolSize();
+    RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
+        dataStreamClientPoolSize);
+  }
+
+  @SuppressWarnings("checkstyle:methodlength")
   private RaftProperties newRaftProperties() {
     final RaftProperties properties = new RaftProperties();
 
@@ -231,6 +263,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
+    if (streamEnable) {
+      setUpRatisStream(properties);
+    }
+
     timeUnit = OzoneConfigKeys.
         DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
     duration = conf.getTimeDuration(
@@ -461,14 +497,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
-          conf.getConfiguration());
+      KeyStoresFactory managerFactory =
+          caClient.getServerKeyStoresFactory();
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, true);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], true);
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, false);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], false);
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 
@@ -491,7 +527,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           Port.Name.RATIS_ADMIN);
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
-
+      if (streamEnable) {
+        DataStreamServerRpc dataStreamServerRpc =
+            server.getDataStreamServerRpc();
+        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+            Port.Name.RATIS_DATASTREAM);
+      }
       isStarted = true;
     }
   }

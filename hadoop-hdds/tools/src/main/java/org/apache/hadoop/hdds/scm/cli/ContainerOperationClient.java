@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -103,12 +103,6 @@ public class ContainerOperationClient implements ScmClient {
         HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
   }
 
-  @VisibleForTesting
-  public StorageContainerLocationProtocol
-      getStorageContainerLocationProtocol() {
-    return storageContainerLocationClient;
-  }
-
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
       throws IOException {
     XceiverClientManager manager;
@@ -173,8 +167,8 @@ public class ContainerOperationClient implements ScmClient {
     // Let us log this info after we let SCM know that we have completed the
     // creation state.
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Created container " + containerId
-          + " machines:" + client.getPipeline().getNodes());
+      LOG.debug("Created container {} machines {}", containerId,
+              client.getPipeline().getNodes());
     }
   }
 
@@ -185,55 +179,6 @@ public class ContainerOperationClient implements ScmClient {
     ContainerID containerID = ContainerID.valueOf(containerId);
     return storageContainerLocationClient.getContainerToken(containerID)
         .encodeToUrlString();
-  }
-
-  /**
-   * Creates a pipeline over the machines chosen by the SCM.
-   *
-   * @param client   - Client
-   * @param pipeline - pipeline to be createdon Datanodes.
-   * @throws IOException
-   */
-  private void createPipeline(XceiverClientSpi client, Pipeline pipeline)
-      throws IOException {
-
-    Preconditions.checkNotNull(pipeline.getId(), "Pipeline " +
-        "name cannot be null when client create flag is set.");
-
-    // Pipeline creation is a three step process.
-    //
-    // 1. Notify SCM that this client is doing a create pipeline on
-    // datanodes.
-    //
-    // 2. Talk to Datanodes to create the pipeline.
-    //
-    // 3. update SCM that pipeline creation was successful.
-
-    // TODO: this has not been fully implemented on server side
-    // SCMClientProtocolServer#notifyObjectStageChange
-    // TODO: when implement the pipeline state machine, change
-    // the pipeline name (string) to pipeline id (long)
-    //storageContainerLocationClient.notifyObjectStageChange(
-    //    ObjectStageChangeRequestProto.Type.pipeline,
-    //    pipeline.getPipelineName(),
-    //    ObjectStageChangeRequestProto.Op.create,
-    //    ObjectStageChangeRequestProto.Stage.begin);
-
-    // client.createPipeline();
-    // TODO: Use PipelineManager to createPipeline
-
-    //storageContainerLocationClient.notifyObjectStageChange(
-    //    ObjectStageChangeRequestProto.Type.pipeline,
-    //    pipeline.getPipelineName(),
-    //    ObjectStageChangeRequestProto.Op.create,
-    //    ObjectStageChangeRequestProto.Stage.complete);
-
-    // TODO : Should we change the state on the client side ??
-    // That makes sense, but it is not needed for the client to work.
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Pipeline creation successful. Pipeline: {}",
-          pipeline);
-    }
   }
 
   @Override
@@ -259,18 +204,6 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  /**
-   * Returns a set of Nodes that meet a query criteria.
-   *
-   * @param opState - The operational state we want the node to have
-   *                eg IN_SERVICE, DECOMMISSIONED, etc
-   * @param nodeState - The health we want the node to have, eg HEALTHY, STALE,
-   *                  etc
-   * @param queryScope - Query scope - Cluster or pool.
-   * @param poolName - if it is pool, a pool name is required.
-   * @return A set of nodes that meet the requested criteria.
-   * @throws IOException
-   */
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState,
@@ -300,9 +233,6 @@ public class ContainerOperationClient implements ScmClient {
         hosts, endHours);
   }
 
-  /**
-   * Creates a specified replication pipeline.
-   */
   @Override
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
@@ -354,14 +284,6 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  /**
-   * Deletes an existing container.
-   *
-   * @param containerId - ID of the container.
-   * @param pipeline    - Pipeline that represents the container.
-   * @param force       - true to forcibly delete the container.
-   * @throws IOException
-   */
   @Override
   public void deleteContainer(long containerId, Pipeline pipeline,
       boolean force) throws IOException {
@@ -386,13 +308,6 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  /**
-   * Delete the container, this will release any resource it uses.
-   *
-   * @param containerID - containerID.
-   * @param force       - True to forcibly delete the container.
-   * @throws IOException
-   */
   @Override
   public void deleteContainer(long containerID, boolean force)
       throws IOException {
@@ -416,14 +331,6 @@ public class ContainerOperationClient implements ScmClient {
         startContainerID, count, state, repType, replicationConfig);
   }
 
-  /**
-   * Get meta data from an existing container.
-   *
-   * @param containerID - ID of the container.
-   * @param pipeline    - Pipeline where the container is located.
-   * @return ContainerInfo
-   * @throws IOException
-   */
   @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
@@ -446,53 +353,24 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  /**
-   * Get meta data from an existing container.
-   *
-   * @param containerID - ID of the container.
-   * @return ContainerInfo - a message of protobuf which has basic info
-   * of a container.
-   * @throws IOException
-   */
   @Override
   public ContainerDataProto readContainer(long containerID) throws IOException {
     ContainerWithPipeline info = getContainerWithPipeline(containerID);
     return readContainer(containerID, info.getPipeline());
   }
 
-  /**
-   * Given an id, return the pipeline associated with the container.
-   *
-   * @param containerId - String Container ID
-   * @return Pipeline of the existing container, corresponding to the given id.
-   * @throws IOException
-   */
   @Override
   public ContainerInfo getContainer(long containerId) throws
       IOException {
     return storageContainerLocationClient.getContainer(containerId);
   }
 
-  /**
-   * Gets a container by Name -- Throws if the container does not exist.
-   *
-   * @param containerId - Container ID
-   * @return ContainerWithPipeline
-   * @throws IOException
-   */
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerId)
       throws IOException {
     return storageContainerLocationClient.getContainerWithPipeline(containerId);
   }
 
-  /**
-   * Gets the list of ReplicaInfo known by SCM for a given container.
-   * @param containerId - The Container ID
-   * @return List of ContainerReplicaInfo for the container or an empty list
-   *         if none.
-   * @throws IOException
-   */
   @Override
   public List<ContainerReplicaInfo>
       getContainerReplicas(long containerId) throws IOException {
@@ -506,11 +384,6 @@ public class ContainerOperationClient implements ScmClient {
     return replicas;
   }
 
-  /**
-   * Close a container.
-   *
-   * @throws IOException
-   */
   @Override
   public void closeContainer(long containerId)
       throws IOException {
@@ -520,13 +393,6 @@ public class ContainerOperationClient implements ScmClient {
     storageContainerLocationClient.closeContainer(containerId);
   }
 
-  /**
-   * Get the the current usage information.
-   *
-   * @param containerID - ID of the container.
-   * @return the size of the given container.
-   * @throws IOException
-   */
   @Override
   public long getContainerSize(long containerID) throws IOException {
     // TODO : Fix this, it currently returns the capacity
@@ -534,12 +400,6 @@ public class ContainerOperationClient implements ScmClient {
     return containerSizeB;
   }
 
-  /**
-   * Check if SCM is in safe mode.
-   *
-   * @return Returns true if SCM is in safe mode else returns false.
-   * @throws IOException
-   */
   @Override
   public boolean inSafeMode() throws IOException {
     return storageContainerLocationClient.inSafeMode();
@@ -551,12 +411,6 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
-  /**
-   * Force SCM out of safe mode.
-   *
-   * @return returns true if operation is successful.
-   * @throws IOException
-   */
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
   }
@@ -612,19 +466,22 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public void transferLeadership(String newLeaderId) throws IOException {
+    storageContainerLocationClient.transferLeadership(newLeaderId);
+  }
+
+  @Override
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException {
+    return storageContainerLocationClient.getFailedDeletedBlockTxn(count,
+        startTxId);
+  }
+
+  @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
   }
 
-  /**
-   * Get Datanode Usage information by ipaddress or uuid.
-   *
-   * @param ipaddress datanode ipaddress String
-   * @param uuid datanode uuid String
-   * @return List of DatanodeUsageInfoProto. Each element contains info such as
-   * capacity, SCMused, and remaining space.
-   * @throws IOException
-   */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String ipaddress, String uuid) throws IOException {
@@ -632,15 +489,6 @@ public class ContainerOperationClient implements ScmClient {
         uuid, ClientVersion.CURRENT_VERSION);
   }
 
-  /**
-   * Get usage information of most or least used datanodes.
-   *
-   * @param mostUsed true if most used, false if least used
-   * @param count Integer number of nodes to get info for
-   * @return List of DatanodeUsageInfoProto. Each element contains info such as
-   * capacity, SCMUsed, and remaining space.
-   * @throws IOException
-   */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {

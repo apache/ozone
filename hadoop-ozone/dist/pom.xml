@@ -19,17 +19,17 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
   <name>Apache Ozone Distribution</name>
   <packaging>jar</packaging>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20220623-1</docker.ozone-runner.version>
-    <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20210419-1</docker.ozone-testkr5b.image>
+    <docker.ozone-runner.version>20230104-1</docker.ozone-runner.version>
+    <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20230318-1</docker.ozone-testkr5b.image>
   </properties>
 
   <build>
@@ -74,8 +74,8 @@
               </outputDirectory>
               <includes>*.classpath</includes>
               <includeArtifactIds>
-                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-insight,
-                ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools
+                hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
+                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -223,6 +223,14 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-insight</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-httpfsgateway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -240,6 +248,10 @@
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.ozone</groupId>
+          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -267,7 +279,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-dependency-plugin</artifactId>
-            <version>3.1.1</version>
             <executions>
               <execution>
                 <id>copy-jacoco-files</id>
@@ -283,21 +294,21 @@
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.agent</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <classifier>runtime</classifier>
                       <destFileName>jacoco-agent.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.cli</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <classifier>nodeps</classifier>
                       <destFileName>jacoco-cli.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
                       <groupId>org.jacoco</groupId>
                       <artifactId>org.jacoco.core</artifactId>
-                      <version>0.8.5</version>
+                      <version>${jacoco.version}</version>
                       <destFileName>jacoco-core.jar</destFileName>
                     </artifactItem>
                     <artifactItem>
@@ -336,6 +347,7 @@
                   <appendAssemblyId>false</appendAssemblyId>
                   <attach>false</attach>
                   <finalName>ozone-${project.version}-src</finalName>
+                  <tarLongFileMode>posix</tarLongFileMode>
                   <outputDirectory>target</outputDirectory>
                   <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->

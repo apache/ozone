@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -152,7 +151,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
@@ -194,15 +193,31 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         || volumeQuotaInBytes == 0) {
       return false;
     }
+    
+    // if volume quota is for reset, no need further check
+    if (volumeQuotaInBytes == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
 
+    boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
+      } else {
+        isBucketQuotaSet = false;
+        break;
       }
     }
+    
+    if (!isBucketQuotaSet) {
+      throw new OMException("Can not set volume space quota on volume " +
+          "as some of buckets in this volume have no quota set.",
+          OMException.ResultCodes.QUOTA_ERROR);
+    }
+    
     if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
       throw new OMException("Total buckets quota in this volume " +

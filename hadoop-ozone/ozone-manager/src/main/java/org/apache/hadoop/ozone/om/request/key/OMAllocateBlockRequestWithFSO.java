@@ -152,7 +152,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
           preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
           hadAllocatedKeySize, repConfig);
-      checkBucketQuotaInBytes(omBucketInfo, totalAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 

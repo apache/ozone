@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -85,6 +86,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
@@ -134,7 +136,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String omID) throws IOException {
+      boolean grpcBlockTokenEnabled, String omID, OMMetrics omMetrics)
+      throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
@@ -148,6 +151,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, omID,
               excludeList);
     } catch (SCMException ex) {
+      omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
         throw new OMException(ex.getMessage(),
@@ -381,7 +385,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Native authorizer requires client id as part of key name to check
     // write ACL on key. Add client id to key name if ozone native
     // authorizer is configured.
-    if (ozoneManager.isNativeAuthorizerEnabled()) {
+    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
       keyNameForAclCheck = key + "/" + clientId;
     }
 
@@ -517,18 +521,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
+   * @paran metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
    */
-  protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
+  protected void checkBucketQuotaInBytes(
+      OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
       long usedBytes = omBucketInfo.getUsedBytes();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
-            + omBucketInfo.getBucketName() + "exceeded: quotaInBytes: "
+            + omBucketInfo.getBucketName() + " exceeded quotaInBytes: "
             + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
             + allocateSize) + " Bytes.",
             OMException.ResultCodes.QUOTA_EXCEEDED);
@@ -815,5 +821,32 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
     return ozoneManager.getOzoneLockProvider()
         .createLockStrategy(getBucketLayout());
+  }
+
+  /**
+   * Wrap the uncommitted blocks as pseudoKeyInfo.
+   *
+   * @param uncommitted Uncommitted OmKeyLocationInfo
+   * @param omKeyInfo   Args for key block
+   * @return pseudoKeyInfo
+   */
+  protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
+      List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
+    if (uncommitted.isEmpty()) {
+      return null;
+    }
+    LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+        uncommitted, omKeyInfo.getKeyName());
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // This is a special marker to indicate that SnapshotDeletingService
+    // can reclaim this key's blocks unconditionally.
+    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
+    // TODO dataSize of pseudoKey is not real here
+    List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
+    // version not matters in the current logic of keyDeletingService,
+    // all versions of blocks will be deleted.
+    uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
+    pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
+    return pseudoKeyInfo;
   }
 }

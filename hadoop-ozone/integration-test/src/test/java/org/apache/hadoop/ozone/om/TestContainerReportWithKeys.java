@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,6 +66,7 @@ public class TestContainerReportWithKeys {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
 
@@ -83,6 +85,7 @@ public class TestContainerReportWithKeys {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(conf);
     scm = cluster.getStorageContainerManager();
   }
 
@@ -91,6 +94,7 @@ public class TestContainerReportWithKeys {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -103,7 +107,6 @@ public class TestContainerReportWithKeys {
     final String keyName = "key" + RandomStringUtils.randomNumeric(5);
     final int keySize = 100;
 
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);

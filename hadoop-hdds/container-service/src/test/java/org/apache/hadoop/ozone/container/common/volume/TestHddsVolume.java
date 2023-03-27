@@ -102,6 +102,16 @@ public class TestHddsVolume {
         versionFile.exists());
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
+
+    // Create a working directory
+    // tmp directory should be initialized.
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File tmpDir = new File(volume.getTmpDirPath().toString());
+    assertTrue(tmpDir.exists());
+
+    // Shutdown the volume.
+    volume.shutdown();
   }
 
   @Test
@@ -327,14 +337,13 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
   }
 
   @Test
@@ -361,14 +370,32 @@ public class TestHddsVolume {
         CONTAINER_DB_NAME);
     assertTrue(containerDBFile.exists());
     assertNotNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+        containerDBFile.getAbsolutePath(), CONF));
 
     // Make it a bad volume
     volume.failVolume();
 
     // The db should be removed from cache
-    assertNull(DatanodeStoreCache.getInstance().getDB(
-        containerDBFile.getAbsolutePath()));
+    assertEquals(0, DatanodeStoreCache.getInstance().size());
+  }
+
+  @Test
+  public void testFailedVolumeSpace() throws IOException {
+    // Build failed volume
+    HddsVolume volume = volumeBuilder.failedVolume(true).build();
+    VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
+
+    try {
+      // In case of failed volume all stats should return 0.
+      assertEquals(0, volumeInfoMetrics.getUsed());
+      assertEquals(0, volumeInfoMetrics.getAvailable());
+      assertEquals(0, volumeInfoMetrics.getCapacity());
+      assertEquals(0, volumeInfoMetrics.getReserved());
+      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
+    } finally {
+      // Shutdown the volume.
+      volume.shutdown();
+    }
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {

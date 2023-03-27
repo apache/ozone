@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.stream.Stream;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -43,7 +45,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -87,7 +89,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds
     .HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone
@@ -110,6 +111,7 @@ public class TestBlockDeletion {
   private Set<Long> containerIdsWithDeletedBlocks;
   private long maxTransactionId = 0;
   private ScmBlockDeletingServiceMetrics metrics;
+  private OzoneClient client;
 
   @BeforeEach
   public void init() throws Exception {
@@ -118,7 +120,8 @@ public class TestBlockDeletion {
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(LegacyReplicationManager.LOG, Level.DEBUG);
 
-    conf.set("ozone.replication.allowed-configs", "^(RATIS/THREE)|(EC/2-1)$");
+    conf.set("ozone.replication.allowed-configs",
+        "^(RATIS/THREE)|(EC/2-1-256k)$");
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
@@ -137,7 +140,6 @@ public class TestBlockDeletion {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         3, TimeUnit.SECONDS);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
@@ -147,15 +149,19 @@ public class TestBlockDeletion {
     conf.setQuietMode(false);
     conf.setTimeDuration("hdds.scm.replication.event.timeout", 100,
         TimeUnit.MILLISECONDS);
+    conf.setTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
+        0,
+        TimeUnit.MILLISECONDS);
     conf.setInt("hdds.datanode.block.delete.threads.max", 5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
     om = cluster.getOzoneManager();
-    writeClient = cluster.getRpcClient().getObjectStore()
+    writeClient = store
         .getClientProxy().getOzoneManagerClient();
     scm = cluster.getStorageContainerManager();
     containerIdsWithDeletedBlocks = new HashSet<>();
@@ -165,6 +171,7 @@ public class TestBlockDeletion {
 
   @AfterEach
   public void cleanup() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -182,6 +189,8 @@ public class TestBlockDeletion {
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(DeleteBlocksCommandHandler.LOG);
 
     String value = RandomStringUtils.random(1024 * 1024);
     store.createVolume(volumeName);
@@ -286,6 +295,12 @@ public class TestBlockDeletion {
         metrics.getNumBlockDeletionTransactionFailure() +
             metrics.getNumBlockDeletionTransactionSuccess());
     LOG.info(metrics.toString());
+
+    // Datanode should receive retried requests with continuous retry counts.
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(0)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(1)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(2)"));
+    Assertions.assertTrue(logCapturer.getOutput().contains("1(3)"));
   }
 
   @Test
@@ -367,12 +382,13 @@ public class TestBlockDeletion {
         LogCapturer.captureLogs(LegacyReplicationManager.LOG);
     logCapturer.clearOutput();
 
+    Thread.sleep(2000);
     scm.getReplicationManager().processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-        .contains("Resend delete Container"), 500, 3000);
+        .contains("Resend delete Container"), 500, 5000);
     cluster.restartHddsDatanode(0, true);
-    Thread.sleep(1000);
+    Thread.sleep(2000);
 
     scm.getReplicationManager().processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
@@ -442,7 +458,7 @@ public class TestBlockDeletion {
             .getContainer(blockID.getContainerID()).getContainerData();
         try (DBHandle db = BlockUtils.getDB(cData, conf)) {
           Assertions.assertNotNull(db.getStore().getBlockDataTable()
-              .get(cData.blockKey(blockID.getLocalID())));
+              .get(cData.getBlockKey(blockID.getLocalID())));
         }
       }, omKeyLocationInfoGroups);
     }
@@ -460,12 +476,13 @@ public class TestBlockDeletion {
           Table<String, BlockData> blockDataTable =
               db.getStore().getBlockDataTable();
 
-          String blockKey = cData.blockKey(blockID.getLocalID());
+          String blockKey = cData.getBlockKey(blockID.getLocalID());
 
           BlockData blockData = blockDataTable.get(blockKey);
           Assertions.assertNull(blockData);
 
-          String deletingKey = cData.deletingBlockKey(blockID.getLocalID());
+          String deletingKey = cData.getDeletingBlockKey(
+              blockID.getLocalID());
           Assertions.assertNull(blockDataTable.get(deletingKey));
         }
         containerIdsWithDeletedBlocks.add(blockID.getContainerID());

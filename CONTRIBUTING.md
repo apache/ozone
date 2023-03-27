@@ -112,6 +112,14 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
+For IntelliJ users, it is recommended to import and select the Code Style scheme located at:
+
+```
+./hadoop-ozone/dev-support/intellij/ozone-style.xml
+```
+
+See https://www.jetbrains.com/help/idea/configuring-code-style.html#import-code-style for detailed instructions.
+
 ### Check your contribution
 
 The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozone/tree/master/hadoop-ozone/dev-support/checks) contains scripts to build and check Ozone.  Most of these are executed by CI for every commit and pull request.  Running them before creating a pull request is strongly recommended.  This can be achieved by enabling the `build-branch` workflow in your fork and letting GitHub run all of the checks, but most of the checks can also be run locally.

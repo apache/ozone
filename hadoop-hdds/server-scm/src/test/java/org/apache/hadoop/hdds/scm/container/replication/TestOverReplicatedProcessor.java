@@ -20,29 +20,18 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests for the OverReplicatedProcessor class.
@@ -50,80 +39,66 @@ import static org.mockito.ArgumentMatchers.eq;
 public class TestOverReplicatedProcessor {
 
   private ConfigurationSource conf;
-  private TestClock clock;
-  private ContainerReplicaPendingOps pendingOps;
   private ReplicationManager replicationManager;
-  private EventPublisher eventPublisher;
   private ECReplicationConfig repConfig;
   private OverReplicatedProcessor overReplicatedProcessor;
+  private ReplicationQueue queue;
 
   @Before
   public void setup() {
     conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    pendingOps = new ContainerReplicaPendingOps(conf, clock);
     replicationManager = Mockito.mock(ReplicationManager.class);
-    eventPublisher = Mockito.mock(EventPublisher.class);
+
+    // use real queue
+    queue = new ReplicationQueue();
+    Mockito.when(replicationManager.dequeueOverReplicatedContainer())
+        .thenAnswer(inv -> queue.dequeueOverReplicatedContainer());
+    ArgumentCaptor<OverReplicatedHealthResult> captor =
+        ArgumentCaptor.forClass(OverReplicatedHealthResult.class);
+    Mockito.doAnswer(inv -> {
+      queue.enqueue(captor.getValue());
+      return null;
+    })
+        .when(replicationManager)
+            .requeueOverReplicatedContainer(captor.capture());
+
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
-        replicationManager, pendingOps, eventPublisher,
-        rmConf.getOverReplicatedInterval());
+        replicationManager, rmConf.getOverReplicatedInterval());
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
   }
 
   @Test
-  public void testDeleteContainerCommand() throws IOException {
+  public void testSuccessfulRun() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    Mockito.when(replicationManager.dequeueOverReplicatedContainer())
-        .thenReturn(
-            new ContainerHealthResult.OverReplicatedHealthResult(container, 3,
-                false), null);
-    Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
-    DeleteContainerCommand cmd =
-        new DeleteContainerCommand(container.getContainerID());
-    cmd.setReplicaIndex(5);
-    commands.put(MockDatanodeDetails.randomDatanodeDetails(), cmd);
+    queue.enqueue(new OverReplicatedHealthResult(
+        container, 3, false));
 
-    Mockito
-        .when(replicationManager.processOverReplicatedContainer(Mockito.any()))
-        .thenReturn(commands);
+    Mockito.when(replicationManager.processOverReplicatedContainer(any()))
+        .thenReturn(1);
     overReplicatedProcessor.processAll();
-
-    // Ensure pending ops is updated for the target DNs in the command and the
-    // correct indexes.
-    List<ContainerReplicaOp> ops =
-        pendingOps.getPendingOps(container.containerID());
-    Assert.assertEquals(1, ops.size());
-    for (ContainerReplicaOp op : ops) {
-      Assert.assertEquals(5, op.getReplicaIndex());
-    }
+    Mockito.verify(replicationManager, Mockito.times(0))
+        .requeueOverReplicatedContainer(any());
   }
 
   @Test
   public void testMessageRequeuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    Mockito.when(replicationManager.dequeueOverReplicatedContainer())
-        .thenReturn(new ContainerHealthResult
-                .OverReplicatedHealthResult(container, 3, false),
-            null);
+    queue.enqueue(new OverReplicatedHealthResult(
+        container, 3, false));
 
     Mockito.when(replicationManager
-            .processOverReplicatedContainer(Mockito.any()))
-        .thenThrow(new IOException("Test Exception"));
+            .processOverReplicatedContainer(any()))
+        .thenThrow(new IOException("Test Exception"))
+        .thenThrow(new AssertionError("Should process only one item"));
     overReplicatedProcessor.processAll();
 
-    Mockito.verify(eventPublisher, Mockito.times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), Mockito.any());
     Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueOverReplicatedContainer(Mockito.any());
+        .requeueOverReplicatedContainer(any());
 
-    // Ensure pending ops has nothing for this container.
-    List<ContainerReplicaOp> ops = pendingOps
-        .getPendingOps(container.containerID());
-    Assert.assertEquals(0, ops.size());
   }
 }

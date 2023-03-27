@@ -45,6 +45,9 @@ public interface OzoneClientAdapter {
   OzoneFSOutputStream createFile(String key, short replication,
       boolean overWrite, boolean recursive) throws IOException;
 
+  OzoneFSDataStreamOutput createStreamFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException;
+
   void renameKey(String key, String newKeyName) throws IOException;
 
   // Users should use rename instead of renameKey in OFS.
@@ -81,4 +84,6 @@ public interface OzoneClientAdapter {
   boolean isFSOptimizedBucket();
 
   FileChecksum getFileChecksum(String keyName, long length) throws IOException;
+
+  String createSnapshot(String pathStr, String snapshotName) throws IOException;
 }

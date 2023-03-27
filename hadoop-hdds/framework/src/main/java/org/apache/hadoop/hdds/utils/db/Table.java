@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 /**
@@ -148,11 +149,22 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   void deleteWithBatch(BatchOperation batch, KEY key) throws IOException;
 
   /**
+   * Deletes a range of keys from the metadata store.
+   *
+   * @param beginKey start metadata key
+   * @param endKey end metadata key
+   * @throws IOException on Failure
+   */
+  void deleteRange(KEY beginKey, KEY endKey) throws IOException;
+
+  /**
    * Returns the iterator for this metadata store.
    *
    * @return MetaStoreIterator
+   * @throws IOException on failure.
    */
-  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator();
+  TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator()
+      throws IOException;
 
   /**
    * Returns a prefixed iterator for this metadata store.
@@ -188,6 +200,17 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     throw new NotImplementedException("addCacheEntry is not implemented");
   }
 
+  /** Add entry to the table cache with a non-null key and a null value. */
+  default void addCacheEntry(KEY cacheKey, long epoch) {
+    addCacheEntry(new CacheKey<>(cacheKey), CacheValue.get(epoch));
+  }
+
+  /** Add entry to the table cache with a non-null key and a non-null value. */
+  default void addCacheEntry(KEY cacheKey, VALUE value, long epoch) {
+    addCacheEntry(new CacheKey<>(cacheKey),
+        CacheValue.get(epoch, value));
+  }
+
   /**
    * Get the cache value from table cache.
    * @param cacheKey
@@ -211,6 +234,13 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   default Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>>
       cacheIterator() {
     throw new NotImplementedException("cacheIterator is not implemented");
+  }
+
+  /**
+   * Create the metrics datasource that emits table cache metrics.
+   */
+  default TableCacheMetrics createCacheMetrics() throws IOException {
+    throw new NotImplementedException("getCacheValue is not implemented");
   }
 
   /**

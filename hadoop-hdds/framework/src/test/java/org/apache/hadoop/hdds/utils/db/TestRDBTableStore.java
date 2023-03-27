@@ -57,7 +57,7 @@ public class TestRDBTableStore {
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
-          "Eighth");
+          "Eighth", "Ninth");
   private final List<String> prefixedFamilies = Arrays.asList(
       "PrefixFirst",
       "PrefixTwo", "PrefixThree",
@@ -165,7 +165,7 @@ public class TestRDBTableStore {
     }
 
     // Write all the keys and delete the keys scheduled for delete.
-    //Assert we find only expected keys in the Table.
+    // Assert we find only expected keys in the Table.
     try (Table testTable = rdbStore.getTable("Fourth")) {
       for (int x = 0; x < deletedKeys.size(); x++) {
         testTable.put(deletedKeys.get(x), value);
@@ -177,13 +177,76 @@ public class TestRDBTableStore {
       }
 
       for (int x = 0; x < validKeys.size(); x++) {
-        Assertions.assertNotNull(testTable.get(validKeys.get(0)));
+        Assertions.assertNotNull(testTable.get(validKeys.get(x)));
       }
 
       for (int x = 0; x < deletedKeys.size(); x++) {
-        Assertions.assertNull(testTable.get(deletedKeys.get(0)));
+        Assertions.assertNull(testTable.get(deletedKeys.get(x)));
       }
     }
+  }
+
+  @Test
+  public void deleteRange() throws Exception {
+
+    // Prepare keys to be written to the test table
+    List<byte[]> keys = new ArrayList<>();
+    for (int x = 0; x < 100; x++) {
+      // Left pad DB keys with zeros
+      String k = String.format("%03d", x) + "-" + RandomStringUtils.random(6);
+      keys.add(k.getBytes(StandardCharsets.UTF_8));
+    }
+    // Some random value
+    byte[] val = RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+
+    try (Table testTable = rdbStore.getTable("Ninth")) {
+
+      // Write keys to the table
+      for (int x = 0; x < keys.size(); x++) {
+        testTable.put(keys.get(x), val);
+      }
+
+      // All keys should exist at this point
+      for (int x = 0; x < keys.size(); x++) {
+        Assertions.assertNotNull(testTable.get(keys.get(x)));
+      }
+
+      // Delete a range of keys: [10th, 20th), zero-indexed
+      final int deleteRangeBegin = 10, deleteRangeEnd = 20;
+      byte[] dRangeBeginKey = keys.get(deleteRangeBegin);
+      byte[] dRangeEndKey = keys.get(deleteRangeEnd);
+
+      testTable.deleteRange(dRangeBeginKey, dRangeEndKey);
+
+      // Keys [10th, 20th) should be gone now
+      for (int x = deleteRangeBegin; x < deleteRangeEnd; x++) {
+        Assertions.assertNull(testTable.get(keys.get(x)));
+      }
+
+      // While the rest of the keys should be untouched
+      for (int x = 0; x < deleteRangeBegin; x++) {
+        Assertions.assertNotNull(testTable.get(keys.get(x)));
+      }
+      for (int x = deleteRangeEnd; x < 100; x++) {
+        Assertions.assertNotNull(testTable.get(keys.get(x)));
+      }
+
+      // Delete the rest of the keys
+      testTable.deleteRange(keys.get(0), keys.get(100 - 1));
+
+      // Confirm key deletion
+      for (int x = 0; x < 100 - 1; x++) {
+        Assertions.assertNull(testTable.get(keys.get(x)));
+      }
+      // The last key is still there because
+      // deleteRange() excludes the endKey by design
+      Assertions.assertNotNull(testTable.get(keys.get(100 - 1)));
+
+      // Delete the last key
+      testTable.delete(keys.get(100 - 1));
+      Assertions.assertNull(testTable.get(keys.get(100 - 1)));
+    }
+
   }
 
   @Test

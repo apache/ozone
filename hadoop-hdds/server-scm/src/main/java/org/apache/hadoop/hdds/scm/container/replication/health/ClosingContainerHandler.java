@@ -24,11 +24,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class used in Replication Manager to close replicas of CLOSING containers.
  */
 public class ClosingContainerHandler extends AbstractCheck {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ClosingContainerHandler.class);
+
   private final ReplicationManager replicationManager;
 
   public ClosingContainerHandler(ReplicationManager replicationManager) {
@@ -50,11 +55,16 @@ public class ClosingContainerHandler extends AbstractCheck {
     if (containerInfo.getState() != HddsProtos.LifeCycleState.CLOSING) {
       return false;
     }
+    LOG.debug("Checking container {} in ClosingContainerHandler",
+        containerInfo);
+
+    boolean forceClose = request.getContainerInfo().getReplicationConfig()
+        .getReplicationType() != HddsProtos.ReplicationType.RATIS;
 
     for (ContainerReplica replica : request.getContainerReplicas()) {
       if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {
         replicationManager.sendCloseContainerReplicaCommand(
-            containerInfo, replica.getDatanodeDetails(), false);
+            containerInfo, replica.getDatanodeDetails(), forceClose);
       }
     }
     return true;

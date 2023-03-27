@@ -28,12 +28,14 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -73,27 +75,30 @@ public class TestStorageContainerManagerHelper {
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    // Write 20 keys in bucketName.
-    Set<String> keyNames = Sets.newHashSet();
-    for (int i = 0; i < numOfKeys; i++) {
-      String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-      keyNames.add(keyName);
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      // Write 20 keys in bucketName.
+      Set<String> keyNames = Sets.newHashSet();
+      for (int i = 0; i < numOfKeys; i++) {
+        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        keyNames.add(keyName);
 
-      TestDataUtil
-          .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        TestDataUtil
+            .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+      }
+
+      for (String key : keyNames) {
+        OmKeyArgs arg = new OmKeyArgs.Builder()
+            .setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getName())
+            .setKeyName(key)
+            .build();
+        OmKeyInfo location = cluster.getOzoneManager()
+            .lookupKey(arg);
+        keyLocationMap.put(key, location);
+      }
     }
 
-    for (String key : keyNames) {
-      OmKeyArgs arg = new OmKeyArgs.Builder()
-          .setVolumeName(bucket.getVolumeName())
-          .setBucketName(bucket.getName())
-          .setKeyName(key)
-          .build();
-      OmKeyInfo location = cluster.getOzoneManager()
-          .lookupKey(arg);
-      keyLocationMap.put(key, location);
-    }
     return keyLocationMap;
   }
 
@@ -111,7 +116,7 @@ public class TestStorageContainerManagerHelper {
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
         pendingDeletionBlocks
-            .add(entry.getKey().replace(cData.deletingBlockKeyPrefix(), ""));
+            .add(entry.getKey().replace(cData.getDeletingBlockKeyPrefix(), ""));
       }
     }
     return pendingDeletionBlocks;
@@ -137,7 +142,8 @@ public class TestStorageContainerManagerHelper {
                   cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
       for (Table.KeyValue<String, BlockData> entry : kvs) {
-        allBlocks.add(Long.valueOf(entry.getKey()));
+        allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
+            .getKeyWithoutPrefix(entry.getKey())));
       }
     }
     return allBlocks;
@@ -149,13 +155,14 @@ public class TestStorageContainerManagerHelper {
       KeyValueContainerData cData = getContainerMetadata(entry.getKey());
       try (DBHandle db = BlockUtils.getDB(cData, conf)) {
         DatanodeStore ds = db.getStore();
-        DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-            (DatanodeStoreSchemaTwoImpl) ds;
-        List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
-            txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
-            .getRangeKVs(null, Integer.MAX_VALUE, null);
+        DatanodeStoreSchemaThreeImpl dnStoreImpl =
+            (DatanodeStoreSchemaThreeImpl) ds;
+        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
+            .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                cData.containerPrefix());
         List<Long> conID = new ArrayList<>();
-        for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
+        for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
             txnsInTxnTable) {
           conID.addAll(txn.getValue().getLocalIDList());
         }

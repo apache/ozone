@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
@@ -57,7 +58,6 @@ import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.util.Preconditions;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,6 +163,12 @@ public class KeyDeletingService extends BackgroundService {
         runCount.incrementAndGet();
         try {
           long startTime = Time.monotonicNow();
+          // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
+          //  snapshot's deletedTable when active DB's deletedTable
+          //  doesn't have enough entries left.
+          //  OM would have to keep track of which snapshot the key is coming
+          //  from. And PurgeKeysRequest would have to be adjusted to be able
+          //  to operate on snapshot checkpoints.
           List<BlockGroup> keyBlocksList = manager
               .getPendingDeletionKeys(keyLimitPerTask);
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
@@ -178,8 +184,10 @@ public class KeyDeletingService extends BackgroundService {
                 //  OMRequest model.
                 delCount = deleteAllKeys(results);
               }
-              LOG.debug("Number of keys deleted: {}, elapsed time: {}ms",
-                  delCount, Time.monotonicNow() - startTime);
+              if (delCount > 0) {
+                LOG.info("Number of keys deleted: {}, elapsed time: {}ms",
+                    delCount, Time.monotonicNow() - startTime);
+              }
               deletedKeyCount.addAndGet(delCount);
             }
           }
@@ -196,13 +204,12 @@ public class KeyDeletingService extends BackgroundService {
      * Deletes all the keys that SCM has acknowledged and queued for delete.
      *
      * @param results DeleteBlockGroups returned by SCM.
-     * @throws RocksDBException on Error.
      * @throws IOException      on Error
      */
     private int deleteAllKeys(List<DeleteBlockGroupResult> results)
-        throws RocksDBException, IOException {
-      Table deletedTable = manager.getMetadataManager().getDeletedTable();
-
+        throws IOException {
+      Table<String, RepeatedOmKeyInfo> deletedTable =
+          manager.getMetadataManager().getDeletedTable();
       DBStore store = manager.getMetadataManager().getStore();
 
       // Put all keys to delete in a single transaction and call for delete.
@@ -213,7 +220,9 @@ public class KeyDeletingService extends BackgroundService {
             // Purge key from OM DB.
             deletedTable.deleteWithBatch(writeBatch,
                 result.getObjectKey());
-            LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
+            }
             deletedCount++;
           }
         }
@@ -226,9 +235,7 @@ public class KeyDeletingService extends BackgroundService {
     /**
      * Submits PurgeKeys request for the keys whose blocks have been deleted
      * by SCM.
-     *
      * @param results DeleteBlockGroups returned by SCM.
-     * @throws IOException      on Error
      */
     public int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results) {
       Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
@@ -242,7 +249,9 @@ public class KeyDeletingService extends BackgroundService {
           String deletedKey = result.getObjectKey();
           // Parse Volume and BucketName
           addToMap(purgeKeysMapPerBucket, deletedKey);
-          LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+          }
           deletedCount++;
         }
       }

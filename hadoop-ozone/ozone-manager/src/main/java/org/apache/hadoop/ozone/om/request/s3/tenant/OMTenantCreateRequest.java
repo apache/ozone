@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -152,6 +151,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String volumeName = request.getVolumeName();
     // Validate volume name
     OmUtils.validateVolumeName(volumeName);
+
+    final String dbVolumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+
+    // Check volume existence
+    if (ozoneManager.getMetadataManager().getVolumeTable()
+        .isExist(dbVolumeKey)) {
+      LOG.debug("volume: '{}' already exists", volumeName);
+      throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
+    }
+
     // TODO: Refactor this and OMVolumeCreateRequest to improve maintainability.
     final VolumeInfo volumeInfo = VolumeInfo.newBuilder()
         .setVolume(volumeName)
@@ -301,7 +311,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           bucketNamespacePolicyName, bucketPolicyName);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.of(omDBTenantState), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omDBTenantState));
 
       // Update tenant cache
       multiTenantManager.getCacheOp().createTenant(

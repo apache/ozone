@@ -158,7 +158,7 @@ public class BlockManagerImpl implements BlockManager {
         // If block exists in cache, blockCount should not be incremented.
         if (!isBlockInCache) {
           if (db.getStore().getBlockDataTable().get(
-              containerData.blockKey(localID)) == null) {
+              containerData.getBlockKey(localID)) == null) {
             // Block does not exist in DB => blockCount needs to be
             // incremented when the block is added into DB.
             incrBlockCount = true;
@@ -166,10 +166,10 @@ public class BlockManagerImpl implements BlockManager {
         }
 
         db.getStore().getBlockDataTable().putWithBatch(
-            batch, containerData.blockKey(localID), data);
+            batch, containerData.getBlockKey(localID), data);
         if (bcsId != 0) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, containerData.bcsIdKey(), bcsId);
+              batch, containerData.getBcsIdKey(), bcsId);
         }
 
         // Set Bytes used, this bytes used will be updated for every write and
@@ -179,13 +179,13 @@ public class BlockManagerImpl implements BlockManager {
         // is only used to compute the bytes used. This is done to keep the
         // current behavior and avoid DB write during write chunk operation.
         db.getStore().getMetadataTable().putWithBatch(
-            batch, containerData.bytesUsedKey(),
+            batch, containerData.getBytesUsedKey(),
             containerData.getBytesUsed());
 
         // Set Block Count for a container.
         if (incrBlockCount) {
           db.getStore().getMetadataTable().putWithBatch(
-              batch, containerData.blockCountKey(),
+              batch, containerData.getBlockCountKey(),
               containerData.getBlockCount() + 1);
         }
 
@@ -327,7 +327,7 @@ public class BlockManagerImpl implements BlockManager {
       try (DBHandle db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
         String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
-            : cData.blockKey(startLocalID);
+            : cData.getBlockKey(startLocalID);
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
                 .getSequentialRangeKVs(startKey, count,
@@ -352,7 +352,7 @@ public class BlockManagerImpl implements BlockManager {
 
   private BlockData getBlockByID(DBHandle db, BlockID blockID,
       KeyValueContainerData containerData) throws IOException {
-    String blockKey = containerData.blockKey(blockID.getLocalID());
+    String blockKey = containerData.getBlockKey(blockID.getLocalID());
 
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {
