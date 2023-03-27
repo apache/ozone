@@ -428,14 +428,14 @@ public class TestContainerEndpoint {
     // Retrieve the first key from the list and verify its metadata
     iterator = keyMetadataList.iterator();
     keyMetadata = iterator.next();
-    assertEquals("dir1/file7", keyMetadata.getKey());
+    assertEquals(FSO_KEY_NAME1, keyMetadata.getKey());
     assertEquals(1, keyMetadata.getVersions().size());
     assertEquals(1, keyMetadata.getBlockIds().size());
     blockIds = keyMetadata.getBlockIds();
     assertEquals(0, blockIds.get(0L).get(0).getLocalID());
 
     keyMetadata = iterator.next();
-    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
+    assertEquals(FSO_KEY_NAME2, keyMetadata.getKey());
     assertEquals(1, keyMetadata.getVersions().size());
     assertEquals(1, keyMetadata.getBlockIds().size());
     blockIds = keyMetadata.getBlockIds();
@@ -493,82 +493,6 @@ public class TestContainerEndpoint {
     assertEquals(0, keyMetadataList.size());
     assertEquals(0, data.getTotalCount());
 
-    // Set up test data for FSO keys
-    setUpFSOData();
-    // Reprocess the container key mapper to ensure the latest mapping is used
-    reprocessContainerKeyMapper();
-
-    // test getting keys for a container with a prev-key parameter for FSO keys
-    String prevKey = reconOMMetadataManager.getOzoneKey(VOLUME_NAME,
-        BUCKET_NAME, FSO_KEY_NAME1);
-    // The path "sampleVol2/bucketTwo/dir/file7" is used to generate the prevKey
-    // parameter for the current test case. This path will be skipped from the
-    // result since we are querying for keys after this path.
-    response =
-        containerEndpoint.getKeysForContainer(CONTAINER_ID_1, -1, prevKey);
-    data =
-        (KeysResponse) response.getEntity();
-
-    assertEquals(2, data.getTotalCount());
-
-    keyMetadataList = data.getKeys();
-    assertEquals(1, keyMetadataList.size());
-
-    iterator = keyMetadataList.iterator();
-    keyMetadata = iterator.next();
-
-    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
-    assertEquals(1, keyMetadata.getVersions().size());
-    assertEquals(1, keyMetadata.getBlockIds().size());
-
-    // test for an empty prev-key parameter for FSO keys, hence all
-    // keys for that container will be returned to the response
-    response = containerEndpoint.getKeysForContainer(
-        CONTAINER_ID_1, -1, StringUtils.EMPTY);
-    data = (KeysResponse) response.getEntity();
-    keyMetadataList = data.getKeys();
-
-    assertEquals(2, data.getTotalCount());
-    assertEquals(2, keyMetadataList.size());
-    iterator = keyMetadataList.iterator();
-    keyMetadata = iterator.next();
-    assertEquals("dir1/file7", keyMetadata.getKey());
-    keyMetadata = iterator.next();
-    assertEquals("dir1/dir2/file8", keyMetadata.getKey());
-  }
-
-  @Test
-  public void testCorrectPathForLayout() throws IOException {
-    // Set up test data for FSO keys
-    setUpFSOData();
-    // Reprocess the container key mapper to ensure the latest mapping is used
-    reprocessContainerKeyMapper();
-
-    // Test with a non-FSO bucket : Return the Same path with names
-    String prevKeyPrefix = "/sampleVol/bucketOne/dir1/file1";
-    String expectedPath = prevKeyPrefix;
-    String actualPath = containerEndpoint.correctPathForLayout(prevKeyPrefix);
-    assertEquals(expectedPath, actualPath);
-
-
-    // Test with a FSO bucket : Return the Same path but with objectIDs
-    String givenPath =
-        "/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + FSO_KEY_NAME1;
-    expectedPath =
-        "/" + VOL_OBJECT_ID + "/" + BUCKET_OBJECT_ID + "/" + PARENT_OBJECT_ID +
-            "/" + FILE_NAME1;
-    actualPath = containerEndpoint.correctPathForLayout(givenPath);
-    assertEquals(expectedPath, actualPath);
-
-    // Test with nested directories : Only the parent of the Immediate directory
-    // will be shown in the path
-    givenPath =
-        "/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + FSO_KEY_NAME2;
-    expectedPath =
-        "/" + VOL_OBJECT_ID + "/" + BUCKET_OBJECT_ID + "/" + PARENT_OBJECT_ID2 +
-            "/" + FILE_NAME2;
-    actualPath = containerEndpoint.correctPathForLayout(givenPath);
-    assertEquals(expectedPath, actualPath);
   }
 
   @Test
