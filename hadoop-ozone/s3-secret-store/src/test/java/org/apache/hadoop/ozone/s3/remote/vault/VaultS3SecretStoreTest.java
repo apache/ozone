@@ -48,7 +48,7 @@ import static org.mockito.Mockito.when;
  */
 public class VaultS3SecretStoreTest {
   private static final String TOKEN = "token";
-  private static final AtomicInteger failAuthCounter = new AtomicInteger(0);
+  private static final AtomicInteger FAIL_AUTH_COUNTER = new AtomicInteger(0);
   private static final Map<String, Map<String, String>> STORE = new HashMap<>();
   private static VaultConfig config;
   private static VaultS3SecretStore s3SecretStore;
@@ -95,11 +95,11 @@ public class VaultS3SecretStoreTest {
     S3SecretValue secret = new S3SecretValue("id", "value");
     s3SecretStore.storeSecret("id", secret);
 
-    failAuthCounter.set(1);
+    FAIL_AUTH_COUNTER.set(1);
 
     assertEquals(secret, s3SecretStore.getSecret("id"));
 
-    failAuthCounter.set(1);
+    FAIL_AUTH_COUNTER.set(1);
 
     assertDoesNotThrow(() -> s3SecretStore.revokeSecret("id"));
   }
@@ -109,12 +109,12 @@ public class VaultS3SecretStoreTest {
     S3SecretValue secret = new S3SecretValue("id", "value");
     s3SecretStore.storeSecret("id", secret);
 
-    failAuthCounter.set(2);
+    FAIL_AUTH_COUNTER.set(2);
 
     assertThrows(IOException.class,
         () -> s3SecretStore.getSecret("id"));
 
-    failAuthCounter.set(2);
+    FAIL_AUTH_COUNTER.set(2);
 
     assertThrows(IOException.class,
         () -> s3SecretStore.revokeSecret("id"));
@@ -151,7 +151,7 @@ public class VaultS3SecretStoreTest {
 
     @Override
     public LookupResponse lookupSelf() throws VaultException {
-      if (failAuthCounter.getAndDecrement() == 0) {
+      if (FAIL_AUTH_COUNTER.getAndDecrement() == 0) {
         throw new VaultException("Fail", 401);
       }
       return new LookupResponseMock(200);
