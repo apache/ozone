@@ -1200,6 +1200,7 @@ message DeletedKeys {
 
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
+    optional string fromSnapshot = 2;
 }
 
 message PurgeKeysResponse {

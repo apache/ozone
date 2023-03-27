@@ -68,6 +68,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String bucketName;
   private final String snapshotName;
   private final OMMetadataManager omMetadataManager;
+  private final KeyManager keyManager;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -82,6 +83,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.bucketName = bucketName;
     this.volumeName = volumeName;
     this.omMetadataManager = keyManager.getMetadataManager();
+    this.keyManager = keyManager;
   }
 
 
@@ -261,5 +263,9 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @VisibleForTesting
   public OMMetadataManager getMetadataManager() {
     return omMetadataManager;
+  }
+
+  public KeyManager getKeyManager() {
+    return keyManager;
   }
 }

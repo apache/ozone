@@ -1787,4 +1787,30 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return omBucketInfo.getObjectID();
   }
+
+  @Override
+  public List<BlockGroup> getBlocksForKeyDelete(String deletedKey)
+      throws IOException {
+    RepeatedOmKeyInfo omKeyInfo = getDeletedTable().get(deletedKey);
+    if (omKeyInfo == null) {
+      return null;
+    }
+
+    List<BlockGroup> result = new ArrayList<>();
+    // Add all blocks from all versions of the key to the deletion list
+    for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
+      for (OmKeyLocationInfoGroup keyLocations :
+          info.getKeyLocationVersions()) {
+        List<BlockID> item = keyLocations.getLocationList().stream()
+            .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+            .collect(Collectors.toList());
+        BlockGroup keyBlocks = BlockGroup.newBuilder()
+            .setKeyName(deletedKey)
+            .addAllBlockIDs(item)
+            .build();
+        result.add(keyBlocks);
+      }
+    }
+    return result;
+  }
 }

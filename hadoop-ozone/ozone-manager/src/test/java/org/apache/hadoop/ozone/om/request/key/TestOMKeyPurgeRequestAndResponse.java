@@ -141,7 +141,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-          omResponse, deletedKeyNames);
+          omResponse, deletedKeyNames, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.

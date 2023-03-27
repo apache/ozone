@@ -282,7 +282,8 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS);
       try {
         snapshotDeletingService = new SnapshotDeletingService(
-            snapshotServiceInterval, snapshotServiceTimeout, ozoneManager);
+            snapshotServiceInterval, snapshotServiceTimeout,
+            ozoneManager, scmClient.getBlockClient());
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
