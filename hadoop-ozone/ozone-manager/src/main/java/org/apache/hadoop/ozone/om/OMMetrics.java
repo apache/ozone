@@ -63,6 +63,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
+  private @Metric MutableCounterLong numKeyHSyncs;
   private @Metric MutableCounterLong numBlockAllocations;
   private @Metric MutableCounterLong numGetServiceLists;
   private @Metric MutableCounterLong numBucketS3Lists;
@@ -81,6 +82,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequests;
   private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
   private @Metric MutableCounterLong numOpenKeysDeleted;
+  private @Metric MutableCounterLong numOpenKeysCleaned;
+  private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
+  private @Metric MutableCounterLong numOpenKeys;
 
   private @Metric MutableCounterLong numAddAcl;
   private @Metric MutableCounterLong numSetAcl;
@@ -746,6 +750,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyCommits.incr();
   }
 
+  public void incNumKeyHSyncs() {
+    numKeyOps.incr();
+    numKeyHSyncs.incr();
+  }
+
   public void incNumKeyCommitFails() {
     numKeyCommitFails.incr();
   }
@@ -789,6 +798,18 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumOpenKeysDeleted() {
     numOpenKeysDeleted.incr();
+  }
+
+  public void incNumOpenKeysCleaned(int delta) {
+    numOpenKeysCleaned.incr(delta);
+  }
+
+  public void incNumOpenKeysHSyncCleaned(int delta) {
+    numOpenKeysHSyncCleaned.incr(delta);
+  }
+
+  public void incNumOpenKeys() {
+    numOpenKeys.incr();
   }
 
   public void incNumOpenKeyDeleteRequestFails() {
@@ -1029,6 +1050,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyHSyncs() {
+    return numKeyHSyncs.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyCommitFails() {
     return numKeyCommitFails.value();
   }
@@ -1089,6 +1115,18 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumOpenKeysDeleted() {
     return numOpenKeysDeleted.value();
+  }
+
+  public long getNumOpenKeysCleaned() {
+    return numOpenKeysCleaned.value();
+  }
+
+  public long getNumOpenKeysHSyncCleaned() {
+    return numOpenKeysHSyncCleaned.value();
+  }
+
+  public long getNumOpenKeys() {
+    return numOpenKeys.value();
   }
 
   public long getNumOpenKeyDeleteRequestFails() {

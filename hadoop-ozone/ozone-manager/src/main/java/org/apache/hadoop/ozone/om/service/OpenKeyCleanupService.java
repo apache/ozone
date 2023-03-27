@@ -198,6 +198,7 @@ public class OpenKeyCleanupService extends BackgroundService {
             openKeyBuckets.stream());
         submitRequest(omRequest);
       }
+      ozoneManager.getMetrics().incNumOpenKeysCleaned(numOpenKeys);
 
       final List<CommitKeyRequest.Builder> hsyncKeys
           = expiredOpenKeys.getHsyncKeys();
@@ -206,6 +207,7 @@ public class OpenKeyCleanupService extends BackgroundService {
         // commit hsync'ed keys
         hsyncKeys.forEach(b -> submitRequest(createCommitKeyRequest(b)));
       }
+      ozoneManager.getMetrics().incNumOpenKeysHSyncCleaned(numHsyncKeys);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of expired open keys submitted for deletion: {},"
