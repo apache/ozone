@@ -531,7 +531,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
         .append(" Decommission Count: ").append(decommissionIndexes.size())
         .append(" Maintenance Count: ").append(maintenanceIndexes.size())
         .append(" inFlightAdd Count: ").append(pendingAdd.size())
-        .append(" inFightDel Count: ").append(pendingDelete.size())
+        .append(" inFlightDel Count: ").append(pendingDelete.size())
         .append(" ReplicationConfig: ").append(repConfig)
         .append(" remainingMaintenanceRedundancy Count: ")
         .append(remainingMaintenanceRedundancy);
