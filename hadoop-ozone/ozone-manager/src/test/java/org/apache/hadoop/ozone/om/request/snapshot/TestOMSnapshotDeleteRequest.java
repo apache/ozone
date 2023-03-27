@@ -20,7 +20,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
 import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
