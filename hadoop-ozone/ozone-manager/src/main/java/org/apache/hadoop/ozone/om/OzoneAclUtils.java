@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Ozone Acl Wrapper class.
@@ -83,24 +85,6 @@ public final class OzoneAclUtils {
 
     boolean isVolOwner = isOwner(user, volOwner);
 
-    IAccessAuthorizer.ACLType parentAclRight = aclType;
-
-    //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
-    // only READ access on parent level access. OzoneNativeAuthorizer has
-    // different parent level access based on the child level access type
-    if (omMetadataReader.isNativeAuthorizerEnabled()) {
-      if (aclType == IAccessAuthorizer.ACLType.CREATE ||
-          aclType == IAccessAuthorizer.ACLType.DELETE ||
-          aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
-        parentAclRight = IAccessAuthorizer.ACLType.WRITE;
-      } else if (aclType == IAccessAuthorizer.ACLType.READ_ACL ||
-          aclType == IAccessAuthorizer.ACLType.LIST) {
-        parentAclRight = IAccessAuthorizer.ACLType.READ;
-      }
-    } else {
-      parentAclRight =  IAccessAuthorizer.ACLType.READ;
-    }
-
     switch (resType) {
     //For Volume level access we only need to check {OWNER} equal
     // to Volume Owner.
@@ -116,6 +100,14 @@ public final class OzoneAclUtils {
     // volume owner if current ugi user is volume owner else we need check
     //{OWNER} equals bucket owner for bucket/key/prefix.
     case PREFIX:
+      //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
+      // only READ access on parent level access. OzoneNativeAuthorizer has
+      // different parent level access based on the child level access type
+      IAccessAuthorizer.ACLType parentAclRight = IAccessAuthorizer.ACLType.READ;
+      if (omMetadataReader.isNativeAuthorizerEnabled() && resType == BUCKET) {
+        parentAclRight = getParentNativeAcl(aclType, resType);
+      }
+      
       omMetadataReader.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
           parentAclRight, vol, bucket, key, user,
           remoteAddress, hostName, true,
@@ -136,6 +128,56 @@ public final class OzoneAclUtils {
       throw new OMException("Unexpected object type:" +
               resType, INVALID_REQUEST);
     }
+  }
+
+  /**
+   * get the Parent ACL based on child ACL and resource type.
+   * 
+   * @param aclRight child acl as required
+   * @param resType resource type
+   * @return parent acl
+   */
+  public static IAccessAuthorizer.ACLType getParentNativeAcl(
+      IAccessAuthorizer.ACLType aclRight, OzoneObj.ResourceType resType) {
+    // For volume, parent access has no meaning and not used
+    if (resType == VOLUME) {
+      return IAccessAuthorizer.ACLType.NONE;
+    }
+    
+    // Refined the parent for bucket, keys & prefix
+    // OP         |CHILD       |PARENT
+
+    // CREATE      NONE        WRITE
+    // DELETE      DELETE      READ
+    // WRITE       WRITE       WRITE     (For key/prefix, volume is READ)
+    // WRITE_ACL   WRITE_ACL   READ      (V1 WRITE_ACL=>WRITE)
+
+    // READ        READ        READ
+    // LIST        LIST        READ      (V1 LIST=>READ)
+    // READ_ACL    READ_ACL    READ      (V1 READ_ACL=>READ)
+
+    // for bucket, except CREATE, all cases need READ for volume
+    if (resType == BUCKET) {
+      if (aclRight == IAccessAuthorizer.ACLType.CREATE) {
+        return IAccessAuthorizer.ACLType.WRITE;
+      }
+      return IAccessAuthorizer.ACLType.READ;
+    }
+    
+    // else for key and prefix, bucket permission will be read
+    // except where key/prefix have CREATE and WRITE,
+    // bucket will have WRITE
+    IAccessAuthorizer.ACLType parentAclRight = aclRight;
+    if (aclRight == IAccessAuthorizer.ACLType.CREATE) {
+      parentAclRight = IAccessAuthorizer.ACLType.WRITE;
+    } else if (aclRight == IAccessAuthorizer.ACLType.READ_ACL
+        || aclRight == IAccessAuthorizer.ACLType.LIST
+        || aclRight == IAccessAuthorizer.ACLType.WRITE_ACL
+        || aclRight == IAccessAuthorizer.ACLType.DELETE) {
+      parentAclRight = IAccessAuthorizer.ACLType.READ;
+    }
+
+    return parentAclRight;
   }
 
   private static boolean isOwner(UserGroupInformation callerUgi,
