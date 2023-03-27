@@ -89,6 +89,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -404,6 +405,14 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
     writeDeletedKeysToOm(reconOMMetadataManager,
         deletedKeysList3, "Bucket3", "Volume3");
+
+    // Populate the deletedDirectories table in OM DB
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
+        3L, 2L, 1L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
+        6L, 5L, 4L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
+        9L, 8L, 7L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);

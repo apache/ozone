@@ -45,11 +45,13 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+
 
 /**
  * Endpoint to fetch current state of ozone cluster.
@@ -122,6 +124,9 @@ public class ClusterStateEndpoint {
     // Keys from the DeletedTable
     GlobalStats deletedKeyRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(DELETED_TABLE));
+    // Directories from the DeletedDirectoryTable
+    GlobalStats deletedDirRecord = globalStatsDao.findById(
+        TableCountTask.getRowKeyFromTable(DELETED_DIR_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
@@ -132,6 +137,7 @@ public class ClusterStateEndpoint {
 
     Long totalKeys = 0L;
     Long deletedKeys = 0L;
+    Long deletedDirs = 0L;
 
     if (keyRecord != null) {
       totalKeys += keyRecord.getValue();
@@ -142,8 +148,13 @@ public class ClusterStateEndpoint {
     if (deletedKeyRecord != null) {
       deletedKeys += deletedKeyRecord.getValue();
     }
+    if (deletedDirRecord != null) {
+      deletedDirs += deletedDirRecord.getValue();
+    }
+
     builder.setKeys(totalKeys);
     builder.setDeletedKeys(deletedKeys);
+    builder.setDeletedDirs(deletedDirs);
 
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)

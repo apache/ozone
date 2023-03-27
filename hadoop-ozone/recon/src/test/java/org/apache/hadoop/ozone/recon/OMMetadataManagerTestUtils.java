@@ -328,6 +328,27 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  public static void writeDeletedDirToOm(OMMetadataManager omMetadataManager,
+                                         String bucketName,
+                                         String volumeName,
+                                         String dirName,
+                                         long parentObjectId,
+                                         long bucketObjectId,
+                                         long volumeObjectId)
+      throws IOException {
+    // DB key in DeletedDirectoryTable => "volumeID/bucketID/parentId/dirName"
+    String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+            bucketObjectId, parentObjectId, dirName);
+
+    omMetadataManager.getDeletedDirTable().put(omKey,
+        new OmKeyInfo.Builder()
+            .setBucketName(bucketName)
+            .setVolumeName(volumeName)
+            .setKeyName(dirName)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .build());
+  }
+
   public static OzoneManagerServiceProviderImpl
       getMockOzoneManagerServiceProvider() throws IOException {
     OzoneManagerServiceProviderImpl omServiceProviderMock =
