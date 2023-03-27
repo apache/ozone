@@ -117,6 +117,7 @@ public final class ClusterStateResponse {
     this.missingContainers = b.missingContainers;
     this.openContainers = b.openContainers;
     this.deletedKeys = b.deletedKeys;
+    this.deletedDirs = b.deletedDirs;
   }
 
   /**

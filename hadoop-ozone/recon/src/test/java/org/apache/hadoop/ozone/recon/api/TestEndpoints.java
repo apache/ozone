@@ -258,6 +258,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     dslContext = getDslContext();
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
@@ -627,6 +628,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 
   @Test
