@@ -261,6 +261,9 @@ public class TestContainerBalancer {
     scm.getScmContext().setLeaderReady();
     containerBalancer.notifyStatusChanged();
     Assertions.assertTrue(containerBalancer.isBalancerRunning());
+    Thread balancingThread = containerBalancer.getCurrentBalancingThread();
+    GenericTestUtils.waitFor(
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
     Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
     stopBalancer();
   }

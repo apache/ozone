@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
@@ -428,6 +429,11 @@ public class ContainerBalancer extends StatefulService {
 
   public ContainerBalancerMetrics getMetrics() {
     return metrics;
+  }
+
+  @VisibleForTesting
+  Thread getCurrentBalancingThread() {
+    return currentBalancingThread;
   }
 
   @Override
