@@ -285,7 +285,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // bucket gets deleted.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenKeyName, omKeyInfo, trxnLogIndex);
-      omMetrics.incNumOpenKeys();
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.

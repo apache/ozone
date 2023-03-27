@@ -84,7 +84,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeysDeleted;
   private @Metric MutableCounterLong numOpenKeysCleaned;
   private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
-  private @Metric MutableCounterLong numOpenKeys;
 
   private @Metric MutableCounterLong numAddAcl;
   private @Metric MutableCounterLong numSetAcl;
@@ -804,12 +803,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numOpenKeysCleaned.incr(delta);
   }
 
-  public void incNumOpenKeysHSyncCleaned(int delta) {
-    numOpenKeysHSyncCleaned.incr(delta);
-  }
-
-  public void incNumOpenKeys() {
-    numOpenKeys.incr();
+  public void incNumOpenKeysHSyncCleaned() {
+    numOpenKeysHSyncCleaned.incr();
   }
 
   public void incNumOpenKeyDeleteRequestFails() {
@@ -1123,10 +1118,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumOpenKeysHSyncCleaned() {
     return numOpenKeysHSyncCleaned.value();
-  }
-
-  public long getNumOpenKeys() {
-    return numOpenKeys.value();
   }
 
   public long getNumOpenKeyDeleteRequestFails() {
