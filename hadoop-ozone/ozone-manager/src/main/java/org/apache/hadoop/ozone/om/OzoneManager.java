@@ -24,8 +24,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -761,7 +759,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     volumeManager = new VolumeManagerImpl(metadataManager);
     bucketManager = new BucketManagerImpl(metadataManager);
 
-    Class<? extends S3SecretStoreProvider> storeProviderClass = configuration.getClass(
+    Class<? extends S3SecretStoreProvider> storeProviderClass =
+        configuration.getClass(
             S3_SECRET_STORAGE_TYPE,
             DEFAULT_SECRET_STORAGE_TYPE,
             S3SecretStoreProvider.class);
@@ -769,7 +768,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       store = storeProviderClass == DEFAULT_SECRET_STORAGE_TYPE
               ? metadataManagerImpl
-              : storeProviderClass.getConstructor().newInstance().get(configuration);
+              : storeProviderClass
+                  .getConstructor().newInstance().get(configuration);
     } catch (Exception e) {
       throw new IOException(e);
     }

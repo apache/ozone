@@ -32,11 +32,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 
 /**
- * Builder for {@link S3RemoteSecretStore}.
+ * Builder for {@link VaultS3SecretStore}.
  */
-public class S3RemoteSecretStoreBuilder {
+public class VaultS3SecretStoreBuilder {
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3RemoteSecretStoreBuilder.class);
+      LoggerFactory.getLogger(VaultS3SecretStoreBuilder.class);
 
   private String address;
   private String nameSpace;
@@ -50,66 +50,66 @@ public class S3RemoteSecretStoreBuilder {
   private String trustStorePassword;
   private Auth auth;
 
-  public S3RemoteSecretStoreBuilder setAddress(String address) {
+  public VaultS3SecretStoreBuilder setAddress(String address) {
     this.address = address;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setEngineVersion(int engineVersion) {
+  public VaultS3SecretStoreBuilder setEngineVersion(int engineVersion) {
     this.engineVersion = engineVersion;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setKeyStoreType(String keyStoreType) {
+  public VaultS3SecretStoreBuilder setKeyStoreType(String keyStoreType) {
     this.keyStoreType = keyStoreType;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setKeyStore(String keyStore) {
+  public VaultS3SecretStoreBuilder setKeyStore(String keyStore) {
     this.keyStore = keyStore;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setKeyStorePassword(String ksPassword) {
+  public VaultS3SecretStoreBuilder setKeyStorePassword(String ksPassword) {
     this.keyStorePassword = ksPassword;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setTrustStoreType(String trustStoreType) {
+  public VaultS3SecretStoreBuilder setTrustStoreType(String trustStoreType) {
     this.trustStoreType = trustStoreType;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setTrustStore(String trustStore) {
+  public VaultS3SecretStoreBuilder setTrustStore(String trustStore) {
     this.trustStore = trustStore;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setTrustStorePassword(String tsPassword) {
+  public VaultS3SecretStoreBuilder setTrustStorePassword(String tsPassword) {
     this.trustStorePassword = tsPassword;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setAuth(Auth auth) {
+  public VaultS3SecretStoreBuilder setAuth(Auth auth) {
     this.auth = auth;
     return this;
   }
 
-  public S3RemoteSecretStoreBuilder setSecretPath(String secretPath) {
+  public VaultS3SecretStoreBuilder setSecretPath(String secretPath) {
     this.secretPath = secretPath;
     return this;
   }
 
 
-  public S3RemoteSecretStoreBuilder setNameSpace(String nameSpace) {
+  public VaultS3SecretStoreBuilder setNameSpace(String nameSpace) {
     this.nameSpace = nameSpace;
     return this;
   }
 
-  public S3RemoteSecretStore build() throws IOException {
+  public VaultS3SecretStore build() throws IOException {
     SslConfig sslConfig = loadKeyStore(null);
     sslConfig = loadTrustStore(sslConfig);
-    return new S3RemoteSecretStore(
+    return new VaultS3SecretStore(
         address,
         nameSpace,
         secretPath,

@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,33 +16,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.remote;
-
-import java.util.Objects;
+package org.apache.hadoop.ozone.om.s3;
 
 /**
- * S3 secret storage type enum.
+ * This package contains S3 secret store related classes.
  */
-public enum S3SecretStoreType {
-  ROCKSDB("rocksDB"),
-  HASHICORP_VAULT("vault");
-
-  private final String type;
-
-  S3SecretStoreType(String type) {
-    this.type = type;
-  }
-
-  public String getType() {
-    return type;
-  }
-
-  public static S3SecretStoreType fromType(String type) {
-    for (S3SecretStoreType value : values()) {
-      if (Objects.equals(value.type, type)) {
-        return value;
-      }
-    }
-    return null;
-  }
-}

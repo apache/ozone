@@ -50,21 +50,21 @@ import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfiguration
  * Based on HashiCorp Vault secret storage.
  * Documentation link {@code https://developer.hashicorp.com/vault}.
  */
-public class S3RemoteSecretStore implements S3SecretStore {
+public class VaultS3SecretStore implements S3SecretStore {
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3RemoteSecretStore.class);
+      LoggerFactory.getLogger(VaultS3SecretStore.class);
 
   private final VaultConfig config;
   private Vault vault;
   private final String secretPath;
   private final Auth auth;
 
-  public S3RemoteSecretStore(String vaultAddress,
-                             String nameSpace,
-                             String secretPath,
-                             int engineVersion,
-                             Auth auth,
-                             SslConfig sslConfig) throws IOException {
+  public VaultS3SecretStore(String vaultAddress,
+                            String nameSpace,
+                            String secretPath,
+                            int engineVersion,
+                            Auth auth,
+                            SslConfig sslConfig) throws IOException {
     try {
       config = new VaultConfig()
           .address(vaultAddress)
@@ -145,7 +145,7 @@ public class S3RemoteSecretStore implements S3SecretStore {
 
     if (!Objects.equals(lookupResponse.getId(), config.getToken())) {
       LOG.error("Lookup token is not the same as Vault client configuration.");
-      throw new VaultException("Failed to re-authenticate");
+      throw new VaultException("Failed to re-authenticate", 401);
     }
   }
 
@@ -167,9 +167,9 @@ public class S3RemoteSecretStore implements S3SecretStore {
     return null;
   }
 
-  public static S3RemoteSecretStore fromConf(Configuration conf)
+  public static VaultS3SecretStore fromConf(Configuration conf)
       throws IOException {
-    S3RemoteSecretStoreBuilder builder = S3RemoteSecretStore.builder()
+    VaultS3SecretStoreBuilder builder = VaultS3SecretStore.builder()
         .setAuth(AuthType.fromConf(conf))
         .setAddress(conf.get(ADDRESS))
         .setNameSpace(conf.get(NAMESPACE))
@@ -192,7 +192,7 @@ public class S3RemoteSecretStore implements S3SecretStore {
     return builder.build();
   }
 
-  public static S3RemoteSecretStoreBuilder builder() {
-    return new S3RemoteSecretStoreBuilder();
+  public static VaultS3SecretStoreBuilder builder() {
+    return new VaultS3SecretStoreBuilder();
   }
 }
