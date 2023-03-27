@@ -984,14 +984,15 @@ public class RpcClient implements ClientProtocol {
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize)
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, token, pageSize);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   /**
@@ -1792,7 +1793,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2183,7 +2184,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2253,7 +2254,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig)
+        .setConfig(conf.getObject(OzoneClientConfig.class))
         .setClientMetrics(clientMetrics);
   }
 

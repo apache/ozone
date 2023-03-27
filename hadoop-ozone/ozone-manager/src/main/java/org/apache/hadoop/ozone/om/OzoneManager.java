@@ -199,7 +199,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
-import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -288,6 +287,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -452,7 +452,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // This metadata reader points to the active filesystem
   private OmMetadataReader omMetadataReader;
   private OmSnapshotManager omSnapshotManager;
-  private SnapshotChainManager snapshotChainManager;
 
   /** A list of property that are reconfigurable at runtime. */
   private final SortedSet<String> reconfigurableProperties =
@@ -770,7 +769,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
     omSnapshotManager = new OmSnapshotManager(this);
-    snapshotChainManager = new SnapshotChainManager(metadataManager);
 
     // Snapshot metrics
     updateActiveSnapshotMetrics();
@@ -1508,15 +1506,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OmSnapshotManager getOmSnapshotManager() {
     return omSnapshotManager;
-  }
-
-  /**
-   * Get Snapshot Chain Manager.
-   *
-   * @return SnapshotChainManager.
-   */
-  public SnapshotChainManager getSnapshotChainManager() {
-    return snapshotChainManager;
   }
 
   /**
@@ -2633,12 +2622,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         String remoteUserName = remoteUserUgi.getShortUserName();
-        // Convert userName to short username
-        String userParamShortName = new HadoopKerberosName(userName)
-            .getShortName();
         // if not admin nor list my own volumes, check ACL.
-        if (!remoteUserName.equals(userParamShortName)
-            && !isAdmin(remoteUserUgi)) {
+        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
           omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);
@@ -2928,6 +2913,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       try {
         leaderId = omRatisServer.getLeader();
+        if (leaderId == null) {
+          LOG.error("No leader found");
+          return "Exception: Not a leader";
+        }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
@@ -3099,8 +3088,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
+
+      final GrpcTlsConfig tlsConfig =
+          OzoneManagerRatisUtils.createServerTlsConfig(
+              secConfig, certClient, true);
+
       RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
-          targetPeerId);
+          targetPeerId, tlsConfig);
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -4221,10 +4215,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Add to cache.
       metadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(dbVolumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionID));
+          CacheValue.get(transactionID, omVolumeArgs));
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
-          new CacheValue<>(Optional.of(userVolumeInfo), transactionID));
+          CacheValue.get(transactionID, userVolumeInfo));
       LOG.info("Created Volume {} With Owner {} required for S3Gateway " +
               "operations.", s3VolumeName, userName);
     }
@@ -4489,10 +4483,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize)
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   @Override // ReconfigureProtocol

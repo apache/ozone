@@ -28,7 +28,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -249,8 +248,7 @@ public class TestTypedRDBTableStore {
         String key = Integer.toString(x);
         String value = Integer.toString(x);
         testTable.addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(value),
-            x));
+            CacheValue.get(x, value));
       }
 
       // As we have added to cache, so get should return value even if it
@@ -275,11 +273,10 @@ public class TestTypedRDBTableStore {
         String value = Integer.toString(x);
         if (x % 2 == 0) {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), x));
+              CacheValue.get(x, value));
         } else {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(),
-              x));
+              CacheValue.get(x));
         }
       }
 
@@ -363,11 +360,11 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.of(value), 1L));
+          CacheValue.get(1L, value));
       Assertions.assertTrue(testTable.isExist(key));
 
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 1L));
+          CacheValue.get(1L));
       Assertions.assertFalse(testTable.isExist(key));
     }
   }
@@ -403,7 +400,7 @@ public class TestTypedRDBTableStore {
       Assertions.assertArrayEquals(value, testTable.get(key));
       Assertions.assertNotSame(value, actualValue);
       testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), 1L));
+              CacheValue.get(1L, value));
       Assertions.assertSame(value, testTable.get(key));
     }
   }

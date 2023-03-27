@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
@@ -85,11 +87,13 @@ import org.junit.Assert;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -323,6 +327,45 @@ public class TestContainerPersistence {
     kvHandler.deleteContainer(container, false);
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID));
+  }
+
+  @Test
+  public void testDeleteContainer() throws IOException {
+    assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+    long testContainerID = getTestContainerID();
+    Container<KeyValueContainerData> container = addContainer(containerSet,
+        testContainerID);
+    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
+    ChunkInfo info = writeChunkHelper(blockID);
+    BlockData blockData = new BlockData(blockID);
+    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+
+    blockManager.putBlock(container, blockData);
+    container.close();
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+    KeyValueContainerData containerData = container.getContainerData();
+
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, BlockData> blockTable = store.getBlockDataTable();
+
+      // Key should exist in Block table.
+      Assertions.assertNotNull(blockTable
+          .getIfExist(containerData.getBlockKey(blockID.getLocalID())));
+
+      container.delete();
+      containerSet.removeContainer(testContainerID);
+      Assert.assertFalse(containerSet.getContainerMapCopy()
+          .containsKey(testContainerID));
+
+      // Key should not exist in Block table, after container gets deleted.
+      Assertions.assertNull(blockTable
+          .getIfExist(containerData.getBlockKey(blockID.getLocalID())));
+    }
   }
 
   /**

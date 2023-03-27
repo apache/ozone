@@ -568,4 +568,22 @@ public final class OzoneConsts {
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
 
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
+
 }

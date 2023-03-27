@@ -70,7 +70,7 @@ public abstract class TestMisReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   protected void setup(ReplicationConfig repConfig)
-      throws NodeNotFoundException, AllSourcesOverloadedException,
+      throws NodeNotFoundException, CommandTargetOverloadedException,
       NotLeaderException {
 
     replicationManager = Mockito.mock(ReplicationManager.class);
