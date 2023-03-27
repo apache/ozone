@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -201,10 +200,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           omMetadataManager.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+          CacheValue.get(trxnLogIndex));
 
       keyTable.addCacheEntry(new CacheKey<>(toKey),
-          new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+          CacheValue.get(trxnLogIndex, fromKeyValue));
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),

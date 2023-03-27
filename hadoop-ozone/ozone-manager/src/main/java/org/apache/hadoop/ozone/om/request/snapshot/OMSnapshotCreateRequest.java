@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -173,7 +172,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, snapshotInfo));
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()

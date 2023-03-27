@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -230,9 +229,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
