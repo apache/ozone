@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -100,7 +99,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     omBucketInfo.incrUsedBytes(omKeyInfo.getDataSize());
     omBucketInfo.incrUsedNamespace(1L);
     omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
     omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
   }
 
@@ -237,7 +236,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     omBucketInfo.incrUsedBytes(1000);
     omBucketInfo.incrUsedNamespace(100L);
     omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
     omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
 
     // prevalidate bucket

@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -261,7 +260,7 @@ public final class OMRequestTestUtils {
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
@@ -271,7 +270,7 @@ public final class OMRequestTestUtils {
       if (addToCache) {
         omMetadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omMetadataManager.getKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
@@ -300,7 +299,7 @@ public final class OMRequestTestUtils {
 
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-            keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
+            keyName)), CacheValue.get(1L, omKeyInfo));
   }
 
   /**
@@ -345,7 +344,7 @@ public final class OMRequestTestUtils {
     if (addToCache) {
       omMetadataManager.getDirectoryTable().addCacheEntry(
               new CacheKey<>(ozoneKey),
-              new CacheValue<>(Optional.of(omDirInfo), trxnLogIndex));
+              CacheValue.get(trxnLogIndex, omDirInfo));
     }
     omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
   }
@@ -383,7 +382,7 @@ public final class OMRequestTestUtils {
     if (addToCache) {
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(key),
-          new CacheValue<>(Optional.of(snapshotInfo), txnID));
+          CacheValue.get(txnID, snapshotInfo));
     }
     omMetadataManager.getSnapshotInfoTable().put(key, snapshotInfo);
   }
@@ -492,7 +491,7 @@ public final class OMRequestTestUtils {
     // Add to cache.
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   /**
@@ -516,7 +515,7 @@ public final class OMRequestTestUtils {
     // Add to cache.
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-            new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+            CacheValue.get(1L, omVolumeArgs));
   }
 
   /**
@@ -557,7 +556,7 @@ public final class OMRequestTestUtils {
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   /**
@@ -579,7 +578,7 @@ public final class OMRequestTestUtils {
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   public static OzoneManagerProtocolProtos.OMRequest createBucketRequest(
@@ -1178,7 +1177,7 @@ public final class OMRequestTestUtils {
         .put(dbKey, omKeyInfo);
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(dbKey),
-        new CacheValue<>(Optional.of(omKeyInfo), 1L));
+        CacheValue.get(1L, omKeyInfo));
   }
 
   /**
@@ -1195,7 +1194,7 @@ public final class OMRequestTestUtils {
     omMetadataManager.getBucketTable().put(dbBucketKey, omBucketInfo);
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(dbBucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   /**
@@ -1211,7 +1210,7 @@ public final class OMRequestTestUtils {
     omMetadataManager.getVolumeTable().put(dbVolumeKey, omVolumeArgs);
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(dbVolumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   /**
@@ -1279,7 +1278,7 @@ public final class OMRequestTestUtils {
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneDBKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
           .put(ozoneDBKey, omKeyInfo);
@@ -1292,7 +1291,7 @@ public final class OMRequestTestUtils {
       if (addToCache) {
         omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneDBKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
           .put(ozoneDBKey, omKeyInfo);

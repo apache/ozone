@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -295,20 +294,20 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     // Add from_key and to_key details into cache.
     if (isRenameDirectory) {
       dirTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       dirTable.addCacheEntry(new CacheKey<>(dbToKey),
-              new CacheValue<>(Optional.of(OMFileRequest.
-                              getDirectoryInfo(fromKeyValue)), trxnLogIndex));
+          CacheValue.get(trxnLogIndex,
+              OMFileRequest.getDirectoryInfo(fromKeyValue)));
     } else {
       Table<String, OmKeyInfo> keyTable =
           metadataMgr.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       keyTable.addCacheEntry(new CacheKey<>(dbToKey),
-              new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+              CacheValue.get(trxnLogIndex, fromKeyValue));
     }
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
@@ -330,8 +329,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       String dbToKeyParent = omMetadataManager.getOzonePathKey(volumeId,
           bucketId, keyParent.getParentObjectID(), keyParent.getFileName());
       dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
-          new CacheValue<>(Optional.of(OMFileRequest
-              .getDirectoryInfo(keyParent)), trxnLogIndex));
+          CacheValue.get(trxnLogIndex,
+              OMFileRequest.getDirectoryInfo(keyParent)));
     } else {
       // For FSO a bucket is root of the filesystem, so rename an
       // object at the root of a bucket need change bucket's modificationTime
@@ -344,7 +343,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           bucketInfo.getVolumeName(), bucketInfo.getBucketName());
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(bucketInfo), trxnLogIndex));
+          CacheValue.get(trxnLogIndex, bucketInfo));
     }
   }
 
