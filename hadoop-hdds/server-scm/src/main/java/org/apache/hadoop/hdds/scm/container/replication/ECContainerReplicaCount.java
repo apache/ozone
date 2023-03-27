@@ -525,15 +525,28 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("Container State: ").append(containerInfo.getState())
-        .append(" Replica Count: ").append(replicas.size())
-        .append(" Healthy Count: ").append(healthyIndexes.size())
-        .append(" Unhealthy Count: ").append(unhealthyReplicaDNs.size())
-        .append(" Decommission Count: ").append(decommissionIndexes.size())
-        .append(" Maintenance Count: ").append(maintenanceIndexes.size())
-        .append(" inFlightAdd Count: ").append(pendingAdd.size())
-        .append(" inFlightDel Count: ").append(pendingDelete.size())
-        .append(" ReplicationConfig: ").append(repConfig)
-        .append(" remainingMaintenanceRedundancy Count: ")
+        .append(", Replicas: (Count: ").append(replicas.size());
+    if (healthyIndexes.size() > 0) {
+      sb.append(", Healthy: ").append(healthyIndexes.size());
+    }
+    if (unhealthyReplicaDNs.size() > 0) {
+      sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
+    }
+    if (decommissionIndexes.size() > 0) {
+      sb.append(", Decommission: ").append(decommissionIndexes.size());
+    }
+    if (maintenanceIndexes.size() > 0) {
+      sb.append(", Maintenance: ").append(maintenanceIndexes.size());
+    }
+    if (pendingAdd.size() > 0) {
+      sb.append(", PendingAdd: ").append(pendingAdd.size());
+    }
+    if (pendingDelete.size() > 0) {
+      sb.append(", PendingDelete: ").append(pendingDelete.size());
+    }
+    sb.append(")")
+        .append(", ReplicationConfig: ").append(repConfig)
+        .append(", RemainingMaintenanceRedundancy: ")
         .append(remainingMaintenanceRedundancy);
     return sb.toString();
   }
