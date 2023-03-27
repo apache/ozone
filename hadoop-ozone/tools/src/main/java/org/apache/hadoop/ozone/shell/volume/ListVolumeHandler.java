@@ -72,7 +72,7 @@ public class ListVolumeHandler extends Handler {
       throws IOException {
 
     if (userName == null) {
-      userName = UserGroupInformation.getCurrentUser().getUserName();
+      userName = UserGroupInformation.getCurrentUser().getShortUserName();
     }
 
     Iterator<? extends OzoneVolume> volumeIterator;

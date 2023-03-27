@@ -42,12 +42,12 @@ Setup ACL tests
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
     Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
-    ${principal} =      Get test user principal    testuser2
-    Execute             ozone sh volume addacl --acl user:${principal}:r ${target}
-    Execute             ozone sh volume addacl --acl user:${principal}:rl ${source}
-    Execute             ozone sh bucket addacl --acl user:${principal}:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:${principal}:r ${target}/readable-link
-    Execute             ozone sh bucket addacl --acl user:${principal}:r ${target}/link-to-unreadable-bucket
+
+    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
+    Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
+    Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/readable-link
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/link-to-unreadable-bucket
 
 Can follow link with read access
     Execute             kdestroy
