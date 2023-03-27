@@ -521,6 +521,23 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     return isSufficientlyReplicated(false);
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Container State: ").append(containerInfo.getState())
+        .append(" Replica Count: ").append(replicas.size())
+        .append(" Healthy Count: ").append(healthyIndexes.size())
+        .append(" Unhealthy Count: ").append(unhealthyReplicaDNs.size())
+        .append(" Decommission Count: ").append(decommissionIndexes.size())
+        .append(" Maintenance Count: ").append(maintenanceIndexes.size())
+        .append(" inFlightAdd Count: ").append(pendingAdd.size())
+        .append(" inFightDel Count: ").append(pendingDelete.size())
+        .append(" ReplicationConfig: ").append(repConfig)
+        .append(" remainingMaintenanceRedundancy Count: ")
+        .append(remainingMaintenanceRedundancy);
+    return sb.toString();
+  }
+
   /**
    * Check if there is an entry in the map for all expected replica indexes,
    * and also that the count against each index is greater than zero.
