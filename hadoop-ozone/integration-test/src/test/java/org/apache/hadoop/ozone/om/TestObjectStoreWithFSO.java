@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -88,6 +89,7 @@ public class TestObjectStoreWithFSO {
   private static String volumeName;
   private static String bucketName;
   private static FileSystem fs;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = new Timeout(1200000);
@@ -109,9 +111,10 @@ public class TestObjectStoreWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
@@ -158,8 +161,6 @@ public class TestObjectStoreWithFSO {
     String parent = "a/b/c/";
     String file = "key" + RandomStringUtils.randomNumeric(5);
     String key = parent + file;
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
@@ -221,15 +222,13 @@ public class TestObjectStoreWithFSO {
   public void testDeleteBucketWithKeys() throws Exception {
     // Create temporary volume and bucket for this test.
     OzoneBucket testBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+        .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     String testVolumeName = testBucket.getVolumeName();
     String testBucketName = testBucket.getName();
 
     String parent = "a/b/c/";
     String file = "key" + RandomStringUtils.randomNumeric(5);
     String key = parent + file;
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(testVolumeName);
@@ -289,7 +288,7 @@ public class TestObjectStoreWithFSO {
         .isBucketEmpty(testVolumeName, testBucketName));
     ozoneVolume.deleteBucket(testBucketName);
     // Cleanup the Volume.
-    cluster.getClient().getObjectStore().deleteVolume(testVolumeName);
+    client.getObjectStore().deleteVolume(testVolumeName);
   }
 
   @Test
@@ -297,8 +296,6 @@ public class TestObjectStoreWithFSO {
     String parent = "a/b/c/";
     String fileName = "key" + RandomStringUtils.randomNumeric(5);
     String key = parent + fileName;
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
@@ -394,8 +391,6 @@ public class TestObjectStoreWithFSO {
    */
   @Test
   public void testListKeysAtDifferentLevels() throws Exception {
-    OzoneClient client = cluster.getClient();
-
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
@@ -508,8 +503,6 @@ public class TestObjectStoreWithFSO {
 
   @Test
   public void testListKeysWithNotNormalizedPath() throws Exception {
-    OzoneClient client = cluster.getClient();
-
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
@@ -615,7 +608,7 @@ public class TestObjectStoreWithFSO {
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    fsDataInputStream.close();
 
     Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
@@ -624,7 +617,6 @@ public class TestObjectStoreWithFSO {
   public void testRenameKey() throws IOException {
     String fromKeyName = UUID.randomUUID().toString();
     String value = "sample value";
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume volume = objectStore.getVolume(volumeName);
@@ -665,7 +657,6 @@ public class TestObjectStoreWithFSO {
     String newKeyName2 = "dir1/key2";
 
     String value = "sample value";
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -690,7 +681,6 @@ public class TestObjectStoreWithFSO {
     String keyName2 = "dir1/dir2/file2";
 
     String value = "sample value";
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -709,7 +699,6 @@ public class TestObjectStoreWithFSO {
   public void testCreateBucketWithBucketLayout() throws Exception {
     String sampleVolumeName = UUID.randomUUID().toString();
     String sampleBucketName = UUID.randomUUID().toString();
-    OzoneClient client = cluster.getClient();
     ObjectStore store = client.getObjectStore();
     store.createVolume(sampleVolumeName);
     OzoneVolume volume = store.getVolume(sampleVolumeName);
@@ -864,6 +853,7 @@ public class TestObjectStoreWithFSO {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -157,7 +156,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
    */
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
-    OzoneClient rpcClient = getCluster().getRpcClient();
+    OzoneClient rpcClient = getClient();
 
     HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(
@@ -352,8 +351,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       OzoneManager ozoneManager = getCluster().getOzoneManager(i);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
-      final ObjectStore store = OzoneClientFactory.getRpcClient(
-          getOmServiceId(), getConf()).getObjectStore();
+      final ObjectStore store = getClient().getObjectStore();
       final HadoopRpcOMFailoverProxyProvider proxyProvider =
           OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 

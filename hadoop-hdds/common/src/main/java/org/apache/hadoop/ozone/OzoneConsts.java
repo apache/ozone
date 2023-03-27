@@ -237,6 +237,11 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
+
 
   /**
    * Default SCM Datanode ID file name.
@@ -562,5 +567,23 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
 }

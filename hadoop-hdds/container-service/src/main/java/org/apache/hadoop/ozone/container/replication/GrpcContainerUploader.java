@@ -105,7 +105,7 @@ public class GrpcContainerUploader implements ContainerUploader {
 
     @Override
     public void onNext(SendContainerResponse sendContainerResponse) {
-      LOG.info("Response for upload container {} to {}", containerId, target);
+      LOG.debug("Response for upload container {} to {}", containerId, target);
     }
 
     @Override

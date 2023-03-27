@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -105,6 +104,7 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
+  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
   @Before
   public void setup() throws IOException {
@@ -118,9 +118,18 @@ public class TestReplicationManager {
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    eventPublisher = Mockito.mock(EventPublisher.class);
+
     scmContext = Mockito.mock(SCMContext.class);
+
     nodeManager = Mockito.mock(NodeManager.class);
+    commandsSent = new HashSet<>();
+    eventPublisher = Mockito.mock(EventPublisher.class);
+    Mockito.doAnswer(invocation -> {
+      commandsSent.add(Pair.of(invocation.getArgument(0),
+          invocation.getArgument(1)));
+      return null;
+    }).when(nodeManager).addDatanodeCommand(any(), any());
+
     legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
@@ -215,8 +224,8 @@ public class TestReplicationManager {
 
     replicationManager.processContainer(container, repQueue, repReport);
 
-    Mockito.verify(eventPublisher, Mockito.times(3))
-        .fireEvent(any(), any());
+    Mockito.verify(nodeManager, Mockito.times(3))
+        .addDatanodeCommand(any(), any());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
@@ -248,8 +257,8 @@ public class TestReplicationManager {
 
     replicationManager.processContainer(container, repQueue, repReport);
 
-    Mockito.verify(eventPublisher, Mockito.times(1))
-        .fireEvent(any(), any());
+    Mockito.verify(nodeManager, Mockito.times(1))
+        .addDatanodeCommand(any(), any());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -313,19 +322,19 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, Collections.emptyList(),
+    handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commands.iterator().hasNext());
-    Assert.assertEquals(unhealthy.getDatanodeDetails(),
-        commands.iterator().next().getKey());
+    Assert.assertTrue(commandsSent.iterator().hasNext());
+    Assert.assertEquals(unhealthy.getDatanodeDetails().getUuid(),
+        commandsSent.iterator().next().getKey());
     Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commands.iterator().next().getValue().getType());
+        commandsSent.iterator().next().getValue().getType());
+
   }
 
   @Test
@@ -354,19 +363,18 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
-    RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(ratisPlacementPolicy, nodeManager);
+    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
+        ratisPlacementPolicy, replicationManager);
 
     Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, Collections.emptyList(),
-            repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commands.iterator().hasNext());
-    Assert.assertNotEquals(unhealthy.getDatanodeDetails(),
-        commands.iterator().next().getKey());
+    handler.processAndSendCommands(replicas, Collections.emptyList(),
+        repQueue.dequeueOverReplicatedContainer(), 2);
+    Assert.assertTrue(commandsSent.iterator().hasNext());
+    Assert.assertNotEquals(unhealthy.getDatanodeDetails().getUuid(),
+        commandsSent.iterator().next().getKey());
     Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commands.iterator().next().getValue().getType());
+        commandsSent.iterator().next().getValue().getType());
   }
 
   @Test
@@ -665,7 +673,7 @@ public class TestReplicationManager {
 
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
-    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
     Assertions.assertEquals(1, ops.size());
     Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
         ops.get(0).getOpType());
@@ -677,7 +685,7 @@ public class TestReplicationManager {
         .getNumDeletionCmdsSent());
 
     // Repeat with Ratis container, as different metrics should be incremented
-    Mockito.clearInvocations(eventPublisher);
+    Mockito.clearInvocations(nodeManager);
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
@@ -689,7 +697,7 @@ public class TestReplicationManager {
         containerInfo, target);
 
     ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
-    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
     Assertions.assertEquals(1, ops.size());
     Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
         ops.get(0).getOpType());
@@ -732,7 +740,7 @@ public class TestReplicationManager {
 
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
-    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
     Assertions.assertEquals(2, ops.size());
     Set<DatanodeDetails> cmdTargets = new HashSet<>();
     Set<Integer> cmdIndexes = new HashSet<>();
@@ -777,14 +785,13 @@ public class TestReplicationManager {
     // + evenTime * factor
     ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-    long expectedDeadline = clock.millis() +
-        Math.round(rmConf.getEventTimeout() *
-            rmConf.getCommandDeadlineFactor());
+    long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
+            rmConf.getDatanodeTimeoutOffset();
     Assert.assertEquals(expectedDeadline, command.getDeadline());
 
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
-    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
     Assertions.assertEquals(1, ops.size());
     Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
@@ -796,7 +803,7 @@ public class TestReplicationManager {
         .getNumReplicationCmdsSent());
 
     // Repeat with Ratis container, as different metrics should be incremented
-    Mockito.clearInvocations(eventPublisher);
+    Mockito.clearInvocations(nodeManager);
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     containerInfo = ReplicationTestUtil.createContainerInfo(ratisRepConfig, 2,
@@ -807,7 +814,7 @@ public class TestReplicationManager {
     replicationManager.sendDatanodeCommand(command, containerInfo, target);
 
     ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
-    Mockito.verify(eventPublisher).fireEvent(any(), any());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
     Assertions.assertEquals(1, ops.size());
     Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
@@ -827,30 +834,34 @@ public class TestReplicationManager {
             HddsProtos.LifeCycleState.CLOSED, 10, 20);
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
-    long scmDeadline = clock.millis() + 1000;
-    long datanodeDeadline = clock.millis() + 500;
+
+    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    long scmDeadline = clock.millis() + rmConf.getEventTimeout();
+    long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
 
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        0, src, target, scmDeadline, datanodeDeadline);
+        0, src, target, scmDeadline);
 
-    ArgumentCaptor<CommandForDatanode> command =
-        ArgumentCaptor.forClass(CommandForDatanode.class);
-    Mockito.verify(eventPublisher).fireEvent(any(), command.capture());
+    ArgumentCaptor<SCMCommand> command =
+        ArgumentCaptor.forClass(SCMCommand.class);
+    ArgumentCaptor<UUID> targetUUID =
+        ArgumentCaptor.forClass(UUID.class);
+    Mockito.verify(nodeManager).addDatanodeCommand(targetUUID.capture(),
+        command.capture());
 
-    CommandForDatanode sentCommand = command.getValue();
-    Assertions.assertEquals(datanodeDeadline,
-        sentCommand.getCommand().getDeadline());
-    ReplicateContainerCommand replicateContainerCommand =
-        (ReplicateContainerCommand) sentCommand.getCommand();
-    Assertions.assertEquals(LOW, replicateContainerCommand.getPriority());
-    Assertions.assertEquals(src.getUuid(), sentCommand.getDatanodeId());
-    Assertions.assertEquals(target,
-        replicateContainerCommand.getTargetDatanode());
+    ReplicateContainerCommand sentCommand =
+        (ReplicateContainerCommand)command.getValue();
+    Assertions.assertEquals(datanodeDeadline, sentCommand.getDeadline());
+    Assertions.assertEquals(LOW, sentCommand.getPriority());
+    Assertions.assertEquals(src.getUuid(), targetUUID.getValue());
+    Assertions.assertEquals(target, sentCommand.getTargetDatanode());
   }
 
   @Test
   public void testCreateThrottledReplicateContainerCommand()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
     sourceNodes.put(cmdTarget, 0);
@@ -865,20 +876,25 @@ public class TestReplicationManager {
           return sourceNodes.get(dn);
         });
 
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    Pair<DatanodeDetails, SCMCommand<?>> cmd = replicationManager
-        .createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
-    Assertions.assertEquals(cmdTarget, cmd.getLeft());
+    replicationManager.sendThrottledReplicationCommand(
+        container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+
+    Assertions.assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
     Assertions.assertEquals(destination,
         ((ReplicateContainerCommand) cmd.getRight()).getTargetDatanode());
     Assertions.assertEquals(0,
         ((ReplicateContainerCommand) cmd.getRight()).getReplicaIndex());
   }
 
-  @Test(expected = AllSourcesOverloadedException.class)
+  @Test(expected = CommandTargetOverloadedException.class)
   public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
-      throws AllSourcesOverloadedException, NodeNotFoundException {
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
     for (int i = 0; i < 3; i++) {
@@ -893,8 +909,41 @@ public class TestReplicationManager {
         });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
-    replicationManager.createThrottledReplicationCommand(
-            1L, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledReplicationCommand(
+            container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+  }
+
+  @Test
+  public void testCreateThrottledDeleteContainerCommand()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> 0);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
+    Assert.assertEquals(commandsSent.size(), 1);
+  }
+
+  @Test(expected = CommandTargetOverloadedException.class)
+  public void testCreateThrottledDeleteContainerCommandThrowsWhenNoSources()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    int limit = replicationManager.getConfig().getDatanodeDeleteLimit();
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
+            eq(SCMCommandProto.Type.deleteContainerCommand)))
+        .thenAnswer(invocation -> limit + 1);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
   }
 
   @SafeVarargs

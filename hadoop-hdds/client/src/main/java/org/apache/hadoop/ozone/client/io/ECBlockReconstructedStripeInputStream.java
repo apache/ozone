@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
@@ -43,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
@@ -152,8 +152,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
       BlockLocationInfo blockInfo, boolean verifyChecksum,
-      XceiverClientFactory xceiverClientFactory, Function<BlockID,
-      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory,
+      XceiverClientFactory xceiverClientFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      BlockInputStreamFactory streamFactory,
       ByteBufferPool byteBufferPool,
       ExecutorService ecReconstructExecutor) {
     super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
@@ -610,6 +611,31 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void readIntoBuffer(int ind, ByteBuffer buf) throws IOException {
+    List<DatanodeDetails> failedLocations = new LinkedList<>();
+    while (true) {
+      int currentBufferPosition = buf.position();
+      try {
+        readFromCurrentLocation(ind, buf);
+        break;
+      } catch (IOException e) {
+        DatanodeDetails failedLocation = getDataLocations()[ind];
+        failedLocations.add(failedLocation);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{}: read [{}] failed from {} due to {}", this,
+              ind, failedLocation, e.getMessage());
+        }
+        closeStream(ind);
+        if (shouldRetryFailedRead(ind)) {
+          buf.position(currentBufferPosition);
+        } else {
+          throw new BadDataLocationException(ind, e, failedLocations);
+        }
+      }
+    }
+  }
+
+  private void readFromCurrentLocation(int ind, ByteBuffer buf)
+      throws IOException {
     BlockExtendedInputStream stream = getOrOpenStream(ind);
     seekStreamIfNecessary(stream, 0);
     while (buf.hasRemaining()) {

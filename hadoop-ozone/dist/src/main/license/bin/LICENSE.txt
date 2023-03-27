@@ -292,7 +292,6 @@ Apache License 2.0
    com.google.guava:guava
    com.google.guava:listenablefuture
    com.google.inject.extensions:guice-assistedinject
-   com.google.inject.extensions:guice-multibindings
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
    com.google.j2objc:j2objc-annotations

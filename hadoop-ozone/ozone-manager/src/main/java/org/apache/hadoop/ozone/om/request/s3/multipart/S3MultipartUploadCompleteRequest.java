@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -458,7 +457,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     // Add key entry to file table.
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(dbOzoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, omKeyInfo));
   }
 
   private int getPartsListSize(String requestedVolume,
@@ -575,10 +574,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .addCacheEntry(
             new CacheKey<>(dbMultipartOpenKey),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
+            CacheValue.get(transactionLogIndex));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(dbMultipartKey),
-        new CacheValue<>(Optional.absent(), transactionLogIndex));
+        CacheValue.get(transactionLogIndex));
 
     // Here, omBucketInfo can be null if its size has not changed. No need to
     // update the bucket info unless its size has changed. We never want to
@@ -586,7 +585,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     if (omBucketInfo != null) {
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(dbBucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
     }
   }
 

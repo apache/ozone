@@ -140,4 +140,23 @@ public abstract class AbstractReplicationTask {
       boolean runOnInServiceOnly) {
     this.shouldOnlyRunOnInServiceDatanodes = runOnInServiceOnly;
   }
+
+  /**
+   * Hook for subclasses to provide info about the command.
+   * @return string representation of the command
+   */
+  protected Object getCommandForDebug() {
+    return "";
+  };
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder()
+        .append(getStatus()).append(" ")
+        .append(getCommandForDebug());
+    if (getStatus() == Status.QUEUED) {
+      sb.append(", queued at ").append(getQueued());
+    }
+    return sb.toString();
+  }
 }

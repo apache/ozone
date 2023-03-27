@@ -107,10 +107,9 @@ public class TestMoveManager {
         .thenReturn(pendingOps);
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
+    Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
-    moveManager = new MoveManager(
-        replicationManager, clock, containerManager);
-    moveManager.onLeaderReady();
+    moveManager = new MoveManager(replicationManager, containerManager);
   }
 
   @Test
@@ -306,10 +305,26 @@ public class TestMoveManager {
   public void testReplicationCommandFails() throws Exception {
     Mockito.doThrow(new RuntimeException("test")).when(replicationManager)
             .sendLowPriorityReplicateContainerCommand(
-        any(), anyInt(), any(), any(), anyLong(), anyLong());
+        any(), anyInt(), any(), any(), anyLong());
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
     Assert.assertEquals(
         MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR, res.get());
+  }
+
+  @Test
+  public void testDeleteCommandFails() throws Exception {
+    CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
+
+    Mockito.doThrow(new ContainerNotFoundException("test"))
+        .when(containerManager).getContainer(any(ContainerID.class));
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, 0, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult moveResult = res.get();
+    Assert.assertEquals(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+        moveResult);
   }
 
   @Test
@@ -321,7 +336,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -351,7 +366,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
-        anyLong(), anyLong());
+        anyLong());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -359,7 +374,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(true));
+        eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -391,7 +406,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -496,7 +511,7 @@ public class TestMoveManager {
         moveManager.move(containerInfo.containerID(), src, tgt);
 
     Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong(), anyLong());
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
 
     return res;
   }

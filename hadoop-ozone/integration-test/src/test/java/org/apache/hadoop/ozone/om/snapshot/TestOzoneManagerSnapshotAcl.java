@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -96,6 +97,7 @@ public class TestOzoneManagerSnapshotAcl {
   private static ObjectStore objectStore;
   private static File metaDir;
   private static OzoneManager ozoneManager;
+  private static OzoneClient client;
   private String volumeName;
   private String bucketName;
   private static final String KEY_PREFIX = "key-";
@@ -128,7 +130,7 @@ public class TestOzoneManagerSnapshotAcl {
         new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    final OzoneClient client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
@@ -146,6 +148,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   @AfterAll
   public static void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

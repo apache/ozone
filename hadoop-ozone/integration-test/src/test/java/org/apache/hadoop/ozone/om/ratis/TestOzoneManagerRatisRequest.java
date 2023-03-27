@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.ratis;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -64,15 +63,14 @@ public class TestOzoneManagerRatisRequest {
     String bucketName = "invalidBuck";
 
     // Add entry to Volume Table.
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setOwnerName("owner")
+        .setAdminName("admin")
+        .build();
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-        new CacheValue<>(
-            Optional.of(
-                OmVolumeArgs.newBuilder()
-                    .setVolume(volumeName)
-                    .setOwnerName("owner")
-                    .setAdminName("admin")
-                    .build()), 100L));
+        CacheValue.get(100L, omVolumeArgs));
 
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
         .createCompleteMPURequest(volumeName, bucketName, "mpuKey", "mpuKeyID",

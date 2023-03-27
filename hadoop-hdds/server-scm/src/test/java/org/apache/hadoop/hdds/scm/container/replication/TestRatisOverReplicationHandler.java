@@ -29,27 +29,38 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * Tests for {@link RatisOverReplicationHandler}.
@@ -59,10 +70,12 @@ public class TestRatisOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
-  private NodeManager nodeManager;
+  private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @Before
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException, NotLeaderException,
+      CommandTargetOverloadedException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
         RATIS_REPLICATION_CONFIG);
 
@@ -71,9 +84,17 @@ public class TestRatisOverReplicationHandler {
         Mockito.anyList(), Mockito.anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
 
-    nodeManager = Mockito.mock(NodeManager.class);
-    Mockito.when(nodeManager.getNodeStatus(Mockito.any()))
-        .thenReturn(NodeStatus.inServiceHealthy());
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY, 0);
+        });
+
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
+        commandsSent);
 
     GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
   }
@@ -106,8 +127,9 @@ public class TestRatisOverReplicationHandler {
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
 
     ContainerReplica stale = replicas.stream().findFirst().get();
-    Mockito.when(nodeManager.getNodeStatus(stale.getDatanodeDetails()))
-        .thenReturn(NodeStatus.inServiceStale());
+    Mockito.when(replicationManager.getNodeStatus(stale.getDatanodeDetails()))
+        .thenAnswer(invocation ->
+            NodeStatus.inServiceStale());
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
@@ -257,6 +279,80 @@ public class TestRatisOverReplicationHandler {
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }
 
+  @Test
+  public void testDeleteThrottlingMisMatchedReplica() throws IOException {
+    Set<ContainerReplica> closedReplicas = createReplicas(
+        container.containerID(), ContainerReplicaProto.State.CLOSED,
+        0, 0, 0, 0);
+
+    ContainerReplica quasiClosedReplica = createContainerReplica(
+        container.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED);
+
+    // When processing the quasi closed replica, simulate an overloaded
+    // exception so that it does not get deleted. Then we can ensure that only
+    // one of the CLOSED replicas is removed.
+    doThrow(CommandTargetOverloadedException.class)
+        .when(replicationManager)
+        .sendThrottledDeleteCommand(Mockito.any(ContainerInfo.class),
+            anyInt(),
+            eq(quasiClosedReplica.getDatanodeDetails()),
+            anyBoolean());
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(quasiClosedReplica);
+    replicas.addAll(closedReplicas);
+
+    RatisOverReplicationHandler handler =
+        new RatisOverReplicationHandler(policy, replicationManager);
+
+    try {
+      handler.processAndSendCommands(replicas, Collections.emptyList(),
+          getOverReplicatedHealthResult(), 2);
+      fail("Expected CommandTargetOverloadedException");
+    } catch (CommandTargetOverloadedException e) {
+      // Expected
+    }
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assert.assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
+        cmd.getKey());
+  }
+
+  @Test
+  public void testDeleteThrottling() throws IOException {
+    Set<ContainerReplica> closedReplicas = createReplicas(
+        container.containerID(), ContainerReplicaProto.State.CLOSED,
+        0, 0, 0, 0, 0);
+
+    final AtomicBoolean shouldThrow = new AtomicBoolean(true);
+    // On the first call we throw, on subsequent calls we succeed.
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      if (shouldThrow.get()) {
+        shouldThrow.set(false);
+        throw new CommandTargetOverloadedException("Test exception");
+      }
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      int replicaIndex = invocationOnMock.getArgument(1);
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      boolean forceDelete = invocationOnMock.getArgument(3);
+      DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+          containerInfo.getContainerID(), forceDelete);
+      deleteCommand.setReplicaIndex(replicaIndex);
+      commandsSent.add(Pair.of(target, deleteCommand));
+      return null;
+    }).when(replicationManager)
+        .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
+
+    RatisOverReplicationHandler handler =
+        new RatisOverReplicationHandler(policy, replicationManager);
+
+    handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 2);
+    Assert.assertEquals(2, commandsSent.size());
+  }
+
   /**
    * Tests whether the specified expectNumCommands number of commands are
    * created by the handler.
@@ -274,14 +370,13 @@ public class TestRatisOverReplicationHandler {
       ContainerHealthResult healthResult,
       int expectNumCommands) throws IOException {
     RatisOverReplicationHandler handler =
-        new RatisOverReplicationHandler(policy, nodeManager);
+        new RatisOverReplicationHandler(policy, replicationManager);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndSendCommands(replicas, pendingOps,
             healthResult, 2);
-    Assert.assertEquals(expectNumCommands, commands.size());
+    Assert.assertEquals(expectNumCommands, commandsSent.size());
 
-    return commands;
+    return commandsSent;
   }
 
   private ContainerHealthResult.OverReplicatedHealthResult

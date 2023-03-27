@@ -54,7 +54,6 @@ share/ozone/lib/guava-jre.jar
 share/ozone/lib/guice-assistedinject.jar
 share/ozone/lib/guice-bridge.jar
 share/ozone/lib/guice.jar
-share/ozone/lib/guice-multibindings.jar
 share/ozone/lib/guice-servlet.jar
 share/ozone/lib/hadoop-annotations.jar
 share/ozone/lib/hadoop-auth.jar
