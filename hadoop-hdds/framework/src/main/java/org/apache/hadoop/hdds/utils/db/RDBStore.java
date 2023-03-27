@@ -130,7 +130,7 @@ public class RDBStore implements DBStore {
 
       //create checkpoints directory if not exists.
       checkpointsParentDir =
-          Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR).toString();
+          dbLocation.getParent() + OM_KEY_PREFIX + OM_CHECKPOINT_DIR;
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();

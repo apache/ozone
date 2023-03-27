@@ -333,16 +333,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
-    try {
-      Path parent = path.getParent();
-      File dir = parent.toFile();
-      String name = path.getFileName().toString();
-      return new OmMetadataManagerImpl(conf, dir, name);
-    // NPE check forced by findbugs NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE
-    } catch (NullPointerException e) {
-      throw new IOException("Invalid database: " +
-                            checkpoint.getCheckpointLocation());
+    Path parent = path.getParent();
+    if (parent == null) {
+      throw new IllegalStateException("DB checkpoint parent path should not "
+          + "have been null. Checkpoint path is " + path);
     }
+    File dir = parent.toFile();
+    Path name = path.getFileName();
+    if (name == null) {
+      throw new IllegalStateException("DB checkpoint dir name should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    return new OmMetadataManagerImpl(conf, dir, name.toString());
   }
 
   /**

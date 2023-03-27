@@ -572,7 +572,7 @@ public final class OzoneConsts {
       + OM_KEY_PREFIX + "diffState";
 
   // Name of the SST file backup directory placed under diff dir.
-  public static final String OM_COMPACTION_BACKUP_DIR = "compaction-sst-backup";
+  public static final String OM_COMPACTION_SST_BACKUP_DIR = "compaction-sst-backup";
   // Name of the compaction log directory placed under diff dir.
   public static final String OM_COMPACTION_LOG_DIR = "compaction-log";
 

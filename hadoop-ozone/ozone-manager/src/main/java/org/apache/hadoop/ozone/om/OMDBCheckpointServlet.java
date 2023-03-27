@@ -231,6 +231,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private boolean includeSnapshotData(HttpServletRequest request) {
     String includeParam =
         request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
+    return Boolean.parseBoolean(includeParam);
+        request.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA);
     if (StringUtils.isNotEmpty(includeParam)) {
       return Boolean.parseBoolean(includeParam);
     }
