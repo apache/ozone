@@ -497,15 +497,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      KeyStoresFactory serverFactory =
+      KeyStoresFactory managerFactory =
           caClient.getServerKeyStoresFactory();
-      KeyStoresFactory clientFactory = caClient.getClientKeyStoresFactory();
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          serverFactory.getKeyManagers()[0],
-          serverFactory.getTrustManagers()[0], true);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], true);
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
-          clientFactory.getKeyManagers()[0],
-          clientFactory.getTrustManagers()[0], false);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], false);
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 
