@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,9 +125,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     try {
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
-            volumeName, bucketName, null);
+        checkAclPermission(ozoneManager, volumeName, bucketName);
       }
 
       // acquire lock.
@@ -266,6 +265,26 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           bucketName, volumeName, exception);
       omMetrics.incNumBucketUpdateFails();
       return omClientResponse;
+    }
+  }
+
+  private void checkAclPermission(
+      OzoneManager ozoneManager, String volumeName, String bucketName)
+      throws IOException {
+    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
+      UserGroupInformation ugi = createUGI();
+      String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
+          IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Bucket properties are allowed to changed by Admin and Owner",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    } else { // ranger acl
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
+          volumeName, bucketName, null);
     }
   }
 

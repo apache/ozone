@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -34,6 +35,7 @@ import java.util.Objects;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -79,6 +81,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     Objects.requireNonNull(context);
     OzoneObjInfo objInfo;
     RequestContext parentContext;
+    RequestContext parentVolContext;
     boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
 
     if (ozObject instanceof OzoneObjInfo) {
@@ -101,37 +104,21 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // Refined the parent context
-    // OP         |CHILD       |PARENT
-
-    // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
-    // DELETE      DELETE       WRITE
-    // WRITE       WRITE        WRITE
-    // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
-
-    // READ        READ         READ
-    // LIST        LIST         READ      (V1 LIST=>READ)
-    // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
-
-    ACLType aclRight = context.getAclRights();
-    ACLType parentAclRight = aclRight;
-
-    if (aclRight == ACLType.CREATE || aclRight == ACLType.DELETE ||
-        aclRight == ACLType.WRITE_ACL) {
-      parentAclRight = ACLType.WRITE;
-    } else if (aclRight == ACLType.READ_ACL || aclRight == ACLType.LIST) {
-      parentAclRight = ACLType.READ;
-    }
-    // To prevent ACL enlargement, parent should be 'CREATE'
-    // when op is 'create bucket'. see HDDS-7461.
-    if (objInfo.getResourceType() == BUCKET && aclRight == ACLType.CREATE) {
-      parentAclRight = ACLType.CREATE;
-    }
+    ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
+        context.getAclRights(), objInfo.getResourceType());
+    
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
         .setAclRights(parentAclRight).build();
+    
+    // Volume will be always read in case of key and prefix
+    parentVolContext = RequestContext.newBuilder()
+        .setClientUgi(context.getClientUgi())
+        .setIp(context.getIp())
+        .setAclType(context.getAclType())
+        .setAclRights(ACLType.READ).build();
 
     switch (objInfo.getResourceType()) {
     case VOLUME:
@@ -168,7 +155,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return (keyAccess
           && prefixManager.checkAccess(objInfo, parentContext)
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     case PREFIX:
       LOG.trace("Checking access for Prefix: {}", objInfo);
       // Skip check for volume owner
@@ -181,7 +168,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           || prefixManager.checkAccess(objInfo, context);
       return (prefixAccess
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     default:
       throw new OMException("Unexpected object type:" +
           objInfo.getResourceType(), INVALID_REQUEST);

@@ -119,17 +119,6 @@ public class TestParentAcl {
         new String[]{"test1"});
   }
 
-  // Refined the parent context
-  // OP         |CHILD       |PARENT
-
-  // CREATE      NONE         WRITE     (parent:'CREATE' when 'create bucket')
-  // DELETE      DELETE       WRITE
-  // WRITE       WRITE        WRITE
-  // WRITE_ACL   WRITE_ACL    WRITE     (V1 WRITE_ACL=>WRITE)
-
-  // READ        READ         READ
-  // LIST        LIST         READ      (V1 LIST=>READ)
-  // READ_ACL    READ_ACL     READ      (V1 READ_ACL=>READ)
   @Test
   @Flaky("HDDS-6335")
   public void testKeyAcl()
@@ -148,11 +137,11 @@ public class TestParentAcl {
     List<OzoneAcl> originalBuckAcls = getBucketAcls(vol, buck);
     List<OzoneAcl> originalKeyAcls = getBucketAcls(vol, buck);
 
-    testParentChild(keyObj, WRITE, WRITE_ACL);
+    testParentChild(keyObj, READ, WRITE_ACL);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls,
         key, originalKeyAcls);
 
-    testParentChild(keyObj, WRITE, DELETE);
+    testParentChild(keyObj, READ, DELETE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls,
         key, originalKeyAcls);
 
@@ -190,10 +179,10 @@ public class TestParentAcl {
 
     List<OzoneAcl> originalVolAcls = getVolumeAcls(vol);
     List<OzoneAcl> originalBuckAcls = getBucketAcls(vol, buck);
-    testParentChild(bucketObj, WRITE, WRITE_ACL);
+    testParentChild(bucketObj, READ, WRITE_ACL);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, WRITE, DELETE);
+    testParentChild(bucketObj, READ, DELETE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
     testParentChild(bucketObj, READ, READ_ACL);
@@ -202,13 +191,13 @@ public class TestParentAcl {
     testParentChild(bucketObj, READ, LIST);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, CREATE, CREATE);
+    testParentChild(bucketObj, WRITE, CREATE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
     testParentChild(bucketObj, READ, READ);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
 
-    testParentChild(bucketObj, WRITE, WRITE);
+    testParentChild(bucketObj, READ, WRITE);
     resetAcl(vol, originalVolAcls, buck, originalBuckAcls, null, null);
   }
 
@@ -263,7 +252,9 @@ public class TestParentAcl {
       Assert.assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
 
       // add the volume acl (grand-parent), now key access is allowed.
-      addVolumeAcl(child.getVolumeName(), parentAcl);
+      OzoneAcl parentVolumeAcl = new OzoneAcl(USER,
+          testUgi1.getUserName(), READ, ACCESS);
+      addVolumeAcl(child.getVolumeName(), parentVolumeAcl);
       Assert.assertTrue(nativeAuthorizer.checkAccess(child, requestContext));
     }
   }
