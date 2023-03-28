@@ -991,21 +991,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private OzoneBlockTokenSecretManager createBlockTokenSecretManager() {
-
     long expiryTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
-    long certificateGracePeriod = Duration.parse(
-        configuration.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
-            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (expiryTime > certificateGracePeriod) {
-      throw new IllegalArgumentException("Certificate grace period " +
-          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-          " should be greater than maximum block token lifetime " +
-          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
-    }
-
     return new OzoneBlockTokenSecretManager(expiryTime, secretKeyClient);
   }
 
