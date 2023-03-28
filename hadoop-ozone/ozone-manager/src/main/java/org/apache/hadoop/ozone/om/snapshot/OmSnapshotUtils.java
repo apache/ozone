@@ -40,7 +40,7 @@ public class OmSnapshotUtils {
    * Get the filename without the introductory metadata directory.
    *
    * @param truncateLength Length to remove.
-   * @param file File to remove prefix from.
+   * @param file           File to remove prefix from.
    * @return Truncated string.
    */
   public static String truncateFileName(int truncateLength, Path file) {
@@ -49,20 +49,20 @@ public class OmSnapshotUtils {
 
   @VisibleForTesting
   public static Object getINode(Path file) throws IOException {
-    return Files.readAttributes(
-        file, BasicFileAttributes.class).fileKey();
+    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
   }
 
   /**
    * Create file of links to add to tarball.
    * Format of entries are either:
    * dir1/fileTo fileFrom
-   *    for files in active db or:
+   * for files in active db or:
    * dir1/fileTo dir2/fileFrom
-   *    for files in another directory, (either another snapshot dir or
-   *    sst compaction backup directory)
+   * for files in another directory, (either another snapshot dir or
+   * sst compaction backup directory)
+   *
    * @param truncateLength - Length of initial path to trim in file path.
-   * @param hardLinkFiles - Map of link->file paths.
+   * @param hardLinkFiles  - Map of link->file paths.
    * @return Path to the file of links created.
    */
   public static Path createHardLinkList(int truncateLength,
@@ -79,10 +79,8 @@ public class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey()))
-          .append("\t")
-          .append(fixedFile)
-          .append("\n");
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append("\t")
+          .append(fixedFile).append("\n");
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
@@ -94,8 +92,8 @@ public class OmSnapshotUtils {
    * @param dbPath Path to db to have links created.
    */
   public static void createHardLinks(Path dbPath) throws IOException {
-    File hardLinkFile = new File(dbPath.toString(),
-        OmSnapshotManager.OM_HARDLINK_FILE);
+    File hardLinkFile =
+        new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
     if (hardLinkFile.exists()) {
       // Read file.
       try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
@@ -110,8 +108,7 @@ public class OmSnapshotUtils {
           Files.createLink(fullToPath, fullFromPath);
         }
         if (!hardLinkFile.delete()) {
-          throw new IOException(
-              "Failed to delete: " + hardLinkFile);
+          throw new IOException("Failed to delete: " + hardLinkFile);
         }
       }
     }
