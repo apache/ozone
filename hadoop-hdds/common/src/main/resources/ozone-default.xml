@@ -2852,6 +2852,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.delta.update.data.size.max.limit</name>
+    <value>1024MB</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Recon get a limited delta updates from OM periodically since sequence number.
+      Based on sequence number passed, OM DB delta update may have large number of
+      log files and each log batch data may be huge depending on frequent writes and
+      updates by ozone client, so to avoid increase in heap memory, this config is used
+      as limiting factor of default 1 GB while preparing DB updates object.
+    </description>
+  </property>
+  <property>
     <name>recon.om.delta.update.loop.limit</name>
     <value>10</value>
     <tag>OZONE, RECON</tag>
