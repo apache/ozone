@@ -57,7 +57,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 public class RDBStore implements DBStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStore.class);
-  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;
@@ -85,28 +84,12 @@ public class RDBStore implements DBStore {
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families) throws IOException {
+                  Set<TableConfig> families, long maxDbUpdatesSizeThreshold)
+      throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1));
-    this.maxDbUpdatesSizeThreshold = MAX_DB_UPDATES_SIZE_THRESHOLD;
-  }
-
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  @VisibleForTesting
-  public RDBStore(File dbFile, ManagedDBOptions rocksDBOption,
-                  ManagedWriteOptions writeOptions,
-                  Set<TableConfig> tableConfigs, CodecRegistry registry,
-                  boolean openReadOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName, boolean enableCompactionLog,
-                  long maxTimeAllowedForSnapshotInDag,
-                  long pruneCompactionDagDaemonRunInterval,
-                  long maxDbUpdatesSizeThreshold) throws IOException {
-    this(dbFile, rocksDBOption, writeOptions, tableConfigs, registry,
-        openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-        enableCompactionLog, maxTimeAllowedForSnapshotInDag,
-        pruneCompactionDagDaemonRunInterval);
-    this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
+        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
+        maxDbUpdatesSizeThreshold);
   }
 
   @SuppressWarnings("parameternumber")
@@ -115,11 +98,13 @@ public class RDBStore implements DBStore {
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanNameName, boolean enableCompactionLog,
                   long maxTimeAllowedForSnapshotInDag,
-                  long compactionDagDaemonInterval)
+                  long compactionDagDaemonInterval,
+                  long maxDbUpdatesSizeThreshold)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
+    this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
     codecRegistry = registry;
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
