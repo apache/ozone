@@ -57,7 +57,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 public class RDBStore implements DBStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStore.class);
-  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 1024 * 1024 * 1024;
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;

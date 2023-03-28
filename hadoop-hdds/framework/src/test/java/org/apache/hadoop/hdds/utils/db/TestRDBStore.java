@@ -318,11 +318,24 @@ public class TestRDBStore {
           org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
           org.apache.commons.codec.binary.StringUtils
               .getBytesUtf16("Value2"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key3"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value3"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key4"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value4"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key5"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value5"));
     }
-    Assertions.assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
+    Assertions.assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
 
-    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 1);
-    Assertions.assertEquals(1, dbUpdatesSince.getData().size());
+    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
+    Assertions.assertEquals(2, dbUpdatesSince.getData().size());
+    Assertions.assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
   }
 
   @Test
