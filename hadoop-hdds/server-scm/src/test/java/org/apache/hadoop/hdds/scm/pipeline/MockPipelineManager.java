@@ -90,12 +90,22 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public Pipeline createPipeline(final ReplicationConfig replicationConfig,
       final List<DatanodeDetails> nodes) {
-    return Pipeline.newBuilder()
+    final Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
+
+    try {
+      stateManager.addPipeline(pipeline.getProtobufMessage(
+          ClientVersion.CURRENT_VERSION));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
+    return pipeline;
   }
 
   @Override

@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -551,13 +553,17 @@ public class TestContainerReportHandler {
         nodeManager, containerManager);
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
-
     final DatanodeDetails datanodeOne = nodeIterator.next();
     final DatanodeDetails datanodeTwo = nodeIterator.next();
     final DatanodeDetails datanodeThree = nodeIterator.next();
+    List<DatanodeDetails> dnList = new ArrayList<>();
+    dnList.add(datanodeOne);
+    dnList.add(datanodeTwo);
+    dnList.add(datanodeThree);
+    Pipeline pipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        dnList);
+
 
     final ContainerReplicaProto.State replicaState
         = ContainerReplicaProto.State.OPEN;
