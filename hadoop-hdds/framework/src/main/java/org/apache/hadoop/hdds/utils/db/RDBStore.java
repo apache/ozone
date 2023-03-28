@@ -197,8 +197,6 @@ public class RDBStore implements DBStore {
     }
   }
 
-
-
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
