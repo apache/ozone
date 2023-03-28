@@ -20,18 +20,15 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -68,7 +65,7 @@ public class TestOMSnapshotDeleteRequest {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
-  private OMMetadataManager omMetadataManager;
+  private OmMetadataManagerImpl omMetadataManager;
 
   private String volumeName;
   private String bucketName;
@@ -206,7 +203,7 @@ public class TestOMSnapshotDeleteRequest {
         snapshotInfo.getSnapshotStatus());
     omMetadataManager.getSnapshotInfoTable().addCacheEntry(
         new CacheKey<>(key),
-        new CacheValue<>(Optional.of(snapshotInfo), 1L));
+        CacheValue.get(1L, snapshotInfo));
 
     // Trigger validateAndUpdateCache
     OMClientResponse omClientResponse =
@@ -259,10 +256,6 @@ public class TestOMSnapshotDeleteRequest {
    */
   @Test
   public void testEntryExists() throws Exception {
-    SnapshotChainManager snapshotChainManager =
-        new SnapshotChainManager(omMetadataManager);
-    when(ozoneManager.getSnapshotChainManager())
-        .thenReturn(snapshotChainManager);
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     String key = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
 

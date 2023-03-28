@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -116,11 +117,11 @@ public class TestRocksDbPersistentSet {
 
       testList.forEach(persistentSet::add);
 
-      Iterator<String> iterator = persistentSet.iterator();
       Iterator<String> setIterator = testSet.iterator();
-
-      while (iterator.hasNext()) {
-        assertEquals(iterator.next(), setIterator.next());
+      try (ClosableIterator<String> iterator = persistentSet.iterator()) {
+        while (iterator.hasNext()) {
+          assertEquals(iterator.next(), setIterator.next());
+        }
       }
       assertFalse(setIterator.hasNext());
     } finally {

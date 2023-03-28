@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -301,6 +302,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       ImmutableSortedSet.of(
           OZONE_ADMINISTRATORS
       );
+
+  private Clock systemClock;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -596,7 +599,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMConfigurator configurator) throws IOException {
     // Use SystemClock when data is persisted
     // and used again after system restarts.
-    Clock systemClock = Clock.system(ZoneOffset.UTC);
+    systemClock = Clock.system(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -903,6 +906,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setScmCertificateClient(CertificateClient client) {
     scmCertificateClient = client;
+  }
+
+  public Clock getSystemClock() {
+    return systemClock;
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
@@ -2078,5 +2085,28 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
+  }
+
+  /**
+   * This will remove the given SCM node from HA Ring by removing it from
+   * Ratis Ring and deleting the related certificates from certificate store.
+   *
+   * @return true if remove was successful, else false.
+   */
+  public boolean removePeerFromHARing(RemoveSCMRequest request)
+      throws IOException {
+    // We cannot remove a node if it's currently leader.
+    if (scmContext.isLeader() && request.getScmId().equals(getScmId())) {
+      throw new IOException("Cannot remove current leader.");
+    }
+
+    // Currently we don't support removal of primordial node.
+    if (request.getScmId().equals(primaryScmNodeId)) {
+      throw new IOException("Removal of primordial node is not supported.");
+    }
+
+    // TODO: Remove the certificate from certificate store.
+    return scmHAManager.removeSCM(request);
+
   }
 }

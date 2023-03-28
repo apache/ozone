@@ -85,7 +85,7 @@ public class ECReplicationConfig implements ReplicationConfig {
    * Create an ECReplicationConfig object from a string representing the
    * various parameters. Acceptable patterns are like:
    *     rs-3-2-1024k
-   *     RS-3-2-2048
+   *     RS-3-2-2048k
    *     XOR-10-4-4096K
    * IllegalArgumentException will be thrown if the passed string does not
    * match the defined pattern.
@@ -95,7 +95,7 @@ public class ECReplicationConfig implements ReplicationConfig {
     final Matcher matcher = STRING_FORMAT.matcher(string);
     if (!matcher.matches()) {
       throw new IllegalArgumentException("EC replication config should be " +
-          "defined in the form rs-3-2-1024k, rs-6-3-1024; or rs-10-4-1024k." +
+          "defined in the form rs-3-2-1024k, rs-6-3-1024k; or rs-10-4-1024k." +
           " Provided configuration was: " + string);
     }
 
@@ -150,7 +150,7 @@ public class ECReplicationConfig implements ReplicationConfig {
     return getCodec() + EC_REPLICATION_PARAMS_DELIMITER
         + getData() + EC_REPLICATION_PARAMS_DELIMITER
         + getParity() + EC_REPLICATION_PARAMS_DELIMITER
-        + getEcChunkSize();
+        + chunkKB();
   }
 
   public HddsProtos.ECReplicationConfig toProto() {
@@ -199,11 +199,16 @@ public class ECReplicationConfig implements ReplicationConfig {
   @Override
   public String toString() {
     return HddsProtos.ReplicationType.EC + "{"
-        + codec + "-" + data + "-" + parity + "-" + ecChunkSize + "}";
+        + codec + "-" + data + "-" + parity + "-" + chunkKB() + "}";
   }
 
   @Override
   public String configFormat() {
-    return HddsProtos.ReplicationType.EC.name() + "/" + data + "-" + parity;
+    return HddsProtos.ReplicationType.EC.name()
+        + "/" + data + "-" + parity + "-" + chunkKB();
+  }
+
+  private String chunkKB() {
+    return ecChunkSize / 1024 + "k";
   }
 }

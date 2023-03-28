@@ -50,11 +50,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_SST_BACKUP_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -101,7 +103,7 @@ public class RDBStore implements DBStore {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
-            OM_COMPACTION_SST_BACKUP_DIR, OM_COMPACTION_LOG_DIR,
+            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
             maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
@@ -155,6 +157,12 @@ public class RDBStore implements DBStore {
       }
 
       if (enableCompactionLog) {
+        ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
+        Preconditions.checkNotNull(ssInfoTableCF,
+            "SnapshotInfoTable column family handle should not be null");
+        // Set CF handle in differ to be used in DB listener
+        rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
+            ssInfoTableCF.getHandle());
         // Finish the initialization of compaction DAG tracker by setting the
         // sequence number as current compaction log filename.
         rocksDBCheckpointDiffer.setCurrentCompactionLog(

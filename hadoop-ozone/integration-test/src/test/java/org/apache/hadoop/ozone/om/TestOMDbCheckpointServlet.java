@@ -65,7 +65,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_COMPACTION_SST_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
@@ -437,7 +437,7 @@ public class TestOMDbCheckpointServlet {
 
     // Simulate links from the compaction dir.
     compactionDirPath = Paths.get(metaDir.toString(),
-        OM_SNAPSHOT_DIFF_DIR, OM_COMPACTION_SST_BACKUP_DIR);
+        OM_SNAPSHOT_DIFF_DIR, DB_COMPACTION_SST_BACKUP_DIR);
     Path fabricatedLink2 = Paths.get(compactionDirPath.toString(),
         "fabricatedFile");
     Files.createLink(fabricatedLink2, fabricatedFile);

@@ -571,14 +571,27 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
 
-  // Name of the SST file backup directory placed under diff dir.
-  public static final String OM_COMPACTION_SST_BACKUP_DIR = "compaction-sst-backup";
-  // Name of the compaction log directory placed under diff dir.
-  public static final String OM_COMPACTION_LOG_DIR = "compaction-log";
-
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
 }

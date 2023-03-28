@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRang
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Optional;
 
 /**
  * Handles OMSetRangerServiceVersionRequest.
@@ -68,7 +67,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
 
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
-        new CacheValue<>(Optional.of(proposedVersionStr), transactionLogIndex));
+        CacheValue.get(transactionLogIndex, proposedVersionStr));
     omResponse.setSetRangerServiceVersionResponse(
         SetRangerServiceVersionResponse.newBuilder().build());
 

@@ -40,10 +40,13 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,6 +54,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -60,6 +64,9 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Tests the ECOverReplicationHandling functionality.
@@ -75,7 +82,8 @@ public class TestECOverReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException, NotLeaderException {
+  public void setup() throws NodeNotFoundException, NotLeaderException,
+      CommandTargetOverloadedException {
     staleNode = null;
 
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -91,7 +99,7 @@ public class TestECOverReplicationHandler {
         });
 
     commandsSent = new HashSet<>();
-    ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
+    ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
     nodeManager = new MockNodeManager(true, 10);
@@ -108,7 +116,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testNoOverReplication()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -119,7 +127,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationFixedByPendingDelete()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -137,7 +145,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithDecommissionIndexes()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -149,7 +157,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithStaleIndexes()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -167,7 +175,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithOpenReplica()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
@@ -187,7 +195,7 @@ public class TestECOverReplicationHandler {
    */
   @Test
   public void testOverReplicationButPolicyReturnsWrongIndexes()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5),
@@ -205,7 +213,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithOneSameIndexes()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -220,7 +228,7 @@ public class TestECOverReplicationHandler {
 
   @Test
   public void testOverReplicationWithMultiSameIndexes()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1),
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -244,7 +252,7 @@ public class TestECOverReplicationHandler {
    */
   @Test
   public void testOverReplicationWithUnderReplication()
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(
             Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
@@ -267,10 +275,58 @@ public class TestECOverReplicationHandler {
     Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
   }
 
+  @Test
+  public void testDeleteThrottling() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(
+            Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ContainerHealthResult.UnderReplicatedHealthResult health =
+        new ContainerHealthResult.UnderReplicatedHealthResult(
+            container, 2, false, false, false);
+
+    // On the first call to throttled delete, throw an overloaded exception.
+    final AtomicBoolean shouldThrow = new AtomicBoolean(true);
+    // On the first call we throw, on subsequent calls we succeed.
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      if (shouldThrow.get()) {
+        shouldThrow.set(false);
+        throw new CommandTargetOverloadedException("Test exception");
+      }
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      int replicaIndex = invocationOnMock.getArgument(1);
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      boolean forceDelete = invocationOnMock.getArgument(3);
+      DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+          containerInfo.getContainerID(), forceDelete);
+      deleteCommand.setReplicaIndex(replicaIndex);
+      commandsSent.add(Pair.of(target, deleteCommand));
+      return null;
+    }).when(replicationManager)
+        .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
+
+    ECOverReplicationHandler ecORH =
+        new ECOverReplicationHandler(policy, replicationManager);
+
+    try {
+      ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+          health, 1);
+      Assertions.fail("Expected CommandTargetOverloadedException");
+    } catch (CommandTargetOverloadedException e) {
+      // This is expected.
+    }
+    Assert.assertEquals(1, commandsSent.size());
+  }
+
   private void testOverReplicationWithIndexes(
       Set<ContainerReplica> availableReplicas,
       Map<Integer, Integer> index2excessNum,
-      List<ContainerReplicaOp> pendingOps) throws NotLeaderException {
+      List<ContainerReplicaOp> pendingOps) throws NotLeaderException,
+      CommandTargetOverloadedException {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
