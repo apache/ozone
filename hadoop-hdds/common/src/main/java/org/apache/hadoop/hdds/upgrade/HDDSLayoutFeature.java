@@ -36,8 +36,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
       + " Erasure Coded block data storage."),
   DATANODE_SCHEMA_V3(4, "Datanode RocksDB Schema Version 3 (one rocksdb " +
       "per disk)"),
-  RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS(5, "Adding the RATIS_DATASTREAM port" +
-      "to the DatanodeDetails.");
+  RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS(5, "Adding the RATIS_DATASTREAM " +
+      "port to the DatanodeDetails.");
 
   //////////////////////////////  //////////////////////////////
 

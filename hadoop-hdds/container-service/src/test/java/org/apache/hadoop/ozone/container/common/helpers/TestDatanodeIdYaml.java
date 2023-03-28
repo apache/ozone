@@ -84,7 +84,8 @@ class TestDatanodeIdYaml {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS
+            .layoutVersion());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
