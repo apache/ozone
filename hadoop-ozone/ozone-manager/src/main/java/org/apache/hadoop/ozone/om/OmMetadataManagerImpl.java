@@ -34,7 +34,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -1601,13 +1600,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public void put(String kerberosId, S3SecretValue secretValue, long txId) {
     s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
-        new CacheValue<>(Optional.of(secretValue), txId));
+        CacheValue.get(txId, secretValue));
   }
 
   @Override
   public void invalidate(String id, long txId) {
     s3SecretTable.addCacheEntry(new CacheKey<>(id),
-        new CacheValue<>(Optional.absent(), txId));
+        CacheValue.get(txId));
   }
 
   @Override

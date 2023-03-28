@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -284,7 +283,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(omDBAccessIdInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omDBAccessIdInfo));
 
       // Add to principalToAccessIdsTable
       if (principalInfo == null) {
@@ -296,8 +295,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       }
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
-          new CacheValue<>(Optional.of(principalInfo),
-              transactionLogIndex));
+          CacheValue.get(transactionLogIndex, principalInfo));
 
       // Expect accessId absence from S3SecretTable
       ozoneManager.getS3SecretManager()

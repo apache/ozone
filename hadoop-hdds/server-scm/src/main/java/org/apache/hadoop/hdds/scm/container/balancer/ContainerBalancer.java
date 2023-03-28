@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
@@ -227,7 +228,7 @@ public class ContainerBalancer extends StatefulService {
               ozoneConfiguration);
       validateConfiguration(configuration);
       this.config = configuration;
-      startBalancingThread(proto.getNextIterationIndex());
+      startBalancingThread(proto.getNextIterationIndex(), true);
     } finally {
       lock.unlock();
     }
@@ -258,7 +259,7 @@ public class ContainerBalancer extends StatefulService {
       this.config = configuration;
 
       //start balancing task
-      startBalancingThread(0);
+      startBalancingThread(0, false);
     } finally {
       lock.unlock();
     }
@@ -267,9 +268,10 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Starts a new balancing thread asynchronously.
    */
-  private void startBalancingThread(int nextIterationIndex) {
+  private void startBalancingThread(int nextIterationIndex,
+      boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
-        config);
+        config, delayStart);
     currentBalancingThread = new Thread(task);
     currentBalancingThread.setName("ContainerBalancerTask");
     currentBalancingThread.setDaemon(true);
@@ -323,6 +325,7 @@ public class ContainerBalancer extends StatefulService {
             "stopping");
         return;
       }
+      LOG.info("Trying to stop ContainerBalancer in this SCM.");
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -358,6 +361,7 @@ public class ContainerBalancer extends StatefulService {
     try {
       validateState(true);
       saveConfiguration(config, false, 0);
+      LOG.info("Trying to stop ContainerBalancer service.");
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -427,11 +431,16 @@ public class ContainerBalancer extends StatefulService {
     return metrics;
   }
 
+  @VisibleForTesting
+  Thread getCurrentBalancingThread() {
+    return currentBalancingThread;
+  }
+
   @Override
   public String toString() {
     String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
-        "%-30s %b%n", "Key", "Value", "Running", getBalancerStatus());
+        "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
   }
 }

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -214,10 +213,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // Add to cache
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omKeyInfo));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, multipartKeyInfo));
 
       omClientResponse =
           new S3InitiateMultipartUploadResponse(

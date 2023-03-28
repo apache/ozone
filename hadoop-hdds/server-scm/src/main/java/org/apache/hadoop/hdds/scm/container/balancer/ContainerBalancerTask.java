@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -41,6 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -116,6 +118,7 @@ public class ContainerBalancerTask implements Runnable {
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
   private int nextIterationIndex;
+  private boolean delayStart;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -130,7 +133,8 @@ public class ContainerBalancerTask implements Runnable {
                                int nextIterationIndex,
                                ContainerBalancer containerBalancer,
                                ContainerBalancerMetrics metrics,
-                               ContainerBalancerConfiguration config) {
+                               ContainerBalancerConfiguration config,
+                               boolean delayStart) {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
@@ -138,6 +142,7 @@ public class ContainerBalancerTask implements Runnable {
     this.moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
     this.moveManager.setReplicationTimeout(
         config.getMoveReplicationTimeout().toMillis());
+    this.delayStart = delayStart;
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;
@@ -162,6 +167,15 @@ public class ContainerBalancerTask implements Runnable {
    */
   public void run() {
     try {
+      if (delayStart) {
+        long delayDuration = ozoneConfiguration.getTimeDuration(
+            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+            TimeUnit.SECONDS);
+        LOG.info("ContainerBalancer will sleep for {} seconds before starting" +
+            " balancing.", delayDuration);
+        Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
+      }
       balance();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
@@ -211,7 +225,10 @@ public class ContainerBalancerTask implements Runnable {
           // one for sending command , one for running du, and one for
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
-          Thread.sleep(3 * nodeReportInterval);
+          long sleepTime = 3 * nodeReportInterval;
+          LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
+              "for updated usage information from Datanodes.", sleepTime);
+          Thread.sleep(nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");

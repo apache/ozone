@@ -140,8 +140,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -302,6 +302,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       ImmutableSortedSet.of(
           OZONE_ADMINISTRATORS
       );
+
+  private Clock systemClock;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -597,7 +599,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMConfigurator configurator) throws IOException {
     // Use SystemClock when data is persisted
     // and used again after system restarts.
-    Clock systemClock = Clock.system(ZoneOffset.UTC);
+    systemClock = Clock.system(ZoneOffset.UTC);
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -904,6 +906,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setScmCertificateClient(CertificateClient client) {
     scmCertificateClient = client;
+  }
+
+  public Clock getSystemClock() {
+    return systemClock;
   }
 
   private ContainerTokenSecretManager createContainerTokenSecretManager(
@@ -1527,6 +1533,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void stop() {
     if (isStopped.getAndSet(true)) {
       LOG.info("Storage Container Manager is not running.");
+      IOUtils.close(LOG, scmHAManager);
+      stopReplicationManager(); // started eagerly
       return;
     }
     try {
@@ -1541,12 +1549,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to stop Container Balancer service.", e);
     }
 
-    try {
-      LOG.info("Stopping Replication Manager Service.");
-      replicationManager.stop();
-    } catch (Exception ex) {
-      LOG.error("Replication manager service stop failed.", ex);
-    }
+    stopReplicationManager();
 
     try {
       LOG.info("Stopping the Datanode Admin Monitor.");
@@ -1649,6 +1652,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmMetadataStore.stop();
     } catch (Exception ex) {
       LOG.error("SCM Metadata store stop failed", ex);
+    }
+  }
+
+  private void stopReplicationManager() {
+    try {
+      LOG.info("Stopping Replication Manager Service.");
+      replicationManager.stop();
+    } catch (Exception ex) {
+      LOG.error("Replication manager service stop failed.", ex);
     }
   }
 

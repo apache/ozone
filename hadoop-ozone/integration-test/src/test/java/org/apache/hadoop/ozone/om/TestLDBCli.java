@@ -16,8 +16,10 @@
  */
 package org.apache.hadoop.ozone.om;
 
-
-import org.apache.commons.io.FileUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,295 +38,296 @@ import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.Assert;
-import org.junit.rules.TemporaryFolder;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import picocli.CommandLine;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.time.LocalDateTime;
-import java.util.List;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-
 /**
- * This class tests the Debug LDB CLI that reads from rocks db file.
+ * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
  */
 public class TestLDBCli {
+  private static final String KEY_TABLE = "keyTable";
+  private static final String BLOCK_DATA = "block_data";
+  private static final ObjectMapper MAPPER = new ObjectMapper();
   private OzoneConfiguration conf;
+  private DBStore dbStore;
+  @TempDir
+  private File tempDir;
+  private StringWriter stdout, stderr;
+  private PrintWriter pstdout, pstderr;
+  private CommandLine cmd;
+  private NavigableMap<String, Map<String, ?>> dbMap;
+  private String keySeparatorSchemaV3 =
+      new OzoneConfiguration().getObject(DatanodeConfiguration.class)
+          .getContainerSchemaV3KeySeparator();
 
-  private RDBParser rdbParser;
-  private DBScanner dbScanner;
-  private DBStore dbStore = null;
-  private List<String> keyNames;
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Before
-  public void setup() throws Exception {
+  @BeforeEach
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    rdbParser = new RDBParser();
-    dbScanner = new DBScanner();
-    keyNames = new ArrayList<>();
+    stdout = new StringWriter();
+    pstdout = new PrintWriter(stdout);
+    stderr = new StringWriter();
+    pstderr = new PrintWriter(stderr);
+
+    cmd = new CommandLine(new RDBParser())
+        .addSubcommand(new DBScanner())
+        .setOut(pstdout)
+        .setErr(pstderr);
+
+    dbMap = new TreeMap<>();
   }
 
-  @After
-  public void shutdown() throws Exception {
+  @AfterEach
+  public void shutdown() throws IOException {
     if (dbStore != null) {
       dbStore.close();
     }
-    System.setOut(System.out);
-    // Restore the static fields in DBScanner
-    DBScanner.setContainerId(-1);
-    DBScanner.setDnDBSchemaVersion("V2");
-    DBScanner.setWithKey(false);
+    pstderr.close();
+    stderr.close();
+    pstdout.close();
+    stdout.close();
   }
 
-  @Test
-  public void testOMDB() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+  /**
+   * Defines ldb tool test cases.
+   */
+  private static Stream<Arguments> scanTestCases() {
+    return Stream.of(
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("No extra args", Collections.emptyList()),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("Length", Pair.of(0, "")),
+            Named.of("Limit 1", Arrays.asList("--length", "1")),
+            Named.of("Expect key1 only", Pair.of("key1", "key2"))
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("InvalidLength", Pair.of(1, "IllegalArgumentException")),
+            Named.of("Limit 0", Arrays.asList("--length", "0")),
+            Named.of("Expect empty result", null)
+        ),
+        Arguments.of(
+            Named.of(KEY_TABLE, Pair.of(KEY_TABLE, false)),
+            Named.of("UnlimitedLength", Pair.of(0, "")),
+            Named.of("Limit -1", Arrays.asList("--length", "-1")),
+            Named.of("Expect key1-key5", Pair.of("key1", "key6"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("Default", Pair.of(0, "")),
+            Named.of("V3", Arrays.asList("--dn-schema", "V3")),
+            Named.of("Expect '1|1'-'2|4'", Pair.of("1|1", "3|5"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("Specify", Pair.of(0, "")),
+            Named.of("V3", Collections.emptyList()),
+            Named.of("Expect '1|1'-'2|4'", Pair.of("1|1", "3|5"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("ContainerID 1", Pair.of(0, "")),
+            Named.of("V3 + cid 1", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "1",
+                "--length", "2")),
+            Named.of("Expect '1|1' and '1|2'", Pair.of("1|1", "2|3"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("ContainerID 2", Pair.of(0, "")),
+            Named.of("V3 + cid 2", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "2",
+                "--length", "2")),
+            Named.of("Expect '2|3' and '2|4'", Pair.of("2|3", "3|5"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V3", Pair.of(BLOCK_DATA, true)),
+            Named.of("ContainerID 2 + Length", Pair.of(0, "")),
+            Named.of("V3 + cid 2 + limit 1", Arrays.asList(
+                "--dn-schema", "V3",
+                "--container-id", "2",
+                "--length", "1")),
+            Named.of("Expect '2|3' only", Pair.of("2|3", "2|4"))
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
+            Named.of("Erroneously parse V2 table as V3",
+                Pair.of(1, "Error: Invalid")),
+            Named.of("Default to V3", Collections.emptyList()),
+            Named.of("Expect exception", null)
+        ),
+        Arguments.of(
+            Named.of(BLOCK_DATA + " V2", Pair.of(BLOCK_DATA, false)),
+            Named.of("Explicit V2", Pair.of(0, "")),
+            Named.of("V2", Arrays.asList("--dn-schema", "V2")),
+            Named.of("Expect 1-4", Pair.of("1", "5"))
+        )
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("scanTestCases")
+  void testLDBScan(
+      @NotNull Pair<String, Boolean> tableAndOption,
+      @NotNull Pair<Integer, String> expectedExitCodeStderrPair,
+      List<String> scanArgs,
+      Pair<String, String> dbMapRange) throws IOException {
+
+    final String tableName = tableAndOption.getLeft();
+    final Boolean schemaV3 = tableAndOption.getRight();
+    // Prepare dummy table. Populate dbMap that contains expected results
+    prepareTable(tableName, schemaV3);
+
+    // Prepare scan args
+    List<String> completeScanArgs = new ArrayList<>();
+    completeScanArgs.addAll(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", tableName));
+    completeScanArgs.addAll(scanArgs);
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    // Check exit code. Print stderr if not expected
+    int expectedExitCode = expectedExitCodeStderrPair.getLeft();
+    Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
+
+    // Construct expected result map given test param input
+    Map<String, Map<String, ?>> expectedMap;
+    if (dbMapRange != null) {
+      expectedMap = dbMap.subMap(dbMapRange.getLeft(), dbMapRange.getRight());
+    } else {
+      expectedMap = new TreeMap<>();
     }
-    // Dummy om.db with only keyTable
-    dbStore = DBStoreBuilder.newBuilder(conf)
-      .setName("om.db")
-      .setPath(newFolder.toPath())
-      .addTable("keyTable")
-      .build();
-    // insert 5 keys
-    for (int i = 0; i < 5; i++) {
-      OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("sampleVol",
-          "sampleBuck", "key" + (i + 1), HddsProtos.ReplicationType.STAND_ALONE,
-          HddsProtos.ReplicationFactor.ONE);
-      String key = "key" + (i + 1);
-      Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
-      byte[] arr = value
-          .getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray();
-      keyTable.put(key.getBytes(UTF_8), arr);
-    }
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    DBScanner.setLimit(100);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
-    Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
-    Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
 
-    final ByteArrayOutputStream outputStreamCaptor =
-        new ByteArrayOutputStream();
-    System.setOut(new PrintStream(outputStreamCaptor, false, DEFAULT_ENCODING));
-    DBScanner.setShowCount(true);
-    dbScanner.call();
-    Assert.assertEquals("5",
-        outputStreamCaptor.toString(DEFAULT_ENCODING).trim());
-    System.setOut(System.out);
-    DBScanner.setShowCount(false);
-
-
-    DBScanner.setLimit(1);
-    Assert.assertEquals(1, getKeyNames(dbScanner).size());
-
-    // Testing the startKey function
-    DBScanner.setLimit(-1);
-    DBScanner.setStartKey("key3");
-    Assert.assertEquals(3, getKeyNames(dbScanner).size());
-
-    DBScanner.setLimit(0);
-    try {
-      getKeyNames(dbScanner);
-      Assert.fail("IllegalArgumentException is expected");
-    }  catch (IllegalArgumentException e) {
-      //ignore
+    if (exitCode == 0) {
+      // Verify stdout on success
+      assertContents(expectedMap, stdout.toString());
     }
 
-    // If set with -1, check if it dumps entire table data.
-    DBScanner.setLimit(-1);
-    DBScanner.setStartKey(null);
-    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+    // Check stderr
+    final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
+    Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
+  }
 
-    // Test dump to file.
-    File tempFile = folder.newFolder();
-    String outFile = tempFile.getAbsolutePath() + "keyTable"
-        + LocalDateTime.now();
-    BufferedReader bufferedReader = null;
-    try {
-      DBScanner.setLimit(-1);
-      DBScanner.setFileName(outFile);
-      keyNames = getKeyNames(dbScanner);
-      Assert.assertEquals(5, keyNames.size());
-      Assert.assertTrue(new File(outFile).exists());
+  /**
+   * Converts String input to a Map and compares to the given Map input.
+   * @param expected expected result Map
+   * @param actualStr String input
+   */
+  private void assertContents(Map<String, ?> expected, String actualStr)
+      throws IOException {
+    // Parse actual output (String) into Map
+    Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
+        actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
 
-      bufferedReader = new BufferedReader(
-          new InputStreamReader(new FileInputStream(outFile), UTF_8));
+    Assertions.assertEquals(expected, actualMap);
+  }
 
-      String readLine;
-      int count = 0;
+  /**
+   * Prepare the table for testing.
+   * Also populate dbMap that contains all possibly expected results.
+   * @param tableName table name
+   * @param schemaV3 set to true for SchemaV3. applicable to block_data table
+   */
+  private void prepareTable(String tableName, boolean schemaV3)
+      throws IOException {
 
-      while ((readLine = bufferedReader.readLine()) != null) {
-        for (String keyName : keyNames) {
-          if (readLine.contains(keyName)) {
-            count++;
-            break;
+    switch (tableName) {
+    case KEY_TABLE:
+      // Dummy om.db with only keyTable
+      dbStore = DBStoreBuilder.newBuilder(conf).setName("om.db")
+          .setPath(tempDir.toPath()).addTable(KEY_TABLE).build();
+
+      Table<byte[], byte[]> keyTable = dbStore.getTable(KEY_TABLE);
+      // Insert 5 keys
+      for (int i = 1; i <= 5; i++) {
+        String key = "key" + i;
+        OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
+            key, HddsProtos.ReplicationType.STAND_ALONE,
+            HddsProtos.ReplicationFactor.ONE);
+        keyTable.put(key.getBytes(UTF_8),
+            value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+
+        // Populate map
+        dbMap.put(key, toMap(value));
+      }
+      break;
+
+    case BLOCK_DATA:
+      conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
+          schemaV3);
+      dbStore = BlockUtils.getUncachedDatanodeStore(
+          tempDir.getAbsolutePath() + "/" + OzoneConsts.CONTAINER_DB_NAME,
+          schemaV3 ? OzoneConsts.SCHEMA_V3 : OzoneConsts.SCHEMA_V2,
+          conf, false).getStore();
+
+      Table<byte[], byte[]> blockTable = dbStore.getTable(BLOCK_DATA);
+      // Insert 2 containers with 2 blocks each
+      final int containerCount = 2;
+      final int blockCount = 2;
+      int blockId = 1;
+      for (int cid = 1; cid <= containerCount; cid++) {
+        for (int blockIdx = 1; blockIdx <= blockCount; blockIdx++, blockId++) {
+          byte[] dbKey;
+          String mapKey;
+          BlockData blockData = new BlockData(new BlockID(cid, blockId));
+          if (schemaV3) {
+            String dbKeyStr = DatanodeSchemaThreeDBDefinition
+                .getContainerKeyPrefix(cid) + blockId;
+            dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
+            // Schema V3 ldb scan output key is "containerId: blockId"
+            mapKey = cid + keySeparatorSchemaV3 + blockId;
+          } else {
+            String dbKeyStr = String.valueOf(blockId);
+            dbKey = StringUtils.string2Bytes(dbKeyStr);
+            // Schema V2 ldb scan output key is "blockId"
+            mapKey = dbKeyStr;
           }
+          blockTable.put(dbKey, blockData.getProtoBufMessage().toByteArray());
+          dbMap.put(mapKey, toMap(blockData));
         }
       }
+      break;
 
-      // As keyName will be in the file twice for each key.
-      // Once in keyName and second time in fileName.
-
-      // Sample key data.
-      // {
-      // ..
-      // ..
-      // "keyName": "key5",
-      // "fileName": "key5",
-      // ..
-      // ..
-      // }
-
-      Assert.assertEquals("File does not have all keys",
-          keyNames.size() * 2, count);
-    } finally {
-      if (bufferedReader != null) {
-        bufferedReader.close();
-      }
-      if (new File(outFile).exists()) {
-        FileUtils.deleteQuietly(new File(outFile));
-      }
+    default:
+      throw new IllegalArgumentException("Unsupported table: " + tableName);
     }
   }
 
-  private List<String> getKeyNames(DBScanner scanner)
-            throws Exception {
-    keyNames.clear();
-    scanner.setTableName("keyTable");
-    scanner.call();
-    Assert.assertFalse(scanner.getScannedObjects().isEmpty());
-    for (Object o : scanner.getScannedObjects()) {
-      OmKeyInfo keyInfo = (OmKeyInfo)o;
-      keyNames.add(keyInfo.getKeyName());
-    }
-    return keyNames;
+  private static Map<String, Object> toMap(Object obj) throws IOException {
+    // Have to use the same serializer (Gson) as DBScanner does.
+    // JsonUtils (ObjectMapper) parses object differently.
+    String json = new Gson().toJson(obj);
+    return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 
-  @Test
-  public void testDNDBSchemaV3() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
-
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, true);
-    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
-            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V3, conf,
-        false).getStore();
-
-    // insert 2 containers, each with 2 blocks
-    final int containerCount = 2;
-    final int blockCount = 2;
-    int blockId = 1;
-    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
-    for (int i = 1; i <= containerCount; i++) {
-      for (int j = 1; j <= blockCount; j++, blockId++) {
-        String key =
-            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(i) + blockId;
-        BlockData blockData = new BlockData(new BlockID(i, blockId));
-        blockTable.put(FixedLengthStringUtils.string2Bytes(key),
-            blockData.getProtoBufMessage().toByteArray());
-      }
-    }
-
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    dbScanner.setTableName("block_data");
-    DBScanner.setDnDBSchemaVersion("V3");
-    DBScanner.setWithKey(true);
-
-    // Scan all container
-    DBScanner.setLimit(-1);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for container 2 block 4
-      Assert.assertTrue(capture.getOutput().contains("2: 4"));
-      // Assert that output has info for container 1 block 1
-      Assert.assertTrue(capture.getOutput().contains("1: 1"));
-    }
-
-    // Scan container 1
-    DBScanner.setContainerId(1);
-    DBScanner.setLimit(2);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output doesn't have info for container 2 block 4
-      Assert.assertFalse(capture.getOutput().contains("2: 4"));
-      // Assert that output has info for container 1 block 1
-      Assert.assertTrue(capture.getOutput().contains("1: 1"));
-    }
-
-    // Scan container 2
-    DBScanner.setContainerId(2);
-    DBScanner.setLimit(2);
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for container 2 block 4
-      Assert.assertTrue(capture.getOutput().contains("2: 4"));
-      // Assert that output doesn't have info for container 1 block 1
-      Assert.assertFalse(capture.getOutput().contains("1: 1"));
-    }
-  }
-
-  @Test
-  public void testDNDBSchemaV2() throws Exception {
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
-    }
-
-    conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
-    dbStore = BlockUtils.getUncachedDatanodeStore(newFolder.getAbsolutePath() +
-            "/" + OzoneConsts.CONTAINER_DB_NAME, OzoneConsts.SCHEMA_V2, conf,
-        false).getStore();
-
-    // insert 1 containers with 2 blocks
-    final long cid = 1;
-    final int blockCount = 2;
-    int blockId = 1;
-    Table<byte[], byte[]> blockTable = dbStore.getTable("block_data");
-    for (int j = 1; j <= blockCount; j++, blockId++) {
-      String key = String.valueOf(blockId);
-      BlockData blockData = new BlockData(new BlockID(cid, blockId));
-      blockTable.put(StringUtils.string2Bytes(key),
-          blockData.getProtoBufMessage().toByteArray());
-    }
-
-    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
-    dbScanner.setParent(rdbParser);
-    dbScanner.setTableName("block_data");
-    DBScanner.setDnDBSchemaVersion("V2");
-    DBScanner.setWithKey(true);
-
-    // Scan all container
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      dbScanner.call();
-      // Assert that output has info for block 2
-      Assert.assertTrue(capture.getOutput().contains("2"));
-    }
-  }
 }
