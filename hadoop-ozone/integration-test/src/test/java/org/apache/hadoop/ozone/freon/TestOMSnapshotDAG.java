@@ -304,10 +304,12 @@ public class TestOMSnapshotDAG {
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, compactionLogDirName);
     File[] fileList = logPath.toFile().listFiles();
-    Assertions.assertNotNull(fileList);
-    for (File file : fileList) {
-      if (file != null && file.isFile() && file.getName().endsWith(".log")) {
-        Assertions.assertEquals(0L, file.length());
+    // fileList can be null when compaction log directory is not even created
+    if (fileList != null) {
+      for (File file : fileList) {
+        if (file != null && file.isFile() && file.getName().endsWith(".log")) {
+          Assertions.assertEquals(0L, file.length());
+        }
       }
     }
     // Verify that no SST has been backed up
