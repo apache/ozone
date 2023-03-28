@@ -24,19 +24,14 @@ OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
-
-OZONE-SITE.XML_ozone.scm.service.ids=scmservice
-OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
-OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1
-OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2
-OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3
-OZONE-SITE.XML_ozone.scm.ratis.enable=true
-OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
-
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.client.address=scm
+
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
 # If SCM sends container close commands as part of upgrade finalization while
@@ -58,6 +53,6 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 
-no_proxy=om1,om2,om3,scm1,scm2,scm3,s3g,kdc,localhost,127.0.0.1
+no_proxy=om1,om2,om3,scm,s3g,kdc,localhost,127.0.0.1
 
 OM_SERVICE_ID=omservice

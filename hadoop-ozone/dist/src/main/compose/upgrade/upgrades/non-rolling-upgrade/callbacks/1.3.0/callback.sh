@@ -15,16 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Fail if required variables are not set.
-set -u
-: "${OZONE_VOLUME}"
-: "${TEST_DIR}"
-set +u
+source "$TEST_DIR"/testlib.sh
 
-source "$TEST_DIR/testlib.sh"
+with_this_version_pre_finalized() {
+  # New layout features were added in this version, so OM and SCM should be
+  # pre-finalized.
+  execute_robot_test "$SCM" --include pre-finalized upgrade/check-finalization.robot
+  # Test that EC is disabled when pre-finalized.
+  execute_robot_test "$SCM" --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
+}
 
-export COMPOSE_FILE="$TEST_DIR/compose/ha/docker-compose.yaml"
-export OM_SERVICE_ID=omservice
-create_data_dirs "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,dn4,dn5,recon,s3g,scm1,scm2,scm3}
-
-echo "Using docker cluster defined in $COMPOSE_FILE"
+with_this_version_finalized() {
+  execute_robot_test "$SCM" --include post-finalized-ec-tests ec/upgrade-ec-check.robot
+}
