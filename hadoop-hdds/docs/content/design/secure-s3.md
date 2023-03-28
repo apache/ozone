@@ -3,7 +3,7 @@ title: Secure S3 keys management
 summary: Improving security regarding s3 keys management
 date: 2023-03-10
 jira: HDDS-8132
-status: implemented
+status: implementing
 author: Maksim Myskov, Mikhail Pochatkin
 ---
 <!--
@@ -24,6 +24,8 @@ There are problems related to the current S3 keys management:
 * Storing keys as plain text in Ozone Manager rocksdb is insecure. An ozone administrator can easily impersonate any user by recovering his keys from rocksdb.
 * The only way for a user to generate keys is to have SSH access to the Ozone cluster. Security policies can also prohibit this.
 * Keys revocation process is manual which leads to security issues.
+* Extend Ozone S3 secret key management to support centralized remote S3 secret storage
+* Implement S3 gateway endpoint to provide get s3 secret and secret renewal
 
 This document proposes solutions to the above issues.
 
