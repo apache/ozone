@@ -27,6 +27,8 @@ import java.time.Duration;
 import java.time.Instant;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * RocksDB Checkpoint Manager, used to create and cleanup checkpoints.
@@ -35,6 +37,8 @@ public class RDBCheckpointManager implements Closeable {
   private final RocksDatabase db;
   private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RDBCheckpointManager.class);
   private final String checkpointNamePrefix;
 
   /**
@@ -85,7 +89,8 @@ public class RDBCheckpointManager implements Closeable {
       LOG.info("Created checkpoint in rocksDB at {} in {} milliseconds",
               checkpointPath, duration);
 
-      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpointPath.toFile());
+      RDBCheckpointUtils.waitForCheckpointDirectoryExist(
+          checkpointPath.toFile());
 
       return new RocksDBCheckpoint(
           checkpointPath,

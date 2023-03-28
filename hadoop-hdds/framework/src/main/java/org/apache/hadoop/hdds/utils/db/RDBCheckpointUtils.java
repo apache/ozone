@@ -29,6 +29,9 @@ import java.time.Instant;
 
 import static org.awaitility.Awaitility.with;
 
+/**
+ * RocksDB Checkpoint Utilities.
+ */
 public class RDBCheckpointUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointUtils.class);
@@ -36,9 +39,13 @@ public class RDBCheckpointUtils {
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
   private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
 
+  private RDBCheckpointUtils(){}
+
   /**
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
    * poll interval.
+   * @param file Checkpoint directory.
+   * @return true if found.
    */
   public static boolean waitForCheckpointDirectoryExist(File file)
       throws IOException {

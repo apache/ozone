@@ -35,7 +35,12 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
+/**
+ * Ozone Manager Snapshot Utilities.
+ */
 public class OmSnapshotUtils {
+
+  private OmSnapshotUtils(){}
   /**
    * Get the filename without the introductory metadata directory.
    *
@@ -47,6 +52,12 @@ public class OmSnapshotUtils {
     return file.toString().substring(truncateLength);
   }
 
+  /**
+   * Get the filename without the introductory metadata directory.
+   *
+   * @param file File whose INode is to be retrieved.
+   * @return INode for file.
+   */
   @VisibleForTesting
   public static Object getINode(Path file) throws IOException {
     return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
