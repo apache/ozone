@@ -1031,10 +1031,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.error("Unable to initialize secret key.", e);
         throw new UncheckedIOException(e);
       }
-      // A backdoor for integration-tests to inject a custom secretKeyClient.
-      // This allows testing token in integration test without fully setting
-      // up a working secure cluster.
-      blockTokenMgr.setSecretKeyClient(secretKeyClient);
     }
 
     if (delegationTokenMgr != null) {
@@ -1059,12 +1055,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * For testing purpose only.
+   * For testing purpose only. This allows testing token in integration test
+   * without fully setting up a working secure cluster.
    */
   @VisibleForTesting
   public void setSecretKeyClient(
       SecretKeySignerClient secretKeyClient) {
     this.secretKeyClient = secretKeyClient;
+    blockTokenMgr.setSecretKeyClient(secretKeyClient);
   }
 
   /**
