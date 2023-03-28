@@ -65,7 +65,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    * materials are changed.
    */
   private PrivateKey currentPrivateKey;
-  private List<String> currentCertList = new ArrayList<>();
+  private List<String> currentCertIdsList = new ArrayList<>();
 
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
@@ -153,10 +153,10 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     PrivateKey privateKey = caClient.getPrivateKey();
     List<X509Certificate> newCertList = caClient.getTrustChain();
     if (currentPrivateKey != null && currentPrivateKey.equals(privateKey) &&
-        currentCertList.size() > 0 &&
-        newCertList.size() == currentCertList.size() &&
+        currentCertIdsList.size() > 0 &&
+        newCertList.size() == currentCertIdsList.size() &&
         !newCertList.stream().filter(
-                c -> !currentCertList.contains(c.getSerialNumber().toString()))
+            c -> !currentCertIdsList.contains(c.getSerialNumber().toString()))
             .findAny().isPresent()) {
       // Security materials(key and certificates) keep the same.
       return null;
@@ -181,9 +181,9 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     }
 
     currentPrivateKey = privateKey;
-    currentCertList.clear();
+    currentCertIdsList.clear();
     for (X509Certificate cert: newCertList) {
-      currentCertList.add(cert.getSerialNumber().toString());
+      currentCertIdsList.add(cert.getSerialNumber().toString());
     }
     return keyManager;
   }
