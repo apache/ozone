@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +57,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.createHardLinkList;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.truncateFileName;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
@@ -218,7 +218,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void processFile(Path file, Map<Object, Path> copyFiles,
                            Map<Path, Path> hardLinkFiles) throws IOException {
     // Get the inode.
-    Object key = OmSnapshotManager.getINode(file);
+    Object key = OmSnapshotUtils.getINode(file);
     // If we already have the inode, store as hard link.
     if (copyFiles.containsKey(key)) {
       hardLinkFiles.put(file, copyFiles.get(key));

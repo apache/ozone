@@ -143,7 +143,7 @@ public class RDBStore implements DBStore {
         }
       }
 
-      //create snapshot directory if does not exist.
+      //create snapshot checkpoint directory if does not exist.
       snapshotsParentDir = Paths.get(dbLocation.getParent(),
           OM_SNAPSHOT_CHECKPOINT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
@@ -151,7 +151,7 @@ public class RDBStore implements DBStore {
         boolean success = snapshotsDir.mkdirs();
         if (!success) {
           throw new IOException(
-              "Unable to create RocksDB snapshot directory: " +
+              "Unable to create RocksDB snapshot checkpoint directory: " +
               snapshotsParentDir);
         }
       }

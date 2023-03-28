@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -63,14 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Map;
-import java.util.stream.Stream;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
@@ -374,12 +366,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // one by one.
   }
 
-  @VisibleForTesting
-  static Object getINode(Path file) throws IOException {
-    return Files.readAttributes(
-        file, BasicFileAttributes.class).fileKey();
-  }
-
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
   public IOmMetadataReader checkForSnapshot(String volumeName,
                                             String bucketName, String keyname)
@@ -495,96 +481,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
           " should be older than to toSnapshot:" + toSnapshot.getName());
     }
-  }
-
-  /**
-   * Create file of links to add to tarball.
-   * Format of entries are either:
-   * dir1/fileTo fileFrom
-   *    for files in active db or:
-   * dir1/fileTo dir2/fileFrom
-   *    for files in another directory, (either another snapshot dir or
-   *    sst compaction backup directory)
-   * @param truncateLength - Length of initial path to trim in file path.
-   * @param hardLinkFiles - Map of link->file paths.
-   * @return Path to the file of links created.
-   */
-  static Path createHardLinkList(int truncateLength,
-                                  Map<Path, Path> hardLinkFiles)
-      throws IOException {
-    Path data = Files.createTempFile("data", "txt");
-    StringBuilder sb = new StringBuilder();
-    for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
-      String fixedFile = truncateFileName(truncateLength, entry.getValue());
-      // If this file is from the active db, strip the path.
-      if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
-        Path f = Paths.get(fixedFile).getFileName();
-        if (f != null) {
-          fixedFile = f.toString();
-        }
-      }
-      sb.append(truncateFileName(truncateLength, entry.getKey()))
-          .append("\t")
-          .append(fixedFile)
-          .append("\n");
-    }
-    Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
-    return data;
-  }
-
-  /**
-   * Get the filename without the introductory metadata directory.
-   *
-   * @param truncateLength Length to remove.
-   * @param file File to remove prefix from.
-   * @return Truncated string.
-   */
-  static String truncateFileName(int truncateLength, Path file) {
-    return file.toString().substring(truncateLength);
-  }
-
-  /**
-   * Create hard links listed in OM_HARDLINK_FILE.
-   *
-   * @param dbPath Path to db to have links created.
-   */
-  static void createHardLinks(Path dbPath) throws IOException {
-    File hardLinkFile = new File(dbPath.toString(),
-        OM_HARDLINK_FILE);
-    if (hardLinkFile.exists()) {
-      // Read file.
-      try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
-        List<String> lines = s.collect(Collectors.toList());
-
-        // Create a link for each line.
-        for (String l : lines) {
-          String from = l.split("\t")[1];
-          String to = l.split("\t")[0];
-          Path fullFromPath = getFullPath(dbPath, from);
-          Path fullToPath = getFullPath(dbPath, to);
-          Files.createLink(fullToPath, fullFromPath);
-        }
-        if (!hardLinkFile.delete()) {
-          throw new IOException(
-              "Failed to delete: " + hardLinkFile);
-        }
-      }
-    }
-  }
-  // Prepend the full path to the hard link entry entry.
-  private static Path getFullPath(Path dbPath, String fileName)
-      throws IOException {
-    File file = new File(fileName);
-    // If there is no directory then this file belongs in the db.
-    if (file.getName().equals(fileName)) {
-      return Paths.get(dbPath.toString(), fileName);
-    }
-    // Else this file belong in a directory parallel to the db.
-    Path parent = dbPath.getParent();
-    if (parent == null) {
-      throw new IOException("Invalid database " + dbPath);
-    }
-    return Paths.get(parent.toString(), fileName);
   }
 
   private int getIndexFromToken(final String token) throws IOException {

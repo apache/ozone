@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
@@ -285,15 +286,15 @@ public class TestOMRatisSnapshots {
           }
           // If it is a hard link on the leader, it should be a hard
           // link on the follower
-          if (OmSnapshotManager.getINode(leaderActiveSST)
-              .equals(OmSnapshotManager.getINode(leaderSnapshotSST))) {
+          if (OmSnapshotUtils.getINode(leaderActiveSST)
+              .equals(OmSnapshotUtils.getINode(leaderSnapshotSST))) {
             Path followerSnapshotSST =
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
             Assertions.assertEquals(
-                OmSnapshotManager.getINode(followerActiveSST),
-                OmSnapshotManager.getINode(followerSnapshotSST),
+                OmSnapshotUtils.getINode(followerActiveSST),
+                OmSnapshotUtils.getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
             hardLinkCount++;
           }

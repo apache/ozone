@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -48,7 +49,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getINode;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -160,12 +161,12 @@ public class TestOmSnapshotManager {
 
     // Create link list.
     Path hardLinkList =
-        OmSnapshotManager.createHardLinkList(
+        OmSnapshotUtils.createHardLinkList(
             testDir.toString().length() + 1, hardLinkFiles);
     Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
 
     // Create links from list.
-    OmSnapshotManager.createHardLinks(dbDir.toPath());
+    OmSnapshotUtils.createHardLinks(dbDir.toPath());
 
     // Confirm expected links.
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
