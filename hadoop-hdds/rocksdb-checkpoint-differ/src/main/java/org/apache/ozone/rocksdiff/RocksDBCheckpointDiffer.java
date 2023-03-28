@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -664,7 +666,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return a list of SST files (without extension) in the DB.
    */
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
-    RocksDB rocksDB = null;
+    ManagedRocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
 
     final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
@@ -672,15 +674,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         getCFDescriptorList(cfOpts);
     final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
-    try (DBOptions dbOptions = new DBOptions()
-        .setParanoidChecks(true)) {
-
-      rocksDB = RocksDB.openReadOnly(dbOptions, dbPathArg,
+    try (ManagedDBOptions managedDBOptions = new ManagedDBOptions()) {
+      managedDBOptions.setParanoidChecks(true);
+      rocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
           cfDescriptors, columnFamilyHandles);
       // Note it retrieves only the selected column families by the descriptor
       // i.e. keyTable, directoryTable, fileTable
       List<LiveFileMetaData> liveFileMetaDataList =
-          rocksDB.getLiveFilesMetaData();
+          rocksDB.get().getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
       for (LiveFileMetaData m : liveFileMetaDataList) {
         LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
