@@ -25,7 +25,7 @@ x-common-config:
 
 x-environment:
   &environment
-  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
+  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-3}
   OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
   OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
 
@@ -39,27 +39,50 @@ x-datanode:
     - 9864
     - 9882
 
+x-om:
+  &om
+  command: ["ozone","om","${OM_HA_ARGS}"]
+  <<: *common-config
+  environment:
+    ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+    <<: *environment
+  ports:
+    - 9862
+    - 9872
+
 x-volumes:
-    - &ozone-dir ${TEST_DIR}/../..:${OZONE_DIR}
-    - &transformation ${TEST_DIR}/../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
+    - &ozone-dir ../../../..:${OZONE_DIR}
+    - &transformation ../../../../libexec/transformation.py:/opt/hadoop/libexec/transformation.py
 
 services:
-  om:
-    command: ["ozone","om"]
-    <<: *common-config
-    environment:
-      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *environment
-    ports:
-      - 9862
-      - 9874
+  om1:
+    <<: *om
     networks:
       net:
         ipv4_address: 10.9.0.11
     volumes:
-      - ${OZONE_VOLUME}/om:/data
+      - ${OZONE_VOLUME}/om1:/data
       - *ozone-dir
       - *transformation
+  om2:
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.12
+    volumes:
+      - ${OZONE_VOLUME}/om2:/data
+      - *ozone-dir
+      - *transformation
+  om3:
+    <<: *om
+    networks:
+      net:
+        ipv4_address: 10.9.0.13
+    volumes:
+      - ${OZONE_VOLUME}/om3:/data
+      - *ozone-dir
+      - *transformation
+
   scm:
     command: ["ozone","scm"]
     <<: *common-config
@@ -69,7 +92,7 @@ services:
       <<: *environment
     networks:
       net:
-        ipv4_address: 10.9.0.12
+        ipv4_address: 10.9.0.14
     ports:
       - 9876:9876
     volumes:
@@ -80,7 +103,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.13
+        ipv4_address: 10.9.0.15
     volumes:
       - ${OZONE_VOLUME}/dn1:/data
       - *ozone-dir
@@ -89,7 +112,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.14
+        ipv4_address: 10.9.0.16
     volumes:
       - ${OZONE_VOLUME}/dn2:/data
       - *ozone-dir
@@ -98,7 +121,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.15
+        ipv4_address: 10.9.0.17
     volumes:
       - ${OZONE_VOLUME}/dn3:/data
       - *ozone-dir
@@ -107,7 +130,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.16
+        ipv4_address: 10.9.0.18
     volumes:
       - ${OZONE_VOLUME}/dn4:/data
       - *ozone-dir
@@ -116,7 +139,7 @@ services:
     <<: *datanode
     networks:
       net:
-        ipv4_address: 10.9.0.17
+        ipv4_address: 10.9.0.19
     volumes:
       - ${OZONE_VOLUME}/dn5:/data
       - *ozone-dir
@@ -128,7 +151,7 @@ services:
       <<: *environment
     networks:
       net:
-        ipv4_address: 10.9.0.18
+        ipv4_address: 10.9.0.20
     ports:
       - 9888:9888
     volumes:
@@ -142,7 +165,7 @@ services:
       <<: *environment
     networks:
       net:
-        ipv4_address: 10.9.0.19
+        ipv4_address: 10.9.0.21
     ports:
       - 9878:9878
     volumes:

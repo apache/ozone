@@ -17,11 +17,6 @@
 
 set -e -o pipefail
 
-# Fail if required variables are not set.
-set -u
-: "${OZONE_CURRENT_VERSION}"
-set +u
-
 _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Cumulative result of all tests run with run_test function.
@@ -29,7 +24,6 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_VOLUME_OWNER:=}"
-: "${OZONE_CURRENT_VERSION:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
 # export for docker-compose
@@ -53,7 +47,8 @@ create_data_dirs() {
 
 ## @description Prepares to run an image with `start_docker_env`.
 ## @param the version of Ozone to be run.
-##   If this is equal to `OZONE_CURRENT_VERSION`, then the ozone runner image wil be used.
+##   If this is equal to the string 'current', then the ozone runner image will
+#    be used.
 ##   Else, a binary image will be used.
 prepare_for_image() {
   local image_version="$1"
@@ -65,96 +60,70 @@ prepare_for_image() {
   fi
 }
 
-## @description Runs a callback function only if it exists.
+## @description Run the common callback function first, then the one specific to
+##   the upgrade being tested if one exists. If neither exists, print a
+##   warning that nothing was tested.
 ## @param The name of the function to run.
 callback() {
   local func="$1"
-  if [[ "$(type -t "$func")" = function ]]; then
-    "$func"
-  else
-    echo "Skipping callback $func. No function implementation found."
-  fi
+
+  set -u
+  : "${OZONE_UPGRADE_CALLBACK}"
+  : "${OZONE_COMMON_CALLBACK}"
+  set +u
+
+  (
+    # Common callback always exists.
+    source "$OZONE_COMMON_CALLBACK"
+    if [[ "$(type -t "$func")" = function ]]; then
+      "$func"
+    fi
+  )
+
+  (
+    # Version specific callback is optional.
+    if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
+      source "$OZONE_UPGRADE_CALLBACK"
+      if [[ "$(type -t "$func")" = function ]]; then
+        "$func"
+      fi
+    fi
+  )
 }
 
-## @description Sets up and runs the test defined by "$1"/test.sh.
-## @param The directory for the upgrade type whose test.sh file will be run.
+## @description Sets up and runs the upgrade test using the provided ozone
+#     versions and docker compose cluster.
+## @param The directory with a load.sh file that can be sourced to load the
+#     docker compose cluster to run the test in.
+## @param The directory of the upgrade type to run.
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
+  local compose_cluster="$1"
+  local upgrade_type="$2"
+  export OZONE_UPGRADE_FROM="$3"
+  export OZONE_UPGRADE_TO="$4"
+
+  local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
+  local callback_dir="$test_dir"/callbacks
+  local execution_dir="$test_dir"/execution/"${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
+  local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
   # Export variables needed by test, since it is run in a subshell.
-  local test_dir="$_upgrade_dir/upgrades/$1"
-  export OZONE_UPGRADE_FROM="$2"
-  export OZONE_UPGRADE_TO="$3"
-  local test_subdir="$test_dir"/"$OZONE_UPGRADE_FROM"-"$OZONE_UPGRADE_TO"
-  export OZONE_UPGRADE_CALLBACK="$test_subdir"/callback.sh
-  export OZONE_VOLUME="$test_subdir"/data
-  export RESULT_DIR="$test_subdir"/result
+  export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh
+  export OZONE_COMMON_CALLBACK="$callback_dir"/common/callback.sh
+  export OZONE_VOLUME="$execution_dir"/data
+  export RESULT_DIR="$execution_dir"/result
+
+  # Load docker compose setup.
+  source "$compose_dir"/load.sh
+
+  # The container to run test commands from. Use one of the SCM containers,
+  # but SCM HA may or may not be used.
+  export SCM="$(docker compose --project-directory="$compose_dir" config --services | grep --max-count=1 scm)"
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1
   fi
 
-  copy_results "$test_subdir" "$ALL_RESULT_DIR"
-}
-
-## @description Generates data on the cluster.
-## @param The prefix to use for data generated.
-## @param All parameters after the first one are passed directly to the robot command,
-##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
-generate() {
-    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/generate.robot
-}
-
-## @description Validates that data exists on the cluster.
-## @param The prefix of the data to be validated.
-## @param All parameters after the first one are passed directly to the robot command,
-##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
-validate() {
-    execute_robot_test scm -v PREFIX:"$1" ${@:2} upgrade/validate.robot
-}
-
-## @description Checks that the metadata layout version of the provided node matches what is expected.
-## @param The name of the docker-compose service to run the check on.
-## @param The path to the VERSION file in the container.
-## @param The metadata layout version expected for that service.
-check_mlv() {
-    service="$1"
-    container_id="$(docker container ps --quiet --filter "name=$service")"
-
-    # If some containers go down during the test run due to resources issues,
-    # just print a message instead of failing the test.
-    if  [[ -n "$container_id" ]]; then
-      execute_robot_test "$service" -v VERSION_FILE:"$2" -v VERSION:"$3" upgrade/check-mlv.robot
-    else
-      echo "No matching containers for docker-compose service $service found. Skipping MLV check."
-    fi
-}
-
-## @description Checks that the metadata layout version of a datanode matches what is expected.
-## @param The name of the docker-compose service to run the check on.
-## @param The metadata layout version expected for that service.
-check_dn_mlv() {
-  check_mlv "$1" /data/metadata/dnlayoutversion/VERSION "$2"
-}
-
-## @description Checks that the metadata layout version of an OM matches what is expected.
-## @param The name of the docker-compose service to run the check on.
-## @param The metadata layout version expected for that service.
-check_om_mlv() {
-  check_mlv "$1" /data/metadata/om/current/VERSION "$2"
-}
-
-## @description Checks that the metadata layout version of an SCM matches what is expected.
-## @param The name of the docker-compose service to run the check on.
-## @param The metadata layout version expected for that service.
-check_scm_mlv() {
-  check_mlv "$1" /data/metadata/scm/current/VERSION "$2"
-}
-
-check_ec_is_disabled() {
-  execute_robot_test scm --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
-}
-
-check_ec_is_enabled() {
-  execute_robot_test scm --include post-finalized-ec-tests ec/upgrade-ec-check.robot
+  copy_results "$execution_dir" "$ALL_RESULT_DIR"
 }
