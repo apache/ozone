@@ -32,14 +32,14 @@ import static org.awaitility.Awaitility.with;
 /**
  * RocksDB Checkpoint Utilities.
  */
-public class RDBCheckpointUtils {
+public final class RDBCheckpointUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointUtils.class);
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
   private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
 
-  private RDBCheckpointUtils(){}
+  private RDBCheckpointUtils() { }
 
   /**
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
