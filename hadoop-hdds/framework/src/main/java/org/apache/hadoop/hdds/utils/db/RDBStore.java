@@ -213,6 +213,7 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     checkPointManager.close();
+    rocksDBCheckpointDiffer.close();
     db.close();
   }
 
