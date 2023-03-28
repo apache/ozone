@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 public final class OmSnapshotUtils {
 
   private OmSnapshotUtils() { }
+
   /**
    * Get the filename without the introductory metadata directory.
    *
@@ -53,7 +54,7 @@ public final class OmSnapshotUtils {
   }
 
   /**
-   * Get the filename without the introductory metadata directory.
+   * Get the INode for file
    *
    * @param file File whose INode is to be retrieved.
    * @return INode for file.
