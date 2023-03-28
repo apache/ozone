@@ -377,12 +377,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     String volumeKey = reconOMMetadataManager.getVolumeKey("sampleVol2");
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
-            .setVolume("sampleVol2").setAdminName("TestUser")
-            .setOwnerName("TestUser").build();
+            .setVolume("sampleVol2")
+            .setAdminName("TestUser")
+            .setOwnerName("TestUser")
+            .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName("sampleVol2").setBucketName("bucketOne").build();
+        .setVolumeName("sampleVol2")
+        .setBucketName("bucketOne")
+        .build();
 
     String bucketKey = reconOMMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
