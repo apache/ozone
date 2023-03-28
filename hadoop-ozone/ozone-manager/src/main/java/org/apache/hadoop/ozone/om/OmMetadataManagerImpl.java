@@ -42,9 +42,9 @@ import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -378,7 +378,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // it is most likely DB entries will get flushed in this wait time.
     if (isSnapshotInCache) {
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
-      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
     }
     setStore(loadDB(conf, metaDir, dbName, true,
             java.util.Optional.of(Boolean.TRUE)));

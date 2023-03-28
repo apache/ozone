@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -626,7 +626,7 @@ public class TestOMRatisSnapshots {
     String fileName =
         getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
     File snapshotDir = new File(fileName);
-    if (!RDBCheckpointManager
+    if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
     }

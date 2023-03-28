@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -479,7 +479,7 @@ public class TestOzoneManagerSnapshotAcl {
     String fileName =
         getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
     File snapshotDir = new File(fileName);
-    if (!RDBCheckpointManager
+    if (!RDBCheckpointUtils
         .waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
     }
