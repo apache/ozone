@@ -28,9 +28,16 @@ import java.io.IOException;
 public interface SecretKeySignerClient {
   ManagedSecretKey getCurrentSecretKey();
 
+  /**
+   * This is where the actual implementation can  prefetch the current
+   * secret key or initialize ay necessary resources, e.g. cache or executors.
+   */
   default void start(ConfigurationSource conf) throws IOException {
   }
 
+  /**
+   * Give a chance for the implementation to clean up acquired resources.
+   */
   default void stop() {
   }
 }
