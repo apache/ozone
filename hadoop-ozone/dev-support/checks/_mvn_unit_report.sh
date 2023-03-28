@@ -32,6 +32,11 @@ find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
     | awk -F/ '{sub("'"TEST-"'",""); sub(".xml",""); print $NF}' \
     | tee "$REPORT_DIR/summary.txt"
 
+find "." -not -path '*/iteration*' -name '*-output.txt' -print0 \
+    | xargs -n1 -0 "grep" -l -E "not closed properly" \
+    | awk -F/ '{sub("-output.txt",""); print $NF}' \
+    | tee "$REPORT_DIR/summary.txt"
+
 #Copy heap dump and dump leftovers
 find "." -not -path '*/iteration*' \
     \( -name "*.hprof" \
