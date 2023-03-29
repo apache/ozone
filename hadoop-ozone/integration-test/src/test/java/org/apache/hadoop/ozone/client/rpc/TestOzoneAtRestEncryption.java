@@ -47,17 +47,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.MultipartCryptoKeyInputStream;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -496,45 +496,48 @@ public class TestOzoneAtRestEncryption {
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
     // Create an input stream to read the data
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    Assert.assertTrue(inputStream instanceof MultipartCryptoKeyInputStream);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
-    // Test complete read
-    byte[] completeRead = new byte[keySize];
-    int bytesRead = inputStream.read(completeRead, 0, keySize);
-    Assert.assertEquals(bytesRead, keySize);
-    Assert.assertArrayEquals(inputData, completeRead);
+      Assert.assertTrue(inputStream.getInputStream()
+          instanceof MultipartInputStream);
 
-    // Read different data lengths and starting from different offsets and
-    // verify the data matches.
-    Random random = new Random();
-    int randomSize = random.nextInt(keySize / 2);
-    int randomOffset = random.nextInt(keySize - randomSize);
+      // Test complete read
+      byte[] completeRead = new byte[keySize];
+      int bytesRead = inputStream.read(completeRead, 0, keySize);
+      Assert.assertEquals(bytesRead, keySize);
+      Assert.assertArrayEquals(inputData, completeRead);
 
-    int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
-        BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
-        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
-        randomSize};
+      // Read different data lengths and starting from different offsets and
+      // verify the data matches.
+      Random random = new Random();
+      int randomSize = random.nextInt(keySize / 2);
+      int randomOffset = random.nextInt(keySize - randomSize);
 
-    int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
-        BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
-        keySize - 1, randomOffset};
+      int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
+          BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
+          DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
+          randomSize};
 
-    for (int readDataLen : readDataSizes) {
-      for (int readFromPosition : readFromPositions) {
-        // Check that offset + buffer size does not exceed the key size
-        if (readFromPosition + readDataLen > keySize) {
-          continue;
+      int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
+          BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
+          keySize - 1, randomOffset};
+
+      for (int readDataLen : readDataSizes) {
+        for (int readFromPosition : readFromPositions) {
+          // Check that offset + buffer size does not exceed the key size
+          if (readFromPosition + readDataLen > keySize) {
+            continue;
+          }
+
+          byte[] readData = new byte[readDataLen];
+          inputStream.seek(readFromPosition);
+          int actualReadLen = inputStream.read(readData, 0, readDataLen);
+
+          assertReadContent(inputData, readData, readFromPosition);
+          Assert.assertEquals(readFromPosition + readDataLen,
+              inputStream.getPos());
+          Assert.assertEquals(readDataLen, actualReadLen);
         }
-
-        byte[] readData = new byte[readDataLen];
-        inputStream.seek(readFromPosition);
-        int actualReadLen = inputStream.read(readData, 0, readDataLen);
-
-        assertReadContent(inputData, readData, readFromPosition);
-        Assert.assertEquals(readFromPosition + readDataLen,
-            inputStream.getPos());
-        Assert.assertEquals(readDataLen, actualReadLen);
       }
     }
   }

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -40,10 +39,12 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
@@ -150,9 +151,11 @@ public class TestOzoneFileSystem {
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
+  private static OzoneBucket ozoneBucket;
   private static String volumeName;
   private static String bucketName;
   private static Trash trash;
@@ -176,13 +179,13 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    volumeName = ozoneBucket.getVolumeName();
+    bucketName = ozoneBucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
             OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
@@ -199,6 +202,7 @@ public class TestOzoneFileSystem {
 
   @AfterClass
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -332,6 +336,30 @@ public class TestOzoneFileSystem {
     Path subdir = new Path("/d1/d2/");
     boolean status = fs.mkdirs(subdir);
     assertTrue("Shouldn't send error if dir exists", status);
+  }
+
+  @Test
+  public void testMakeDirsWithAnFakeDirectory() throws Exception {
+    /*
+     * Op 1. commit a key -> "dir1/dir2/key1"
+     * Op 2. create dir -> "dir1/testDir", the dir1 is a fake dir,
+     *  "dir1/testDir" can be created normal
+     */
+
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
+    String fullKeyName = fakeParentKey + "/key1";
+    TestDataUtil.createKey(ozoneBucket, fullKeyName, "");
+
+    // /dir1/dir2 should not exist
+    assertFalse(fs.exists(new Path(fakeParentKey)));
+
+    // /dir1/dir2/key2 should be created because has a fake parent directory
+    Path subdir = new Path(fakeParentKey, "key2");
+    assertTrue(fs.mkdirs(subdir));
+    // the intermediate directories /dir1 and /dir1/dir2 will be created too
+    assertTrue(fs.exists(new Path(fakeGrandpaKey)));
+    assertTrue(fs.exists(new Path(fakeParentKey)));
   }
 
   @Test
@@ -727,6 +755,37 @@ public class TestOzoneFileSystem {
     }
   }
 
+  @Test
+  public void testListStatusOnKeyNameContainDelimiter() throws Exception {
+    /*
+    * op1: create a key -> "dir1/dir2/key1"
+    * op2: `ls /` child dir "/dir1/" will be return
+    * op2: `ls /dir1` child dir "/dir1/dir2/" will be return
+    * op3: `ls /dir1/dir2` file "/dir1/dir2/key" will be return
+    *
+    * the "/dir1", "/dir1/dir2/" are fake directory
+    * */
+    String keyName = "dir1/dir2/key1";
+    TestDataUtil.createKey(ozoneBucket, keyName, "");
+    FileStatus[] fileStatuses;
+
+    fileStatuses = fs.listStatus(new Path("/"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2", fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+
+    fileStatuses = fs.listStatus(new Path("/dir1/dir2"));
+    assertEquals(1, fileStatuses.length);
+    assertEquals("/dir1/dir2/key1",
+        fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isFile());
+  }
+
   /**
    * Cleanup files and directories.
    *
@@ -1005,10 +1064,10 @@ public class TestOzoneFileSystem {
     Path fileNotExists = new Path("/file_notexist");
     try {
       fs.open(fileNotExists);
-      Assert.fail("Should throw FILE_NOT_FOUND error as file doesn't exist!");
+      Assert.fail("Should throw FileNotFoundException as file doesn't exist!");
     } catch (FileNotFoundException fnfe) {
-      Assert.assertTrue("Expected FILE_NOT_FOUND error",
-              fnfe.getMessage().contains("FILE_NOT_FOUND"));
+      Assert.assertTrue("Expected KEY_NOT_FOUND error",
+              fnfe.getMessage().contains("KEY_NOT_FOUND"));
     }
   }
 
@@ -1273,6 +1332,24 @@ public class TestOzoneFileSystem {
             "file1")));
   }
 
+  @Test
+  public void testRenameContainDelimiterFile() throws Exception {
+    String fakeGrandpaKey = "dir1";
+    String fakeParentKey = fakeGrandpaKey + "/dir2";
+    String sourceKeyName = fakeParentKey + "/key1";
+    String targetKeyName = fakeParentKey +  "/key2";
+    TestDataUtil.createKey(ozoneBucket, sourceKeyName, "");
+
+    Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
+    Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
+    assertTrue(fs.rename(sourcePath, targetPath));
+    assertFalse(fs.exists(sourcePath));
+    assertTrue(fs.exists(targetPath));
+    // intermediate directories will not be created
+    assertFalse(fs.exists(new Path(fakeGrandpaKey)));
+    assertFalse(fs.exists(new Path(fakeParentKey)));
+  }
+
 
   /**
    * Fails if the (a) parent of dst does not exist or (b) parent is a file.
@@ -1370,7 +1447,7 @@ public class TestOzoneFileSystem {
     if (isDirectory) {
       key = key + "/";
     }
-    return cluster.getClient().getObjectStore().getVolume(volumeName)
+    return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(key);
   }
 
@@ -1438,7 +1515,7 @@ public class TestOzoneFileSystem {
   public void testCreateKeyShouldUseRefreshedBucketReplicationConfig()
       throws IOException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     final TestClock testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String

@@ -125,6 +125,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
                 ValidationContext.of(ozoneManager.getVersionManager(),
                     ozoneManager.getMetadataManager()))
             .load();
+
   }
 
   /**
@@ -143,67 +144,63 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throw new ServiceException(e);
     }
 
-    OMResponse response = 
-        dispatcher.processRequest(validatedRequest, this::processRequest,
-        request.getCmdType(), request.getTraceID());
-    
+    OMResponse response = dispatcher.processRequest(validatedRequest,
+        this::processRequest,
+        request.getCmdType(),
+        request.getTraceID());
+
     return requestValidations.validateResponse(request, response);
   }
 
-  private OMResponse processRequest(OMRequest request) throws
-      ServiceException {
+  private OMResponse processRequest(OMRequest request) throws ServiceException {
     OMClientRequest omClientRequest = null;
-
     boolean s3Auth = false;
+
     try {
       if (request.hasS3Authentication()) {
         OzoneManager.setS3Auth(request.getS3Authentication());
         try {
           s3Auth = true;
-          // If Request has S3Authentication validate S3 credentials
-          // if current OM is leader and then proceed with
-          // processing the request.
+          // If request has S3Authentication, validate S3 credentials.
+          // If current OM is leader and then proceed with the request.
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
         } catch (IOException ex) {
-          // If validate credentials fail return error OM Response.
           return createErrorResponse(request, ex);
         }
       }
-      if (isRatisEnabled) {
-        // Check if the request is a read only request
-        if (OmUtils.isReadOnly(request)) {
-          return submitReadRequestToOM(request);
-        } else {
-          // To validate credentials we have already verified leader status.
-          // This will skip of checking leader status again if request has
-          // S3Auth.
-          if (!s3Auth) {
-            OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
-          }
-          try {
-            omClientRequest =
-                createClientRequest(request, ozoneManager);
-            // TODO: Note: Due to HDDS-6055, createClientRequest() could now
-            //  return null, which triggered the findbugs warning.
-            //  Added the assertion.
-            assert (omClientRequest != null);
-            request = omClientRequest.preExecute(ozoneManager);
-          } catch (IOException ex) {
-            // As some of the preExecute returns error. So handle here.
-            if (omClientRequest != null) {
-              omClientRequest.handleRequestFailure(ozoneManager);
-            }
-            return createErrorResponse(request, ex);
-          }
-          OMResponse response = submitRequestToRatis(request);
-          if (!response.getSuccess()) {
-            omClientRequest.handleRequestFailure(ozoneManager);
-          }
-          return response;
-        }
-      } else {
+
+      if (!isRatisEnabled) {
         return submitRequestDirectlyToOM(request);
       }
+
+      if (OmUtils.isReadOnly(request)) {
+        return submitReadRequestToOM(request);
+      }
+
+      // To validate credentials we have already verified leader status.
+      // This will skip of checking leader status again if request has S3Auth.
+      if (!s3Auth) {
+        OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+      }
+      try {
+        omClientRequest = createClientRequest(request, ozoneManager);
+        // TODO: Note: Due to HDDS-6055, createClientRequest() could now
+        //  return null, which triggered the findbugs warning.
+        //  Added the assertion.
+        assert (omClientRequest != null);
+        request = omClientRequest.preExecute(ozoneManager);
+      } catch (IOException ex) {
+        if (omClientRequest != null) {
+          omClientRequest.handleRequestFailure(ozoneManager);
+        }
+        return createErrorResponse(request, ex);
+      }
+
+      OMResponse response = submitRequestToRatis(request);
+      if (!response.getSuccess()) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      }
+      return response;
     } finally {
       OzoneManager.setS3Auth(null);
     }
@@ -240,12 +237,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   private ServiceException createNotLeaderException() {
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-
-    // TODO: Set suggest leaderID. Right now, client is not using suggest
-    // leaderID. Need to fix this.
+    RaftPeerId raftLeaderId = omRatisServer.getRaftLeaderId();
+    String raftLeaderAddress = omRatisServer.getRaftLeaderAddress();
 
     OMNotLeaderException notLeaderException =
-        new OMNotLeaderException(raftPeerId);
+        raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
+            new OMNotLeaderException(raftPeerId, raftLeaderId,
+                raftLeaderAddress);
 
     LOG.debug(notLeaderException.getMessage());
 
@@ -267,10 +265,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request) throws
-      ServiceException {
-    OMClientResponse omClientResponse = null;
-    long index = 0L;
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
+    OMClientResponse omClientResponse;
     try {
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
@@ -278,11 +274,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         OMClientRequest omClientRequest =
             createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
-        index = transactionIndex.incrementAndGet();
+        long index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
       }
     } catch (IOException ex) {
-      // As some of the preExecute returns error. So handle here.
+      // As some preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
     try {

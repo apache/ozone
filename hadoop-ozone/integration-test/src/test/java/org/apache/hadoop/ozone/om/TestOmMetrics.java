@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -48,6 +49,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -65,6 +67,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
@@ -88,6 +91,7 @@ public class TestOmMetrics {
    */
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
+  private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -104,7 +108,8 @@ public class TestOmMetrics {
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
   }
 
@@ -113,6 +118,7 @@ public class TestOmMetrics {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -280,7 +286,7 @@ public class TestOmMetrics {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
@@ -316,8 +322,20 @@ public class TestOmMetrics {
     writeClient.commitKey(keyArgs, keySession.getId());
     writeClient.deleteKey(keyArgs);
 
+    keyArgs = createKeyArgs(volumeName, bucketName,
+        new ECReplicationConfig("rs-6-4-1024K"));
+    try {
+      keySession = writeClient.openKey(keyArgs);
+      writeClient.commitKey(keyArgs, keySession.getId());
+    } catch (Exception e) {
+      //Expected Failure in preExecute due to not enough datanode
+      Assertions.assertTrue(e.getMessage()
+          .contains("No enough datanodes to choose"));
+    }
+
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
+    assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
@@ -325,8 +343,12 @@ public class TestOmMetrics {
         any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
+    OmMetadataReader omMetadataReader = ozoneManager.getOmMetadataReader();
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
+
+    HddsWhiteboxTestUtils.setInternalState(
+        omMetadataReader, "keyManager", mockKm);
 
     // inject exception to test for Failure Metrics on the write path
     mockWritePathExceptions(OmBucketInfo.class);
@@ -367,6 +389,67 @@ public class TestOmMetrics {
 
   }
 
+  @Test
+  public void testSnapshotOps() throws Exception {
+    // This tests needs enough datanodes to allocate the
+    // blocks for the keys.
+    clusterBuilder.setNumDatanodes(3);
+    startCluster();
+
+    OmBucketInfo omBucketInfo = createBucketInfo(false);
+
+    String volumeName = omBucketInfo.getVolumeName();
+    String bucketName = omBucketInfo.getBucketName();
+    String snapshot1 = "snap1";
+    String snapshot2 = "snap2";
+
+    writeClient.createBucket(omBucketInfo);
+
+    // Create first key
+    OmKeyArgs keyArgs1 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession = writeClient.openKey(keyArgs1);
+    writeClient.commitKey(keyArgs1, keySession.getId());
+
+    // Create first snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot1);
+
+    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+
+    assertCounter("NumSnapshotCreateFails", 0L, omMetrics);
+    assertCounter("NumSnapshotCreates", 1L, omMetrics);
+    assertCounter("NumSnapshotListFails", 0L, omMetrics);
+    assertCounter("NumSnapshotLists", 0L, omMetrics);
+
+    assertCounter("NumSnapshotActive", 1L, omMetrics);
+    assertCounter("NumSnapshotDeleted", 0L, omMetrics);
+    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
+
+    // Create second key
+    OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    OpenKeySession keySession2 = writeClient.openKey(keyArgs2);
+    writeClient.commitKey(keyArgs2, keySession2.getId());
+
+    // Create second snapshot
+    writeClient.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // List snapshots
+    writeClient.listSnapshot(volumeName, bucketName);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
+    assertCounter("NumSnapshotCreates", 2L, omMetrics);
+    assertCounter("NumSnapshotLists", 1L, omMetrics);
+
+    // restart OM
+    cluster.restartOzoneManager();
+
+    // Check number of active snapshots in the snapshot table
+    // is the same after OM restart
+    assertCounter("NumSnapshotActive", 2L, omMetrics);
+  }
+
   private <T> void mockWritePathExceptions(Class<T>klass) throws Exception {
     String tableName;
     if (klass == OmBucketInfo.class) {
@@ -396,7 +479,7 @@ public class TestOmMetrics {
     startCluster();
     try {
       // Create a volume.
-      cluster.getClient().getObjectStore().createVolume("volumeacl");
+      client.getObjectStore().createVolume("volumeacl");
 
       OzoneObj volObj = new OzoneObjInfo.Builder().setVolumeName("volumeacl")
           .setResType(VOLUME).setStoreType(OZONE).build();
@@ -424,7 +507,7 @@ public class TestOmMetrics {
       assertCounter("NumRemoveAcl", 1L, omMetrics);
 
     } finally {
-      cluster.getClient().getObjectStore().deleteVolume("volumeacl");
+      client.getObjectStore().deleteVolume("volumeacl");
     }
   }
 
@@ -435,7 +518,7 @@ public class TestOmMetrics {
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     startCluster();
 
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     // Create a volume.
     objectStore.createVolume("volumeacl");
     // Create a bucket.

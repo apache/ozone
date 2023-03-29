@@ -60,7 +60,8 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  reconOMMetadataManager,
                                  OzoneConfiguration
                                  ozoneConfiguration) {
-    super(reconNamespaceSummaryManager, reconOMMetadataManager);
+    super(reconNamespaceSummaryManager,
+        reconOMMetadataManager, ozoneConfiguration);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -86,10 +87,16 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       String updatedKey = omdbUpdateEvent.getKey();
 
       try {
-        OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-            (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
-        OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
-        OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
+        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        Object value = keyTableUpdateEvent.getValue();
+        Object oldValue = keyTableUpdateEvent.getOldValue();
+        if (!(value instanceof OmKeyInfo)) {
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+              value.getClass().getName(), updatedKey);
+          continue;
+        }
+        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
 
         // KeyTable entries belong to both Legacy and OBS buckets.
         // Check bucket layout and if it's OBS
@@ -185,12 +192,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             ioEx);
         return false;
       }
+      if (!checkAndCallFlushToDB(nsSummaryMap)) {
+        return false;
+      }
     }
 
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
 
@@ -241,6 +249,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           } else {
             handlePutKeyEvent(keyInfo, nsSummaryMap);
           }
+          if (!checkAndCallFlushToDB(nsSummaryMap)) {
+            return false;
+          }
         }
       }
     } catch (IOException ioEx) {
@@ -249,10 +260,8 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       return false;
     }
 
-    try {
-      writeNSSummariesToDB(nsSummaryMap);
-    } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
       return false;
     }
     LOG.info("Completed a reprocess run of NSSummaryTaskWithLegacy");

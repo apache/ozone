@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Project</description>
   <name>Apache Ozone HDDS</name>
   <packaging>pom</packaging>
@@ -40,6 +40,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>client</module>
     <module>common</module>
     <module>framework</module>
+    <module>managed-rocksdb</module>
+    <module>rocksdb-checkpoint-differ</module>
     <module>container-service</module>
     <module>server-scm</module>
     <module>tools</module>
@@ -47,6 +49,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>config</module>
     <module>test-utils</module>
     <module>erasurecode</module>
+    <module>rocks-native</module>
   </modules>
 
   <repositories>
@@ -68,6 +71,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-common</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-managed-rocksdb</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
@@ -131,6 +140,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hdds-server-framework</artifactId>
         <version>${hdds.version}</version>
       </dependency>
+
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>rocksdb-checkpoint-differ</artifactId>
+      <version>${hdds.version}</version>
+    </dependency>
 
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -233,6 +248,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocks-native</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

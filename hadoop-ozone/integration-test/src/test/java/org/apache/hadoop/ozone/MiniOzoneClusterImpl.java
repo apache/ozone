@@ -28,8 +28,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -59,6 +61,7 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -86,10 +89,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
@@ -124,6 +129,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
+  private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -315,12 +321,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
-  public OzoneClient getClient() throws IOException {
-    return OzoneClientFactory.getRpcClient(conf);
+  public OzoneClient newClient() throws IOException {
+    OzoneClient client = createClient();
+    clients.add(client);
+    return client;
   }
 
-  @Override
-  public OzoneClient getRpcClient() throws IOException {
+  protected OzoneClient createClient() throws IOException {
     return OzoneClientFactory.getRpcClient(conf);
   }
 
@@ -446,6 +453,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
+      IOUtils.closeQuietly(clients.toArray(new AutoCloseable[0]));
       File baseDir = new File(GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" +
               getClusterId()));
@@ -653,6 +661,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (!streamBufferMaxSize.isPresent()) {
         streamBufferMaxSize = Optional.of(2 * streamBufferFlushSize.get());
       }
+      if (!dataStreamBufferFlushSize.isPresent()) {
+        dataStreamBufferFlushSize = Optional.of((long) 4 * chunkSize.get());
+      }
+      if (!dataStreamMinPacketSize.isPresent()) {
+        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get() / 4);
+      }
+      if (!datastreamWindowSize.isPresent()) {
+        datastreamWindowSize = Optional.of((long) 8 * chunkSize.get());
+      }
       if (!blockSize.isPresent()) {
         blockSize = Optional.of(2 * streamBufferMaxSize.get());
       }
@@ -669,6 +686,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
       clientConfig.setStreamBufferFlushSize(Math.round(
           streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
+      clientConfig.setDataStreamBufferFlushSize(Math.round(
+          streamBufferSizeUnit.get().toBytes(dataStreamBufferFlushSize.get())));
+      clientConfig.setDataStreamMinPacketSize((int) Math.round(
+          streamBufferSizeUnit.get()
+              .toBytes(dataStreamMinPacketSize.getAsInt())));
+      clientConfig.setStreamWindowSize(Math.round(
+          streamBufferSizeUnit.get().toBytes(datastreamWindowSize.get())));
       conf.setFromObject(clientConfig);
 
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
@@ -838,8 +862,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             reservedSpaceString);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
-        dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
-            workDir.toString());
         if (reconServer != null) {
           OzoneStorageContainerManager reconScm =
               reconServer.getReconStorageContainerManager();
@@ -916,6 +938,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           randomContainerPort);
       conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
           randomContainerPort);
+      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+          enableContainerDatastream);
+      conf.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
+          randomContainerStreamPort);
 
       conf.setFromObject(new ReplicationConfig().setPort(0));
     }
@@ -949,6 +975,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+      conf.set(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD, "10s");
 
       ConfigurationProvider.setConfiguration(conf);
     }

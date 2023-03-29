@@ -28,6 +28,7 @@ import java.util.Map;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -271,7 +272,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
     rawTable.deleteWithBatch(batch, codecRegistry.asRawData(key));
+  }
 
+  @Override
+  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+    rawTable.deleteRange(codecRegistry.asRawData(beginKey),
+        codecRegistry.asRawData(endKey));
   }
 
   @Override
@@ -320,6 +326,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
+  }
+
+  @Override
+  public TableCacheMetrics createCacheMetrics() throws IOException {
+    return TableCacheMetrics.create(cache, getName());
   }
 
   @Override

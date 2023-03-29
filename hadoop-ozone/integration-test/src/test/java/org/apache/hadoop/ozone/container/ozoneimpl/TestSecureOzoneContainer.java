@@ -30,10 +30,10 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -123,9 +123,7 @@ public class TestSecureOzoneContainer {
     secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(
-        new SecurityConfig(conf),
-        TimeUnit.DAYS.toMillis(1),
-        caClient.getCertificate().getSerialNumber().toString());
+        new SecurityConfig(conf), TimeUnit.DAYS.toMillis(1));
   }
 
   @Test
@@ -164,8 +162,7 @@ public class TestSecureOzoneContainer {
       secretManager.start(caClient);
 
       ugi.doAs((PrivilegedAction<Void>) () -> {
-        try {
-          XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+        try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
           client.connect();
 
           Token<?> token = null;

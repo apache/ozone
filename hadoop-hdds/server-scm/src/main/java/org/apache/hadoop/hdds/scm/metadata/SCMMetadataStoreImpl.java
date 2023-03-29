@@ -192,7 +192,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       metaTable = META.getTable(store);
 
-      checkAndPopulateTable(moveTable, META.getName());
+      checkAndPopulateTable(metaTable, META.getName());
 
       statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
 

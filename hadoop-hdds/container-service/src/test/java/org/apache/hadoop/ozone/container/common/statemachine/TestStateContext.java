@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -137,19 +139,7 @@ public class TestStateContext {
 
   @Test
   public void testReportQueueWithAddReports() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachineMock =
-        mock(DatanodeStateMachine.class);
-    OzoneContainer o = mock(OzoneContainer.class);
-    ContainerSet s = mock(ContainerSet.class);
-    when(datanodeStateMachineMock.getContainer()).thenReturn(o);
-    when(o.getContainerSet()).thenReturn(s);
-    when(s.getContainerReport())
-        .thenReturn(
-            StorageContainerDatanodeProtocolProtos
-                .ContainerReportsProto.getDefaultInstance());
-    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+    StateContext ctx = createSubject();
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -623,6 +613,58 @@ public class TestStateContext {
 
   @Test
   public void testCommandQueueSummary() throws IOException {
+    StateContext ctx = createSubject();
+    ctx.addCommand(ReplicateContainerCommand.forTest(1));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(ReplicateContainerCommand.forTest(2));
+    ctx.addCommand(ReplicateContainerCommand.forTest(3));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+
+    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
+    Assertions.assertEquals(3,
+        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
+    Assertions.assertEquals(2,
+        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
+    Assertions.assertEquals(1,
+        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+  }
+
+  @Test
+  void updatesTermForCommandWithNewerTerm() throws IOException {
+    final long originalTerm = 1;
+    final long commandTerm = 2;
+    StateContext subject = createSubject();
+    SCMCommand<?> commandWithNewTerm = someCommand();
+    subject.setTermOfLeaderSCM(originalTerm);
+    commandWithNewTerm.setTerm(commandTerm);
+
+    subject.addCommand(commandWithNewTerm);
+
+    OptionalLong termOfLeaderSCM = subject.getTermOfLeaderSCM();
+    assertTrue(termOfLeaderSCM.isPresent());
+    assertEquals(commandTerm, termOfLeaderSCM.getAsLong());
+    assertEquals(commandWithNewTerm, subject.getNextCommand());
+  }
+
+  @Test
+  void keepsExistingTermForCommandWithOlderTerm() throws IOException {
+    final long originalTerm = 2;
+    final long commandTerm = 1;
+    StateContext subject = createSubject();
+    SCMCommand<?> commandWithNewTerm = someCommand();
+    subject.setTermOfLeaderSCM(originalTerm);
+    commandWithNewTerm.setTerm(commandTerm);
+
+    subject.addCommand(commandWithNewTerm);
+
+    OptionalLong termOfLeaderSCM = subject.getTermOfLeaderSCM();
+    assertTrue(termOfLeaderSCM.isPresent());
+    assertEquals(originalTerm, termOfLeaderSCM.getAsLong());
+    assertNull(subject.getNextCommand());
+  }
+
+  private static StateContext createSubject() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
@@ -634,22 +676,12 @@ public class TestStateContext {
         .thenReturn(
             StorageContainerDatanodeProtocolProtos
                 .ContainerReportsProto.getDefaultInstance());
-    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
+    return new StateContext(conf, DatanodeStates.getInitState(),
         datanodeStateMachineMock);
-    ctx.addCommand(new ReplicateContainerCommand(1, null));
-    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new ReplicateContainerCommand(2, null));
-    ctx.addCommand(new ReplicateContainerCommand(3, null));
-    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+  }
 
-    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
-    Assertions.assertEquals(3,
-        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
-    Assertions.assertEquals(2,
-        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
-    Assertions.assertEquals(1,
-        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+  private static SCMCommand<?> someCommand() {
+    return ReplicateContainerCommand.forTest(1);
   }
 
 }

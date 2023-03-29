@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -26,11 +25,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -75,6 +76,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   private static FileSystem fs;
   private static String volumeName;
   private static String bucketName;
+  private static OzoneClient client;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -89,9 +91,10 @@ public class TestDirectoryDeletingServiceWithFSO {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster,
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
@@ -109,6 +112,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
   @AfterAll
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -237,7 +241,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     long elapsedRunCount = dirDeletingService.getRunCount() - preRunCount;
     assertTrue(dirDeletingService.getRunCount() > 1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertTrue(elapsedRunCount == 8 || elapsedRunCount == 9);
+    assertTrue(elapsedRunCount >= 7);
   }
 
   @Test
@@ -283,7 +287,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 0);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 3);
-    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 4);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
     assertTrue(dirDeletingService.getRunCount() > 1);

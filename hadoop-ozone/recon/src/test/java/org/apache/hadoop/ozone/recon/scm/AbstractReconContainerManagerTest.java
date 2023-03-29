@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.LinkedList;
 import java.util.List;
@@ -48,7 +49,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -112,7 +112,7 @@ public class AbstractReconContainerManagerTest {
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        conf, new MonotonicClock(ZoneId.systemDefault()));
+        conf, Clock.system(ZoneId.systemDefault()));
 
     containerManager = new ReconContainerManager(
         conf,

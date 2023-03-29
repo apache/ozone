@@ -27,6 +27,7 @@ import java.util.Collection;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpConfig.Policy;
@@ -40,6 +41,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -55,6 +57,7 @@ public class TestOzoneManagerHttpServer {
   private static String sslConfDir;
   private static OzoneConfiguration conf;
   private static URLConnectionFactory connectionFactory;
+  private static File ozoneMetadataDirectory;
 
   @Parameters public static Collection<Object[]> policy() {
     Object[][] params = new Object[][] {
@@ -74,7 +77,12 @@ public class TestOzoneManagerHttpServer {
   @BeforeClass public static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
-    base.mkdirs();
+
+    // Create metadata directory
+    ozoneMetadataDirectory = new File(BASEDIR, "metadata");
+    ozoneMetadataDirectory.mkdirs();
+
+    // Initialize the OzoneConfiguration
     conf = new OzoneConfiguration();
     keystoresDir = new File(BASEDIR).getAbsolutePath();
     sslConfDir = KeyStoreTestUtil.getClasspathDir(
@@ -86,6 +94,14 @@ public class TestOzoneManagerHttpServer {
         KeyStoreTestUtil.getClientSSLConfigFileName());
     conf.set(OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
         KeyStoreTestUtil.getServerSSLConfigFileName());
+
+    // Set up OM HTTP and HTTPS addresses
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
+        ozoneMetadataDirectory.getAbsolutePath());
+    conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "localhost:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "localhost:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY, "localhost");
+    conf.set(OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY, "localhost");
   }
 
   @AfterClass public static void tearDown() throws Exception {
@@ -96,11 +112,6 @@ public class TestOzoneManagerHttpServer {
 
   @Test public void testHttpPolicy() throws Exception {
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
-    conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "localhost:0");
-    conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "localhost:0");
-    conf.set(OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY, "localhost");
-    conf.set(OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY, "localhost");
-
     OzoneManagerHttpServer server = null;
     try {
       server = new OzoneManagerHttpServer(conf, null);
@@ -117,7 +128,30 @@ public class TestOzoneManagerHttpServer {
           canAccess("https", server.getHttpsAddress())));
       Assert.assertTrue(implies(policy.isHttpsEnabled(),
           !canAccess("http", server.getHttpsAddress())));
+    } finally {
+      if (server != null) {
+        server.stop();
+      }
+    }
+  }
 
+  @Test
+  // Verify if jetty-dir will be created inside ozoneMetadataDirectory path
+  public void testJettyDirectoryCreation() throws Exception {
+    OzoneManagerHttpServer server = null;
+    try {
+      server = new OzoneManagerHttpServer(conf, null);
+      DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
+      server.start();
+      // Checking if the /webserver directory does get created
+      File webServerDir =
+          new File(ozoneMetadataDirectory, BaseHttpServer.SERVER_DIR);
+      Assert.assertTrue(webServerDir.exists());
+      // Verify that the jetty directory is set correctly
+      String expectedJettyDirLocation =
+          ozoneMetadataDirectory.getAbsolutePath() + BaseHttpServer.SERVER_DIR;
+      Assertions.assertEquals(expectedJettyDirLocation,
+          server.getJettyBaseTmpDir());
     } finally {
       if (server != null) {
         server.stop();

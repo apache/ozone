@@ -30,8 +30,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,6 +49,10 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Helper class to provide common methods used to test ReplicationManager.
@@ -120,6 +131,16 @@ public final class ReplicationTestUtil {
         datanodeDetails, datanodeDetails.getUuid());
   }
 
+  public static ContainerReplica createContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId) {
+    DatanodeDetails datanodeDetails
+        = MockDatanodeDetails.randomDatanodeDetails();
+    return createContainerReplica(containerID, replicaIndex, opState,
+        replicaState, 123L, 1234L,
+        datanodeDetails, datanodeDetails.getUuid(), seqId);
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
@@ -139,6 +160,24 @@ public final class ReplicationTestUtil {
     return builder.build();
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public static ContainerReplica createContainerReplica(ContainerID containerID,
+      int replicaIndex, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
+      DatanodeDetails datanodeDetails, UUID originNodeId, long seqId) {
+    ContainerReplica.ContainerReplicaBuilder builder
+        = ContainerReplica.newBuilder();
+    datanodeDetails.setPersistedOpState(opState);
+    builder.setContainerID(containerID);
+    builder.setReplicaIndex(replicaIndex);
+    builder.setKeyCount(keyCount);
+    builder.setBytesUsed(bytesUsed);
+    builder.setContainerState(replicaState);
+    builder.setDatanodeDetails(datanodeDetails);
+    builder.setSequenceId(seqId);
+    builder.setOriginNodeId(originNodeId);
+    return builder.build();
+  }
 
   public static ContainerInfo createContainerInfo(ReplicationConfig repConfig) {
     return createContainerInfo(repConfig, 1, HddsProtos.LifeCycleState.CLOSED);
@@ -198,6 +237,9 @@ public final class ReplicationTestUtil {
 
   public static PlacementPolicy getSimpleTestPlacementPolicy(
       final NodeManager nodeManager, final OzoneConfiguration conf) {
+
+    final Node rackNode = MockDatanodeDetails.randomDatanodeDetails();
+
     return new SCMCommonPlacementPolicy(nodeManager, conf) {
       @Override
       protected List<DatanodeDetails> chooseDatanodesInternal(
@@ -215,6 +257,12 @@ public final class ReplicationTestUtil {
       @Override
       public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
         return null;
+      }
+
+      @Override
+      protected Node getPlacementGroup(DatanodeDetails dn) {
+        // Make it look like a single rack cluster
+        return rackNode;
       }
     };
   }
@@ -268,5 +316,99 @@ public final class ReplicationTestUtil {
         return null;
       }
     };
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * SendThrottledReplicationCommand method so that it adds the command created
+   * to the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   * @throws CommandTargetOverloadedException
+   */
+  public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      ReplicateContainerCommand command = ReplicateContainerCommand
+          .toTarget(containerInfo.getContainerID(),
+              invocationOnMock.getArgument(2));
+      command.setReplicaIndex(invocationOnMock.getArgument(3));
+      commandsSent.add(Pair.of(sources.get(0), command));
+      return null;
+    }).when(mock).sendThrottledReplicationCommand(
+        Mockito.any(ContainerInfo.class), Mockito.anyList(),
+        Mockito.any(DatanodeDetails.class), anyInt());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendDatanodeCommand method so that it adds the command created to the
+   * commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   */
+  public static void mockRMSendDatanodeCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      SCMCommand<?> command = invocationOnMock.getArgument(0);
+      commandsSent.add(Pair.of(target, command));
+      return null;
+    }).when(mock).sendDatanodeCommand(any(), any(), any());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendDeleteCommand method so that it adds the command created to the
+   * commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   */
+  public static void mockRMSendDeleteCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      int replicaIndex = invocationOnMock.getArgument(1);
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      boolean forceDelete = invocationOnMock.getArgument(3);
+      DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+          containerInfo.getContainerID(), forceDelete);
+      deleteCommand.setReplicaIndex(replicaIndex);
+      commandsSent.add(Pair.of(target, deleteCommand));
+      return null;
+    }).when(mock).sendDeleteCommand(any(), anyInt(), any(), anyBoolean());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * sendThrottledDeleteCommand method so that it adds the command created to
+   * the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   */
+  public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      ContainerInfo containerInfo = invocationOnMock.getArgument(0);
+      int replicaIndex = invocationOnMock.getArgument(1);
+      DatanodeDetails target = invocationOnMock.getArgument(2);
+      boolean forceDelete = invocationOnMock.getArgument(3);
+      DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+          containerInfo.getContainerID(), forceDelete);
+      deleteCommand.setReplicaIndex(replicaIndex);
+      commandsSent.add(Pair.of(target, deleteCommand));
+      return null;
+    }).when(mock)
+        .sendThrottledDeleteCommand(any(), anyInt(), any(), anyBoolean());
   }
 }

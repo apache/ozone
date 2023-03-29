@@ -86,6 +86,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
     this.omProxyInfos = new HashMap<>();
     List<String> omNodeIDList = new ArrayList<>();
+    Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
     Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
         omSvcId);
@@ -112,6 +113,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
         omProxies.put(nodeId, null);
         omProxyInfos.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
+        omNodeAddressMap.put(nodeId, omProxyInfo.getAddress());
       } else {
         LOG.error("Failed to create OM proxy for {} at address {}",
             nodeId, rpcAddrStr);
@@ -125,6 +127,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     }
     setOmProxies(omProxies);
     setOmNodeIDList(omNodeIDList);
+    setOmNodeAddressMap(omNodeAddressMap);
   }
 
   private T createOMProxy(InetSocketAddress omAddress) throws IOException {
@@ -227,13 +230,20 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   }
 
   @VisibleForTesting
+  public Map<String, OMProxyInfo> getOMProxyInfoMap() {
+    return omProxyInfos;
+  }
+
+  @VisibleForTesting
   protected void setProxiesForTesting(
       Map<String, ProxyInfo<T>> setOMProxies,
       Map<String, OMProxyInfo> setOMProxyInfos,
-      List<String> setOMNodeIDList) {
+      List<String> setOMNodeIDList,
+      Map<String, InetSocketAddress> setOMNodeAddress) {
     setOmProxies(setOMProxies);
     this.omProxyInfos = setOMProxyInfos;
     setOmNodeIDList(setOMNodeIDList);
+    setOmNodeAddressMap(setOMNodeAddress);
   }
 
 }

@@ -27,16 +27,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -59,6 +63,7 @@ public class TestReconWithOzoneManagerHA {
   private ObjectStore objectStore;
   private static final String OM_SERVICE_ID = "omService1";
   private static final String VOL_NAME = "testrecon";
+  private OzoneClient client;
 
   @Before
   public void setup() throws Exception {
@@ -79,14 +84,19 @@ public class TestReconWithOzoneManagerHA {
         .includeRecon(true)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
+    objectStore = client.getObjectStore();
     objectStore.createVolume(VOL_NAME);
-    objectStore.getVolume(VOL_NAME).createBucket(VOL_NAME);
+    // TODO: HDDS-5463
+    //  Recon's container ID to key mapping does not yet support FSO buckets.
+    objectStore.getVolume(VOL_NAME).createBucket(VOL_NAME,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
   }
 
   @After
   public void tearDown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

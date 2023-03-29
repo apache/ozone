@@ -68,8 +68,16 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
   @Override
   public void onMessage(ContainerID containerID, EventPublisher publisher) {
-    LOG.info("Close container Event triggered for container : {}", containerID);
+    if (!scmContext.isLeader()) {
+      LOG.warn("Skip close container {} since current SCM is not leader.",
+          containerID);
+      return;
+    }
+
     try {
+      LOG.info("Close container Event triggered for container : {}, " +
+              "current state: {}", containerID,
+              containerManager.getContainer(containerID).getState());
       // If the container is in OPEN state, FINALIZE it.
       if (containerManager.getContainer(containerID).getState()
           == LifeCycleState.OPEN) {
@@ -130,7 +138,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
    * @throws ContainerNotFoundException
    */
   private List<DatanodeDetails> getNodes(final ContainerInfo container)
-      throws ContainerNotFoundException, NotLeaderException {
+      throws ContainerNotFoundException {
     try {
       return pipelineManager.getPipeline(container.getPipelineID()).getNodes();
     } catch (PipelineNotFoundException ex) {

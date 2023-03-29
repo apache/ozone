@@ -100,10 +100,20 @@ public class TestRDBStore {
   @Test
   public void compactDB() throws Exception {
     Assertions.assertNotNull(rdbStore, "DB Store cannot be null");
-    insertRandomData(rdbStore, 1);
-    // This test does not assert anything if there is any error this test
-    // will throw and fail.
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j <= 10; j++) {
+        insertRandomData(rdbStore, i);
+        rdbStore.flushDB();
+      }
+    }
+
+    int metaSizeBeforeCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
     rdbStore.compactDB();
+    int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
+
+    Assertions.assertTrue(metaSizeAfterCompact < metaSizeBeforeCompact);
+    Assertions.assertEquals(metaSizeAfterCompact, 2);
+
   }
 
   @Test

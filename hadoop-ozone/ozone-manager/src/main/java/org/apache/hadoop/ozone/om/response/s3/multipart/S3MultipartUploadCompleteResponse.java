@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
@@ -66,7 +67,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> unUsedParts,
       @Nonnull BucketLayout bucketLayout,
-      @Nonnull OmBucketInfo omBucketInfo,
+      @CheckForNull OmBucketInfo omBucketInfo,
       RepeatedOmKeyInfo keyVersionsToDelete) {
     super(omResponse, bucketLayout);
     this.partsUnusedList = unUsedParts;
@@ -135,19 +136,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
     return ozoneKey;
   }
 
-  protected String getMultipartKey() {
-    return multipartKey;
-  }
-
   protected OmKeyInfo getOmKeyInfo() {
     return omKeyInfo;
-  }
-
-  protected List<OmKeyInfo> getPartsUnusedList() {
-    return partsUnusedList;
-  }
-
-  public OmBucketInfo getOmBucketInfo() {
-    return omBucketInfo;
   }
 }

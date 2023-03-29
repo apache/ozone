@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,17 +47,22 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.datastream.SupportedDataStreamType;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.RoutingTable;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,7 +140,9 @@ public final class RatisHelper {
         .setId(toRaftPeerId(dn))
         .setAddress(toRaftPeerAddress(dn, Port.Name.RATIS_SERVER))
         .setAdminAddress(toRaftPeerAddress(dn, Port.Name.RATIS_ADMIN))
-        .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS));
+        .setClientAddress(toRaftPeerAddress(dn, Port.Name.RATIS))
+        .setDataStreamAddress(
+            toRaftPeerAddress(dn, Port.Name.RATIS_DATASTREAM));
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
@@ -188,6 +196,7 @@ public final class RatisHelper {
       ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
+        toRaftPeer(pipeline.getFirstNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
@@ -207,7 +216,7 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       ConfigurationSource configuration) {
-    return newRaftClient(rpcType, leader.getId(),
+    return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         tlsConfig, configuration);
   }
@@ -215,20 +224,21 @@ public final class RatisHelper {
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy,
       ConfigurationSource ozoneConfiguration) {
-    return newRaftClient(rpcType, leader.getId(),
+    return newRaftClient(rpcType, leader.getId(), leader,
         newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
         ozoneConfiguration);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
-      RaftGroup group, RetryPolicy retryPolicy,
+      RaftPeer primary, RaftGroup group, RetryPolicy retryPolicy,
       GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
     final RaftProperties properties = newRaftProperties(rpcType);
+    enableNettyStreaming(properties);
 
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
@@ -236,6 +246,7 @@ public final class RatisHelper {
     return RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
+        .setPrimaryDataStreamServer(primary)
         .setProperties(properties)
         .setParameters(setClientTlsConf(rpcType, tlsConfig))
         .setRetryPolicy(retryPolicy)
@@ -265,6 +276,7 @@ public final class RatisHelper {
       GrpcTlsConfig tlsConfig) {
     if (tlsConfig != null) {
       GrpcConfigKeys.Client.setTlsConf(parameters, tlsConfig);
+      NettyConfigKeys.DataStream.Client.setTlsConf(parameters, tlsConfig);
     }
   }
 
@@ -275,6 +287,8 @@ public final class RatisHelper {
       GrpcConfigKeys.Server.setTlsConf(parameters, serverConf);
       GrpcConfigKeys.TLS.setConf(parameters, serverConf);
       setAdminTlsConf(parameters, serverConf);
+
+      NettyConfigKeys.DataStream.Server.setTlsConf(parameters, serverConf);
     }
     setClientTlsConf(parameters, clientConf);
     return parameters;
@@ -296,6 +310,12 @@ public final class RatisHelper {
     return properties;
   }
 
+  public static RaftProperties enableNettyStreaming(RaftProperties properties) {
+    RaftConfigKeys.DataStream.setType(properties,
+        SupportedDataStreamType.NETTY);
+    return properties;
+  }
+
   /**
    * Set all client properties matching with regex
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
@@ -310,7 +330,8 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf =
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
-      if (isClientConfig(key) || isGrpcClientConfig(key)) {
+      if (isClientConfig(key) || isGrpcClientConfig(key)
+              || isNettyStreamConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -326,6 +347,15 @@ public final class RatisHelper {
         !key.startsWith(GrpcConfigKeys.Admin.PREFIX) &&
         !key.startsWith(GrpcConfigKeys.Server.PREFIX);
   }
+
+  private static boolean isNettyStreamConfig(String key) {
+    return key.startsWith(NettyConfigKeys.DataStream.PREFIX);
+  }
+
+  private static boolean isStreamClientConfig(String key) {
+    return key.startsWith(RaftClientConfigKeys.DataStream.PREFIX);
+  }
+
   /**
    * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
@@ -340,7 +370,8 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!isClientConfig(key)) {
+      if (isNettyStreamConfig(key) || isStreamClientConfig(key) ||
+          !isClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -401,6 +432,119 @@ public final class RatisHelper {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+  
+  public static RoutingTable getRoutingTable(Pipeline pipeline) {
+    RaftPeerId primaryId = null;
+    List<RaftPeerId> raftPeers = new ArrayList<>();
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      final RaftPeerId raftPeerId = RaftPeerId.valueOf(dn.getUuidString());
+      try {
+        if (dn == pipeline.getFirstNode()) {
+          primaryId = raftPeerId;
+        }
+      } catch (IOException e) {
+        LOG.error("Can not get FirstNode from the pipeline: {} with " +
+            "exception: {}", pipeline.toString(), e.getLocalizedMessage());
+        return null;
+      }
+      raftPeers.add(raftPeerId);
+    }
+
+    RoutingTable.Builder builder = RoutingTable.newBuilder();
+    RaftPeerId previousId = primaryId;
+    for (RaftPeerId peerId : raftPeers) {
+      if (peerId.equals(primaryId)) {
+        continue;
+      }
+      builder.addSuccessor(previousId, peerId);
+      previousId = peerId;
+    }
+
+    return builder.build();
+  }
+
+  public static void debug(ByteBuffer buffer, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buffer = buffer.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buffer.remaining() > 0; i++) {
+      builder.append(buffer.get()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buffer, builder);
+  }
+
+  public static void debug(ByteBuf buf, String name, Logger log) {
+    if (!log.isDebugEnabled()) {
+      return;
+    }
+    buf = buf.duplicate();
+    final StringBuilder builder = new StringBuilder();
+    for (int i = 1; buf.readableBytes() > 0; i++) {
+      builder.append(buf.readByte()).append(i % 20 == 0 ? "\n  " : ", ");
+    }
+    log.debug("{}: {}\n  {}", name, buf, builder);
+  }
+
+
+  /**
+   * Use raft client to send admin request, transfer the leadership.
+   * 1. Set priority and send setConfiguration request
+   * 2. Trigger transferLeadership API.
+   *
+   * @param raftGroup     the Raft group
+   * @param targetPeerId  the target expected leader
+   * @throws IOException
+   */
+  public static void transferRatisLeadership(ConfigurationSource conf,
+      RaftGroup raftGroup, RaftPeerId targetPeerId, GrpcTlsConfig tlsConfig)
+      throws IOException {
+    // TODO: need a common raft client related conf.
+    try (RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
+        null, raftGroup, createRetryPolicy(conf), tlsConfig, conf)) {
+      if (raftGroup.getPeer(targetPeerId) == null) {
+        throw new IOException("Cannot choose the target leader. The expected " +
+            "leader RaftPeerId is " + targetPeerId + " and the peers are " +
+            raftGroup.getPeers().stream().map(RaftPeer::getId)
+                .collect(Collectors.toList()) + ".");
+      }
+      LOG.info("Chosen the targetLeaderId {} to transfer leadership",
+          targetPeerId);
+
+      // Set priority
+      List<RaftPeer> peersWithNewPriorities = new ArrayList<>();
+      for (RaftPeer peer : raftGroup.getPeers()) {
+        peersWithNewPriorities.add(
+            RaftPeer.newBuilder(peer)
+                .setPriority(peer.getId().equals(targetPeerId) ? 2 : 1)
+                .build()
+        );
+      }
+      RaftClientReply reply;
+      // Set new configuration
+      reply = raftClient.admin().setConfiguration(peersWithNewPriorities);
+      if (reply.isSuccess()) {
+        LOG.info("Successfully set new priority for division: {}",
+            peersWithNewPriorities);
+      } else {
+        LOG.warn("Failed to set new priority for division: {}." +
+            " Ratis reply: {}", peersWithNewPriorities, reply);
+        throw new IOException(reply.getException());
+      }
+
+      // Trigger the transferLeadership
+      reply = raftClient.admin().transferLeadership(targetPeerId, 60000);
+      if (reply.isSuccess()) {
+        LOG.info("Successfully transferred leadership to {}.", targetPeerId);
+      } else {
+        LOG.warn("Failed to transfer leadership to {}. Ratis reply: {}",
+            targetPeerId, reply);
+        throw new IOException(reply.getException());
+      }
     }
   }
 }

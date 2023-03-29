@@ -18,10 +18,15 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -31,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 import com.google.common.util.concurrent.Striped;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -39,7 +45,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
@@ -61,19 +66,21 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
@@ -101,6 +108,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -108,6 +116,7 @@ import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkV
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,13 +129,13 @@ public class KeyValueHandler extends Handler {
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
-  private final ContainerType containerType;
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
+  private final boolean checkIfNoBlockFiles;
 
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
@@ -138,7 +147,6 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
-    containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
         DatanodeConfiguration.class).isChunkDataValidationCheck();
@@ -151,6 +159,14 @@ public class KeyValueHandler extends Handler {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+
+    checkIfNoBlockFiles =
+        conf.getBoolean(
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+        DatanodeConfiguration.
+            OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -182,6 +198,25 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+      Container container, ContainerCommandRequestProto msg)
+      throws StorageContainerException {
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    checkContainerOpen(kvContainer);
+
+    if (msg.hasWriteChunk()) {
+      BlockID blockID =
+          BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+
+      return chunkManager.getStreamDataChannel(kvContainer,
+          blockID, metrics);
+    } else {
+      throw new StorageContainerException("Malformed request.",
+          ContainerProtos.Result.IO_EXCEPTION);
+    }
+  }
+
+  @Override
   public void stop() {
     chunkManager.shutdown();
     blockManager.shutdown();
@@ -192,9 +227,15 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, Container container,
       DispatcherContext dispatcherContext) {
 
-    return KeyValueHandler
-        .dispatchRequest(this, request, (KeyValueContainer) container,
-            dispatcherContext);
+    try {
+      return KeyValueHandler
+          .dispatchRequest(this, request, (KeyValueContainer) container,
+              dispatcherContext);
+    } catch (RuntimeException e) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException(e, CONTAINER_INTERNAL_ERROR),
+          request);
+    }
   }
 
   @VisibleForTesting
@@ -230,6 +271,8 @@ public class KeyValueHandler extends Handler {
       return handler.handleDeleteChunk(request, kvContainer);
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
+    case StreamInit:
+      return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
     case CompactChunk:
@@ -254,6 +297,35 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public BlockManager getBlockManager() {
     return this.blockManager;
+  }
+
+  ContainerCommandResponseProto handleStreamInit(
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    final BlockID blockID;
+    if (request.hasWriteChunk()) {
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed {} request. trace ID: {}",
+            request.getCmdType(), request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+
+    String path = null;
+    try {
+      checkContainerOpen(kvContainer);
+      path = chunkManager
+          .streamInit(kvContainer, blockID);
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    }
+
+    return getSuccessResponseBuilder(request)
+        .setMessage(path)
+        .build();
   }
 
   /**
@@ -326,16 +398,13 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  private void populateContainerPathFields(KeyValueContainer container)
-      throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container,
+      HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          container.getContainerData().getMaxSize());
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-              containerVolume, clusterId);
-      container.populatePathFields(idDir, containerVolume);
+          hddsVolume, clusterId);
+      container.populatePathFields(idDir, hddsVolume);
     } finally {
       volumeSet.readUnlock();
     }
@@ -592,8 +661,8 @@ public class KeyValueHandler extends Handler {
       }
       List<BlockData> responseData =
           blockManager.listBlock(kvContainer, startLocalId, count);
-      for (int i = 0; i < responseData.size(); i++) {
-        returnData.add(responseData.get(i).getProtoBufMessage());
+      for (BlockData responseDatum : responseData) {
+        returnData.add(responseDatum.getProtoBufMessage());
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -959,8 +1028,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
+      final TarContainerPacker packer) throws IOException {
     Preconditions.checkState(originalContainerData instanceof
         KeyValueContainerData, "Should be KeyValueContainerData instance");
 
@@ -970,7 +1038,8 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container);
+    HddsVolume targetVolume = originalContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;
@@ -1016,7 +1085,7 @@ public class KeyValueHandler extends Handler {
         try {
           container.markContainerUnhealthy();
         } catch (IOException ex) {
-          // explicitly catch IOException here since the this operation
+          // explicitly catch IOException here since this operation
           // will fail if the Rocksdb metadata is corrupted.
           long id = container.getContainerData().getContainerID();
           LOG.warn("Unexpected error while marking container " + id
@@ -1110,11 +1179,113 @@ public class KeyValueHandler extends Handler {
     }
   }
 
+  @Override
+  public void deleteUnreferenced(Container container, long localID)
+      throws IOException {
+    // Since the block/chunk is already checked that is unreferenced, no
+    // need to lock the container here.
+    StringBuilder prefixBuilder = new StringBuilder();
+    ContainerLayoutVersion layoutVersion = container.getContainerData().
+        getLayoutVersion();
+    long containerID = container.getContainerData().getContainerID();
+    // Only supports the default chunk/block name format now
+    switch (layoutVersion) {
+    case FILE_PER_BLOCK:
+      prefixBuilder.append(localID).append(".block");
+      break;
+    case FILE_PER_CHUNK:
+      prefixBuilder.append(localID).append("_chunk_");
+      break;
+    default:
+      throw new IOException("Unsupported container layout version " +
+          layoutVersion + " for the container " + containerID);
+    }
+    String prefix = prefixBuilder.toString();
+    File chunkDir = ContainerUtils.getChunkDir(container.getContainerData());
+    // chunkNames here is an array of file/dir name, so if we cannot find any
+    // matching one, it means the client did not write any chunk into the block.
+    // Since the putBlock request may fail, we don't know if the chunk exists,
+    // thus we need to check it when receiving the request to delete such blocks
+    String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    if (chunkNames.length == 0) {
+      LOG.warn("Missing delete block(Container = {}, Block = {}",
+          containerID, localID);
+      return;
+    }
+    for (String name: chunkNames) {
+      File file = new File(chunkDir, name);
+      if (!file.isFile()) {
+        continue;
+      }
+      FileUtil.fullyDelete(file);
+      LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
+          containerID);
+    }
+  }
+
+  private String[] getFilesWithPrefix(String prefix, File chunkDir) {
+    FilenameFilter filter = (dir, name) -> name.startsWith(prefix);
+    return chunkDir.list(filter);
+  }
+
+  private boolean logBlocksIfNonZero(Container container)
+      throws IOException {
+    boolean nonZero = false;
+    try (DBHandle dbHandle
+             = BlockUtils.getDB(
+        (KeyValueContainerData) container.getContainerData(),
+        conf)) {
+      BlockIterator<BlockData>
+          blockIterator = dbHandle.getStore().
+          getBlockIterator(container.getContainerData().getContainerID());
+      StringBuilder stringBuilder = new StringBuilder();
+      while (blockIterator.hasNext()) {
+        nonZero = true;
+        stringBuilder.append(blockIterator.nextBlock());
+        if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
+          break;
+        }
+      }
+      if (nonZero) {
+        LOG.error("blocks in rocksDB on container delete: {}",
+            stringBuilder.toString());
+      }
+    }
+    return nonZero;
+  }
+
+  private boolean logBlocksFoundOnDisk(Container container) throws IOException {
+    // List files left over
+    File chunksPath = new
+        File(container.getContainerData().getChunksPath());
+    Preconditions.checkArgument(chunksPath.isDirectory());
+    boolean notEmpty = false;
+    try (DirectoryStream<Path> dir
+             = Files.newDirectoryStream(chunksPath.toPath())) {
+      StringBuilder stringBuilder = new StringBuilder();
+      for (Path block : dir) {
+        if (notEmpty) {
+          stringBuilder.append(",");
+        }
+        stringBuilder.append(block);
+        notEmpty = true;
+        if (stringBuilder.length() > StorageUnit.KB.toBytes(16)) {
+          break;
+        }
+      }
+      if (notEmpty) {
+        LOG.error("Files still part of the container on delete: {}",
+            stringBuilder.toString());
+      }
+    }
+    return notEmpty;
+  }
+
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
     container.writeLock();
     try {
-    // If force is false, we check container state.
+      // If force is false, we check container state.
       if (!force) {
         // Check if container is open
         if (container.getContainerData().isOpen()) {
@@ -1124,19 +1295,106 @@ public class KeyValueHandler extends Handler {
         }
         // Safety check that the container is empty.
         // If the container is not empty, it should not be deleted unless the
-        // container is beinf forcefully deleted (which happens when
+        // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
         if (container.getContainerData().getBlockCount() != 0) {
+          metrics.incContainerDeleteFailedBlockCountNotZero();
           LOG.error("Received container deletion command for container {} but" +
-              " the container is not empty.",
-              container.getContainerData().getContainerID());
+                  " the container is not empty with blockCount {}",
+              container.getContainerData().getContainerID(),
+              container.getContainerData().getBlockCount());
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
         }
+
+        // This is a defensive check to make sure there is no data loss if
+        // 1. There are one or more blocks on the filesystem
+        // 2. There are one or more blocks in the block table
+        // This can lead to false positives as
+        // 1. Chunks written to disk that did not get recorded in RocksDB can
+        //    occur due to failures during write
+        // 2. Blocks that were deleted from blocks table but the deletion of
+        //    the underlying file could not be completed
+        // 3. Failures between files being deleted from disk but not being
+        //    cleaned up.
+        // 4. Bugs in the code.
+        // Blocks stored on disk represent data written by a client and should
+        // be treated with care at the expense of creating artifacts on disk
+        // that  might be unreferenced.
+        // https://issues.apache.org/jira/browse/HDDS-8138 will move the
+        // implementation to only depend on consistency of the chunks folder
+
+        // First check if any files are in the chunks folder. If there are
+        // to help with debugging also dump the blocks table data.
+        if (checkIfNoBlockFiles) {
+          if (!container.isEmpty()) {
+            metrics.incContainerDeleteFailedNonEmpty();
+            logBlocksFoundOnDisk(container);
+            logBlocksIfNonZero(container);
+            // List Blocks from Blocks Table
+            throw new StorageContainerException("Non-force deletion of " +
+                "non-empty container dir:" +
+                container.getContainerData().getContainerID() +
+                " is not allowed.",
+                DELETE_ON_NON_EMPTY_CONTAINER);
+          }
+
+          // The chunks folder is empty, not check if the blocks table has any
+          // blocks still referenced. This will avoid cleaning up the
+          // blocks table for future debugging.
+          // List rocks
+          if (logBlocksIfNonZero(container)) {
+            LOG.error("Non-empty blocks table for container {}",
+                container.getContainerData().getContainerID());
+            metrics.incContainerDeleteFailedNonEmptyBlocksDB();
+            throw new StorageContainerException("Non-force deletion of " +
+                "non-empty container block table:" +
+                container.getContainerData().getContainerID() +
+                " is not allowed.",
+                DELETE_ON_NON_EMPTY_CONTAINER);
+          }
+        }
+      } else {
+        metrics.incContainersForceDelete();
+      }
+      if (container.getContainerData() instanceof KeyValueContainerData) {
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) container.getContainerData();
+        HddsVolume hddsVolume = keyValueContainerData.getVolume();
+
+        // Rename container location
+        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
+            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
+
+        if (!success) {
+          LOG.error("Failed to move container under " +
+              hddsVolume.getDeleteServiceDirPath());
+          throw new StorageContainerException("Moving container failed",
+              CONTAINER_INTERNAL_ERROR);
+        }
+
+        if (LOG.isDebugEnabled()) {
+          String containerPath = keyValueContainerData
+              .getContainerPath();
+          File containerDir = new File(containerPath);
+
+          LOG.debug("Container {} has been successfuly moved under {}",
+              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+        }
       }
       long containerId = container.getContainerData().getContainerID();
       containerSet.removeContainer(containerId);
+    } catch (StorageContainerException e) {
+      throw e;
+    } catch (IOException e) {
+      // All other IO Exceptions should be treated as if the container is not
+      // empty as a defensive check.
+      LOG.error("Could not determine if the container {} is empty",
+          container.getContainerData().getContainerID(), e);
+      throw new StorageContainerException("Could not determine if container "
+          + container.getContainerData().getContainerID() +
+          " is empty", DELETE_ON_NON_EMPTY_CONTAINER);
     } finally {
       container.writeUnlock();
     }

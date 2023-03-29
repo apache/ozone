@@ -88,10 +88,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ExecutorService executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
+  private final OzoneContainer ozoneContainer;
 
-  public DeleteBlocksCommandHandler(ContainerSet cset,
+  public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
-    this.containerSet = cset;
+    this.ozoneContainer = container;
+    this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.executor = Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
@@ -117,7 +119,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
       LOG.warn("Command is discarded because of the command queue is full");
-      return;
     }
   }
 
@@ -332,7 +333,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
           (Table<String, DeletedBlocksTransaction>) table;
-      delTxTable.putWithBatch(batch, containerData.deleteTxnKey(tid), txn);
+      delTxTable.putWithBatch(batch, containerData.getDeleteTxnKey(tid),
+          txn);
     };
 
     markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
@@ -366,9 +368,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       int newDeletionBlocks, long txnID, DeletionMarker marker)
       throws IOException {
     long containerId = delTX.getContainerID();
-    if (!isTxnIdValid(containerId, containerData, delTX)) {
-      return;
-    }
+    logDeleteTransaction(containerId, containerData, delTX);
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -389,9 +389,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    if (!isTxnIdValid(containerId, containerData, delTX)) {
-      return;
-    }
+    logDeleteTransaction(containerId, containerData, delTX);
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -402,10 +400,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try (BatchOperation batch = containerDB.getStore().getBatchHandler()
           .initBatchOperation()) {
         for (Long blkLong : delTX.getLocalIDList()) {
-          String blk = containerData.blockKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           if (blkInfo != null) {
-            String deletingKey = containerData.deletingBlockKey(blkLong);
+            String deletingKey = containerData.getDeletingBlockKey(blkLong);
             if (blockDataTable.get(deletingKey) != null
                 || deletedBlocksTable.get(blk) != null) {
               if (LOG.isDebugEnabled()) {
@@ -424,9 +422,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                   blkLong, containerId);
             }
           } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Block {} not found or already under deletion in"
-                  + " container {}, skip deleting it.", blkLong, containerId);
+            // try clean up the possibly onDisk but unreferenced blocks/chunks
+            try {
+              Container<?> container = containerSet.getContainer(containerId);
+              ozoneContainer.getDispatcher().getHandler(container
+                  .getContainerType()).deleteUnreferenced(container, blkLong);
+            } catch (IOException e) {
+              LOG.error("Failed to delete files for unreferenced block {} of " +
+                      "container {}", blkLong, containerId, e);
             }
           }
         }
@@ -457,15 +460,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable
-            .putWithBatch(batchOperation, containerData.latestDeleteTxnKey(),
-                delTX.getTxID());
+            .putWithBatch(batchOperation,
+                containerData.getLatestDeleteTxnKey(), delTX.getTxID());
       }
 
       long pendingDeleteBlocks =
           containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
       metadataTable
           .putWithBatch(batchOperation,
-              containerData.pendingDeleteBlockCountKey(),
+              containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
       // update pending deletion blocks count and delete transaction ID in
@@ -475,23 +478,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  private boolean isTxnIdValid(long containerId,
+  private void logDeleteTransaction(long containerId,
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
-    boolean b = true;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}", containerId,
-          containerData.getMetadataPath());
+      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+          containerId, containerData.getMetadataPath(), delTX.getTxID());
     }
 
     if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Ignoring delete blocks for containerId: %d."
-                + " Outdated delete transactionId %d < %d", containerId,
-            delTX.getTxID(), containerData.getDeleteTransactionId()));
-      }
-      b = false;
+      LOG.info(String.format("Delete blocks for containerId: %d"
+              + " is either received out of order or retried,"
+              + " %d <= %d", containerId, delTX.getTxID(),
+          containerData.getDeleteTransactionId()));
     }
-    return b;
   }
 
   @Override

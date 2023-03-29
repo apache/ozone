@@ -317,9 +317,9 @@ public class TestSchemaTwoBackwardsCompatibility {
 
           // update delete related metadata
           db.getStore().getMetadataTable().putWithBatch(batch,
-              cData.latestDeleteTxnKey(), txn.getTxID());
+              cData.getLatestDeleteTxnKey(), txn.getTxID());
           db.getStore().getMetadataTable().putWithBatch(batch,
-              cData.pendingDeleteBlockCountKey(),
+              cData.getPendingDeleteBlockCountKey(),
               cData.getNumPendingDeletionBlocks() + BLOCKS_PER_TXN);
           db.getStore().getBatchHandler().commitBatchOperation(batch);
 

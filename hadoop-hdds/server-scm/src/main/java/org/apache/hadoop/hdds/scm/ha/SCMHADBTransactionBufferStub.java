@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 // TODO: Move this class to test package after fixing Recon
 /**
@@ -32,6 +33,7 @@ import java.io.IOException;
 public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private BatchOperation currentBatchOperation;
+  private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public SCMHADBTransactionBufferStub() {
   }
@@ -54,13 +56,23 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
-    table.putWithBatch(getCurrentBatchOperation(), key, value);
+    rwLock.readLock().lock();
+    try {
+      table.putWithBatch(getCurrentBatchOperation(), key, value);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
-    table.deleteWithBatch(getCurrentBatchOperation(), key);
+    rwLock.readLock().lock();
+    try {
+      table.deleteWithBatch(getCurrentBatchOperation(), key);
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override
@@ -86,9 +98,14 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public void flush() throws IOException {
     if (dbStore != null) {
-      dbStore.commitBatchOperation(getCurrentBatchOperation());
-      currentBatchOperation.close();
-      currentBatchOperation = null;
+      rwLock.writeLock().lock();
+      try {
+        dbStore.commitBatchOperation(getCurrentBatchOperation());
+        currentBatchOperation.close();
+        currentBatchOperation = null;
+      } finally {
+        rwLock.writeLock().unlock();
+      }
     }
   }
 

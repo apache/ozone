@@ -246,8 +246,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setStorageSize(
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           0, org.apache.hadoop.hdds.conf.StorageUnit.MB);
-      conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
-          TimeUnit.MILLISECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10,
           TimeUnit.SECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 20,
@@ -272,6 +270,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           conf.getObject(ReplicationManagerConfiguration.class);
       replicationConf.setInterval(Duration.ofSeconds(10));
       replicationConf.setEventTimeout(Duration.ofSeconds(20));
+      replicationConf.setDatanodeTimeoutOffset(0);
       conf.setFromObject(replicationConf);
       conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);

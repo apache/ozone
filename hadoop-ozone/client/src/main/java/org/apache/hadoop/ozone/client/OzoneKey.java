@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.time.Instant;
 import java.util.Map;
@@ -156,12 +157,6 @@ public class OzoneKey {
     return modificationTime;
   }
 
-  /**
-   * Returns the replication type of the key.
-   *
-   * @return replicationType
-   */
-
   public Map<String, String> getMetadata() {
     return metadata;
   }
@@ -170,6 +165,11 @@ public class OzoneKey {
     this.metadata.putAll(metadata);
   }
 
+  /**
+   * Returns the replication type of the key.
+   *
+   * @return replicationType
+   */
   @Deprecated
   @JsonIgnore
   public ReplicationType getReplicationType() {
@@ -185,6 +185,13 @@ public class OzoneKey {
 
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
+  }
+
+  public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
+    return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
+        keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
+        keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
+        keyInfo.getMetadata());
   }
 
 }

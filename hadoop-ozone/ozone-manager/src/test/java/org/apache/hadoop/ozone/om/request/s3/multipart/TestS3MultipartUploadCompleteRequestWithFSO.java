@@ -51,6 +51,12 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
   }
 
   @Override
+  protected long getNamespaceCount() {
+    // parent directory count which is also created
+    return 5L;
+  }
+
+  @Override
   protected void addVolumeAndBucket(String volumeName, String bucketName)
       throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,

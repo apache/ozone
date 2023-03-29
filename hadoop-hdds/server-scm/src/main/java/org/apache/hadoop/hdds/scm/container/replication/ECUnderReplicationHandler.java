@@ -30,25 +30,24 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.health.ECReplicationCheckHandler;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
@@ -59,20 +58,23 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
-  private final ECReplicationCheckHandler ecReplicationCheck;
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
 
-  public ECUnderReplicationHandler(ECReplicationCheckHandler ecReplicationCheck,
-      final PlacementPolicy containerPlacement, final ConfigurationSource conf,
-                                   NodeManager nodeManager) {
-    this.ecReplicationCheck = ecReplicationCheck;
+  private static class CannotFindTargetsException extends IOException {
+    CannotFindTargetsException(Throwable cause) {
+      super(cause);
+    }
+  }
+
+  public ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
+      final ConfigurationSource conf, ReplicationManager replicationManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
   }
 
   private boolean validatePlacement(List<DatanodeDetails> replicaNodes,
@@ -101,164 +103,116 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param result - Health check result.
    * @param remainingMaintenanceRedundancy - represents that how many nodes go
    *                                      into maintenance.
-   * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself. If an empty list is returned, it indicates
-   * the container is no longer unhealthy and can be removed from the unhealthy
-   * queue. Any exception indicates that the container is still unhealthy and
-   * should be retried later.
+   * @return The number of commands sent.
    */
   @Override
-  public Map<DatanodeDetails, SCMCommand<?>> processAndCreateCommands(
+  public int processAndSendCommands(
       final Set<ContainerReplica> replicas,
       final List<ContainerReplicaOp> pendingOps,
       final ContainerHealthResult result,
       final int remainingMaintenanceRedundancy) throws IOException {
     ContainerInfo container = result.getContainerInfo();
-    ECReplicationConfig repConfig =
-        (ECReplicationConfig) container.getReplicationConfig();
+    LOG.debug("Handling under-replicated EC container: {}", container);
+
     final ECContainerReplicaCount replicaCount =
         new ECContainerReplicaCount(container, replicas, pendingOps,
             remainingMaintenanceRedundancy);
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setContainerInfo(container)
-        .setContainerReplicas(replicas)
-        .setPendingOps(pendingOps)
-        .setMaintenanceRedundancy(remainingMaintenanceRedundancy)
-        .build();
-    ContainerHealthResult currentUnderRepRes = ecReplicationCheck
-        .checkHealth(request);
-    LOG.debug("Handling under-replicated EC container: {}", container);
-    if (currentUnderRepRes
-        .getHealthState() != ContainerHealthResult.HealthState
-        .UNDER_REPLICATED) {
+    if (replicaCount.isSufficientlyReplicated()) {
       LOG.info("The container {} state changed and it's not in under"
-              + " replication any more. Current state is: {}",
-          container.getContainerID(), currentUnderRepRes);
-      return emptyMap();
+              + " replication any more.", container.getContainerID());
+      return 0;
     }
+    if (replicaCount.isSufficientlyReplicated(true)) {
+      LOG.info("The container {} with replicas {} will be sufficiently " +
+          "replicated after pending replicas are created",
+          container.getContainerID(), replicaCount.getReplicas());
+      return 0;
+    }
+
     // don't place reconstructed replicas on exclude nodes, since they already
     // have replicas
     List<DatanodeDetails> excludedNodes = replicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
+    // DNs that are already waiting to receive replicas cannot be targets
+    excludedNodes.addAll(
+        pendingOps.stream()
+        .filter(containerReplicaOp -> containerReplicaOp.getOpType() ==
+            ContainerReplicaOp.PendingOpType.ADD)
+        .map(ContainerReplicaOp::getTarget)
+        .collect(Collectors.toList()));
 
-    ContainerHealthResult.UnderReplicatedHealthResult containerHealthResult =
-        ((ContainerHealthResult.UnderReplicatedHealthResult)
-            currentUnderRepRes);
-    if (containerHealthResult.isSufficientlyReplicatedAfterPending()) {
-      LOG.info("The container {} with replicas {} is sufficiently replicated",
-          container.getContainerID(), replicaCount.getReplicas());
-      return emptyMap();
-    }
-    if (replicaCount.isUnrecoverable()) {
-      LOG.warn("The container {} is unrecoverable. The available replicas" +
-          " are: {}.", container.containerID(), replicaCount.getReplicas());
-      return emptyMap();
-    }
     final ContainerID id = container.containerID();
-    final Map<DatanodeDetails, SCMCommand<?>> commands = new HashMap<>();
+    int commandsSent = 0;
     try {
-     // State is UNDER_REPLICATED
       final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
       for (ContainerReplicaOp op : pendingOps) {
         if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
           deletionInFlight.add(op.getTarget());
         }
       }
-      List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
+
       Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
-              filterSources(replicas, deletionInFlight);
-      List<DatanodeDetails> nodes =
-              sources.values().stream().map(Pair::getLeft)
-                      .map(ContainerReplica::getDatanodeDetails)
-                      .filter(datanodeDetails ->
-                              datanodeDetails.getPersistedOpState() ==
-                              HddsProtos.NodeOperationalState.IN_SERVICE)
-                      .collect(Collectors.toList());
-      // We got the missing indexes, this is excluded any decommissioning
-      // indexes. Find the good source nodes.
-      if (missingIndexes.size() > 0) {
+          filterSources(replicas, deletionInFlight);
+      List<DatanodeDetails> availableSourceNodes =
+          sources.values().stream().map(Pair::getLeft)
+              .map(ContainerReplica::getDatanodeDetails)
+              .filter(datanodeDetails ->
+                  datanodeDetails.getPersistedOpState() ==
+                      HddsProtos.NodeOperationalState.IN_SERVICE)
+              .collect(Collectors.toList());
 
-        LOG.debug("Missing indexes detected for the container {}." +
-                " The missing indexes are {}", id, missingIndexes);
-        // We have source nodes.
-        if (sources.size() >= repConfig.getData()) {
-          final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-              excludedNodes, container, missingIndexes.size());
-
-          if (validatePlacement(nodes, selectedDatanodes)) {
-            excludedNodes.addAll(selectedDatanodes);
-            nodes.addAll(selectedDatanodes);
-            List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
-                    sourceDatanodesWithIndex = new ArrayList<>();
-            for (Pair<ContainerReplica, NodeStatus> src : sources.values()) {
-              sourceDatanodesWithIndex.add(
-                      new ReconstructECContainersCommand
-                              .DatanodeDetailsAndReplicaIndex(
-                              src.getLeft().getDatanodeDetails(),
-                              src.getLeft().getReplicaIndex()));
-            }
-
-            final ReconstructECContainersCommand reconstructionCommand =
-                    new ReconstructECContainersCommand(id.getProtobuf().getId(),
-                            sourceDatanodesWithIndex, selectedDatanodes,
-                            int2byte(missingIndexes),
-                            repConfig);
-            // Keeping the first target node as coordinator.
-            commands.put(selectedDatanodes.get(0), reconstructionCommand);
-          }
+      try {
+        commandsSent += processMissingIndexes(replicaCount, sources,
+            availableSourceNodes, excludedNodes);
+        commandsSent += processDecommissioningIndexes(replicaCount, sources,
+            availableSourceNodes, excludedNodes);
+        commandsSent +=  processMaintenanceOnlyIndexes(replicaCount, sources,
+            excludedNodes);
+        // TODO - we should be able to catch SCMException here and check the
+        //        result code but the RackAware topology never sets the code.
+      } catch (CannotFindTargetsException e) {
+        // If we get here, we tried to find nodes to fix the under replication
+        // issues, but were not able to find any at some stage, and the
+        // placement policy threw an exception.
+        // At this stage. If the cluster is small and there are some
+        // over replicated indexes, it could stop us finding a new node as there
+        // are no more nodes left to try.
+        // If the container is also over replicated, then hand it off to the
+        // over-rep handler, and after those over-rep indexes are cleared the
+        // under replication can be re-tried in the next iteration of RM.
+        // However, we should only hand off to the over rep handler if there are
+        // no commands already created. If we have some commands, they may
+        // attempt to use sources the over-rep handler would remove. So we
+        // should let the commands we have created be processed, and then the
+        // container will be re-processed in a further RM pass.
+        LOG.debug("Unable to located new target nodes for container {}",
+            container, e);
+        if (commandsSent > 0) {
+          LOG.debug("Some commands have already been created, so returning " +
+              "with them only");
+          return commandsSent;
+        }
+        if (replicaCount.isOverReplicated()) {
+          LOG.debug("Container {} is both under and over replicated. Cannot " +
+              "find enough target nodes, so handing off to the " +
+              "OverReplication handler", container);
+          return replicationManager.processOverReplicatedContainer(result);
         } else {
-          LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
-              + " to insufficient source replicas found. Number of source "
-              + "replicas needed: {}. Number of available source replicas are:"
-              + " {}. Available sources are: {}", container.containerID(),
-              repConfig.getData(), sources.size(), sources);
+          throw (SCMException)e.getCause();
         }
       }
-      Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
-      if (decomIndexes.size() > 0) {
-        final List<DatanodeDetails> selectedDatanodes =
-            getTargetDatanodes(excludedNodes, container, decomIndexes.size());
-        if (validatePlacement(nodes, selectedDatanodes)) {
-          excludedNodes.addAll(selectedDatanodes);
-          Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
-          // In this case we need to do one to one copy.
-          for (ContainerReplica replica : replicas) {
-            if (decomIndexes.contains(replica.getReplicaIndex())) {
-              if (!iterator.hasNext()) {
-                LOG.warn("Couldn't find enough targets. Available source"
-                    + " nodes: {}, the target nodes: {}, excluded nodes: {} and"
-                    + "  the decommission indexes: {}",
-                    replicas, selectedDatanodes, excludedNodes, decomIndexes);
-                break;
-              }
-              DatanodeDetails decommissioningSrcNode
-                  = replica.getDatanodeDetails();
-              final ReplicateContainerCommand replicateCommand =
-                  new ReplicateContainerCommand(id.getProtobuf().getId(),
-                      ImmutableList.of(decommissioningSrcNode));
-              // For EC containers, we need to track the replica index which is
-              // to be replicated, so add it to the command.
-              replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-              DatanodeDetails target = iterator.next();
-              commands.put(target, replicateCommand);
-            }
-          }
-        }
-      }
-      processMaintenanceOnlyIndexes(replicaCount, replicas, excludedNodes,
-          commands);
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while processing for creating the EC reconstruction" +
-              " container commands for {}.",
+              " container commands for container {}.",
           id, ex);
       throw ex;
     }
-    if (commands.size() == 0) {
+    if (commandsSent == 0) {
       LOG.warn("Container {} is under replicated, but no commands were " +
           "created to correct it", id);
     }
-    return commands;
+    return commandsSent;
   }
 
   private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
@@ -270,8 +224,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         // maintenance nodes, as the replicas will remain present in the
         // container manager, even when they go dead.
         .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
-        .map(r -> Pair.of(r, ReplicationManager
-            .getNodeStatus(r.getDatanodeDetails(), nodeManager)))
+        .map(r -> {
+          try {
+            return Pair.of(r,
+                replicationManager.getNodeStatus(r.getDatanodeDetails()));
+          } catch (NodeNotFoundException e) {
+            throw new IllegalStateException("Unable to find NodeStatus for "
+                + r.getDatanodeDetails(), e);
+          }
+        })
         .filter(pair -> pair.getRight().isHealthy())
         // If there are multiple nodes online for a given index, we just
         // pick any IN_SERVICE one. At the moment, the input streams cannot
@@ -299,62 +260,220 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     // size may be changed smaller than origin, we should be defensive.
     final long dataSizeRequired =
         Math.max(container.getUsedBytes(), currentContainerSize);
-    return containerPlacement
-        .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
-            dataSizeRequired);
+    try {
+      return containerPlacement
+          .chooseDatanodes(excludedNodes, null, requiredNodes, 0,
+              dataSizeRequired);
+    } catch (SCMException e) {
+      // SCMException can come from many places in SCM, so catch it here and
+      // throw a more specific exception instead.
+      throw new CannotFindTargetsException(e);
+    }
+  }
+
+  /**
+   * Processes replicas that are in maintenance nodes and should need
+   * additional copies.
+   * @return number of commands sent
+   * @throws IOException
+   */
+  private int processMissingIndexes(
+      ECContainerReplicaCount replicaCount, Map<Integer,
+      Pair<ContainerReplica, NodeStatus>> sources,
+      List<DatanodeDetails> availableSourceNodes,
+      List<DatanodeDetails> excludedNodes) throws IOException {
+    ContainerInfo container = replicaCount.getContainer();
+    ECReplicationConfig repConfig =
+        (ECReplicationConfig)container.getReplicationConfig();
+    List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
+    if (missingIndexes.size() == 0) {
+      return 0;
+    }
+
+    int commandsSent = 0;
+    if (sources.size() >= repConfig.getData()) {
+      final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
+          excludedNodes, container, missingIndexes.size());
+
+      if (validatePlacement(availableSourceNodes, selectedDatanodes)) {
+        excludedNodes.addAll(selectedDatanodes);
+        // TODO - what are we adding all the selected nodes to available
+        //        sources?
+        availableSourceNodes.addAll(selectedDatanodes);
+        List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
+            sourceDatanodesWithIndex = new ArrayList<>();
+        for (Pair<ContainerReplica, NodeStatus> src : sources.values()) {
+          sourceDatanodesWithIndex.add(
+              new ReconstructECContainersCommand
+                  .DatanodeDetailsAndReplicaIndex(
+                  src.getLeft().getDatanodeDetails(),
+                  src.getLeft().getReplicaIndex()));
+        }
+
+        final ReconstructECContainersCommand reconstructionCommand =
+            new ReconstructECContainersCommand(container.getContainerID(),
+                sourceDatanodesWithIndex, selectedDatanodes,
+                int2byte(missingIndexes),
+                repConfig);
+        replicationManager.sendDatanodeCommand(reconstructionCommand,
+            container, selectedDatanodes.get(0));
+        // For each index that is going to be reconstructed with this command,
+        // adjust the replica count to reflect the pending operation.
+        for (int i = 0; i < missingIndexes.size(); i++) {
+          adjustPendingOps(
+              replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));
+        }
+        commandsSent++;
+      }
+    } else {
+      LOG.warn("Cannot proceed for EC container reconstruction for {}, due"
+              + " to insufficient source replicas found. Number of source "
+              + "replicas needed: {}. Number of available source replicas are:"
+              + " {}. Available sources are: {}", container.containerID(),
+          repConfig.getData(), sources.size(), sources);
+    }
+    return commandsSent;
+  }
+
+  /**
+   * Processes replicas that are in maintenance nodes and should need
+   * additional copies.
+   * @return number of commands sent
+   * @throws IOException
+   */
+  private int processDecommissioningIndexes(
+      ECContainerReplicaCount replicaCount,
+      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
+      List<DatanodeDetails> availableSourceNodes,
+      List<DatanodeDetails> excludedNodes) throws IOException {
+    ContainerInfo container = replicaCount.getContainer();
+    Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
+    int commandsSent = 0;
+    if (decomIndexes.size() > 0) {
+      final List<DatanodeDetails> selectedDatanodes =
+          getTargetDatanodes(excludedNodes, container, decomIndexes.size());
+      if (validatePlacement(availableSourceNodes, selectedDatanodes)) {
+        excludedNodes.addAll(selectedDatanodes);
+        Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
+        // In this case we need to do one to one copy.
+        for (Integer decomIndex : decomIndexes) {
+          Pair<ContainerReplica, NodeStatus> source = sources.get(decomIndex);
+          if (source == null) {
+            LOG.warn("Cannot find source replica for decommissioning index " +
+                    "{} in container {}", decomIndex, container.containerID());
+            continue;
+          }
+          ContainerReplica sourceReplica = source.getLeft();
+          if (!iterator.hasNext()) {
+            LOG.warn("Couldn't find enough targets. Available source"
+                + " nodes: {}, the target nodes: {}, excluded nodes: {}"
+                + "  and the decommission indexes: {}",
+                sources.values().stream()
+                    .map(Pair::getLeft).collect(Collectors.toSet()),
+                selectedDatanodes, excludedNodes, decomIndexes);
+            break;
+          }
+          createReplicateCommand(
+              container, iterator, sourceReplica, replicaCount);
+          commandsSent++;
+        }
+      }
+    }
+    return commandsSent;
   }
 
   /**
    * Processes replicas that are in maintenance nodes and should need
    * additional copies.
    * @param replicaCount
-   * @param replicas set of container replicas
+   * @param sources Map of Replica Index to a pair of ContainerReplica and
+   *                NodeStatus. This is the list of available replicas.
    * @param excludedNodes nodes that should not be targets for new copies
-   * @param commands
+   * @@return number of commands sent
    * @throws IOException
    */
-  private void processMaintenanceOnlyIndexes(
-      ECContainerReplicaCount replicaCount, Set<ContainerReplica> replicas,
-      List<DatanodeDetails> excludedNodes,
-      Map<DatanodeDetails, SCMCommand<?>> commands) throws IOException {
+  private int processMaintenanceOnlyIndexes(
+      ECContainerReplicaCount replicaCount,
+      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
+      List<DatanodeDetails> excludedNodes) throws IOException {
     Set<Integer> maintIndexes = replicaCount.maintenanceOnlyIndexes(true);
     if (maintIndexes.isEmpty()) {
-      return;
+      return 0;
     }
 
     ContainerInfo container = replicaCount.getContainer();
     // this many maintenance replicas need another copy
     int additionalMaintenanceCopiesNeeded =
         replicaCount.additionalMaintenanceCopiesNeeded(true);
+    if (additionalMaintenanceCopiesNeeded == 0) {
+      return 0;
+    }
     List<DatanodeDetails> targets = getTargetDatanodes(excludedNodes, container,
         additionalMaintenanceCopiesNeeded);
     excludedNodes.addAll(targets);
 
     Iterator<DatanodeDetails> iterator = targets.iterator();
+    int commandsSent = 0;
     // copy replica from source maintenance DN to a target DN
-    for (ContainerReplica replica : replicas) {
-      if (maintIndexes.contains(replica.getReplicaIndex()) &&
-          additionalMaintenanceCopiesNeeded > 0) {
-        if (!iterator.hasNext()) {
-          LOG.warn("Couldn't find enough targets. Available source"
-                  + " nodes: {}, target nodes: {}, excluded nodes: {} and"
-                  + " maintenance indexes: {}",
-              replicas, targets, excludedNodes, maintIndexes);
-          break;
-        }
-        DatanodeDetails maintenanceSourceNode = replica.getDatanodeDetails();
-        final ReplicateContainerCommand replicateCommand =
-            new ReplicateContainerCommand(
-                container.containerID().getProtobuf().getId(),
-                ImmutableList.of(maintenanceSourceNode));
-        // For EC containers we need to track the replica index which is
-        // to be replicated, so add it to the command.
-        replicateCommand.setReplicaIndex(replica.getReplicaIndex());
-        DatanodeDetails target = iterator.next();
-        commands.put(target, replicateCommand);
-        additionalMaintenanceCopiesNeeded -= 1;
+
+    for (Integer maintIndex : maintIndexes) {
+      if (additionalMaintenanceCopiesNeeded <= 0) {
+        break;
       }
+      Pair<ContainerReplica, NodeStatus> source = sources.get(maintIndex);
+      if (source == null) {
+        LOG.warn("Cannot find source replica for maintenance index " +
+            "{} in container {}", maintIndex, container.containerID());
+        continue;
+      }
+      ContainerReplica sourceReplica = source.getLeft();
+      if (!iterator.hasNext()) {
+        LOG.warn("Couldn't find enough targets. Available source"
+                + " nodes: {}, target nodes: {}, excluded nodes: {} and"
+                + " maintenance indexes: {}",
+            sources.values().stream()
+                .map(Pair::getLeft).collect(Collectors.toSet()),
+            targets, excludedNodes, maintIndexes);
+        break;
+      }
+      createReplicateCommand(container, iterator, sourceReplica, replicaCount);
+      commandsSent++;
+      additionalMaintenanceCopiesNeeded -= 1;
     }
+    return commandsSent;
+  }
+
+  private void createReplicateCommand(
+      ContainerInfo container, Iterator<DatanodeDetails> iterator,
+      ContainerReplica replica, ECContainerReplicaCount replicaCount)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    final boolean push = replicationManager.getConfig().isPush();
+    DatanodeDetails source = replica.getDatanodeDetails();
+    DatanodeDetails target = iterator.next();
+    final long containerID = container.getContainerID();
+
+    if (push) {
+      replicationManager.sendThrottledReplicationCommand(
+          container, Collections.singletonList(source), target,
+          replica.getReplicaIndex());
+    } else {
+      ReplicateContainerCommand replicateCommand =
+          ReplicateContainerCommand.fromSources(containerID,
+          ImmutableList.of(source));
+      // For EC containers, we need to track the replica index which is
+      // to be replicated, so add it to the command.
+      replicateCommand.setReplicaIndex(replica.getReplicaIndex());
+      replicationManager.sendDatanodeCommand(replicateCommand, container,
+          target);
+    }
+    adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
+  }
+
+  private void adjustPendingOps(ECContainerReplicaCount replicaCount,
+      DatanodeDetails target, int replicaIndex) {
+    replicaCount.addPendingOp(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex,
+        Long.MAX_VALUE));
   }
 
   private static byte[] int2byte(List<Integer> src) {

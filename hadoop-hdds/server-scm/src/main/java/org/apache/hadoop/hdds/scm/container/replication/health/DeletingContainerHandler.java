@@ -60,14 +60,19 @@ public class DeletingContainerHandler extends AbstractCheck {
     HddsProtos.LifeCycleState containerState = containerInfo.getState();
 
     if (containerState == HddsProtos.LifeCycleState.DELETED) {
+      LOG.debug("Container {} is DELETED so returning true", containerInfo);
       return true;
     }
 
     if (containerState != HddsProtos.LifeCycleState.DELETING) {
       return false;
     }
+    LOG.debug("Checking container {} in DeletingContainerHandler",
+        containerInfo);
 
     if (request.getContainerReplicas().size() == 0) {
+      LOG.debug("Deleting Container {} has no replicas so marking for cleanup" +
+          " and returning true", containerInfo);
       replicationManager.updateContainerState(
           cID, HddsProtos.LifeCycleEvent.CLEANUP);
       return true;
@@ -82,7 +87,8 @@ public class DeletingContainerHandler extends AbstractCheck {
         .forEach(rp -> {
           try {
             replicationManager.sendDeleteCommand(
-                containerInfo, rp.getReplicaIndex(), rp.getDatanodeDetails());
+                containerInfo, rp.getReplicaIndex(), rp.getDatanodeDetails(),
+                false);
           } catch (NotLeaderException e) {
             LOG.warn("Failed to delete empty replica with index {} for " +
                     "container {} on datanode {}", rp.getReplicaIndex(),

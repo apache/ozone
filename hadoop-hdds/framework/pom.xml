@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-server-framework</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Server Framework
   </description>
   <name>Apache Ozone HDDS Server Framework</name>
@@ -46,6 +46,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -110,10 +114,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
-    </dependency>
-    <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_dropwizard</artifactId>
     </dependency>
@@ -160,6 +160,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>spotbugs-annotations</artifactId>
       <scope>compile</scope>
     </dependency>
+
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>rocksdb-checkpoint-differ</artifactId>
+      <version>${hdds.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+    </dependency>
   </dependencies>
 
 
@@ -171,6 +181,17 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
