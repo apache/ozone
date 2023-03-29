@@ -23,7 +23,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation to mark a class that belongs to a specific HDDS Layout Version.
+ * Annotation to mark a class or a field declaration that belongs to a specific
+ * HDDS Layout Version.
  */
 @Target({ElementType.TYPE, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
