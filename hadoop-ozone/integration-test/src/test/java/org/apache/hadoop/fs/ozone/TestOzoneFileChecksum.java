@@ -37,14 +37,13 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.StringUtils;
-import org.junit.Rule;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.List;
@@ -59,10 +58,8 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * Test FileChecksum API.
  */
+@Timeout(100)
 public class TestOzoneFileChecksum {
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(100);
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster = null;
