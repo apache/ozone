@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -88,6 +89,8 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           moveDeletedKeysRequest.getNextDBKeysList();
       List<SnapshotMoveKeyInfos> reclaimKeysList =
           moveDeletedKeysRequest.getReclaimKeysList();
+      List<HddsProtos.KeyValue> renamedKeysList =
+          moveDeletedKeysRequest.getRenamedKeysList();
 
       OmSnapshot omNextSnapshot = null;
 
@@ -100,7 +103,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), omFromSnapshot, omNextSnapshot,
-          nextDBKeysList, reclaimKeysList);
+          nextDBKeysList, reclaimKeysList, renamedKeysList);
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
