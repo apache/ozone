@@ -869,11 +869,14 @@ public class TestReplicationManager {
       sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), i * 5);
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.replicateContainerCommand)))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
         .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           DatanodeDetails dn = invocation.getArgument(0);
-          return sourceNodes.get(dn);
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              sourceNodes.get(dn));
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return counts;
         });
 
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
@@ -908,12 +911,15 @@ public class TestReplicationManager {
       sourceNodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.replicateContainerCommand)))
-        .thenAnswer(invocation -> replicationCount);
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
-        .thenAnswer(invocation -> reconstructionCount);
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              replicationCount);
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand,
+              reconstructionCount);
+          return counts;
+        });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
@@ -931,11 +937,14 @@ public class TestReplicationManager {
     targetNodes.put(cmdTarget, 0);
     targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
         .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           DatanodeDetails dn = invocation.getArgument(0);
-          return targetNodes.get(dn);
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              targetNodes.get(dn));
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return counts;
         });
 
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
@@ -969,12 +978,15 @@ public class TestReplicationManager {
     targets.add(MockDatanodeDetails.randomDatanodeDetails());
     targets.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.replicateContainerCommand)))
-        .thenAnswer(invocation -> replicationCount);
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
-        .thenAnswer(invocation -> reconstructionCount);
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              replicationCount);
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand,
+              reconstructionCount);
+          return counts;
+        });
 
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);

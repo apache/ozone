@@ -567,10 +567,10 @@ public class ReplicationManager implements SCMService {
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
-        int replicateCount = nodeManager.getTotalDatanodeCommandCount(dn,
-            Type.replicateContainerCommand);
-        int reconstructCount = nodeManager.getTotalDatanodeCommandCount(dn,
-            Type.reconstructECContainersCommand);
+        Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
+            dn, Type.replicateContainerCommand, Type.replicateContainerCommand);
+        int replicateCount = counts.get(Type.replicateContainerCommand);
+        int reconstructCount = counts.get(Type.reconstructECContainersCommand);
         int totalCount = replicateCount
             + reconstructCount * reconstructionCommandWeight;
         if (totalCount >= datanodeReplicationLimit) {
