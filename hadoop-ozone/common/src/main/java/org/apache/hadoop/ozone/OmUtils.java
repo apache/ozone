@@ -277,6 +277,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case InfoLifecycleConfiguration:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -338,6 +339,8 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case CreateLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -916,7 +919,7 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
           List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
     List<List<String>> omInfoList = new ArrayList<>();

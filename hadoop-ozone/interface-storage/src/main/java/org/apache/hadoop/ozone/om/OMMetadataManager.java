@@ -477,6 +477,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
   List<OmLifecycleConfiguration> listLifecycleConfigurations();
 
   /**
+   * Fetches the lifecycle configuration by bucketName.
+   *
+   * @param bucketName bucketName of the lifecycle configuration
+   * @return OmLifecycleConfiguration
+   * @throws IOException
+   */
+  OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException;
+
+  /**
    * Gets the OM Meta table.
    * @return meta table reference.
    */

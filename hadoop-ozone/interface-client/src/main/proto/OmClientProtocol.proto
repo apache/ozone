@@ -156,6 +156,9 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  CreateLifecycleConfiguration = 150;
+  InfoLifecycleConfiguration   = 151;
+  DeleteLifecycleConfiguration = 152;
 }
 
 enum SafeMode {
@@ -303,6 +306,10 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+
+  optional CreateLifecycleConfigurationRequest createLifecycleConfigurationRequest = 150;
+  optional InfoLifecycleConfigurationRequest   infoLifecycleConfigurationRequest   = 151;
+  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 152;
 }
 
 message OMResponse {
@@ -436,6 +443,10 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+
+  optional CreateLifecycleConfigurationResponse createLifecycleConfigurationResponse = 150;
+  optional InfoLifecycleConfigurationResponse   infoLifecycleConfigurationResponse   = 151;
+  optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 152;
 }
 
 enum Status {
@@ -2383,6 +2394,32 @@ message LifecycleConfiguration {
   repeated LifecycleRule rules = 5;
   optional uint64 objectID = 6;
   optional uint64 updateID = 7;
+}
+
+message CreateLifecycleConfigurationRequest {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message CreateLifecycleConfigurationResponse {
+
+}
+
+message InfoLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message InfoLifecycleConfigurationResponse {
+  required LifecycleConfiguration lifecycleConfiguration = 1;
+}
+
+message DeleteLifecycleConfigurationRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+}
+
+message DeleteLifecycleConfigurationResponse {
+
 }
 
 /**
