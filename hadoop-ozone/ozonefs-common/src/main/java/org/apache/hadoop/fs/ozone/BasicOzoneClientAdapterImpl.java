@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -71,6 +72,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -650,8 +652,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
-      String fromSnapshot, String toSnapshot) throws IOException {
-    return objectStore.snapshotDiff(volume.getName(), bucket.getName(),
-        fromSnapshot, toSnapshot, "", -1, false).getSnapshotDiffReport();
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException {
+    SnapshotDiffResponse snapshotDiffResponse = null;
+    do {
+      snapshotDiffResponse =
+          objectStore.snapshotDiff(volume.getName(), bucket.getName(),
+              fromSnapshot, toSnapshot, "", -1, false);
+      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
+    } while (snapshotDiffResponse.getJobStatus() != DONE);
+    return snapshotDiffResponse.getSnapshotDiffReport();
   }
 }

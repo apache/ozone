@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
@@ -89,6 +90,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -1286,10 +1288,16 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
-      String fromSnapshot, String toSnapshot) throws IOException {
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException {
     OFSPath ofsPath = new OFSPath(snapshotDir, config);
-    return proxy.snapshotDiff(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-        fromSnapshot, toSnapshot, "", -1, false).getSnapshotDiffReport();
+    SnapshotDiffResponse snapshotDiffResponse = null;
+    do {
+      snapshotDiffResponse = objectStore.snapshotDiff(ofsPath.getVolumeName(),
+          ofsPath.getBucketName(), fromSnapshot, toSnapshot, "", -1, false);
+      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
+    } while (snapshotDiffResponse.getJobStatus() != DONE);
+    return snapshotDiffResponse.getSnapshotDiffReport();
   }
 
 }
