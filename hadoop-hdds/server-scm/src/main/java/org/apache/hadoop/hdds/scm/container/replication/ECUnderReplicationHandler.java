@@ -317,6 +317,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 repConfig);
         replicationManager.sendThrottledReconstructionCommand(
             container, reconstructionCommand);
+        for (int i = 0; i < missingIndexes.size(); i++) {
+          adjustPendingOps(
+              replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));
+        }
         commandsSent++;
       }
     } else {
@@ -460,6 +464,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       replicationManager.sendDatanodeCommand(replicateCommand, container,
           target);
     }
+    adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
+  }
+
+  private void adjustPendingOps(ECContainerReplicaCount replicaCount,
+                                DatanodeDetails target, int replicaIndex) {
+    replicaCount.addPendingOp(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex,
+        Long.MAX_VALUE));
   }
 
   private static byte[] int2byte(List<Integer> src) {
