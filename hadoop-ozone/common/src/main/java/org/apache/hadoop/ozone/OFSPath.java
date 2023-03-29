@@ -31,6 +31,7 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
@@ -165,10 +166,10 @@ public class OFSPath {
 
   /**
    * Returns the last element of the KeyName, which can either be a file name
-   * or the leaf directory/bucket.
+   * or the leaf directory.
    */
   public String getFileName() {
-    return keyName.substring(keyName.lastIndexOf(OZONE_URI_DELIMITER) + 1);
+    return Paths.get(keyName).getFileName().toString();
   }
 
   private boolean isEmpty() {

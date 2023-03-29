@@ -138,7 +138,7 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Test
-  public void testKeyToBucketLevel() throws IOException {
+  public void testKeyRenameToBucketLevel() throws IOException {
     final String dir = "dir1";
     final String key = dir + "/key1";
     final Path source = new Path(getBucketPath(), key);
