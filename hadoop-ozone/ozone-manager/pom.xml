@@ -186,10 +186,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.elasticsearch</groupId>
           <artifactId>*</artifactId>
         </exclusion>
