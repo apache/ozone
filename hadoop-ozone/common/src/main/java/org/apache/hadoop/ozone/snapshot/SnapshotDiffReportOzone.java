@@ -149,9 +149,10 @@ public class SnapshotDiffReport
       return null;
     }
     DiffType type = fromProtobufDiffType(entry.getDiffType());
-    return type == null ? null :
-        new DiffReportEntry(type, entry.getSourcePath().getBytes(),
-            entry.hasTargetPath() ? entry.getTargetPath().getBytes() : null);
+    return type == null ? null : new DiffReportEntry(type,
+        entry.getSourcePath().getBytes(StandardCharsets.UTF_8),
+        entry.hasTargetPath() ?
+            entry.getTargetPath().getBytes(StandardCharsets.UTF_8) : null);
   }
 
   public static OzoneManagerProtocolProtos
@@ -161,7 +162,8 @@ public class SnapshotDiffReport
     builder.setDiffType(toProtobufDiffType(entry.getType()))
         .setSourcePath(new String(entry.getSourcePath()));
     if (entry.getTargetPath() != null) {
-      String targetPath = new String(entry.getTargetPath());
+      String targetPath =
+          new String(entry.getTargetPath(), StandardCharsets.UTF_8);
       builder.setTargetPath(targetPath);
     }
     return builder.build();

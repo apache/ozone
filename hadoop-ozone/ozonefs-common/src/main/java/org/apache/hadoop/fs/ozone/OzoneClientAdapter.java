@@ -89,5 +89,6 @@ public interface OzoneClientAdapter {
   String createSnapshot(String pathStr, String snapshotName) throws IOException;
 
   SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
-      String fromSnapshot, String toSnapshot) throws IOException,InterruptedException;
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException;
 }

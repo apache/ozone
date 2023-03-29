@@ -1419,7 +1419,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
-      final String fromSnapshot, final String toSnapshot) throws IOException,InterruptedException {
+      final String fromSnapshot, final String toSnapshot)
+      throws IOException, InterruptedException {
     OFSPath ofsPath =
         new OFSPath(snapshotDir, OzoneConfiguration.of(getConf()));
     Preconditions.checkArgument(ofsPath.isBucket(),
