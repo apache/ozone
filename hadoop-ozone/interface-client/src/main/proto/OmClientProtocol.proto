@@ -1711,6 +1711,7 @@ message SnapshotMoveDeletedKeysRequest {
   optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
 }
 
 message SnapshotMoveKeyInfos {
