@@ -81,10 +81,7 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -210,13 +207,13 @@ public class SnapshotDiffManager implements AutoCloseable {
             OzoneConfigKeys
                 .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
             StorageUnit.BYTES);
-    ExecutorService executorService = new ThreadPoolExecutor(0,
+    ExecutorService execService = new ThreadPoolExecutor(0,
             threadPoolSize, 60, TimeUnit.SECONDS,
             new SynchronousQueue<>(), new ThreadFactoryBuilder()
             .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
             .build(),
             new ThreadPoolExecutor.DiscardPolicy());
-    sstDumpTool = new ManagedSSTDumpTool(executorService, bufferSize);
+    sstDumpTool = new ManagedSSTDumpTool(execService, bufferSize);
   }
 
   private Map<String, String> getTablePrefixes(
@@ -257,7 +254,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private Set<String> getSSTFileListForSnapshot(OmSnapshot snapshot,
-                                                List<String> tablesToLookUp) throws RocksDBException {
+          List<String> tablesToLookUp) throws RocksDBException {
     return RdbUtil.getSSTFilesForComparison(snapshot
         .getMetadataManager().getStore().getDbLocation()
         .getPath(), tablesToLookUp);
