@@ -81,19 +81,10 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -471,7 +462,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
     ColumnFamilyHandle objectIDsColumnFamily = null;
-
     try {
       // JobId is prepended to column families name to make them unique
       // for request.
@@ -491,30 +481,19 @@ public class SnapshotDiffManager implements AutoCloseable {
       // Note: Store objectId and keyName as byte array to reduce unnecessary
       // serialization and deserialization.
       final PersistentMap<byte[], byte[]> objectIdToKeyNameMapForFromSnapshot =
-          new RocksDbPersistentMap<>(db,
-              fromSnapshotColumnFamily,
-              codecRegistry,
-              byte[].class,
-              byte[].class);
-
+          new RocksDbPersistentMap<>(db, fromSnapshotColumnFamily,
+              codecRegistry, byte[].class, byte[].class);
       // ObjectId to keyName map to keep key info for toSnapshot.
       final PersistentMap<byte[], byte[]> objectIdToKeyNameMapForToSnapshot =
-          new RocksDbPersistentMap<>(db,
-              toSnapshotColumnFamily,
-              codecRegistry,
-              byte[].class,
-              byte[].class);
-
+          new RocksDbPersistentMap<>(db, toSnapshotColumnFamily, codecRegistry,
+              byte[].class, byte[].class);
       // Set of unique objectId between fromSnapshot and toSnapshot.
       final PersistentSet<byte[]> objectIDsToCheckMap =
-          new RocksDbPersistentSet<>(db,
-              objectIDsColumnFamily,
-              codecRegistry,
+          new RocksDbPersistentSet<>(db, objectIDsColumnFamily, codecRegistry,
               byte[].class);
 
       final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
           fromSnapshot.getMetadataManager());
-
       final Table<String, OmKeyInfo> fsKeyTable =
           fromSnapshot.getMetadataManager().getKeyTable(bucketLayout);
       final Table<String, OmKeyInfo> tsKeyTable =
@@ -537,37 +516,31 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       // Workaround to handle deletes if native rockstools for reading
       // tombstone is not loaded.
-      // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read to
-      //  read tombstone
+      // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
       if (!isNativeRocksToolsLoaded) {
         deltaFilesForKeyOrFileTable.addAll(getSSTFileListForSnapshot(
                 fromSnapshot, tablesToLookUp));
       }
       try {
-        addToObjectIdMap(fsKeyTable,
-            tsKeyTable,
+        addToObjectIdMap(fsKeyTable, tsKeyTable,
             Pair.of(isNativeRocksToolsLoaded, deltaFilesForKeyOrFileTable),
             objectIdToKeyNameMapForFromSnapshot,
-            objectIdToKeyNameMapForToSnapshot,
-            objectIDsToCheckMap,
+            objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
             tablePrefixes);
       } catch (NativeLibraryNotLoadedException e) {
         // Workaround to handle deletes if use of native rockstools for reading
         // tombstone fails.
-        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read to
-        //  read tombstone
+        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
         deltaFilesForKeyOrFileTable.addAll(getSSTFileListForSnapshot(
                 fromSnapshot, tablesToLookUp));
         try {
-          addToObjectIdMap(fsKeyTable,
-                  tsKeyTable,
-                  Pair.of(false, deltaFilesForKeyOrFileTable),
-                  objectIdToKeyNameMapForFromSnapshot,
-                  objectIdToKeyNameMapForToSnapshot,
-                  objectIDsToCheckMap,
-                  tablePrefixes);
+          addToObjectIdMap(fsKeyTable, tsKeyTable,
+              Pair.of(false, deltaFilesForKeyOrFileTable),
+              objectIdToKeyNameMapForFromSnapshot,
+              objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+              tablePrefixes);
         } catch (NativeLibraryNotLoadedException ex) {
-          //This code should be never executed.
+          // This code should be never executed.
           throw new IllegalStateException(ex);
         }
       }
@@ -586,8 +559,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                   fromSnapshot, tablesToLookUp));
         }
         try {
-          addToObjectIdMap(fsDirTable,
-              tsDirTable,
+          addToObjectIdMap(fsDirTable, tsDirTable,
               Pair.of(isNativeRocksToolsLoaded, deltaFilesForDirTable),
               objectIdToKeyNameMapForFromSnapshot,
               objectIdToKeyNameMapForToSnapshot,
@@ -597,26 +569,21 @@ public class SnapshotDiffManager implements AutoCloseable {
           try {
             // Workaround to handle deletes if use of native rockstools for
             // reading tombstone fails.
-            // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read to
-            //  read tombstone
+            // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
             deltaFilesForDirTable.addAll(getSSTFileListForSnapshot(
                     fromSnapshot, tablesToLookUp));
-            addToObjectIdMap(fsDirTable,
-                    tsDirTable,
-                    Pair.of(false, deltaFilesForDirTable),
-                    objectIdToKeyNameMapForFromSnapshot,
-                    objectIdToKeyNameMapForToSnapshot,
-                    objectIDsToCheckMap,
-                    tablePrefixes);
+            addToObjectIdMap(fsDirTable, tsDirTable,
+                Pair.of(false, deltaFilesForDirTable),
+                objectIdToKeyNameMapForFromSnapshot,
+                objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+                tablePrefixes);
           } catch (NativeLibraryNotLoadedException ex) {
-            //This code should be never executed.
+            // This code should be never executed.
             throw new IllegalStateException(ex);
           }
         }
       }
-
-      generateDiffReport(jobId,
-          objectIDsToCheckMap,
+      generateDiffReport(jobId, objectIDsToCheckMap,
           objectIdToKeyNameMapForFromSnapshot,
           objectIdToKeyNameMapForToSnapshot);
       updateJobStatus(jobKey, IN_PROGRESS, DONE);
@@ -643,14 +610,13 @@ public class SnapshotDiffManager implements AutoCloseable {
       throws IOException, NativeLibraryNotLoadedException {
 
     Set<String> deltaFiles = isNativeRocksToolsLoadedDeltaFilesPair.getRight();
-    boolean nativeRocksToolsLoaded =
-            isNativeRocksToolsLoadedDeltaFilesPair.getLeft();
-    boolean isDirectoryTable =
-        fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
-
     if (deltaFiles.isEmpty()) {
       return;
     }
+    boolean nativeRocksToolsLoaded =
+        isNativeRocksToolsLoadedDeltaFilesPair.getLeft();
+    boolean isDirectoryTable =
+        fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     try (Stream<String> keysToCheck = nativeRocksToolsLoaded
                  ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool)

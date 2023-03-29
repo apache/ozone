@@ -69,10 +69,10 @@ public class ManagedSstFileReader {
   public Stream<String> getKeyStream() throws RocksDBException,
           NativeLibraryNotLoadedException, IOException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
-    ManagedOptions options = new ManagedOptions();
-    ReadOptions readOptions = new ManagedReadOptions();
     final MultipleSstFileIterator<String> itr =
             new MultipleSstFileIterator<String>(sstFiles) {
+            private ManagedOptions options = new ManagedOptions();
+            private ReadOptions readOptions = new ManagedReadOptions();
           @Override
           protected CloseableIterator<String>
               getKeyIteratorForFile(String file) throws RocksDBException {
