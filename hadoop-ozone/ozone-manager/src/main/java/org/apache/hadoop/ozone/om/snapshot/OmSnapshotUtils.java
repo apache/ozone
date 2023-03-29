@@ -54,7 +54,7 @@ public final class OmSnapshotUtils {
   }
 
   /**
-   * Get the INode for file
+   * Get the INode for file.
    *
    * @param file File whose INode is to be retrieved.
    * @return INode for file.
