@@ -1341,6 +1341,7 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+    optional bool dbUpdateSuccess = 4;
 }
 
 message RangerBGSyncRequest {
@@ -1712,6 +1713,7 @@ message SnapshotMoveDeletedKeysRequest {
   optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
 }
 
 message SnapshotMoveKeyInfos {

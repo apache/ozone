@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -56,6 +57,7 @@ public class TestContainerBalancer {
   private ContainerBalancerConfiguration balancerConfiguration;
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private StatefulServiceStateManager serviceStateManager;
+  private OzoneConfiguration conf;
 
   /**
    * Sets up configuration values and creates a mock cluster.
@@ -63,7 +65,7 @@ public class TestContainerBalancer {
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException,
       TimeoutException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     scm = Mockito.mock(StorageContainerManager.class);
     serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
     balancerConfiguration =
@@ -199,7 +201,7 @@ public class TestContainerBalancer {
    */
   @Test
   public void testValidationOfConfigurations() {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
 
     conf.setTimeDuration(
         "hdds.container.balancer.move.replication.timeout", 60,
@@ -215,6 +217,55 @@ public class TestContainerBalancer {
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
             "be less than hdds.container.balancer.move.timeout.");
+  }
+
+  /**
+   * Tests that ContainerBalancerTask starts with a delay of
+   * "hdds.scm.wait.time.after.safemode.exit" when ContainerBalancer receives
+   * status change notification in
+   * {@link ContainerBalancer#notifyStatusChanged()}.
+   */
+  @Test
+  public void testDelayedStartOnSCMStatusChange()
+      throws IllegalContainerBalancerStateException, IOException,
+      InvalidContainerBalancerConfigurationException, TimeoutException,
+      InterruptedException {
+    long delayDuration = 10;
+    conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit",
+        delayDuration, TimeUnit.SECONDS);
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+
+    // Start the ContainerBalancer service.
+    containerBalancer.startBalancer(balancerConfiguration);
+    GenericTestUtils.waitFor(() -> containerBalancer.isBalancerRunning(), 1,
+        20);
+    Assertions.assertTrue(containerBalancer.isBalancerRunning());
+
+    // Balancer should stop the current balancing thread when it receives a
+    // status change notification
+    scm.getScmContext().updateLeaderAndTerm(false, 1);
+    containerBalancer.notifyStatusChanged();
+    Assertions.assertFalse(containerBalancer.isBalancerRunning());
+
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(ContainerBalancerTask.LOG);
+    String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
+        " seconds before starting balancing.";
+    /*
+     Send a status change notification again and check whether balancer
+     starts balancing. We're actually just checking for the expected log
+     line here.
+     */
+    scm.getScmContext().updateLeaderAndTerm(true, 2);
+    scm.getScmContext().setLeaderReady();
+    containerBalancer.notifyStatusChanged();
+    Assertions.assertTrue(containerBalancer.isBalancerRunning());
+    Thread balancingThread = containerBalancer.getCurrentBalancingThread();
+    GenericTestUtils.waitFor(
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
+    Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
+    stopBalancer();
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)

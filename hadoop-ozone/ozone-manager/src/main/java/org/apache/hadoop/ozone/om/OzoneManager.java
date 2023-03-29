@@ -199,7 +199,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
-import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -288,6 +287,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServicePro
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -2622,12 +2622,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         String remoteUserName = remoteUserUgi.getShortUserName();
-        // Convert userName to short username
-        String userParamShortName = new HadoopKerberosName(userName)
-            .getShortName();
         // if not admin nor list my own volumes, check ACL.
-        if (!remoteUserName.equals(userParamShortName)
-            && !isAdmin(remoteUserUgi)) {
+        if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
           omMetadataReader.checkAcls(ResourceType.VOLUME,
               StoreType.OZONE, ACLType.LIST,
               OzoneConsts.OZONE_ROOT, null, null);
@@ -3092,8 +3088,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
+
+      final GrpcTlsConfig tlsConfig =
+          OzoneManagerRatisUtils.createServerTlsConfig(
+              secConfig, certClient, true);
+
       RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
-          targetPeerId);
+          targetPeerId, tlsConfig);
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -3980,6 +3981,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
     dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
     dbUpdates.setLatestSequenceNumber(updatesSince.getLatestSequenceNumber());
+    dbUpdates.setDBUpdateSuccess(updatesSince.isDBUpdateSuccess());
     return dbUpdates;
   }
 
@@ -4214,10 +4216,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Add to cache.
       metadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(dbVolumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionID));
+          CacheValue.get(transactionID, omVolumeArgs));
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
-          new CacheValue<>(Optional.of(userVolumeInfo), transactionID));
+          CacheValue.get(transactionID, userVolumeInfo));
       LOG.info("Created Volume {} With Owner {} required for S3Gateway " +
               "operations.", s3VolumeName, userName);
     }

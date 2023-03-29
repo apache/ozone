@@ -225,7 +225,7 @@ public class TestContainerBalancerTask {
         .register(Mockito.any(SCMService.class));
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), balancerConfiguration);
+        sb.getMetrics(), balancerConfiguration, false);
   }
 
   @Test
@@ -261,7 +261,7 @@ public class TestContainerBalancerTask {
 
       balancerConfiguration.setThreshold(randomThreshold);
       containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-          sb.getMetrics(), balancerConfiguration);
+          sb.getMetrics(), balancerConfiguration, false);
       containerBalancerTask.run();
 
       unBalancedNodesAccordingToBalancer =
@@ -580,7 +580,7 @@ public class TestContainerBalancerTask {
     cbc.setBalancingInterval(1);
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc);
+        sb.getMetrics(), cbc, false);
     containerBalancerTask.run();
 
     stopBalancer();
@@ -619,7 +619,7 @@ public class TestContainerBalancerTask {
     cbc.setBalancingInterval(1);
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
-        sb.getMetrics(), cbc);
+        sb.getMetrics(), cbc, false);
     containerBalancerTask.run();
 
     stopBalancer();
@@ -978,6 +978,41 @@ public class TestContainerBalancerTask {
         containerBalancerTask.getMetrics()
             .getNumContainerMovesFailed() >= 3);
     stopBalancer();
+  }
+
+  @Test
+  public void testDelayedStart() throws InterruptedException, TimeoutException {
+    conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10,
+        TimeUnit.SECONDS);
+    ContainerBalancer balancer = new ContainerBalancer(scm);
+    containerBalancerTask = new ContainerBalancerTask(scm, 2, balancer,
+        balancer.getMetrics(), balancerConfiguration, true);
+    Thread balancingThread = new Thread(containerBalancerTask);
+    // start the thread and assert that balancer is RUNNING
+    balancingThread.start();
+    Assertions.assertEquals(ContainerBalancerTask.Status.RUNNING,
+        containerBalancerTask.getBalancerStatus());
+
+    /*
+     Wait for the thread to start sleeping and assert that it's sleeping.
+     This is the delay before it starts balancing.
+     */
+    GenericTestUtils.waitFor(
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
+    Assertions.assertEquals(Thread.State.TIMED_WAITING,
+        balancingThread.getState());
+
+    // interrupt the thread from its sleep, wait and assert that balancer has
+    // STOPPED
+    balancingThread.interrupt();
+    GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
+        ContainerBalancerTask.Status.STOPPED, 1, 20);
+    Assertions.assertEquals(ContainerBalancerTask.Status.STOPPED,
+        containerBalancerTask.getBalancerStatus());
+
+    // ensure the thread dies
+    GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
+    Assertions.assertFalse(balancingThread.isAlive());
   }
 
   /**

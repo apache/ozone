@@ -45,6 +45,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
@@ -105,6 +107,9 @@ public final class DBStoreBuilder {
   private boolean enableCompactionLog;
   private long maxTimeAllowedForSnapshotInDag;
   private long pruneCompactionDagDaemonRunInterval;
+  // this is to track the total size of dbUpdates data since sequence
+  // number in request to avoid increase in heap memory.
+  private long maxDbUpdatesSizeThreshold;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -162,6 +167,10 @@ public final class DBStoreBuilder {
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    this.maxDbUpdatesSizeThreshold = (long) configuration.getStorageSize(
+        OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT,
+        OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT, StorageUnit.BYTES);
   }
 
   private void applyDBDefinition(DBDefinition definition) {
@@ -219,7 +228,7 @@ public final class DBStoreBuilder {
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
           registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionLog, maxTimeAllowedForSnapshotInDag,
-          pruneCompactionDagDaemonRunInterval);
+          pruneCompactionDagDaemonRunInterval, maxDbUpdatesSizeThreshold);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }

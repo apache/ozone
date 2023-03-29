@@ -21,7 +21,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=true
-export OM_SERVICE_ID="id1"
+export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
@@ -33,13 +33,13 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-execute_robot_test ${SCM} kinit.robot
+execute_robot_test s3g kinit.robot
 
-execute_robot_test ${SCM} freon
+execute_robot_test s3g freon
 
-execute_robot_test ${SCM} -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
+execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
 
-execute_robot_test ${SCM} basic/links.robot
+execute_robot_test s3g basic/links.robot
 
 exclude=""
 for bucket in encrypted link; do
@@ -48,12 +48,16 @@ for bucket in encrypted link; do
   exclude="--exclude no-bucket-type"
 done
 
-execute_robot_test ${SCM} admincli
+execute_robot_test s3g admincli
 
-execute_robot_test ${SCM} httpfs
+execute_robot_test s3g omha/om-leader-transfer.robot
+execute_robot_test s3g scmha/scm-leader-transfer.robot
+
+execute_robot_test s3g httpfs
 
 export SCM=scm2.org
-execute_robot_test ${SCM} admincli
+execute_robot_test s3g admincli
+
 stop_docker_env
 
 generate_report
