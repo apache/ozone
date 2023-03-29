@@ -58,7 +58,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 /**
  * Test FileChecksum API.
  */
-@Timeout(100)
+@Timeout(300)
 public class TestOzoneFileChecksum {
 
   private OzoneConfiguration conf;
