@@ -84,7 +84,7 @@ public class RDBStore implements DBStore {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
         TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
-        maxDbUpdatesSizeThreshold,true);
+        maxDbUpdatesSizeThreshold, true);
   }
 
   @SuppressWarnings("parameternumber")
