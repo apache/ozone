@@ -98,7 +98,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -1004,7 +1003,7 @@ public class TestKeyManagerImpl {
           .getOzoneKey(VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i);
       metadataManager.getKeyTable(getDefaultBucketLayout())
           .addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(), 2L));
+              CacheValue.get(2L));
     }
   }
 
@@ -1074,7 +1073,7 @@ public class TestKeyManagerImpl {
           keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i);
       metadataManager.getKeyTable(getDefaultBucketLayout())
           .addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(), 2L));
+              CacheValue.get(2L));
     }
   }
 
@@ -1102,7 +1101,7 @@ public class TestKeyManagerImpl {
         // Mark as deleted in cache.
         metadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(key),
-                new CacheValue<>(Optional.absent(), 2L));
+                CacheValue.get(2L));
         deletedKeySet.add(key);
       }
     }
@@ -1138,7 +1137,7 @@ public class TestKeyManagerImpl {
             metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, key);
         metadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
-                new CacheValue<>(Optional.absent(), 2L));
+                CacheValue.get(2L));
         deletedKeySet.add(key);
       }
       doDelete = !doDelete;
@@ -1187,7 +1186,7 @@ public class TestKeyManagerImpl {
           metadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME, key);
       metadataManager.getKeyTable(getDefaultBucketLayout())
           .addCacheEntry(new CacheKey<>(ozoneKey),
-              new CacheValue<>(Optional.absent(), 2L));
+              CacheValue.get(2L));
       deletedKeySet.add(key);
     }
     // Update existKeySet

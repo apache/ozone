@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -358,7 +357,7 @@ public class TestS3MultipartResponse {
 
     omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-            new CacheValue<>(Optional.of(volumeArgs), 1));
+            CacheValue.get(1, volumeArgs));
   }
 
   public void addBucketToDB(String volumeName, String bucketName)
@@ -374,6 +373,6 @@ public class TestS3MultipartResponse {
     omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getBucketKey(
                     volumeName, bucketName)),
-            new CacheValue<>(Optional.of(omBucketInfo), 1));
+            CacheValue.get(1, omBucketInfo));
   }
 }

@@ -51,7 +51,10 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 /**
  * RocksDB Store that supports creating Tables in DB.
@@ -69,23 +72,19 @@ public class RDBStore implements DBStore {
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private final String dbJmxBeanName;
-  /**
-   * Name of the SST file backup directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionSSTBackupDirName = "compaction-sst-backup";
-  /**
-   * Name of the compaction log directory placed under metadata dir.
-   * Can be made configurable later.
-   */
-  private final String dbCompactionLogDirName = "compaction-log";
+
+  // this is to track the total size of dbUpdates data since sequence
+  // number in request to avoid increase in heap memory.
+  private long maxDbUpdatesSizeThreshold;
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families) throws IOException {
+                  Set<TableConfig> families, long maxDbUpdatesSizeThreshold)
+      throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1), true);
+        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
+        maxDbUpdatesSizeThreshold,true);
   }
 
   @SuppressWarnings("parameternumber")
@@ -95,11 +94,14 @@ public class RDBStore implements DBStore {
                   String dbJmxBeanNameName, boolean enableCompactionLog,
                   long maxTimeAllowedForSnapshotInDag,
                   long compactionDagDaemonInterval,
+                  long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs)
+
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
+    this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
     codecRegistry = registry;
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
@@ -108,8 +110,8 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), dbCompactionSSTBackupDirName,
-            dbCompactionLogDirName, dbLocation.toString(),
+            dbLocation.getParent(), DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR, dbLocation.toString(),
             maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
@@ -155,6 +157,12 @@ public class RDBStore implements DBStore {
       }
 
       if (enableCompactionLog) {
+        ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
+        Preconditions.checkNotNull(ssInfoTableCF,
+            "SnapshotInfoTable column family handle should not be null");
+        // Set CF handle in differ to be used in DB listener
+        rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
+            ssInfoTableCF.getHandle());
         // Finish the initialization of compaction DAG tracker by setting the
         // sequence number as current compaction log filename.
         rocksDBCheckpointDiffer.setCurrentCompactionLog(
@@ -359,6 +367,7 @@ public class RDBStore implements DBStore {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
+    long cumulativeDBUpdateLogBatchSize = 0L;
     DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
     try (ManagedTransactionLogIterator logIterator =
         db.getUpdatesSince(sequenceNumber)) {
@@ -403,6 +412,10 @@ public class RDBStore implements DBStore {
           if (currSequenceNumber - sequenceNumber >= limitCount) {
             break;
           }
+          cumulativeDBUpdateLogBatchSize += result.writeBatch().getDataSize();
+          if (cumulativeDBUpdateLogBatchSize >= maxDbUpdatesSizeThreshold) {
+            break;
+          }
         } finally {
           result.writeBatch().close();
         }
@@ -412,6 +425,7 @@ public class RDBStore implements DBStore {
       LOG.warn("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will be thrown to the client",
           sequenceNumber, e);
+      dbUpdatesWrapper.setDBUpdateSuccess(false);
       // Throw the exception back to Recon. Expect Recon to fall back to
       // full snapshot.
       throw e;
@@ -419,6 +433,7 @@ public class RDBStore implements DBStore {
       LOG.error("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
+      dbUpdatesWrapper.setDBUpdateSuccess(false);
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;

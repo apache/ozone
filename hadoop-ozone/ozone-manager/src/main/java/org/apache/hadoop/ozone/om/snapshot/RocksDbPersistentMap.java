@@ -19,8 +19,11 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
@@ -79,5 +82,58 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     }
+  }
+
+  @Override
+  public ClosableIterator<Map.Entry<K, V>> iterator() {
+    ManagedRocksIterator iterator =
+        new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
+    iterator.get().seekToFirst();
+
+    return new ClosableIterator<Map.Entry<K, V>>() {
+      @Override
+      public boolean hasNext() {
+        return iterator.get().isValid();
+      }
+
+      @Override
+      public Map.Entry<K, V> next() {
+        K key;
+        V value;
+
+        try {
+          key = codecRegistry.asObject(iterator.get().key(), keyType);
+          value = codecRegistry.asObject(iterator.get().value(), valueType);
+        } catch (IOException exception) {
+          // TODO: [SNAPSHOT] Fail gracefully.
+          throw new RuntimeException(exception);
+        }
+
+        // Move iterator to the next.
+        iterator.get().next();
+
+        return new Map.Entry<K, V>() {
+          @Override
+          public K getKey() {
+            return key;
+          }
+
+          @Override
+          public V getValue() {
+            return value;
+          }
+
+          @Override
+          public V setValue(V value) {
+            throw new IllegalStateException("setValue is not implemented.");
+          }
+        };
+      }
+
+      @Override
+      public void close() {
+        iterator.close();
+      }
+    };
   }
 }
