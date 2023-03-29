@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -85,6 +86,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2260,5 +2263,37 @@ public class TestRootedOzoneFileSystem {
   public void testFileSystemDeclaresCapability() throws Throwable {
     assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
     assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
+  }
+
+
+  @Test
+  public void testSnapshotDiff() throws Exception {
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucketPath1 = new Path(volumePath1, bucket1.getName());
+    Path snap1 = fs.createSnapshot(bucketPath1);
+    Path file1 = new Path(bucketPath1, "key1");
+    Path file2 = new Path(bucketPath1, "key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snap2 = fs.createSnapshot(bucketPath1);
+    String fromSnap = Paths.get(snap1.toString()).getFileName().toString();
+    String toSnap = Paths.get(snap2.toString()).getFileName().toString();
+    SnapshotDiffReport diff =
+        ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
+    Assert.assertEquals(2, diff.getDiffList().size());
+    Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
+        diff.getDiffList().get(0).getType());
+    Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
+        diff.getDiffList().get(1).getType());
+    Assert.assertArrayEquals("key1".getBytes(StandardCharsets.UTF_8),
+        diff.getDiffList().get(0).getSourcePath());
+    Assert.assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8),
+        diff.getDiffList().get(1).getSourcePath());
+    // try snapDiff between non-bucket paths
+    String errorMsg = "Path is not a bucket";
+    LambdaTestUtils.intercept(IllegalArgumentException.class, errorMsg,
+        () -> ofs.getSnapshotDiffReport(volumePath1, fromSnap, toSnap));
   }
 }

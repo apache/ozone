@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
@@ -645,5 +646,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return objectStore.createSnapshot(ofsPath.getVolumeName(),
         ofsPath.getBucketName(),
         snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot) throws IOException {
+    return objectStore.snapshotDiff(volume.getName(), bucket.getName(),
+        fromSnapshot, toSnapshot, "", -1, false).getSnapshotDiffReport();
   }
 }

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -1416,5 +1417,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         fileCount(summary[2]).directoryCount(summary[3]).
         spaceConsumed(summary[1]).build();
   }
+
+  public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
+      final String fromSnapshot, final String toSnapshot) throws IOException {
+    OFSPath ofsPath =
+        new OFSPath(snapshotDir, OzoneConfiguration.of(getConf()));
+    Preconditions.checkArgument(ofsPath.isBucket(),
+        "Unsupported : Path is not a bucket");
+    // TODO:HDDS-7681 support snapdiff when toSnapshot="." referring to
+    //  current state of the bucket, This can be achieved by calling
+    //  createSnapshot and then doing the diff.
+    return adapter.getSnapshotDiffReport(snapshotDir, fromSnapshot, toSnapshot);
+  }
+
 
 }

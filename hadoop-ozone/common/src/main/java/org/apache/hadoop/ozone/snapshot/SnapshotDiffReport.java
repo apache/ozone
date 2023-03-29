@@ -19,145 +19,27 @@
 package org.apache.hadoop.ozone.snapshot;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto.DiffTypeProto;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
 /**
  * Snapshot diff report.
  */
-public class SnapshotDiffReport {
+public class SnapshotDiffReport
+    extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
   private static final String LINE_SEPARATOR = System.getProperty(
       "line.separator", "\n");
-
-  /**
-   * Types of the difference, which include CREATE, MODIFY, DELETE, and RENAME.
-   * Each type has a label for representation:
-   * +  CREATE
-   * M  MODIFY
-   * -  DELETE
-   * R  RENAME
-   */
-  public enum DiffType {
-    CREATE("+"),
-    MODIFY("M"),
-    DELETE("-"),
-    RENAME("R");
-
-    private final String label;
-
-    DiffType(String label) {
-      this.label = label;
-    }
-
-    public String getLabel() {
-      return label;
-    }
-
-    public DiffTypeProto toProtobuf() {
-      return DiffTypeProto.valueOf(this.name());
-    }
-
-    public static DiffType fromProtobuf(final DiffTypeProto type) {
-      return DiffType.valueOf(type.name());
-    }
-  }
-
-  /**
-   * Snapshot diff report entry.
-   */
-  public static final class DiffReportEntry {
-
-    /**
-     * The type of diff.
-     */
-    private final DiffType type;
-
-    /**
-     * Source File/Object path.
-     */
-    private final String sourcePath;
-
-    /**
-     * Destination File/Object path, if this is a re-name operation.
-     */
-    private final String targetPath;
-
-    private DiffReportEntry(final DiffType type, final String sourcePath,
-                            final String targetPath) {
-      this.type = type;
-      this.sourcePath = sourcePath;
-      this.targetPath = targetPath;
-    }
-
-    public static DiffReportEntry of(final DiffType type,
-                                     final String sourcePath) {
-      return of(type, sourcePath, null);
-    }
-
-    public static DiffReportEntry of(final DiffType type,
-                                     final String sourcePath,
-                                     final String targetPath) {
-      return new DiffReportEntry(type, sourcePath, targetPath);
-
-    }
-
-    @Override
-    public String toString() {
-      String str = type.getLabel() + "\t" + sourcePath;
-      if (type == DiffType.RENAME) {
-        str += " -> " + targetPath;
-      }
-      return str;
-    }
-
-    public DiffType getType() {
-      return type;
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (other instanceof DiffReportEntry) {
-        DiffReportEntry entry = (DiffReportEntry) other;
-        return this.type.equals(entry.getType()) && this.sourcePath
-            .equals(entry.sourcePath) && (this.targetPath != null ?
-            this.targetPath.equals(entry.targetPath) : true);
-      }
-      return false;
-    }
-
-    @Override
-    public int hashCode() {
-      return toString().hashCode();
-    }
-
-    public DiffReportEntryProto toProtobuf() {
-      final DiffReportEntryProto.Builder builder = DiffReportEntryProto
-          .newBuilder();
-      builder.setDiffType(type.toProtobuf()).setSourcePath(sourcePath);
-      if (targetPath != null) {
-        builder.setTargetPath(targetPath);
-      }
-      return builder.build();
-    }
-
-    public static DiffReportEntry fromProtobuf(
-        final DiffReportEntryProto entry) {
-      return of(DiffType.fromProtobuf(entry.getDiffType()),
-          entry.getSourcePath(),
-          entry.hasTargetPath() ? entry.getTargetPath() : null);
-    }
-
-  }
-
 
   /**
    * Volume name to which the snapshot bucket belongs.
@@ -168,15 +50,6 @@ public class SnapshotDiffReport {
    * Bucket name to which the snapshot belongs.
    */
   private final String bucketName;
-  /**
-   * start point of the diff.
-   */
-  private final String fromSnapshot;
-
-  /**
-   * end point of the diff.
-   */
-  private final String toSnapshot;
 
   /**
    * list of diff.
@@ -188,16 +61,16 @@ public class SnapshotDiffReport {
    */
   private final String token;
 
-  public SnapshotDiffReport(final String volumeName,
-                            final String bucketName,
-                            final String fromSnapshot,
-                            final String toSnapshot,
-                            final List<DiffReportEntry> entryList,
-                            final String token) {
+
+  public SnapshotDiffReport(final String snapshotRoot,
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshot,
+      final String toSnapshot,
+      final List<DiffReportEntry> entryList, final String token) {
+    super(snapshotRoot, fromSnapshot, toSnapshot, entryList);
     this.volumeName = volumeName;
     this.bucketName = bucketName;
-    this.fromSnapshot = fromSnapshot;
-    this.toSnapshot = toSnapshot;
     this.diffList = entryList != null ? entryList : Collections.emptyList();
     this.token = token;
   }
@@ -210,9 +83,9 @@ public class SnapshotDiffReport {
   public String toString() {
     StringBuilder str = new StringBuilder();
     str.append("Difference between snapshot: ")
-        .append(fromSnapshot)
+        .append(getFromSnapshot())
         .append(" and snapshot: ")
-        .append(toSnapshot)
+        .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
     for (DiffReportEntry entry : diffList) {
       str.append(entry.toString()).append(LINE_SEPARATOR);
@@ -230,9 +103,10 @@ public class SnapshotDiffReport {
         .newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setFromSnapshot(fromSnapshot)
-        .setToSnapshot(toSnapshot);
-    builder.addAllDiffList(diffList.stream().map(DiffReportEntry::toProtobuf)
+        .setFromSnapshot(getFromSnapshot())
+        .setToSnapshot(getLaterSnapshotName());
+    builder.addAllDiffList(diffList.stream().map(
+            SnapshotDiffReport::toProtobufDiffReportEntry)
         .collect(Collectors.toList()));
     if (StringUtils.isNotEmpty(token)) {
       builder.setToken(token);
@@ -242,14 +116,70 @@ public class SnapshotDiffReport {
 
   public static SnapshotDiffReport fromProtobuf(
       final SnapshotDiffReportProto report) {
-    return new SnapshotDiffReport(report.getVolumeName(),
+    Path bucketPath = new Path(
+        OZONE_URI_DELIMITER + report.getVolumeName()
+            + OZONE_URI_DELIMITER + report.getBucketName());
+    OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
+    return new SnapshotDiffReport(path.toString(),
+        report.getVolumeName(),
         report.getBucketName(),
         report.getFromSnapshot(),
         report.getToSnapshot(),
         report.getDiffListList().stream()
-            .map(DiffReportEntry::fromProtobuf)
+            .map(SnapshotDiffReport::fromProtobufDiffReportEntry)
             .collect(Collectors.toList()),
         report.getToken());
   }
+
+  public static DiffType fromProtobufDiffType(
+      final OzoneManagerProtocolProtos.DiffReportEntryProto
+          .DiffTypeProto type) {
+    return DiffType.valueOf(type.name());
+  }
+
+  public static OzoneManagerProtocolProtos.DiffReportEntryProto
+      .DiffTypeProto toProtobufDiffType(DiffType type) {
+    return OzoneManagerProtocolProtos.DiffReportEntryProto
+        .DiffTypeProto.valueOf(type.name());
+  }
+
+  public static DiffReportEntry fromProtobufDiffReportEntry(
+      final OzoneManagerProtocolProtos.DiffReportEntryProto entry) {
+    if (entry == null) {
+      return null;
+    }
+    DiffType type = fromProtobufDiffType(entry.getDiffType());
+    return type == null ? null :
+        new DiffReportEntry(type, entry.getSourcePath().getBytes(),
+            entry.hasTargetPath() ? entry.getTargetPath().getBytes() : null);
+  }
+
+  public static OzoneManagerProtocolProtos
+      .DiffReportEntryProto toProtobufDiffReportEntry(DiffReportEntry entry) {
+    final OzoneManagerProtocolProtos.DiffReportEntryProto.Builder builder =
+        OzoneManagerProtocolProtos.DiffReportEntryProto.newBuilder();
+    builder.setDiffType(toProtobufDiffType(entry.getType()))
+        .setSourcePath(new String(entry.getSourcePath()));
+    if (entry.getTargetPath() != null) {
+      String targetPath = new String(entry.getTargetPath());
+      builder.setTargetPath(targetPath);
+    }
+    return builder.build();
+  }
+
+
+  public static DiffReportEntry getDiffReportEntry(final DiffType type,
+      final String sourcePath) {
+    return getDiffReportEntry(type, sourcePath, null);
+  }
+
+  public static DiffReportEntry getDiffReportEntry(final DiffType type,
+      final String sourcePath, final String targetPath) {
+    return new DiffReportEntry(type,
+        sourcePath.getBytes(StandardCharsets.UTF_8),
+        targetPath != null ? targetPath.getBytes(StandardCharsets.UTF_8) :
+            null);
+  }
+
 
 }

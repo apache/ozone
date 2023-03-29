@@ -511,11 +511,11 @@ public class TestOmSnapshot {
     SnapshotDiffReport diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
     Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, key2)));
+        SnapshotDiffReport.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, key2)));
     Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.DELETE, key1)));
+        SnapshotDiffReport.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE, key1)));
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
@@ -526,8 +526,8 @@ public class TestOmSnapshot {
     SnapshotDiffReport diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.RENAME, key2, key2Renamed)));
+        SnapshotDiffReport.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, key2, key2Renamed)));
 
 
     // Create a directory
@@ -543,8 +543,8 @@ public class TestOmSnapshot {
       dir1 = dir1 + OM_KEY_PREFIX;
     }
     Assert.assertTrue(diff4.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
+        SnapshotDiffReport.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, dir1)));
 
   }
 

@@ -37,10 +37,14 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -56,8 +60,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob.SnapshotDiffJobCodec;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -74,12 +76,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 
 /**
  * Class to generate snapshot diff.
@@ -228,18 +234,22 @@ public class SnapshotDiffManager implements AutoCloseable {
         volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
         forceFullDiff);
 
+    OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
+
     switch (snapDiffJob.getStatus()) {
     case QUEUED:
       return submitSnapDiffJob(snapDiffJobKey, volume, bucket, fromSnapshot,
           toSnapshot, fsInfo, tsInfo, index, pageSize, forceFullDiff);
     case IN_PROGRESS:
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+              null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
     case FAILED:
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), FAILED, DEFAULT_WAIT_TIME.toMillis());
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+              null), FAILED, DEFAULT_WAIT_TIME.toMillis());
     case DONE:
       SnapshotDiffReport report = createPageResponse(snapDiffJob.getJobId(),
           volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
@@ -248,6 +258,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
     }
+  }
+
+  @NotNull
+  private static OFSPath getSnapshotRootPath(String volume, String bucket) {
+    Path bucketPath = new Path(
+        OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
+    OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
+    return path;
   }
 
   private SnapshotDiffReport createPageResponse(final String jobId,
@@ -259,6 +277,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                                                 final int pageSize)
       throws IOException {
     List<DiffReportEntry> diffReportList = new ArrayList<>();
+
+    OFSPath path = getSnapshotRootPath(volume, bucket);
 
     boolean hasMoreEntries = true;
 
@@ -275,8 +295,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     String tokenString = hasMoreEntries ?
         String.valueOf(index + pageSize) : null;
 
-    return new SnapshotDiffReport(volume, bucket, fromSnapshot.getName(),
-        toSnapshot.getName(), diffReportList, tokenString);
+    return new SnapshotDiffReport(path.toString(), volume, bucket,
+        fromSnapshot.getName(), toSnapshot.getName(), diffReportList,
+        tokenString);
   }
 
   @SuppressWarnings("parameternumber")
@@ -295,6 +316,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
 
+    OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
+
     // This is only possible if another thread tired to submit the request,
     // and it got rejected. In this scenario, return the Rejected job status
     // with wait time.
@@ -302,9 +325,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       LOG.info("Snap diff job has been removed for for volume: {}, " +
           "bucket: {}, fromSnapshot: {} and toSnapshot: {}.",
           volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReport(snapshotRoot.toString(),
+              volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
+              new ArrayList<>(), null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
 
     // Check again that request is still in queued status. If it is not queued,
@@ -317,9 +341,10 @@ public class SnapshotDiffManager implements AutoCloseable {
         return new SnapshotDiffResponse(report, DONE, 0L);
       } else {
         // Otherwise, return the same status as in DB with wait time.
-        return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-            fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-            null), snapDiffJob.getStatus(), DEFAULT_WAIT_TIME.toMillis());
+        return new SnapshotDiffResponse(
+            new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+                fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+                null), snapDiffJob.getStatus(), DEFAULT_WAIT_TIME.toMillis());
       }
     }
 
@@ -344,6 +369,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
         volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
 
+    OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
+
     // Submit the request to the executor if job is still in queued status.
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
@@ -352,10 +379,10 @@ public class SnapshotDiffManager implements AutoCloseable {
           volume, bucket, fromSnapshot, toSnapshot, fsInfo, tsInfo,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null),
-          IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+              null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
     } catch (RejectedExecutionException exception) {
       // Remove the entry from job table so that client can retry.
       // If entry is not removed, client has to wait till cleanup service
@@ -364,9 +391,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       snapDiffJobTable.remove(jobKey);
       LOG.info("Exceeded the snapDiff parallel requests progressing " +
           "limit. Please retry after {}.", DEFAULT_WAIT_TIME);
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+              null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
   }
 
@@ -704,21 +732,25 @@ public class SnapshotDiffManager implements AutoCloseable {
                 "Old and new key name both are null");
           } else if (oldKeyName == null) { // Key Created.
             String key = codecRegistry.asObject(newKeyName, String.class);
-            DiffReportEntry entry = DiffReportEntry.of(DiffType.CREATE, key);
+            DiffReportEntry entry =
+                SnapshotDiffReport.getDiffReportEntry(DiffType.CREATE, key);
             createDiffs.add(codecRegistry.asRawData(entry));
           } else if (newKeyName == null) { // Key Deleted.
             String key = codecRegistry.asObject(oldKeyName, String.class);
-            DiffReportEntry entry = DiffReportEntry.of(DiffType.DELETE, key);
+            DiffReportEntry entry =
+                SnapshotDiffReport.getDiffReportEntry(DiffType.DELETE, key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
           } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
             String key = codecRegistry.asObject(newKeyName, String.class);
-            DiffReportEntry entry = DiffReportEntry.of(DiffType.MODIFY, key);
+            DiffReportEntry entry =
+                SnapshotDiffReport.getDiffReportEntry(DiffType.MODIFY, key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
           } else { // Key Renamed.
             String oldKey = codecRegistry.asObject(oldKeyName, String.class);
             String newKey = codecRegistry.asObject(newKeyName, String.class);
             renameDiffs.add(codecRegistry.asRawData(
-                DiffReportEntry.of(DiffType.RENAME, oldKey, newKey)));
+                SnapshotDiffReport.getDiffReportEntry(DiffType.RENAME, oldKey,
+                    newKey)));
           }
         }
       }
