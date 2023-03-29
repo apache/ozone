@@ -157,6 +157,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>jersey-client</artifactId>
     </dependency>
 
+    <!-- Overriding ranger-intg jackson version -->
+    <dependency>
+      <groupId>org.codehaus.jackson</groupId>
+      <artifactId>jackson-core-asl</artifactId>
+      <version>${jackson1.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-intg</artifactId>
