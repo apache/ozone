@@ -165,7 +165,7 @@ public class TestContainerStateMachineIdempotency {
         return logCapturer.getOutput().contains(
             "Sending delete container command for open container " +
                 "pipeline does not belongs to DN");
-      }, 200, 20000);
+      }, 200, 10000);
       logCapturer.stopCapturing();
 
     } catch (IOException ioe) {
