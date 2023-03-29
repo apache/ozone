@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.codec;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -36,7 +36,8 @@ public class OmDBDiffReportEntryCodec implements
           .SnapshotDiffReport.DiffReportEntry object)
       throws IOException {
     checkNotNull(object, "Null object can't be converted to byte array.");
-    return SnapshotDiffReport.toProtobufDiffReportEntry(object).toByteArray();
+    return SnapshotDiffReportOzone.toProtobufDiffReportEntry(object)
+        .toByteArray();
   }
 
   @Override
@@ -45,7 +46,7 @@ public class OmDBDiffReportEntryCodec implements
       byte[] rawData) throws IOException {
     checkNotNull(rawData,
         "Null byte array can't be converted to " + "real object.");
-    return SnapshotDiffReport.fromProtobufDiffReportEntry(
+    return SnapshotDiffReportOzone.fromProtobufDiffReportEntry(
         OzoneManagerProtocolProtos.DiffReportEntryProto.parseFrom(rawData));
   }
 

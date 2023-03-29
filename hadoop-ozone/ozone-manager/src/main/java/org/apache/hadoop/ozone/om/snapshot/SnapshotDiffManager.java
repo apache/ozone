@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob.SnapshotDiffJobCodec;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -242,17 +242,18 @@ public class SnapshotDiffManager implements AutoCloseable {
           toSnapshot, fsInfo, tsInfo, index, pageSize, forceFullDiff);
     case IN_PROGRESS:
       return new SnapshotDiffResponse(
-          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
               null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
     case FAILED:
       return new SnapshotDiffResponse(
-          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
               null), FAILED, DEFAULT_WAIT_TIME.toMillis());
     case DONE:
-      SnapshotDiffReport report = createPageResponse(snapDiffJob.getJobId(),
-          volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
+      SnapshotDiffReportOzone report =
+          createPageResponse(snapDiffJob.getJobId(), volume, bucket,
+              fromSnapshot, toSnapshot, index, pageSize);
       return new SnapshotDiffResponse(report, DONE, 0L);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
@@ -268,7 +269,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     return path;
   }
 
-  private SnapshotDiffReport createPageResponse(final String jobId,
+  private SnapshotDiffReportOzone createPageResponse(final String jobId,
                                                 final String volume,
                                                 final String bucket,
                                                 final OmSnapshot fromSnapshot,
@@ -295,7 +296,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     String tokenString = hasMoreEntries ?
         String.valueOf(index + pageSize) : null;
 
-    return new SnapshotDiffReport(path.toString(), volume, bucket,
+    return new SnapshotDiffReportOzone(path.toString(), volume, bucket,
         fromSnapshot.getName(), toSnapshot.getName(), diffReportList,
         tokenString);
   }
@@ -326,7 +327,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           "bucket: {}, fromSnapshot: {} and toSnapshot: {}.",
           volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
       return new SnapshotDiffResponse(
-          new SnapshotDiffReport(snapshotRoot.toString(),
+          new SnapshotDiffReportOzone(snapshotRoot.toString(),
               volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
               new ArrayList<>(), null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
@@ -336,13 +337,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (snapDiffJob.getStatus() != QUEUED) {
       // Same request is submitted by another thread and already completed.
       if (snapDiffJob.getStatus() == DONE) {
-        SnapshotDiffReport report = createPageResponse(snapDiffJob.getJobId(),
-            volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
+        SnapshotDiffReportOzone report =
+            createPageResponse(snapDiffJob.getJobId(), volume, bucket,
+                fromSnapshot, toSnapshot, index, pageSize);
         return new SnapshotDiffResponse(report, DONE, 0L);
       } else {
         // Otherwise, return the same status as in DB with wait time.
         return new SnapshotDiffResponse(
-            new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+            new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
                 fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
                 null), snapDiffJob.getStatus(), DEFAULT_WAIT_TIME.toMillis());
       }
@@ -380,7 +382,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       return new SnapshotDiffResponse(
-          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
               null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
     } catch (RejectedExecutionException exception) {
@@ -392,7 +394,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       LOG.info("Exceeded the snapDiff parallel requests progressing " +
           "limit. Please retry after {}.", DEFAULT_WAIT_TIME);
       return new SnapshotDiffResponse(
-          new SnapshotDiffReport(snapshotRoot.toString(), volume, bucket,
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
               null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
@@ -733,24 +735,27 @@ public class SnapshotDiffManager implements AutoCloseable {
           } else if (oldKeyName == null) { // Key Created.
             String key = codecRegistry.asObject(newKeyName, String.class);
             DiffReportEntry entry =
-                SnapshotDiffReport.getDiffReportEntry(DiffType.CREATE, key);
+                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.CREATE,
+                    key);
             createDiffs.add(codecRegistry.asRawData(entry));
           } else if (newKeyName == null) { // Key Deleted.
             String key = codecRegistry.asObject(oldKeyName, String.class);
             DiffReportEntry entry =
-                SnapshotDiffReport.getDiffReportEntry(DiffType.DELETE, key);
+                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.DELETE,
+                    key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
           } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
             String key = codecRegistry.asObject(newKeyName, String.class);
             DiffReportEntry entry =
-                SnapshotDiffReport.getDiffReportEntry(DiffType.MODIFY, key);
+                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.MODIFY,
+                    key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
           } else { // Key Renamed.
             String oldKey = codecRegistry.asObject(oldKeyName, String.class);
             String newKey = codecRegistry.asObject(newKeyName, String.class);
             renameDiffs.add(codecRegistry.asRawData(
-                SnapshotDiffReport.getDiffReportEntry(DiffType.RENAME, oldKey,
-                    newKey)));
+                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.RENAME,
+                    oldKey, newKey)));
           }
         }
       }

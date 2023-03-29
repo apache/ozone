@@ -35,7 +35,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 /**
  * Snapshot diff report.
  */
-public class SnapshotDiffReport
+public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
   private static final String LINE_SEPARATOR = System.getProperty(
@@ -62,7 +62,7 @@ public class SnapshotDiffReport
   private final String token;
 
 
-  public SnapshotDiffReport(final String snapshotRoot,
+  public SnapshotDiffReportOzone(final String snapshotRoot,
       final String volumeName,
       final String bucketName,
       final String fromSnapshot,
@@ -106,7 +106,7 @@ public class SnapshotDiffReport
         .setFromSnapshot(getFromSnapshot())
         .setToSnapshot(getLaterSnapshotName());
     builder.addAllDiffList(diffList.stream().map(
-            SnapshotDiffReport::toProtobufDiffReportEntry)
+            SnapshotDiffReportOzone::toProtobufDiffReportEntry)
         .collect(Collectors.toList()));
     if (StringUtils.isNotEmpty(token)) {
       builder.setToken(token);
@@ -114,19 +114,19 @@ public class SnapshotDiffReport
     return builder.build();
   }
 
-  public static SnapshotDiffReport fromProtobuf(
+  public static SnapshotDiffReportOzone fromProtobuf(
       final SnapshotDiffReportProto report) {
     Path bucketPath = new Path(
         OZONE_URI_DELIMITER + report.getVolumeName()
             + OZONE_URI_DELIMITER + report.getBucketName());
     OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
-    return new SnapshotDiffReport(path.toString(),
+    return new SnapshotDiffReportOzone(path.toString(),
         report.getVolumeName(),
         report.getBucketName(),
         report.getFromSnapshot(),
         report.getToSnapshot(),
         report.getDiffListList().stream()
-            .map(SnapshotDiffReport::fromProtobufDiffReportEntry)
+            .map(SnapshotDiffReportOzone::fromProtobufDiffReportEntry)
             .collect(Collectors.toList()),
         report.getToken());
   }

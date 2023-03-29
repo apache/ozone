@@ -2278,8 +2278,10 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
     Path snap2 = fs.createSnapshot(bucketPath1);
-    String fromSnap = Paths.get(snap1.toString()).getFileName().toString();
-    String toSnap = Paths.get(snap2.toString()).getFileName().toString();
+    java.nio.file.Path fromSnapPath = Paths.get(snap1.toString()).getFileName();
+    java.nio.file.Path toSnapPath = Paths.get(snap2.toString()).getFileName();
+    String fromSnap = fromSnapPath != null ? fromSnapPath.toString() : null;
+    String toSnap = toSnapPath != null ? toSnapPath.toString() : null;
     SnapshotDiffReport diff =
         ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
     Assert.assertEquals(2, diff.getDiffList().size());
