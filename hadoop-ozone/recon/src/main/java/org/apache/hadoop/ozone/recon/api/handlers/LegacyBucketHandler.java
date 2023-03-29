@@ -87,21 +87,22 @@ public class LegacyBucketHandler extends BucketHandler {
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        iterator = keyTable.iterator()) {
 
-    iterator.seek(key);
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      if (dbKey.equals(key)) {
-        return EntityType.KEY;
+      iterator.seek(key);
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
+        if (dbKey.equals(key)) {
+          return EntityType.KEY;
+        }
+        if (dbKey.equals(key + OM_KEY_PREFIX)) {
+          return EntityType.DIRECTORY;
+        }
       }
-      if (dbKey.equals(key + OM_KEY_PREFIX)) {
-        return EntityType.DIRECTORY;
-      }
+      return EntityType.UNKNOWN;
     }
-    return EntityType.UNKNOWN;
   }
 
   /**
@@ -119,8 +120,6 @@ public class LegacyBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
     long totalDU = 0L;
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
 
     String seekPrefix = OM_KEY_PREFIX +
         vol +
@@ -141,31 +140,34 @@ public class LegacyBucketHandler extends BucketHandler {
     }
 
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    iterator.seek(seekPrefix);
-    // handle direct keys
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      // since the RocksDB is ordered, seek until the prefix isn't matched
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = keyTable.iterator()) {
+      iterator.seek(seekPrefix);
+      // handle direct keys
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
+        // since the RocksDB is ordered, seek until the prefix isn't matched
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
+        }
 
-      String[] keys = dbKey.split(OM_KEY_PREFIX);
+        String[] keys = dbKey.split(OM_KEY_PREFIX);
 
-      // iteration moved to the next level
-      // and not handling direct keys
-      if (keys.length - seekKeys.length > 1) {
-        continue;
-      }
-
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        // skip directory markers, just include directKeys
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+        // iteration moved to the next level
+        // and not handling direct keys
+        if (keys.length - seekKeys.length > 1) {
           continue;
         }
-        totalDU += keyInfo.getReplicatedSize();
+
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          // skip directory markers, just include directKeys
+          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+            continue;
+          }
+          totalDU += keyInfo.getReplicatedSize();
+        }
       }
     }
 
@@ -197,9 +199,6 @@ public class LegacyBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
     long keyDataSizeWithReplica = 0L;
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
-
     String seekPrefix = OM_KEY_PREFIX +
         vol +
         OM_KEY_PREFIX +
@@ -218,45 +217,49 @@ public class LegacyBucketHandler extends BucketHandler {
       seekPrefix += dirName;
     }
     String[] seekKeys = seekPrefix.split(OM_KEY_PREFIX);
-    iterator.seek(seekPrefix);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = keyTable.iterator()) {
 
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
+      iterator.seek(seekPrefix);
 
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
 
-      String[] keys = dbKey.split(OM_KEY_PREFIX);
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
+        }
 
-      // iteration moved to the next level
-      // and not handling direct keys
-      if (keys.length - seekKeys.length > 1) {
-        continue;
-      }
+        String[] keys = dbKey.split(OM_KEY_PREFIX);
 
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        // skip directory markers, just include directKeys
-        if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+        // iteration moved to the next level
+        // and not handling direct keys
+        if (keys.length - seekKeys.length > 1) {
           continue;
         }
-        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        String subpath = buildSubpath(normalizedPath,
-            keyInfo.getFileName());
-        diskUsage.setSubpath(subpath);
-        diskUsage.setKey(true);
-        diskUsage.setSize(keyInfo.getDataSize());
 
-        if (withReplica) {
-          long keyDU = keyInfo.getReplicatedSize();
-          keyDataSizeWithReplica += keyDU;
-          diskUsage.setSizeWithReplica(keyDU);
-        }
-        // list the key as a subpath
-        if (listFile) {
-          duData.add(diskUsage);
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          // skip directory markers, just include directKeys
+          if (keyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
+            continue;
+          }
+          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+          String subpath = buildSubpath(normalizedPath,
+              keyInfo.getFileName());
+          diskUsage.setSubpath(subpath);
+          diskUsage.setKey(true);
+          diskUsage.setSize(keyInfo.getDataSize());
+
+          if (withReplica) {
+            long keyDU = keyInfo.getReplicatedSize();
+            keyDataSizeWithReplica += keyDU;
+            diskUsage.setSizeWithReplica(keyDU);
+          }
+          // list the key as a subpath
+          if (listFile) {
+            duData.add(diskUsage);
+          }
         }
       }
     }
