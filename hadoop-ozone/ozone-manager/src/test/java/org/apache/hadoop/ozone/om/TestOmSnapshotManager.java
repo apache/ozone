@@ -97,7 +97,7 @@ public class TestOmSnapshotManager {
     HddsWhiteboxTestUtils.setInternalState(
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
 
-    //  create second snapshot checkpoint (which will be used for eviction)
+    // create second snapshot checkpoint (which will be used for eviction)
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         second);
 
@@ -108,7 +108,6 @@ public class TestOmSnapshotManager {
     omSnapshotManager
         .checkForSnapshot(second.getVolumeName(),
         second.getBucketName(), getSnapshotPrefix(second.getName()));
-
 
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();

@@ -20,6 +20,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -97,6 +99,11 @@ public class TestOMSnapshotDeleteRequest {
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    when(omSnapshotManager.getSnapshotCache())
+        .thenReturn(mock(LoadingCache.class));
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
