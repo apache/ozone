@@ -59,8 +59,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
-    String fromSnapshot = purgeKeysRequest.hasFromSnapshot() ?
-        purgeKeysRequest.getFromSnapshot() : null;
+    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
+        purgeKeysRequest.getSnapshotTableKey() : null;
     List<String> keysToBePurgedList = new ArrayList<>();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -88,7 +88,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
           keysToBePurgedList, omFromSnapshot);
-    }  catch (IOException ex) {
+    } catch (IOException ex) {
       omClientResponse = new OMKeyPurgeResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {

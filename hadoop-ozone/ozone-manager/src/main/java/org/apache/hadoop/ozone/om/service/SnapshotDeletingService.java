@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
@@ -255,9 +254,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 toNextDBList);
 
             // Delete keys From deletedTable
-            long startTime = Time.monotonicNow();
             processKeyDeletes(keysToPurge, omSnapshot.getKeyManager(),
-                startTime, snapInfo.getTableKey());
+                snapInfo.getTableKey());
             snapshotLimit--;
             successRunCount.incrementAndGet();
           } catch (IOException ex) {

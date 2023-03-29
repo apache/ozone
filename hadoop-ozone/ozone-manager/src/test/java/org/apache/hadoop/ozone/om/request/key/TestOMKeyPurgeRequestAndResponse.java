@@ -102,7 +102,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .addDeletedKeys(deletedKeysInBucket);
 
     if (snapshotDbKey != null) {
-      purgeKeysRequest.setFromSnapshot(snapshotDbKey);
+      purgeKeysRequest.setSnapshotTableKey(snapshotDbKey);
     }
     purgeKeysRequest.build();
 
@@ -128,7 +128,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     // validateAndUpdateCache OMSnapshotCreateResponse.
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L,
             ozoneManagerDoubleBufferHelper);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);

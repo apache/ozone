@@ -82,8 +82,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
-    this.omMetadataManager = keyManager.getMetadataManager();
     this.keyManager = keyManager;
+    this.omMetadataManager = keyManager.getMetadataManager();
   }
 
 
@@ -137,7 +137,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    // TODO: handle denormalization
+    // TODO: [SNAPSHOT] handle denormalization
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
   }
 

@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -65,8 +64,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
       long serviceTimeout, ConfigurationSource conf) {
-    super("KeyDeletingService", serviceInterval, TimeUnit.MILLISECONDS,
-        KEY_DELETING_CORE_POOL_SIZE, serviceTimeout, ozoneManager, scmClient);
+    super(KeyDeletingService.class.getSimpleName(), serviceInterval,
+        TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
+        serviceTimeout, ozoneManager, scmClient);
     this.manager = manager;
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
@@ -119,7 +119,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         getRunCount().incrementAndGet();
         try {
-          long startTime = Time.monotonicNow();
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
           //  snapshot's deletedTable when active DB's deletedTable
           //  doesn't have enough entries left.
@@ -130,7 +129,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               .getPendingDeletionKeys(keyLimitPerTask);
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             int delCount = processKeyDeletes(keyBlocksList,
-                getOzoneManager().getKeyManager(), startTime, null);
+                getOzoneManager().getKeyManager(), null);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {

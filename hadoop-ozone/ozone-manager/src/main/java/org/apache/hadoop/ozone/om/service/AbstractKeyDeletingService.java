@@ -21,7 +21,6 @@ import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -31,7 +30,10 @@ import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -65,27 +67,29 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
     this.ozoneManager = ozoneManager;
     this.scmClient = scmClient;
     this.runCount = new AtomicLong(0);
-
   }
 
-  public int processKeyDeletes(List<BlockGroup> keyBlocksList,
-      KeyManager manager, long startTime, String snapTableKey)
-      throws IOException {
+  protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
+                                  KeyManager manager,
+                                  String snapTableKey) throws IOException {
+
+    long startTime = Time.monotonicNow();
     int delCount = 0;
-    List<DeleteBlockGroupResult> results =
+    List<DeleteBlockGroupResult> blockDeletionResults =
         scmClient.deleteKeyBlocks(keyBlocksList);
-    if (results != null) {
+    if (blockDeletionResults != null) {
       if (isRatisEnabled()) {
-        delCount = submitPurgeKeysRequest(results, snapTableKey);
+        delCount = submitPurgeKeysRequest(blockDeletionResults, snapTableKey);
       } else {
         // TODO: Once HA and non-HA paths are merged, we should have
         //  only one code path here. Purge keys should go through an
         //  OMRequest model.
-        delCount = deleteAllKeys(results, manager);
+        delCount = deleteAllKeys(blockDeletionResults, manager);
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Number of keys deleted: {}, elapsed time: {}ms",
-            delCount, Time.monotonicNow() - startTime);
+        LOG.debug("Blocks for {} (out of {}) keys are deleted in {} ms",
+            delCount, blockDeletionResults.size(),
+            Time.monotonicNow() - startTime);
       }
     }
     return delCount;
@@ -128,8 +132,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
    * by SCM.
    * @param results DeleteBlockGroups returned by SCM.
    */
-  public int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      String snapTableKey) {
+  private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+                                     String snapTableKey) {
     Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
         new HashMap<>();
 
@@ -148,16 +152,16 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
       }
     }
 
-
-    OzoneManagerProtocolProtos.PurgeKeysRequest.Builder purgeKeysRequest =
-        OzoneManagerProtocolProtos.PurgeKeysRequest.newBuilder();
+    PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
+    if (snapTableKey != null) {
+      purgeKeysRequest.setSnapshotTableKey(snapTableKey);
+    }
 
     // Add keys to PurgeKeysRequest bucket wise.
     for (Map.Entry<Pair<String, String>, List<String>> entry :
         purgeKeysMapPerBucket.entrySet()) {
       Pair<String, String> volumeBucketPair = entry.getKey();
-      OzoneManagerProtocolProtos.DeletedKeys deletedKeysInBucket =
-          OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+      DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
           .setVolumeName(volumeBucketPair.getLeft())
           .setBucketName(volumeBucketPair.getRight())
           .addAllKeys(entry.getValue())
@@ -165,13 +169,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
       purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
     }
 
-    if (snapTableKey != null) {
-      purgeKeysRequest.setFromSnapshot(snapTableKey);
-    }
-
-    OzoneManagerProtocolProtos.OMRequest omRequest =
-        OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(Type.PurgeKeys)
         .setPurgeKeysRequest(purgeKeysRequest)
         .setClientId(clientId.toString())
         .build();
@@ -191,7 +190,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
   }
 
   private RaftClientRequest createRaftClientRequestForPurge(
-      OzoneManagerProtocolProtos.OMRequest omRequest) {
+      OMRequest omRequest) {
     return RaftClientRequest.newBuilder()
         .setClientId(clientId)
         .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
@@ -226,12 +225,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
       return false;
     }
     return ozoneManager.isRatisEnabled();
-  }
-
-
-  @Override
-  public BackgroundTaskQueue getTasks() {
-    return null;
   }
 
   public OzoneManager getOzoneManager() {
