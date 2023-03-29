@@ -168,7 +168,8 @@ public class TestContainerPlacementFactory {
             SCMContainerPlacementRackAware.class.getName());
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, null, null, true, null);
-    Assertions.assertSame(SCMContainerPlacementRackAware.class, policy.getClass());
+    Assertions.assertSame(SCMContainerPlacementRackAware.class,
+            policy.getClass());
   }
 
   @Test
