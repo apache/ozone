@@ -23,26 +23,28 @@ Test Timeout        5 minutes
 *** Variables ***
 
 ** Keywords ***
-Get SCM Leader Node
+Get SCM Node Count
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
                             LOG                     ${result}
-                            Should Contain          ${result}               LEADER              1
-                            Should Contain          ${result}               FOLLOWER            2
-    ${scmLine} =            Get Lines Containing String                     ${result}           LEADER
-    ${splits} =             Split String            ${scmLine}          :
-    ${leaderSCM} =          Strip String            ${splits[3]}
-                            LOG                     Leader SCM: ${leaderSCM}
-    [return]                ${leaderSCM}
+    ${scm_count} =          Get Line Count          ${result}
+    [return]                ${scm_count}
 
 *** Test Cases ***
-Transfer Leadership randomly
-    # Find Leader SCM and one Follower SCM
-    ${leaderSCM} =          Get SCM Leader Node
-                            LOG                     Leader SCM: ${leaderSCM}
-    # Transfer leadership to the Follower SCM
-    ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -r
-                            LOG                     ${result}
-                            Should Contain          ${result}               Transfer leadership successfully
+Verify SCM Count
+    ${scm_count} =          Get SCM Node Count
+                            LOG                     SCM Instance Count: ${scm_count}
+    ${scm_count} =          Convert To String       ${scm_count}
+                            Should be Equal         4                       ${scm_count}
 
-    ${newLeaderSCM} =       Get SCM Leader Node
-                            Should Not be Equal     ${leaderSCM}            ${newLeaderSCM}
+Transfer Leader to SCM4
+    ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
+                            LOG                     ${result}
+    ${scm4_line} =          Get Lines Containing String                      ${result}           scm4.org
+    ${scm4_split} =         Split String            ${scm4_line}             :
+    ${scm4_uuid} =          Strip String            ${scm4_split[3]}
+
+    ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -n ${scm4_uuid}
+                            LOG                     ${result}
+                            Should Contain          ${result}                Transfer leadership successfully
+
+

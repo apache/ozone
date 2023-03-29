@@ -53,6 +53,14 @@ execute_robot_test s3g admincli
 execute_robot_test s3g omha/om-leader-transfer.robot
 execute_robot_test s3g scmha/scm-leader-transfer.robot
 
+docker-compose up -d scm4.org
+wait_for_port scm4.org 9894 120
+wait_for_scm scm4.org 120
+execute_robot_test ${SCM} scmha/primordial-scm.robot
+docker-compose up -d datanode4
+wait_for_port datanode4 9856 60
+execute_robot_test ${SCM} scmha/datanode-list.robot
+
 execute_robot_test s3g httpfs
 
 export SCM=scm2.org

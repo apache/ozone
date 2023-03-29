@@ -316,6 +316,33 @@ wait_for_port(){
 }
 
 
+## @description wait until SCM instance show up in "scm roles" command
+## @param The scm id
+## @param The maximum time to wait in seconds
+wait_for_scm(){
+  local scm=$1
+  local timeout=$2
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose exec -T $scm bash -c  \
+       "kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM && ozone admin scm roles | grep $scm"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "SCM $scm has joined the SCM HA group"
+         return;
+     fi
+     echo "SCM $scm hasn't joined the SCM HA group yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $scm to join SCM HA group"
+   return 1
+}
+
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
   docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
