@@ -169,7 +169,8 @@ public class OFSPath {
    * or the leaf directory.
    */
   public String getFileName() {
-    return Paths.get(keyName).getFileName().toString();
+    java.nio.file.Path file = Paths.get(keyName).getFileName();
+    return file != null ? file.toString() : "";
   }
 
   private boolean isEmpty() {
