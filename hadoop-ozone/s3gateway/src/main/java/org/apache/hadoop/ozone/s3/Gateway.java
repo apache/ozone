@@ -79,11 +79,11 @@ public class Gateway extends GenericCli {
     loginS3GUser(ozoneConfiguration);
 
     if (StringUtils.isEmpty(ozoneConfiguration.get(
-            OzoneConfigKeys.OZONE_METADATA_DIRS))) {
+            OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
       //Setting ozone.metadata.dirs if not set so that server setup doesn't
       // fail.
       Path tmpMetaDir = Files.createTempDirectory(Paths.get(""),
-              "ozone_s3g_tmp_meta_dir");
+              "ozone_s3g_tmp_base_dir");
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
         try {
           FileUtils.deleteDirectory(tmpMetaDir.toFile());
@@ -92,7 +92,7 @@ public class Gateway extends GenericCli {
                   tmpMetaDir.toFile().getAbsolutePath(), e);
         }
       }));
-      ozoneConfiguration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+      ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
               tmpMetaDir.toFile().getAbsolutePath());
     }
 
