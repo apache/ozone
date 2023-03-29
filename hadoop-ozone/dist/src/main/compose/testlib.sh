@@ -315,31 +315,31 @@ wait_for_port(){
    return 1
 }
 
-
-## @description wait until SCM instance show up in "scm roles" command
-## @param The scm id
+## @description wait for the stat to be ready
+## @param The container ID
 ## @param The maximum time to wait in seconds
-wait_for_scm(){
-  local scm=$1
+## @param The command line to be executed
+wait_for_execute_command(){
+  local container=$1
   local timeout=$2
+  local command=$3
 
   #Reset the timer
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose exec -T $scm bash -c  \
-       "kinit -kt /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM && ozone admin scm roles | grep $scm"
+     docker-compose exec -T $container bash -c '$command'
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
-         echo "SCM $scm has joined the SCM HA group"
+         echo "$command succeed"
          return;
      fi
-     echo "SCM $scm hasn't joined the SCM HA group yet"
+     echo "$command hasn't succeed yet"
      sleep 1
    done
-   echo "Timed out waiting on $scm to join SCM HA group"
+   echo "Timed out waiting on $command to be successful"
    return 1
 }
 
