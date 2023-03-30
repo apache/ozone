@@ -94,9 +94,6 @@ public class ClusterStateEndpoint {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
 
-    containerStateCounts.setTotalContainerCount(
-        this.containerManager.getContainers().size());
-
     int pipelines = this.pipelineManager.getPipelines().size();
 
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
@@ -173,7 +170,7 @@ public class ClusterStateEndpoint {
 
     // Subtract deleted containers from total containers.
     containerStateCounts.setTotalContainerCount(
-        containerStateCounts.getTotalContainerCount() -
+        this.containerManager.getContainers().size() -
             containerStateCounts.getDeletedContainersCount());
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
