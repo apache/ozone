@@ -167,6 +167,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   private final Object compactionListenerWriteLock = new Object();
 
   private final ScheduledExecutorService executor;
+  private boolean closed;
   private final long maxAllowedTimeInDag;
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
@@ -303,9 +304,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
-    if (executor != null) {
-      executor.shutdown();
+  public void close() {
+    synchronized (compactionListenerWriteLock) {
+      if (!closed) {
+        closed = true;
+        if (executor != null) {
+          executor.shutdown();
+        }
+      }
     }
   }
 
@@ -457,9 +463,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       public void onCompactionBegin(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        // Skip compaction DAG tracking if the snapshotInfoTable is empty.
-        // i.e. No snapshot exists in OM.
-        if (isSnapshotInfoTableEmpty(db)) {
+        if (compactionJobInfo.inputFiles().size() == 0) {
+          LOG.error("Compaction input files list is empty");
           return;
         }
 
@@ -468,9 +473,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         // all SST files.
 
         synchronized (compactionListenerWriteLock) {
+          if (closed) {
+            return;
+          }
 
-          if (compactionJobInfo.inputFiles().size() == 0) {
-            LOG.error("Compaction input files list is empty");
+          // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+          // i.e. No snapshot exists in OM.
+          if (isSnapshotInfoTableEmpty(db)) {
             return;
           }
 
@@ -507,70 +516,75 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        // Skip compaction DAG tracking if the snapshotInfoTable is empty.
-        // i.e. No snapshot exists in OM.
-        if (isSnapshotInfoTableEmpty(db)) {
+        if (compactionJobInfo.inputFiles().isEmpty()) {
+          LOG.error("Compaction input files list is empty");
           return;
         }
 
+        if (new HashSet<>(compactionJobInfo.inputFiles())
+            .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
+          LOG.info("Skipped the compaction entry. Compaction input files: " +
+                  "{} and output files: {} are same.",
+              compactionJobInfo.inputFiles(),
+              compactionJobInfo.outputFiles());
+          return;
+        }
+
+        final StringBuilder sb = new StringBuilder();
+
+        if (LOG.isDebugEnabled()) {
+          // Print compaction reason for this entry in the log file
+          // e.g. kLevelL0FilesNum / kLevelMaxLevelSize.
+          sb.append(COMPACTION_LOG_COMMENT_LINE_PREFIX)
+              .append(compactionJobInfo.compactionReason())
+              .append('\n');
+        }
+
+        // Mark the beginning of a compaction log
+        sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
+
+        // Trim DB path, only keep the SST file name
+        final int filenameOffset =
+            compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
+
+        // Append the list of input files
+        final List<String> inputFiles = compactionJobInfo.inputFiles();
+        // Trim the file path, leave only the SST file name without extension
+        inputFiles.replaceAll(s -> s.substring(
+            filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+        final String inputFilesJoined =
+            String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, inputFiles);
+        sb.append(inputFilesJoined);
+
+        // Insert delimiter between input files and output files
+        sb.append(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
+
+        // Append the list of output files
+        final List<String> outputFiles = compactionJobInfo.outputFiles();
+        outputFiles.replaceAll(s -> s.substring(
+            filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+        final String outputFilesJoined =
+            String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, outputFiles);
+        sb.append(outputFilesJoined);
+
+        // End of line
+        sb.append('\n');
+
+        String content = sb.toString();
+
         synchronized (compactionListenerWriteLock) {
-
-          if (compactionJobInfo.inputFiles().isEmpty()) {
-            LOG.error("Compaction input files list is empty");
+          if (closed) {
             return;
           }
 
-          if (new HashSet<>(compactionJobInfo.inputFiles())
-              .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
-            LOG.info("Skipped the compaction entry. Compaction input files: " +
-                "{} and output files: {} are same.",
-                compactionJobInfo.inputFiles(),
-                compactionJobInfo.outputFiles());
+          // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+          // i.e. No snapshot exists in OM.
+          if (isSnapshotInfoTableEmpty(db)) {
             return;
           }
-
-          final StringBuilder sb = new StringBuilder();
-
-          if (LOG.isDebugEnabled()) {
-            // Print compaction reason for this entry in the log file
-            // e.g. kLevelL0FilesNum / kLevelMaxLevelSize.
-            sb.append(COMPACTION_LOG_COMMENT_LINE_PREFIX)
-                .append(compactionJobInfo.compactionReason())
-                .append('\n');
-          }
-
-          // Mark the beginning of a compaction log
-          sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
-
-          // Trim DB path, only keep the SST file name
-          final int filenameOffset =
-              compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
-
-          // Append the list of input files
-          final List<String> inputFiles = compactionJobInfo.inputFiles();
-          // Trim the file path, leave only the SST file name without extension
-          inputFiles.replaceAll(s -> s.substring(
-              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          final String inputFilesJoined =
-              String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, inputFiles);
-          sb.append(inputFilesJoined);
-
-          // Insert delimiter between input files and output files
-          sb.append(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
-
-          // Append the list of output files
-          final List<String> outputFiles = compactionJobInfo.outputFiles();
-          outputFiles.replaceAll(s -> s.substring(
-              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          final String outputFilesJoined =
-              String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, outputFiles);
-          sb.append(outputFilesJoined);
-
-          // End of line
-          sb.append('\n');
 
           // Write input and output file names to compaction log
-          appendToCurrentCompactionLog(sb.toString());
+          appendToCurrentCompactionLog(content);
 
           // Populate the DAG
           // TODO: Once SnapshotChainManager is put into use, set snapshotID to
