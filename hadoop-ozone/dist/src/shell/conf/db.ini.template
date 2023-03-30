@@ -1,0 +1,25 @@
+# This is a RocksDB option file.
+#
+# For detailed file format spec, please refer to the example file
+# examples/rocksdb_option_file_example.ini in
+# https://github.com/facebook/rocksdb
+#
+# Below is the server name and corresponding RocksDB option file name:
+#      OM                    om.db.ini
+#      SCM                   scm.db.ini
+#      DN                    dn-crl.db.ini
+#
+# Below is an example of a RocksDB options file:
+
+[DBOptions]
+   max_background_flushes=2
+   compaction_readahead_size=4194304
+   bytes_per_sync=1048576
+   max_background_compactions=4
+   max_background_jobs=48
+   create_missing_column_families=true
+   create_if_missing=true
+
+[CFOptions "default"]
+
+[TableOptions/BlockBasedTable "default"]

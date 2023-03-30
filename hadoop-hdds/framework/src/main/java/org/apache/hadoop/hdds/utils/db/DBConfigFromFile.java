@@ -120,7 +120,7 @@ public final class DBConfigFromFile {
     Preconditions.checkNotNull(cfDescs);
     Preconditions.checkArgument(cfDescs.size() > 0);
 
-    //TODO: Add Documentation on how to support RocksDB Mem Env.
+    // Documentation on how to support RocksDB Mem Env: see HDDS-8331.
     Env env = Env.getDefault();
     ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
