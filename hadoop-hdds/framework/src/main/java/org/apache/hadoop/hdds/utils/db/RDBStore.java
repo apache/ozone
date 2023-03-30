@@ -31,6 +31,7 @@ import java.util.Set;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -221,6 +222,7 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     checkPointManager.close();
+    IOUtils.closeQuietly(rocksDBCheckpointDiffer);
     db.close();
   }
 
