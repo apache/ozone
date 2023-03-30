@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -342,6 +343,27 @@ public final class ReplicationTestUtil {
     }).when(mock).sendThrottledReplicationCommand(
         Mockito.any(ContainerInfo.class), Mockito.anyList(),
         Mockito.any(DatanodeDetails.class), anyInt());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * SendThrottledReconstructionCommand method so that it adds the command
+   * created to the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   * @throws CommandTargetOverloadedException
+   */
+  public static void mockSendThrottledReconstructionCommand(
+      ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
+      commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
+      return null;
+    }).when(mock).sendThrottledReconstructionCommand(
+        Mockito.any(ContainerInfo.class), Mockito.any());
   }
 
   /**

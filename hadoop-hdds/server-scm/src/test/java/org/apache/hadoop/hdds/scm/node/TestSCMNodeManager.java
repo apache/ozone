@@ -1039,6 +1039,14 @@ public class TestSCMNodeManager {
         node1, SCMCommandProto.Type.replicateContainerCommand));
     Assertions.assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));
+    Map<SCMCommandProto.Type, Integer> counts =
+        nodeManager.getTotalDatanodeCommandCounts(node1,
+            SCMCommandProto.Type.replicateContainerCommand,
+            SCMCommandProto.Type.closeContainerCommand);
+    Assertions.assertEquals(0,
+        counts.get(SCMCommandProto.Type.replicateContainerCommand));
+    Assertions.assertEquals(16,
+        counts.get(SCMCommandProto.Type.closeContainerCommand));
   }
 
   @Test
