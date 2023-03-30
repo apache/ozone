@@ -62,14 +62,9 @@ class TestOmLCRule {
         .setEnabled(true)
         .setPrefix("")
         .setAction(exp);
-    assertDoesNotThrow(r2::build);
+    OmLCRule omLCRule = assertDoesNotThrow(r2::build);
 
     // Empty id should generate a 48 (default) bit one.
-    OmLCRule.Builder r3 = new OmLCRule.Builder()
-        .setEnabled(true)
-        .setAction(exp);
-
-    OmLCRule omLCRule = assertDoesNotThrow(r3::build);
     assertEquals(OmLCRule.LC_ID_LENGTH, omLCRule.getId().length(),
         "Expected a " + OmLCRule.LC_ID_LENGTH + " length generated ID");
   }
@@ -95,6 +90,13 @@ class TestOmLCRule {
         .setAction(null);
     assertOMException(r2::build, INVALID_REQUEST,
         "At least one action needs to be specified in a rule");
+
+    OmLCRule.Builder r3 = new OmLCRule.Builder()
+        .setEnabled(true)
+        .setAction(exp);
+
+    assertOMException(r3::build, INVALID_REQUEST,
+        "Filter and Prefix cannot both be null.");
   }
 
   @Test
@@ -157,11 +159,13 @@ class TestOmLCRule {
 
     rules.add(new OmLCRule.Builder()
         .setId("duplicate-id")
+            .setPrefix("")
         .setAction(new OmLCExpiration.Builder().setDays(30).build())
         .build());
 
     rules.add(new OmLCRule.Builder()
         .setId("duplicate-id") // Same ID
+        .setPrefix("")
         .setAction(new OmLCExpiration.Builder().setDays(60).build())
         .build());
 

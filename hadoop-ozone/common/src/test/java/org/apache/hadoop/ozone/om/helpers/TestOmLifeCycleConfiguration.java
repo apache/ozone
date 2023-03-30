@@ -50,6 +50,7 @@ public class TestOmLifeCycleConfiguration {
         .setBucket("spark")
         .setRules(Collections.singletonList(new OmLCRule.Builder()
             .setId("spark logs")
+                .setPrefix("")
             .setAction(new OmLCExpiration.Builder()
                 .setDays(30)
                 .build())
@@ -63,6 +64,7 @@ public class TestOmLifeCycleConfiguration {
   public void testCreateInValidLCConfiguration() throws OMException {
     OmLCRule rule = new OmLCRule.Builder()
         .setId("spark logs")
+        .setPrefix("")
         .setAction(new OmLCExpiration.Builder().setDays(30).build())
         .build();
 
@@ -85,6 +87,7 @@ public class TestOmLifeCycleConfiguration {
       OmLCRule r = new OmLCRule.Builder()
           .setId(Integer.toString(i))
           .setAction(new OmLCExpiration.Builder().setDays(30).build())
+          .setPrefix("")
           .build();
       rules4.add(r);
     }
@@ -104,10 +107,12 @@ public class TestOmLifeCycleConfiguration {
     OmLCRule rule1 = new OmLCRule.Builder()
         .setId("test-rule1")
         .setAction(new OmLCExpiration.Builder().setDays(30).build())
+        .setPrefix("")
         .build();
 
     OmLCRule rule2 = new OmLCRule.Builder()
         .setId("test-rule2")
+        .setPrefix("")
         .setAction(new OmLCExpiration.Builder().setDays(60).build())
         .build();
 
