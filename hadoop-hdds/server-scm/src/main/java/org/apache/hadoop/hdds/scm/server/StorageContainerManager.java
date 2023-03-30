@@ -904,7 +904,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public void setScmCertificateClient(CertificateClient client) {
+  public void setScmCertificateClient(CertificateClient client)
+      throws IOException {
+    if (scmCertificateClient != null) {
+      scmCertificateClient.close();
+    }
     scmCertificateClient = client;
   }
 
@@ -1646,6 +1650,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmSafeModeManager.stop();
     serviceManager.stop();
     RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
+
+    if (scmCertificateClient != null) {
+      try {
+        scmCertificateClient.close();
+      } catch (IOException ioe) {
+        LOG.error("Closing certificate client failed", ioe);
+      }
+    }
 
     try {
       LOG.info("Stopping SCM MetadataStore.");

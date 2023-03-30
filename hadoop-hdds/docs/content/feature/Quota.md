@@ -61,7 +61,7 @@ e. If the cluster is upgraded from old version less than 1.1.0, use of quota on 
 
 ## Client usage
 ### Storage Space level quota
-Storage space level quotas allow the use of units such as KB (k), MB (m), GB (g), TB (t), PB (p), etc. Represents how much storage Spaces will be used.
+Storage space level quotas allow the use of units B, KB, MB, GB and TB. Represents how much storage Spaces will be used.
 
 #### Volume Storage Space level quota
 ```shell

@@ -76,9 +76,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -109,7 +107,7 @@ public class TestOmSnapshot {
   private static boolean enabledFileSystemPaths;
   private static boolean forceFullSnapshotDiff;
   private static ObjectStore store;
-  private static File metaDir;
+  private static OzoneConfiguration leaderConfig;
   private static OzoneManager leaderOzoneManager;
 
   private static RDBStore rdbStore;
@@ -182,9 +180,9 @@ public class TestOmSnapshot {
     bucketName = ozoneBucket.getName();
 
     leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    leaderConfig = leaderOzoneManager.getConfiguration();
     rdbStore =
         (RDBStore) leaderOzoneManager.getMetadataManager().getStore();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
 
     store = client.getObjectStore();
@@ -195,7 +193,6 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(leaderConfig);
   }
 
   @AfterClass
@@ -845,8 +842,8 @@ public class TestOmSnapshot {
         leaderOzoneManager.getMetadataManager().getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName =
-        metaDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME
-            + snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+        OmSnapshotManager.getSnapshotPath(leaderConfig, snapshotInfo) +
+        OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils
         .waitFor(() -> new File(snapshotDirName).exists(), 1000, 120000);
     return snapshotKeyPrefix;
