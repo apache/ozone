@@ -851,7 +851,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               .getFollowerNextIndices()).min().getAsLong();
           LOG.debug("Removing data corresponding to log index {} min index {} "
                   + "from cache", index, minIndex);
-          stateMachineDataCache.removeIf(k -> k >= (Math.min(minIndex, index)));
+          stateMachineDataCache.removeIf(k -> k <= (Math.min(minIndex, index)));
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -874,7 +874,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // if waitOnBothFollower is false, remove the entry from the cache
       // as soon as its applied and such entry exists in the cache.
       if (!waitOnBothFollowers) {
-        stateMachineDataCache.removeIf(k -> k >= index);
+        stateMachineDataCache.removeIf(k -> k <= index);
       }
       DispatcherContext.Builder builder =
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
@@ -996,7 +996,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<Void> truncate(long index) {
-    stateMachineDataCache.removeIf(k -> k >= index);
+    stateMachineDataCache.removeIf(k -> k <= index);
     return CompletableFuture.completedFuture(null);
   }
 
