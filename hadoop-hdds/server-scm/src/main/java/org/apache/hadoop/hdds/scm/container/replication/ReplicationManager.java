@@ -568,7 +568,8 @@ public class ReplicationManager implements SCMService {
     for (DatanodeDetails dn : datanodes) {
       try {
         Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
-            dn, Type.replicateContainerCommand, Type.replicateContainerCommand);
+            dn, Type.replicateContainerCommand,
+            Type.reconstructECContainersCommand);
         int replicateCount = counts.get(Type.replicateContainerCommand);
         int reconstructCount = counts.get(Type.reconstructECContainersCommand);
         int totalCount = replicateCount

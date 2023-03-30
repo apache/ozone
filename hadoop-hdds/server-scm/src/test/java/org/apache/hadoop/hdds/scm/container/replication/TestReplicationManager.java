@@ -869,7 +869,9 @@ public class TestReplicationManager {
       sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), i * 5);
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           DatanodeDetails dn = invocation.getArgument(0);
@@ -911,7 +913,9 @@ public class TestReplicationManager {
       sourceNodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           counts.put(SCMCommandProto.Type.replicateContainerCommand,
@@ -937,7 +941,9 @@ public class TestReplicationManager {
     targetNodes.put(cmdTarget, 0);
     targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           DatanodeDetails dn = invocation.getArgument(0);
@@ -978,7 +984,9 @@ public class TestReplicationManager {
     targets.add(MockDatanodeDetails.randomDatanodeDetails());
     targets.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(), any()))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           counts.put(SCMCommandProto.Type.replicateContainerCommand,
