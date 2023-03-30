@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -142,6 +143,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
 
     scmClient = Mockito.mock(ScmClient.class);
     ozoneBlockTokenSecretManager =
