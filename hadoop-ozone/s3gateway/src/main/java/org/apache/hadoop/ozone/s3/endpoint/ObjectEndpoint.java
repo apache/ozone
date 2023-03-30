@@ -318,19 +318,7 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneKeyDetails keyDetails = getClientProtocol()
           .getS3KeyDetails(bucketName, keyPath);
 
-      /*
-        Necessary for directories in buckets with FSO layout.
-        Intended for apps which use Hadoop S3A.
-        Example of such app is Trino (through Hive connector).
-       */
-      boolean isFsoDirCreationEnabled = ozoneConfiguration
-          .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-              OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
-      if (isFsoDirCreationEnabled &&
-          !keyDetails.isFile() &&
-          !keyPath.endsWith("/")) {
-        throw new OMException(ResultCodes.KEY_NOT_FOUND);
-      }
+      isFile(keyPath, keyDetails);
 
       long length = keyDetails.getDataSize();
 
@@ -477,19 +465,7 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
-      /*
-        Necessary for directories in buckets with FSO layout.
-        Intended for apps which use Hadoop S3A.
-        Example of such app is Trino (through Hive connector).
-       */
-      boolean isFsoDirCreationEnabled = ozoneConfiguration
-          .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-              OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
-      if (isFsoDirCreationEnabled &&
-          !key.isFile() &&
-          !keyPath.endsWith("/")) {
-        throw new OMException(ResultCodes.KEY_NOT_FOUND);
-      }
+      isFile(keyPath, key);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
@@ -521,6 +497,22 @@ public class ObjectEndpoint extends EndpointBase {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters()));
     return response.build();
+  }
+
+  private void isFile(String keyPath, OzoneKey key) throws OMException {
+    /*
+      Necessary for directories in buckets with FSO layout.
+      Intended for apps which use Hadoop S3A.
+      Example of such app is Trino (through Hive connector).
+     */
+    boolean isFsoDirCreationEnabled = ozoneConfiguration
+        .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+            OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT);
+    if (isFsoDirCreationEnabled &&
+        !key.isFile() &&
+        !keyPath.endsWith("/")) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
   }
 
   /**

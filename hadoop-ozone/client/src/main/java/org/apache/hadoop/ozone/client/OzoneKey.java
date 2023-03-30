@@ -87,9 +87,9 @@ public class OzoneKey {
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-      String keyName, long size, long creationTime,
-      long modificationTime, ReplicationConfig replicationConfig,
-      Map<String, String> metadata, boolean isFile) {
+                  String keyName, long size, long creationTime,
+                  long modificationTime, ReplicationConfig replicationConfig,
+                  Map<String, String> metadata, boolean isFile) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig, isFile);
     this.metadata.putAll(metadata);
