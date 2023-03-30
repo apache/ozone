@@ -92,6 +92,7 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.storage.proto
     .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -1421,6 +1422,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             //  make sure to update deletedTable accordingly in this case.
             //  4. Further optimization: Skip all snapshotted keys altogether
             //  e.g. by prefixing all unreclaimable keys, then calling seek
+
+            // If the bucket is a snapshot bucket then we should not process
+            // entries related to the snapshot from the deletedTable.
+            boolean isSnapshotBucket =
+                OMClientRequestUtils.isSnapshotBucket(this, info);
+            if (isSnapshotBucket) {
+              break;
+            }
 
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
