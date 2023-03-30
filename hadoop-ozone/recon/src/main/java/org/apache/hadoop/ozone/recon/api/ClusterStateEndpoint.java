@@ -52,7 +52,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
-
 /**
  * Endpoint to fetch current state of ozone cluster.
  */
@@ -103,6 +102,8 @@ public class ClusterStateEndpoint {
         MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
     int openContainersCount = this.containerManager.getContainerStateCount(
         HddsProtos.LifeCycleState.OPEN);
+    int deletedContainersCount = this.containerManager.getContainerStateCount(
+        HddsProtos.LifeCycleState.DELETED);
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
@@ -156,6 +157,8 @@ public class ClusterStateEndpoint {
     builder.setDeletedKeys(deletedKeys);
     builder.setDeletedDirs(deletedDirs);
 
+    // Subtract deleted containers from total containers.
+    containers = containers - deletedContainersCount;
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
         .setPipelines(pipelines)
@@ -164,6 +167,7 @@ public class ClusterStateEndpoint {
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(openContainersCount)
+        .setDeletedContainers(deletedContainersCount)
         .build();
     return Response.ok(response).build();
   }
