@@ -133,14 +133,15 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     for (long i = 1L; i <= 5L; ++i) {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
           .setContainerID(i)
-          .setReplicationConfig(
-              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
-          .setState(LifeCycleState.DELETED )
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.ONE))
+          .setState(LifeCycleState.DELETED)
           .setOwner("test")
           .setPipelineID(pipeline.getId())
           .build();
 
-      ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(containerInfo, pipeline);
+      ContainerWithPipeline containerWithPipeline =
+          new ContainerWithPipeline(containerInfo, pipeline);
       when(mockScmServiceProvider.getContainerWithPipeline(i))
           .thenReturn(containerWithPipeline);
       containerIDs.add(i);
