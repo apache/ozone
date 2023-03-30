@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.ratis_snapshot;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,13 +54,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * OzoneManagerSnapshotProvider downloads the latest checkpoint from the
- * leader OM and loads the checkpoint into State Machine.
+ * OmRatisSnapshotProvider downloads the latest checkpoint from the
+ * leader OM and loads the checkpoint into State Machine.  In addtion
+ * to the latest checkpoint, it also downloads any previous
+ * omSnapshots the leader has created.
+ *
+ * The term "snapshot" has two related but slightly different meanings
+ * in ozone.  An "omSnapshot" is a copy of the om's metadata at a
+ * point in time.  It is created by users through the "ozone sh
+ * snapshot create" cli.
+ *
+ * A "ratisSnapshot", (provided by this class), is used by om
+ * followers to bootstrap themselves to the current state of the om
+ * leader.  ratisSnapshots will contain copies of all the individual
+ * "omSnapshot"s that exist on the leader at the time of the
+ * bootstrap.  The follower needs these copies to respond the users
+ * snapshot requests when it becomes the leader.
  */
-public class OzoneManagerSnapshotProvider {
+public class OmRatisSnapshotProvider {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OzoneManagerSnapshotProvider.class);
+      LoggerFactory.getLogger(OmRatisSnapshotProvider.class);
 
   private final File omSnapshotDir;
   private Map<String, OMNodeDetails> peerNodesMap;
@@ -68,9 +82,7 @@ public class OzoneManagerSnapshotProvider {
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
 
-  private static final String OM_SNAPSHOT_DB = "om.snapshot.db";
-
-  public OzoneManagerSnapshotProvider(MutableConfigurationSource conf,
+  public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
 
     LOG.info("Initializing OM Snapshot Provider");

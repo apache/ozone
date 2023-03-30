@@ -33,6 +33,7 @@ import java.util.Set;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -51,9 +52,12 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 /**
@@ -110,8 +114,9 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), DB_COMPACTION_SST_BACKUP_DIR,
-            DB_COMPACTION_LOG_DIR, dbLocation.toString(),
+            dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
+            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
             maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
@@ -142,16 +147,16 @@ public class RDBStore implements DBStore {
         checkpointsParentDir = null;
       } else {
         Path checkpointsParentDirPath =
-            Paths.get(dbLocation.getParent(), "db.checkpoints");
+            Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
         checkpointsParentDir = checkpointsParentDirPath.toString();
         Files.createDirectories(checkpointsParentDirPath);
       }
-      //create snapshot directory if does not exist.
+      //create snapshot checkpoint directory if does not exist.
       if (!createCheckpointDirs) {
         snapshotsParentDir = null;
       } else {
         Path snapshotsParentDirPath =
-            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_DIR);
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
         Files.createDirectories(snapshotsParentDirPath);
       }
@@ -218,6 +223,7 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     checkPointManager.close();
+    IOUtils.closeQuietly(rocksDBCheckpointDiffer);
     db.close();
   }
 

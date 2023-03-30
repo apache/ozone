@@ -67,6 +67,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
 
   public OmSnapshot(KeyManager keyManager,
@@ -83,7 +84,6 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.volumeName = volumeName;
     this.omMetadataManager = keyManager.getMetadataManager();
   }
-
 
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {

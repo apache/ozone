@@ -58,9 +58,7 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -72,7 +70,6 @@ public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneCluster cluster;
   private ObjectStore store;
-  private File metaDir;
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
   private OzoneClient client;
@@ -122,7 +119,7 @@ public class TestOzoneSnapshotRestore {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(leaderConfig);
+    OMStorage.getOmDbDir(leaderConfig);
 
   }
 
@@ -160,9 +157,8 @@ public class TestOzoneSnapshotRestore {
             .getMetadataManager()
             .getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
-    String snapshotDirName = metaDir + OM_KEY_PREFIX +
-            OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-            snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+    String snapshotDirName = OmSnapshotManager
+        .getSnapshotPath(clientConf, snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
             1000, 120000);
     return snapshotKeyPrefix;

@@ -16,21 +16,14 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -41,27 +34,45 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.hdds.ExitManager;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
-
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
-import static org.junit.Assert.assertTrue;
-
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the Ratis snapshots feature in OM.
@@ -167,6 +178,8 @@ public class TestOMRatisSnapshots {
     // Do some transactions so that the log index increases
     List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
 
+    SnapshotInfo snapshotInfo = createOzoneSnapshot(leaderOM);
+
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -237,6 +250,58 @@ public class TestOMRatisSnapshots {
         TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
         volumeName, bucketName, newKeys.get(0))));
      */
+
+    // Read back data from the OM snapshot.
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(".snapshot/snap1/" + keys.get(0)).build();
+    OmKeyInfo omKeyInfo;
+    omKeyInfo = followerOM.lookupKey(omKeyArgs);
+    Assertions.assertNotNull(omKeyInfo);
+    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+
+    // Confirm followers snapshot hard links are as expected
+    File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
+    Path followerActiveDir = Paths.get(followerMetaDir.toString(), OM_DB_NAME);
+    Path followerSnapshotDir =
+        Paths.get(getSnapshotPath(followerOM.getConfiguration(), snapshotInfo));
+    File leaderMetaDir = OMStorage.getOmDbDir(leaderOM.getConfiguration());
+    Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
+    Path leaderSnapshotDir =
+        Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+    // Get the list of hardlinks from the leader.  Then confirm those links
+    //  are on the follower
+    int hardLinkCount = 0;
+    try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
+      for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
+        String fileName = leaderSnapshotSST.getFileName().toString();
+        if (fileName.toLowerCase().endsWith(".sst")) {
+
+          Path leaderActiveSST =
+              Paths.get(leaderActiveDir.toString(), fileName);
+          // Skip if not hard link on the leader
+          if (!leaderActiveSST.toFile().exists()) {
+            continue;
+          }
+          // If it is a hard link on the leader, it should be a hard
+          // link on the follower
+          if (OmSnapshotUtils.getINode(leaderActiveSST)
+              .equals(OmSnapshotUtils.getINode(leaderSnapshotSST))) {
+            Path followerSnapshotSST =
+                Paths.get(followerSnapshotDir.toString(), fileName);
+            Path followerActiveSST =
+                Paths.get(followerActiveDir.toString(), fileName);
+            Assertions.assertEquals(
+                OmSnapshotUtils.getINode(followerActiveSST),
+                OmSnapshotUtils.getINode(followerSnapshotSST),
+                "Snapshot sst file is supposed to be a hard link");
+            hardLinkCount++;
+          }
+        }
+      }
+    }
+    Assertions.assertTrue(hardLinkCount > 0, "No hard links were found");
   }
 
   @Ignore("Enable this unit test after RATIS-1481 used")
@@ -545,6 +610,27 @@ public class TestOMRatisSnapshots {
     }, 100, 3000);
     String msg = "RPC server is stopped";
     Assert.assertTrue(logCapture.getOutput().contains(msg));
+  }
+
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM)
+      throws IOException {
+    objectStore.createSnapshot(volumeName, bucketName, "snap1");
+
+    String tableKey = SnapshotInfo.getTableKey(volumeName,
+                                               bucketName,
+                                               "snap1");
+    SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(tableKey);
+    // Allow the snapshot to be written to disk
+    String fileName =
+        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+    File snapshotDir = new File(fileName);
+    if (!RDBCheckpointUtils
+        .waitForCheckpointDirectoryExist(snapshotDir)) {
+      throw new IOException("snapshot directory doesn't exist");
+    }
+    return snapshotInfo;
   }
 
   private List<String> writeKeysToIncreaseLogIndex(
