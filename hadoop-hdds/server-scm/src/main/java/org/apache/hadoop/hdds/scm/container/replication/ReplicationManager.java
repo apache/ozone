@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -75,7 +74,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -179,6 +177,7 @@ public class ReplicationManager implements SCMService {
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
   private final int datanodeReplicationLimit;
+  private final int reconstructionCommandWeight;
   private final int datanodeDeleteLimit;
 
   /**
@@ -231,6 +230,7 @@ public class ReplicationManager implements SCMService {
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
+    this.reconstructionCommandWeight = rmConf.getReconstructionCommandWeight();
     this.datanodeDeleteLimit = rmConf.getDatanodeDeleteLimit();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
@@ -484,17 +484,20 @@ public class ReplicationManager implements SCMService {
   public void sendThrottledDeleteCommand(final ContainerInfo container,
       int replicaIndex, final DatanodeDetails datanode, boolean force)
       throws NotLeaderException, CommandTargetOverloadedException {
-    List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount =
-        getAvailableDatanodes(Collections.singletonList(datanode),
-            Type.deleteContainerCommand, datanodeDeleteLimit);
-    if (datanodeWithCommandCount.isEmpty()) {
-      throw new CommandTargetOverloadedException("Cannot schedule a delete " +
-          "container command for container " + container.containerID() +
-          " on datanode " + datanode + " as it has too many pending delete " +
-          "commands");
+    try {
+      int commandCount = nodeManager.getTotalDatanodeCommandCount(datanode,
+          Type.deleteContainerCommand);
+      if (commandCount >= datanodeDeleteLimit) {
+        throw new CommandTargetOverloadedException("Cannot schedule a delete " +
+            "container command for container " + container.containerID() +
+            " on datanode " + datanode + " as it has too many pending delete " +
+            "commands (" + commandCount + ")");
+      }
+      sendDeleteCommand(container, replicaIndex, datanode, force);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalArgumentException("Datanode " + datanode + " not " +
+          "found in NodeManager. Should not happen");
     }
-    sendDeleteCommand(container, replicaIndex, datanodeWithCommandCount.get(0)
-        .getRight(), force);
   }
 
   /**
@@ -516,8 +519,8 @@ public class ReplicationManager implements SCMService {
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
-    List<Pair<Integer, DatanodeDetails>> sourceWithCmds = getAvailableDatanodes(
-        sources, Type.replicateContainerCommand, datanodeReplicationLimit);
+    List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
+        getAvailableDatanodesForReplication(sources);
     if (sourceWithCmds.isEmpty()) {
       throw new CommandTargetOverloadedException("No sources with capacity " +
           "available for replication of container " + containerID + " to " +
@@ -532,33 +535,53 @@ public class ReplicationManager implements SCMService {
     sendDatanodeCommand(cmd, containerInfo, sourceWithCmds.get(0).getRight());
   }
 
+  public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
+      ReconstructECContainersCommand command)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    List<DatanodeDetails> targets = command.getTargetDatanodes();
+    List<Pair<Integer, DatanodeDetails>> targetWithCmds =
+        getAvailableDatanodesForReplication(targets);
+    if (targetWithCmds.isEmpty()) {
+      throw new CommandTargetOverloadedException("No target with capacity " +
+          "available for reconstruction of " + containerInfo.getContainerID());
+    }
+    // Put the least loaded target first
+    targetWithCmds.sort(Comparator.comparingInt(Pair::getLeft));
+    sendDatanodeCommand(command, containerInfo,
+        targetWithCmds.get(0).getRight());
+  }
+
   /**
-   * For the given datanodes and command type, lookup the current queue command
-   * count and return a list of datanodes with the current command count. If
-   * any datanode is at or beyond the limit, then it will not be included in the
+   * For the given datanodes, lookup the current queued command count for
+   * replication and reconstruction and return a list of datanodes with the
+   * total queued count which are less than the limit.
+   * Any datanode is at or beyond the limit, then it will not be included in the
    * returned list.
    * @param datanodes List of datanodes to check for available capacity
-   * @param commandType The Type of datanode command to check the capacity for.
-   * @param limit The limit of commands of that type.
    * @return List of datanodes with the current command count that are not over
    *         the limit.
    */
-  private List<Pair<Integer, DatanodeDetails>> getAvailableDatanodes(
-      List<DatanodeDetails> datanodes,
-      StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type commandType,
-      int limit) {
+  private List<Pair<Integer, DatanodeDetails>>
+      getAvailableDatanodesForReplication(List<DatanodeDetails> datanodes) {
     List<Pair<Integer, DatanodeDetails>> datanodeWithCommandCount
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
-        int commandCount = nodeManager.getTotalDatanodeCommandCount(dn,
-            commandType);
-        if (commandCount >= limit) {
+        Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
+            dn, Type.replicateContainerCommand,
+            Type.reconstructECContainersCommand);
+        int replicateCount = counts.get(Type.replicateContainerCommand);
+        int reconstructCount = counts.get(Type.reconstructECContainersCommand);
+        int totalCount = replicateCount
+            + reconstructCount * reconstructionCommandWeight;
+        if (totalCount >= datanodeReplicationLimit) {
           LOG.debug("Datanode {} has reached the maximum number of queued " +
-              "{} commands ({})", dn, commandType, limit);
+              "commands, replication: {}, reconstruction: {} * {})",
+              dn, replicateCount, reconstructCount,
+              reconstructionCommandWeight);
           continue;
         }
-        datanodeWithCommandCount.add(Pair.of(commandCount, dn));
+        datanodeWithCommandCount.add(Pair.of(totalCount, dn));
       } catch (NodeNotFoundException e) {
         LOG.error("Node {} not found in NodeManager. Should not happen",
             dn, e);
@@ -1160,14 +1183,29 @@ public class ReplicationManager implements SCMService {
         defaultValue = "20",
         tags = { SCM, DATANODE },
         description = "A limit to restrict the total number of replication " +
-            "commands queued on a datanode. Note this is intended to be a " +
-            " temporary config until we have a more dynamic way of limiting " +
-            "load."
+            "and reconstruction commands queued on a datanode. Note this is " +
+            "intended to be a temporary config until we have a more dynamic " +
+            "way of limiting load."
     )
     private int datanodeReplicationLimit = 20;
 
     public int getDatanodeReplicationLimit() {
       return datanodeReplicationLimit;
+    }
+
+    @Config(key = "datanode.reconstruction.weight",
+        type = ConfigType.INT,
+        defaultValue = "3",
+        tags = { SCM, DATANODE },
+        description = "When counting the number of replication commands on a " +
+            "datanode, the number of reconstruction commands is multiplied " +
+            "by this weight to ensure reconstruction commands use more of " +
+            "the capacity, as they are more expensive to process."
+    )
+    private int reconstructionCommandWeight = 3;
+
+    public int getReconstructionCommandWeight() {
+      return reconstructionCommandWeight;
     }
 
     @Config(key = "datanode.delete.container.limit",
@@ -1239,6 +1277,10 @@ public class ReplicationManager implements SCMService {
         throw new IllegalArgumentException("event.timeout.datanode.offset is"
             + " set to " + datanodeTimeoutOffset + " and must be <"
             + " event.timeout, which is set to " + eventTimeout);
+      }
+      if (reconstructionCommandWeight <= 0) {
+        throw new IllegalArgumentException("reconstructionCommandWeight is"
+            + " set to " + reconstructionCommandWeight + " and must be > 0");
       }
     }
   }

@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -332,6 +333,12 @@ public class SimpleMockNodeManager implements NodeManager {
   public int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException {
     return 0;
+  }
+
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
   }
 
   @Override

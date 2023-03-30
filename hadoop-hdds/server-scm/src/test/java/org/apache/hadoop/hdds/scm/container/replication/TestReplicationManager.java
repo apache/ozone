@@ -859,7 +859,7 @@ public class TestReplicationManager {
   }
 
   @Test
-  public void testCreateThrottledReplicateContainerCommand()
+  public void testSendThrottledReplicateContainerCommand()
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
     Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
@@ -869,11 +869,16 @@ public class TestReplicationManager {
       sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), i * 5);
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.replicateContainerCommand)))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
           DatanodeDetails dn = invocation.getArgument(0);
-          return sourceNodes.get(dn);
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              sourceNodes.get(dn));
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return counts;
         });
 
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
@@ -892,27 +897,126 @@ public class TestReplicationManager {
   }
 
   @Test(expected = CommandTargetOverloadedException.class)
-  public void testCreateThrottledReplicateContainerCommandThrowsWhenNoSources()
+  public void testSendThrottledReplicateContainerCommandThrowsWhenNoSources()
       throws CommandTargetOverloadedException, NodeNotFoundException,
       NotLeaderException {
+    // Reconstruction commands also count toward the limit, so set things up
+    // so that the nodes are at the limit caused by 1 reconstruction command
+    // and the remaining replication commands
     int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
-    Map<DatanodeDetails, Integer> sourceNodes = new HashMap<>();
+    int reconstructionWeight = replicationManager.getConfig()
+        .getReconstructionCommandWeight();
+    int reconstructionCount = 1;
+    int replicationCount = limit - reconstructionCount * reconstructionWeight;
+    List<DatanodeDetails> sourceNodes = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      sourceNodes.put(MockDatanodeDetails.randomDatanodeDetails(), limit + 1);
+      sourceNodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
-    Mockito.when(nodeManager.getTotalDatanodeCommandCount(any(),
-            eq(SCMCommandProto.Type.replicateContainerCommand)))
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
         .thenAnswer(invocation -> {
-          DatanodeDetails dn = invocation.getArgument(0);
-          return sourceNodes.get(dn);
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              replicationCount);
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand,
+              reconstructionCount);
+          return counts;
         });
 
     DatanodeDetails destination = MockDatanodeDetails.randomDatanodeDetails();
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     replicationManager.sendThrottledReplicationCommand(
-            container, new ArrayList<>(sourceNodes.keySet()), destination, 0);
+            container, sourceNodes, destination, 0);
+  }
+
+  @Test
+  public void testSendThrottledReconstructionCommand()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    Map<DatanodeDetails, Integer> targetNodes = new HashMap<>();
+    DatanodeDetails cmdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    targetNodes.put(cmdTarget, 0);
+    targetNodes.put(MockDatanodeDetails.randomDatanodeDetails(), 5);
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          DatanodeDetails dn = invocation.getArgument(0);
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              targetNodes.get(dn));
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return counts;
+        });
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    ReconstructECContainersCommand command = createReconstructionCommand(
+        container, new ArrayList<>(targetNodes.keySet()));
+
+    replicationManager.sendThrottledReconstructionCommand(container, command);
+
+    Assertions.assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+  }
+
+  @Test(expected = CommandTargetOverloadedException.class)
+  public void testSendThrottledReconstructionCommandThrowsWhenNoTargets()
+      throws CommandTargetOverloadedException, NodeNotFoundException,
+      NotLeaderException {
+    int limit = replicationManager.getConfig().getDatanodeReplicationLimit();
+    int reconstructionWeight = replicationManager.getConfig()
+        .getReconstructionCommandWeight();
+
+    // We want to test that Replication commands also count toward the limit,
+    // and also that the weight is applied the the reconstruction count.
+    // Using the values below will set the targets at their limit.
+    int reconstructionCount = 2;
+    int replicationCount = limit - reconstructionCount * reconstructionWeight;
+
+    List<DatanodeDetails> targets = new ArrayList<>();
+    targets.add(MockDatanodeDetails.randomDatanodeDetails());
+    targets.add(MockDatanodeDetails.randomDatanodeDetails());
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+            eq(SCMCommandProto.Type.replicateContainerCommand),
+            eq(SCMCommandProto.Type.reconstructECContainersCommand)))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              replicationCount);
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand,
+              reconstructionCount);
+          return counts;
+        });
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand command = createReconstructionCommand(
+        container, targets);
+    replicationManager.sendThrottledReconstructionCommand(container, command);
+  }
+
+  private ReconstructECContainersCommand createReconstructionCommand(
+      ContainerInfo containerInfo, List<DatanodeDetails> targets) {
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources
+        = new ArrayList<>();
+    for (int i = 1; i <= 3; i++) {
+      sources.add(
+          new ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex(
+              MockDatanodeDetails.randomDatanodeDetails(), i));
+    }
+    byte[] missingIndexes = new byte[]{4, 5};
+
+    return new ReconstructECContainersCommand(
+        containerInfo.getContainerID(), sources,
+        targets, missingIndexes, (ECReplicationConfig) repConfig);
   }
 
   @Test
