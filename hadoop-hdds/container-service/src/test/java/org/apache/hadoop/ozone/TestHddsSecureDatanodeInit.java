@@ -356,7 +356,6 @@ public class TestHddsSecureDatanodeInit {
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
-  @Disabled("HDDS-7874")
   public void testCertificateRotationRecoverableFailure() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);

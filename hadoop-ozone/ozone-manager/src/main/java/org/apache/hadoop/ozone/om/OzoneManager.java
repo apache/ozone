@@ -1066,7 +1066,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void setCertClient(CertificateClient certClient) throws IOException {
     // TODO: Initialize it in constructor with implementation for certClient.
     if (certClient != null) {
-      certClient.close();
+      this.certClient.close();
     }
     this.certClient = certClient;
   }

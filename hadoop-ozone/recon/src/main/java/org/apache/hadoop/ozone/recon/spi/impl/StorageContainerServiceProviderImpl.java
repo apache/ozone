@@ -201,15 +201,13 @@ public class StorageContainerServiceProviderImpl
             SecurityConfig secConf = new SecurityConfig(configuration);
             try (ReconCertificateClient certClient =
                      new ReconCertificateClient(
-                         secConf, reconStorage, null, null)) {
-              try (
-                  SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                      hostAddress, grpcPort, configuration, certClient)) {
-                downloadClient.download(targetFile.toPath()).get();
-              } catch (ExecutionException | InterruptedException e) {
-                LOG.error("Rocks DB checkpoint downloading failed", e);
-                throw new IOException(e);
-              }
+                         secConf, reconStorage, null, null);
+                 SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+                     hostAddress, grpcPort, configuration, certClient)) {
+              downloadClient.download(targetFile.toPath()).get();
+            } catch (ExecutionException | InterruptedException e) {
+              LOG.error("Rocks DB checkpoint downloading failed", e);
+              throw new IOException(e);
             }
             LOG.info("Downloaded SCM Snapshot from Leader SCM");
             break;
