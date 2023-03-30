@@ -29,21 +29,11 @@ import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfiguration
  * Type of authentication method.
  */
 public enum AuthType {
-  APP_ROLE("appRole"),
-  TOKEN("token");
-
-  private final String name;
-
-  AuthType(String name) {
-    this.name = name;
-  }
-
-  public String getName() {
-    return name;
-  }
+  APP_ROLE,
+  TOKEN;
 
   public static Auth fromConf(Configuration conf) {
-    AuthType authType = AuthType.valueOf(conf.get(AUTH_TYPE));
+    AuthType authType = AuthType.valueOf(conf.get(AUTH_TYPE).toUpperCase());
     switch (authType) {
     case TOKEN:
       String token = conf.get(S3SecretRemoteStoreConfigurationKeys.TOKEN);

@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.ADDRESS;
@@ -104,8 +105,19 @@ public class VaultS3SecretStore implements S3SecretStore {
   public S3SecretValue getSecret(String kerberosID) throws IOException {
     try {
       checkAuth();
-      String s3Secret = vault.logical()
-          .read(secretPath + '/' + kerberosID).getData().get(kerberosID);
+
+      Map<String, String> data = vault.logical()
+              .read(secretPath + '/' + kerberosID).getData();
+
+      if (data == null) {
+        return null;
+      }
+
+      String s3Secret = data.get(kerberosID);
+      if (s3Secret == null) {
+        return null;
+      }
+
       return new S3SecretValue(kerberosID, s3Secret);
     } catch (VaultException e) {
       LOG.error("Failed to read secret", e);
