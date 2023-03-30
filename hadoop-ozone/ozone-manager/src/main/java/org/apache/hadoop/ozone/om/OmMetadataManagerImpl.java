@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -36,13 +37,14 @@ import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -108,7 +110,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_L
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
@@ -327,13 +329,48 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.omEpoch = 0;
   }
 
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    Path path = checkpoint.getCheckpointLocation();
+    Path parent = path.getParent();
+    if (parent == null) {
+      throw new IllegalStateException("DB checkpoint parent path should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    File dir = parent.toFile();
+    Path name = path.getFileName();
+    if (name == null) {
+      throw new IllegalStateException("DB checkpoint dir name should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    return new OmMetadataManagerImpl(conf, dir, name.toString());
+  }
+
+  /**
+   * Metadata constructor for checkpoints.
+   *
+   * @param conf - Ozone conf.
+   * @param dir - Checkpoint parent directory.
+   * @param name - Checkpoint directory name.
+   * @throws IOException
+   */
+  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+      throws IOException {
+    lock = new OmReadOnlyLock();
+    omEpoch = 0;
+    setStore(loadDB(conf, dir, name, true,
+        java.util.Optional.of(Boolean.TRUE)));
+    initializeOmTables(false);
+  }
+
+
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
     File metaDir = new File(snapshotDir);
     String dbName = OM_DB_NAME + snapshotDirName;
     // The check is only to prevent every snapshot read to perform a disk IO
@@ -341,7 +378,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // it is most likely DB entries will get flushed in this wait time.
     if (isSnapshotInCache) {
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
-      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
     }
     setStore(loadDB(conf, metaDir, dbName, true,
             java.util.Optional.of(Boolean.TRUE)));

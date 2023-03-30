@@ -50,9 +50,12 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 /**
@@ -107,8 +110,9 @@ public class RDBStore implements DBStore {
     try {
       if (enableCompactionLog) {
         rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent(), DB_COMPACTION_SST_BACKUP_DIR,
-            DB_COMPACTION_LOG_DIR, dbLocation.toString(),
+            dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
+            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
             maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
@@ -136,7 +140,7 @@ public class RDBStore implements DBStore {
 
       //create checkpoints directory if not exists.
       checkpointsParentDir =
-          Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
+          dbLocation.getParent() + OM_KEY_PREFIX + OM_CHECKPOINT_DIR;
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
@@ -147,15 +151,15 @@ public class RDBStore implements DBStore {
         }
       }
 
-      //create snapshot directory if does not exist.
+      //create snapshot checkpoint directory if does not exist.
       snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_DIR).toString();
+          OM_SNAPSHOT_CHECKPOINT_DIR).toString();
       File snapshotsDir = new File(snapshotsParentDir);
       if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdir();
+        boolean success = snapshotsDir.mkdirs();
         if (!success) {
           throw new IOException(
-              "Unable to create RocksDB snapshot directory: " +
+              "Unable to create RocksDB snapshot checkpoint directory: " +
               snapshotsParentDir);
         }
       }

@@ -230,7 +230,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     final File parentDir = new File(metadataDir);
     if (!parentDir.exists()) {
-      if (!parentDir.mkdir()) {
+      if (!parentDir.mkdirs()) {
         LOG.error("Error creating compaction log parent dir.");
         return null;
       }

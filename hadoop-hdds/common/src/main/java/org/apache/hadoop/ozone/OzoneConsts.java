@@ -141,6 +141,8 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
+  public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
+      "includeSnapshotData";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
@@ -562,7 +564,13 @@ public final class OzoneConsts {
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 
   public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_CHECKPOINT_DIR = "db.checkpoints";
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "diffState";
+
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
