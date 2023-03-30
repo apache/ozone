@@ -23,7 +23,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -64,9 +63,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
@@ -77,6 +78,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
  * This class is used to manage/create OM snapshots.
  */
 public final class OmSnapshotManager implements AutoCloseable {
+  public static final String OM_HARDLINK_FILE = "hardLinkFile";
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
@@ -450,6 +452,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   public static String getSnapshotPrefix(String snapshotName) {
     return OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX +
         snapshotName + OM_KEY_PREFIX;
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+                                     SnapshotInfo snapshotInfo) {
+    return OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {

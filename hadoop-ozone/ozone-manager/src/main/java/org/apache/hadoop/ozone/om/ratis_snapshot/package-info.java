@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.ratis_snapshot;
 
 /**
- * This package contains OM Snapshot related classes.
+ * This package contains OM Ratis Snapshot related classes.
  */
