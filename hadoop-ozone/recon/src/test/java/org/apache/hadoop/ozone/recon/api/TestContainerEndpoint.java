@@ -118,16 +118,23 @@ public class TestContainerEndpoint {
   private long keyCount = 5L;
   private static final String FSO_KEY_NAME1 = "dir1/file7";
   private static final String FSO_KEY_NAME2 = "dir1/dir2/file8";
+  private static final String FSO_KEY_NAME3 = "dir1/dir2/file9";
+  private static final String FSO_KEY_NAME4 = "dir1/dir2/dir3/file10";
   private static final String BUCKET_NAME = "fsoBucket";
   private static final String VOLUME_NAME = "sampleVol2";
   private static final String FILE_NAME1 = "file7";
   private static final String FILE_NAME2 = "file8";
+  private static final String FILE_NAME3 = "file9";
+  private static final String FILE_NAME4 = "file10";
   private static final long FILE_ONE_OBJECT_ID = 13L;
   private static final long FILE_TWO_OBJECT_ID = 14L;
-  private static final long PARENT_OBJECT_ID = 2L;
-  private static final long PARENT_OBJECT_ID2 = 3L;
-  private static final long BUCKET_OBJECT_ID = 1L;
-  private static final long VOL_OBJECT_ID = 0L;
+  private static final long FILE_THREE_OBJECT_ID = 15L;
+  private static final long FILE_FOUR_OBJECT_ID = 16L;
+  private static final long PARENT_OBJECT_ID = 2L;  // dir1 objectID
+  private static final long PARENT_OBJECT_ID2 = 3L; // dir2 objectID
+  private static final long PARENT_OBJECT_ID3 = 4L; // dir3 objectID
+  private static final long BUCKET_OBJECT_ID = 1L;  // fsoBucket objectID
+  private static final long VOL_OBJECT_ID = 0L;    // sampleVol2 objectID
   private static final long CONTAINER_ID_1 = 20L;
   private static final long CONTAINER_ID_2 = 21L;
   private static final long CONTAINER_ID_3 = 22L;
@@ -341,6 +348,34 @@ public class TestContainerEndpoint {
         Collections.singletonList(locationInfoGroup),
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
         KEY_ONE_SIZE);
+
+    // add the multi-block key to Recon's OM
+    writeKeyToOm(reconOMMetadataManager,
+        FSO_KEY_NAME3,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        FILE_NAME3,
+        FILE_THREE_OBJECT_ID,
+        PARENT_OBJECT_ID2,
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    // add the multi-block key to Recon's OM
+    writeKeyToOm(reconOMMetadataManager,
+        FSO_KEY_NAME4,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        FILE_NAME4,
+        FILE_FOUR_OBJECT_ID,
+        PARENT_OBJECT_ID3,
+        BUCKET_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(locationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
   }
 
   private OmKeyLocationInfoGroup getLocationInfoGroup1() {
@@ -422,8 +457,8 @@ public class TestContainerEndpoint {
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
 
-    assertEquals(2, data.getTotalCount());
-    assertEquals(2, keyMetadataList.size());
+    assertEquals(4, data.getTotalCount());
+    assertEquals(4, keyMetadataList.size());
 
     // Retrieve the first key from the list and verify its metadata
     iterator = keyMetadataList.iterator();
@@ -492,6 +527,37 @@ public class TestContainerEndpoint {
     keyMetadataList = data.getKeys();
     assertEquals(0, keyMetadataList.size());
     assertEquals(0, data.getTotalCount());
+
+    // Now to check if the ContainerEndpoint also reads the File table
+    // Set up test data for FSO keys
+    setUpFSOData();
+    // Reprocess the container key mapper to ensure the latest mapping is used
+    reprocessContainerKeyMapper();
+    response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
+
+    // Ensure that the expected number of keys is returned
+    data = (KeysResponse) response.getEntity();
+    keyMetadataList = data.getKeys();
+
+    assertEquals(4, data.getTotalCount());
+    assertEquals(3, keyMetadataList.size());
+
+    // Retrieve the first key from the list and verify its metadata
+    iterator = keyMetadataList.iterator();
+    keyMetadata = iterator.next();
+    assertEquals(FSO_KEY_NAME2, keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+    Map<Long, List<KeyMetadata.ContainerBlockMetadata>> blockIds =
+        keyMetadata.getBlockIds();
+    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
+
+    keyMetadata = iterator.next();
+    assertEquals(FSO_KEY_NAME3, keyMetadata.getKey());
+    assertEquals(1, keyMetadata.getVersions().size());
+    assertEquals(1, keyMetadata.getBlockIds().size());
+    blockIds = keyMetadata.getBlockIds();
+    assertEquals(0, blockIds.get(0L).get(0).getLocalID());
 
   }
 
@@ -745,7 +811,7 @@ public class TestContainerEndpoint {
   @Test
   public void testUnhealthyContainersFilteredResponse()
       throws IOException, TimeoutException {
-    String missing =  UnHealthyContainerStates.MISSING.toString();
+    String missing = UnHealthyContainerStates.MISSING.toString();
 
     Response response = containerEndpoint
         .getUnhealthyContainers(missing, 1000, 1);
@@ -881,7 +947,7 @@ public class TestContainerEndpoint {
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
-      int misRep) {
+                                      int misRep) {
     int cid = 0;
     for (int i = 0; i < missing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
@@ -905,7 +971,7 @@ public class TestContainerEndpoint {
   }
 
   private void createUnhealthyRecord(int id, String state, int expected,
-      int actual, int delta, String reason) {
+                                     int actual, int delta, String reason) {
     long cID = Integer.toUnsignedLong(id);
     UnhealthyContainers missing = new UnhealthyContainers();
     missing.setContainerId(cID);
