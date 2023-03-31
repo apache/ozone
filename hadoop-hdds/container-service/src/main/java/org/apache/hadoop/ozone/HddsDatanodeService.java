@@ -355,6 +355,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      certClient.close();
       LOG.info("Re-initialize certificate client.");
       certClient = new DNCertificateClient(secConf, datanodeDetails, null,
           this::saveNewCertId, this::terminateDatanode);
@@ -440,7 +441,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
 
   /**
@@ -582,7 +583,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
   }
 
