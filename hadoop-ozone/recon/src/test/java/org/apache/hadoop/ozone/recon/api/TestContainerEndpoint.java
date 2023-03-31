@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
@@ -761,5 +762,21 @@ public class TestContainerEndpoint {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  @Test
+  public void testGetContainerInsights() throws IOException, TimeoutException {
+    reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> containers = reconContainerManager.getContainers();
+    assertEquals(2, containers.size());
+    reconContainerManager.deleteContainer(ContainerID.valueOf(1));
+    Response containerInsights = containerEndpoint.getContainerInsights();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+    ContainerDiscrepancyInfo containerDiscrepancyInfo =
+        containerDiscrepancyInfoList.get(0);
+    assertEquals(1, containerDiscrepancyInfo.getContainerID());
+    assertEquals(1, containerDiscrepancyInfoList.size());
   }
 }

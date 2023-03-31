@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
@@ -400,4 +401,43 @@ public class ContainerEndpoint {
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
   }
+
+  @GET
+  @Path("insights/nonscmcontainers")
+  public Response getContainerInsights() {
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(-1, -1);
+      List<Long> scmContainers = containerManager.getContainers().stream()
+          .map(containerInfo -> containerInfo.getContainerID()).collect(
+              Collectors.toList());
+      List<Map.Entry<Long, ContainerMetadata>> notExistsAtSCMContainers =
+          omContainers.entrySet().stream().filter(containerMetadataEntry ->
+                  !(scmContainers.contains(containerMetadataEntry.getKey())))
+              .collect(
+                  Collectors.toList());
+
+      notExistsAtSCMContainers.forEach(nonSCMContainer -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonSCMContainer.getKey());
+        containerDiscrepancyInfo.setNumberOfKeys(
+            nonSCMContainer.getValue().getNumberOfKeys());
+        containerDiscrepancyInfo.setPipelines(nonSCMContainer.getValue()
+            .getPipelines());
+        containerDiscrepancyInfo.setExistsAt("OM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    }
+
+    return Response.ok(containerDiscrepancyInfoList).build();
+  }
+
 }

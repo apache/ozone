@@ -17,31 +17,39 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
 import java.util.List;
 
 /**
- * Metadata object that represents a Container.
+ * Metadata object that represents a Container Discrepancy Info.
  */
-@XmlAccessorType(XmlAccessType.FIELD)
-public class ContainerMetadata {
+public class ContainerDiscrepancyInfo {
 
-  @XmlElement(name = "ContainerID")
+  @JsonProperty("containerId")
   private long containerID;
 
-  @XmlElement(name = "NumberOfKeys")
+  @JsonProperty("omContainerState")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private long omContainerState;
+
+  @JsonProperty("scmContainerState")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private long scmContainerState;
+
+  @JsonProperty("numberOfKeys")
   private long numberOfKeys;
 
   @JsonProperty("pipelines")
   private List<Pipeline> pipelines;
 
-  public ContainerMetadata(long containerID) {
-    this.containerID = containerID;
+  @JsonProperty("existsAt")
+  private String existsAt;
+
+  public ContainerDiscrepancyInfo() {
+
   }
 
   public long getContainerID() {
@@ -60,6 +68,22 @@ public class ContainerMetadata {
     this.numberOfKeys = numberOfKeys;
   }
 
+  public long getOmContainerState() {
+    return omContainerState;
+  }
+
+  public void setOmContainerState(long omContainerState) {
+    this.omContainerState = omContainerState;
+  }
+
+  public long getScmContainerState() {
+    return scmContainerState;
+  }
+
+  public void setScmContainerState(long scmContainerState) {
+    this.scmContainerState = scmContainerState;
+  }
+
   public List<Pipeline> getPipelines() {
     return pipelines;
   }
@@ -67,5 +91,13 @@ public class ContainerMetadata {
   public void setPipelines(
       List<Pipeline> pipelines) {
     this.pipelines = pipelines;
+  }
+
+  public String getExistsAt() {
+    return existsAt;
+  }
+
+  public void setExistsAt(String existsAt) {
+    this.existsAt = existsAt;
   }
 }
