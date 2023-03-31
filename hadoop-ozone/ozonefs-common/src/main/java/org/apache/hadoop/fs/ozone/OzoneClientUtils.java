@@ -81,6 +81,9 @@ public final class OzoneClientUtils {
             || ex.getResult().equals(BUCKET_NOT_FOUND)) {
           // for orphan link bucket, return layout as link bucket
           bucket.setSourcePathExist(false);
+          LOG.error("Source Bucket is not found, its orphan bucket and " +
+              "used link bucket {} layout {}", bucket.getName(),
+              bucket.getBucketLayout());
           return bucket.getBucketLayout();
         }
         // other case throw exception

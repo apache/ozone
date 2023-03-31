@@ -676,7 +676,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     try {
       getFileStatus(f);
     } catch (FileNotFoundException ex) {
-      // remove orpahan link bucket directly
+      // remove orphan link bucket directly
       if (isLinkBucket(f, ofsPath)) {
         deleteBucketFromVolume(f, ofsPath);
         return true;
@@ -706,6 +706,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return true;
       }
     } catch (Exception ex) {
+      LOG.error("Exception while getting bucket link information, " +
+          "considered it as false", ex);
       return false;
     }
     return false;

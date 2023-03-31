@@ -894,6 +894,8 @@ public class BasicRootedOzoneClientAdapterImpl
         statuses = bucket
             .listStatus(keyName, recursive, startKey, numEntries);
       } else {
+        LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
+            "and returning empty list of files inside it", bucket.getName());
         statuses = Collections.emptyList();
       }
       
