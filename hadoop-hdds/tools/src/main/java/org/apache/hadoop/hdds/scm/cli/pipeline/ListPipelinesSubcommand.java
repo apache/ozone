@@ -61,12 +61,13 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   private String replication;
 
   @CommandLine.Option(
-      names = {"-ffc", "--filterByFactor"},
+      names = {"-ffc", "--filterByFactor", "--filter-by-factor"},
       description = "[deprecated] Filter pipelines by factor (e.g. ONE, THREE) "
           + " (implies RATIS replication type)")
   private ReplicationFactor factor;
 
-  @CommandLine.Option(names = {"-s", "--state", "-fst", "--filterByState"},
+  @CommandLine.Option(
+      names = {"-s", "--state", "-fst", "--filterByState", "--filter-by-state"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -161,7 +160,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
@@ -178,7 +177,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
@@ -245,7 +244,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
           cacheIter.next();
       String key = cacheKeyValue.getKey().getCacheKey();
-      // TODO: Revisit when delete snapshot gets implemented as entry
+      // TODO: [SNAPSHOT] Revisit when delete snapshot gets implemented as entry
       //  in cache/table could be null.
       if (key.startsWith(snapshotBucketKey)) {
         return true;

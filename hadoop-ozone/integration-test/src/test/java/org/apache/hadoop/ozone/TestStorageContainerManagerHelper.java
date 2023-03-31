@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -74,27 +75,30 @@ public class TestStorageContainerManagerHelper {
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    // Write 20 keys in bucketName.
-    Set<String> keyNames = Sets.newHashSet();
-    for (int i = 0; i < numOfKeys; i++) {
-      String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-      keyNames.add(keyName);
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      // Write 20 keys in bucketName.
+      Set<String> keyNames = Sets.newHashSet();
+      for (int i = 0; i < numOfKeys; i++) {
+        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        keyNames.add(keyName);
 
-      TestDataUtil
-          .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        TestDataUtil
+            .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+      }
+
+      for (String key : keyNames) {
+        OmKeyArgs arg = new OmKeyArgs.Builder()
+            .setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getName())
+            .setKeyName(key)
+            .build();
+        OmKeyInfo location = cluster.getOzoneManager()
+            .lookupKey(arg);
+        keyLocationMap.put(key, location);
+      }
     }
 
-    for (String key : keyNames) {
-      OmKeyArgs arg = new OmKeyArgs.Builder()
-          .setVolumeName(bucket.getVolumeName())
-          .setBucketName(bucket.getName())
-          .setKeyName(key)
-          .build();
-      OmKeyInfo location = cluster.getOzoneManager()
-          .lookupKey(arg);
-      keyLocationMap.put(key, location);
-    }
     return keyLocationMap;
   }
 

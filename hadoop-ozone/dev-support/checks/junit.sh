@@ -21,6 +21,7 @@ cd "$DIR/../../.." || exit 1
 
 : ${CHECK:="unit"}
 : ${ITERATIONS:="1"}
+: ${OZONE_WITH_COVERAGE:="false"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -29,6 +30,10 @@ fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
 MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx --no-transfer-progress'
+
+if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
+fi
 
 if [[ "${FAIL_FAST:-}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
@@ -71,7 +76,9 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 done
 
-#Archive combined jacoco records
-mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
+  #Archive combined jacoco records
+  mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+fi
 
 exit ${rc}

@@ -65,7 +65,7 @@ public final class DatanodeIdYaml {
   public static void createDatanodeIdFile(DatanodeDetails datanodeDetails,
                                           File path,
                                           ConfigurationSource conf)
-          throws IOException {
+      throws IOException {
     DumperOptions options = new DumperOptions();
     options.setPrettyFlow(true);
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);

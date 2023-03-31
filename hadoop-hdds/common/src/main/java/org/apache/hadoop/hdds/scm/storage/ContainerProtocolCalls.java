@@ -20,12 +20,14 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -67,6 +69,7 @@ import org.apache.hadoop.security.token.Token;
 
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,36 +131,78 @@ public final class ContainerProtocolCalls  {
     return response.getListBlock();
   }
 
+  static <T> T tryEachDatanode(Pipeline pipeline,
+      CheckedFunction<DatanodeDetails, T, IOException> op,
+      Function<DatanodeDetails, String> toErrorMessage)
+      throws IOException {
+    final Set<DatanodeDetails> excluded = new HashSet<>();
+    for (; ;) {
+      final DatanodeDetails d = pipeline.getClosestNode(excluded);
+
+      try {
+        return op.apply(d);
+      } catch (IOException e) {
+        excluded.add(d);
+        if (excluded.size() < pipeline.size()) {
+          LOG.warn(toErrorMessage.apply(d)
+              + "; will try another datanode.", e);
+        } else {
+          throw e;
+        }
+      }
+    }
+  }
+
   /**
    * Calls the container protocol to get a container block.
    *
    * @param xceiverClient client to perform call
+   * @param validators functions to validate the response
    * @param datanodeBlockID blockID to identify container
    * @param token a token for this block (may be null)
    * @return container protocol get block response
    * @throws IOException if there is an I/O error while performing the call
    */
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
+      List<CheckedBiFunction> validators,
       DatanodeBlockID datanodeBlockID,
       Token<? extends TokenIdentifier> token) throws IOException {
     GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
         .newBuilder()
         .setBlockID(datanodeBlockID);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
         .setCmdType(Type.GetBlock)
         .setContainerID(datanodeBlockID.getContainerID())
-        .setDatanodeUuid(id)
         .setGetBlock(readBlockRequest);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    ContainerCommandRequestProto request = builder.build();
+    return tryEachDatanode(xceiverClient.getPipeline(),
+        d -> getBlock(xceiverClient, validators, builder, d),
+        d -> toErrorMessage(datanodeBlockID, d));
+  }
+
+  static String toErrorMessage(DatanodeBlockID blockId, DatanodeDetails d) {
+    return String.format("Failed to get block #%s in container #%s from %s",
+        blockId.getLocalID(), blockId.getContainerID(), d);
+  }
+
+  public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
+      DatanodeBlockID datanodeBlockID,
+      Token<? extends TokenIdentifier> token) throws IOException {
+    return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token);
+  }
+
+  private static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
+      List<CheckedBiFunction> validators,
+      ContainerCommandRequestProto.Builder builder,
+      DatanodeDetails datanode) throws IOException {
+    final ContainerCommandRequestProto request = builder
+        .setDatanodeUuid(datanode.getUuidString()).build();
     ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, getValidatorList());
+        xceiverClient.sendCommand(request, validators);
     return response.getGetBlock();
   }
 
@@ -285,40 +330,27 @@ public final class ContainerProtocolCalls  {
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .setChunkData(chunk)
             .setReadChunkVersion(ContainerProtos.ReadChunkVersion.V1);
-    final Pipeline pipeline = xceiverClient.getPipeline();
-    final Set<DatanodeDetails> excluded = new HashSet<>();
-    for (; ;) {
-      final DatanodeDetails d = pipeline.getClosestNode(excluded);
-
-      try {
-        return readChunk(xceiverClient, chunk, blockID,
-            validators, token, readChunkRequest, d);
-      } catch (IOException e) {
-        excluded.add(d);
-        if (excluded.size() < pipeline.size()) {
-          LOG.warn(toErrorMessage(chunk, blockID, d), e);
-        } else {
-          throw e;
-        }
-      }
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
+            .setContainerID(blockID.getContainerID())
+            .setReadChunk(readChunkRequest);
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
     }
+
+    return tryEachDatanode(xceiverClient.getPipeline(),
+        d -> readChunk(xceiverClient, chunk, blockID,
+            validators, builder, d),
+        d -> toErrorMessage(chunk, blockID, d));
   }
 
   private static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
       List<CheckedBiFunction> validators,
-      Token<? extends TokenIdentifier> token,
-      ReadChunkRequestProto.Builder readChunkRequest,
+      ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
-    final String id = d.getUuidString();
-    ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadChunk)
-            .setContainerID(blockID.getContainerID())
-            .setDatanodeUuid(id).setReadChunk(readChunkRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
+    final ContainerCommandRequestProto request = builder
+        .setDatanodeUuid(d.getUuidString()).build();
     ContainerCommandResponseProto reply =
         xceiverClient.sendCommand(request, validators);
     final ReadChunkResponseProto response = reply.getReadChunk();
@@ -687,12 +719,28 @@ public final class ContainerProtocolCalls  {
   }
 
   public static List<CheckedBiFunction> getValidatorList() {
-    List<CheckedBiFunction> validators = new ArrayList<>(1);
+    return VALIDATORS;
+  }
+
+  private static final List<CheckedBiFunction> VALIDATORS = createValidators();
+
+  private static List<CheckedBiFunction> createValidators() {
     CheckedBiFunction<ContainerProtos.ContainerCommandRequestProto,
         ContainerProtos.ContainerCommandResponseProto, IOException>
         validator = (request, response) -> validateContainerResponse(response);
+    return Collections.singletonList(validator);
+  }
+
+  public static List<CheckedBiFunction> toValidatorList(
+      CheckedBiFunction<ContainerCommandRequestProto,
+          ContainerCommandResponseProto, IOException> validator) {
+    final List<CheckedBiFunction> defaults
+        = ContainerProtocolCalls.getValidatorList();
+    final List<CheckedBiFunction> validators
+        = new ArrayList<>(defaults.size() + 1);
+    validators.addAll(defaults);
     validators.add(validator);
-    return validators;
+    return Collections.unmodifiableList(validators);
   }
 
   public static HashMap<DatanodeDetails, GetBlockResponseProto>

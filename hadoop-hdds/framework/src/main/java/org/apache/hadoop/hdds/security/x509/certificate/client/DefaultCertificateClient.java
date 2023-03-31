@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -329,6 +330,39 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return null;
     }
     return firstCertificateFrom(caCertPath);
+  }
+
+  /**
+   * Return all certificates in this component's trust chain,
+   * the last one is the root CA certificate.
+   */
+  @Override
+  public synchronized List<X509Certificate> getTrustChain() {
+    CertPath path = getCertPath();
+    if (path == null || path.getCertificates() == null) {
+      return null;
+    }
+
+    List<X509Certificate> chain = new ArrayList<>();
+    // certificate bundle case
+    if (path.getCertificates().size() > 1) {
+      for (int i = 0; i < path.getCertificates().size(); i++) {
+        chain.add((X509Certificate) path.getCertificates().get(i));
+      }
+    } else {
+      // case before certificate bundle is supported
+      chain.add(getCertificate());
+      X509Certificate cert = getCACertificate();
+      if (cert != null) {
+        chain.add(getCACertificate());
+      }
+      cert = getRootCACertificate();
+      if (cert != null) {
+        chain.add(cert);
+      }
+    }
+
+    return chain;
   }
 
   @Override
@@ -922,7 +956,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     Date expireDate = certificate.getNotAfter();
     LocalDateTime gracePeriodStart = expireDate.toInstant()
-        .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+        .minus(gracePeriod).atZone(ZoneId.systemDefault()).toLocalDateTime();
     LocalDateTime currentTime = LocalDateTime.now();
     if (gracePeriodStart.isBefore(currentTime)) {
       // Cert is already in grace period time.
@@ -1195,7 +1229,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               getComponentName() + "-CertificateLifetimeMonitor")
               .setDaemon(true).build());
     }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
+    this.executorService.scheduleAtFixedRate(
+        new CertificateLifetimeMonitor(this),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1206,6 +1241,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *  Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateLifetimeMonitor implements Runnable {
+    private CertificateClient certClient;
+
+    public CertificateLifetimeMonitor(CertificateClient client) {
+      this.certClient = client;
+    }
+
     @Override
     public void run() {
 
@@ -1245,7 +1286,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           cleanBackupDir();
           // notify notification receivers
           notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-              currentCert.getSerialNumber().toString(), newCertId));
+              certClient, currentCert.getSerialNumber().toString(), newCertId));
         }
       } finally {
         renewLock.unlock();
