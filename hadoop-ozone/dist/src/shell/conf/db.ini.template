@@ -1,3 +1,20 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with this
+# work for additional information regarding copyright ownership.  The ASF
+# licenses this file to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# http://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+#
+
 # This is a RocksDB option file.
 #
 # For detailed file format spec, please refer to the example file
@@ -8,6 +25,34 @@
 #      OM                    om.db.ini
 #      SCM                   scm.db.ini
 #      DN                    dn-crl.db.ini
+#
+# A typical RocksDB options file has four sections, which are
+# Version section, DBOptions section, at least one CFOptions
+# section, and one TableOptions section for each column family.
+# The RocksDB options file in general follows the basic INI
+# file format with the following extensions / modifications:
+#
+#  * Escaped characters
+#    We escaped the following characters:
+#     - \n -- line feed - new line
+#     - \r -- carriage return
+#     - \\ -- backslash \
+#     - \: -- colon symbol :
+#     - \# -- hash tag #
+#  * Comments
+#    We support # style comments.  Comments can appear at the ending
+#    part of a line.
+#  * Statements
+#    A statement is of the form option_name = value.
+#    Each statement contains a '=', where extra white-spaces
+#    are supported. However, we don't support multi-lined statement.
+#    Furthermore, each line can only contain at most one statement.
+#  * Sections
+#    Sections are of the form [SecitonTitle "SectionArgument"],
+#    where section argument is optional.
+#  * List
+#    We use colon-separated string to represent a list.
+#    For instance, n1:n2:n3:n4 is a list containing four values.
 #
 # Below is an example of a RocksDB options file:
 

@@ -1,7 +1,7 @@
 ---
-title: 自定义Rocksdb参数
+title: 自定义 Rocksdb 参数
 linktitle: Rocksdb Options
-summary: OM/SCM/DN使用的自定义的Rocksdb参数
+summary: OM/SCM/DN 使用的自定义的 Rocksdb 参数
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -20,11 +20,11 @@ summary: OM/SCM/DN使用的自定义的Rocksdb参数
   limitations under the License.
 -->
 
-Ozone使用的rocksdb参数大多数为默认参数。本页介绍如何通过配置文件来使用自定义的rocksdb参数。
+Ozone 使用的 rocksdb 参数大多数为默认参数。本页介绍如何通过配置文件来使用自定义的 rocksdb 参数。
 
-## 使用Rocksdb配置文件
+## 使用 Rocksdb 配置文件
 
-将对应的配置文件`file`放在OZONE的配置目录`$OZONE_DIR/etc/hadoop`下，然后重启服务即可。以下列出了OM/SCM/DN默认加载的rocksdb配置文件名。
+将对应的配置文件 `file` 放在 OZONE 的配置目录 `$OZONE_DIR/etc/hadoop` 下，然后重启服务即可。以下列出了 OM/SCM/DN 默认加载的 rocksdb 配置文件名。
 
 服务 | 文件名     
 ----|---------
@@ -32,11 +32,11 @@ OM  | om.db.ini
 SCM | scm.db.ini 
 DN  | dn-crl.db.ini
 
-Rocksdb配置文件格式请参考：[rocksdb_option_file_example.ini](https://github.com/facebook/rocksdb/blob/main/examples/rocksdb_option_file_example.ini)
+Rocksdb 配置文件格式请参考：[rocksdb_option_file_example.ini](https://github.com/facebook/rocksdb/blob/main/examples/rocksdb_option_file_example.ini)
 
 ## 验证配置文件生效
 
-查看rocksdb目录下的`OPTIONS-xxxxxx`相应配置项是否符合预期。例如，OM的配置文件`$OZONE_DIR/etc/hadoop/om.db.ini`如下：(修改`max_background_flushes=4`)
+查看 rocksdb 目录下的 `OPTIONS-xxxxxx` 相应配置项是否符合预期。例如，OM 的配置文件 `$OZONE_DIR/etc/hadoop/om.db.ini` 如下：(修改 `max_background_flushes=4`)
 
 ```ini
 [DBOptions]
@@ -52,4 +52,4 @@ Rocksdb配置文件格式请参考：[rocksdb_option_file_example.ini](https://g
 
 [TableOptions/BlockBasedTable "default"]
 ```
-重启OM后，查看OM的rocksdb目录（`${DBDATA}/om.db`）下`OPTIONS-xxxxxx`内容，`max_background_flushes=4`表明配置生效。
+重启 OM 后，查看 OM 的 rocksdb 目录（`${DBDATA}/om.db`）下 `OPTIONS-xxxxxx` 内容， `max_background_flushes=4` 表明配置生效。
