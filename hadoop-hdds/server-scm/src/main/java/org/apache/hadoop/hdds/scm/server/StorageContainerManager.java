@@ -150,6 +150,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
+import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
@@ -1663,7 +1664,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
-    leaseManager.shutdown();
+    try {
+      leaseManager.shutdown();
+    } catch (LeaseManagerNotRunningException ex) {
+      LOG.debug("Lease manager not running, ignore");
+    }
     RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     if (scmCertificateClient != null) {
