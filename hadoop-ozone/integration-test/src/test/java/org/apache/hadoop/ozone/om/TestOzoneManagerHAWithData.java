@@ -109,8 +109,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
-  public void testOMHAMetrics() throws InterruptedException,
-      TimeoutException, IOException {
+  public void testOMHAMetrics() throws Exception {
+    shutdown();
+    init();
+    getCluster().waitForClusterToBeReady();
     waitForLeaderToBeReady();
 
     // Get leader OM
@@ -170,16 +172,16 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
 
   /**
-   * Some tests are stopping or restarting OMs.
-   * There are test cases where we might need to
-   * wait for a leader to be elected and ready.
+   * After restarting OMs we need to wait
+   * for a leader to be elected and ready.
    */
   private void waitForLeaderToBeReady()
-      throws InterruptedException, TimeoutException {
-    // Check number of nodes
-    Assertions.assertEquals(3, getCluster().getOzoneManagersList().size());
+      throws InterruptedException, TimeoutException, IOException {
     for (OzoneManager om : getCluster().getOzoneManagersList()) {
-      Assertions.assertTrue(om.isRunning());
+      if (!getCluster().isOMActive(om.getOMNodeId())) {
+        getCluster().stopOzoneManager(om.getOMNodeId());
+        getCluster().restartOzoneManager(om, true);
+      }
     }
     // Wait for Leader Election timeout
     int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
@@ -531,7 +533,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     followerOM1.stop();
 
     // Do more transactions. Stopped OM should miss these transactions and
-    // the logs corresponding to atleast some of the missed transactions
+    // the logs corresponding to at least some missed transactions
     // should be purged. This will force the OM to install snapshot when
     // restarted.
     long minNewTxIndex = followerOM1LastAppliedIndex + getLogPurgeGap() * 10L;
