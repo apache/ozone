@@ -197,17 +197,18 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           .getPrincipalToAccessIdsTable().getIfExist(userPrincipal);
       Preconditions.checkNotNull(principalInfo);
       principalInfo.removeAccessId(accessId);
-      omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
-          new CacheKey<>(userPrincipal),
-          new CacheValue<>(principalInfo.getAccessIds().size() > 0 ?
+      CacheValue<OmDBUserPrincipalInfo> cacheValue =
+          principalInfo.getAccessIds().size() > 0
+              ? CacheValue.get(transactionLogIndex, principalInfo)
               // Invalidate (remove) the entry if accessIds set is empty
-              Optional.of(principalInfo) : Optional.absent(),
-              transactionLogIndex));
+              : CacheValue.get(transactionLogIndex);
+      omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
+          new CacheKey<>(userPrincipal), cacheValue);
 
       // Remove from TenantAccessIdTable
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
       s3SecretManager.invalidateCacheEntry(accessId, transactionLogIndex);

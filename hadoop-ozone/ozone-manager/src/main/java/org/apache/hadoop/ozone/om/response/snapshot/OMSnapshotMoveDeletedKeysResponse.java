@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.response.snapshot;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -46,16 +47,19 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private OmSnapshot nextSnapshot;
   private List<SnapshotMoveKeyInfos> nextDBKeysList;
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
+  private List<HddsProtos.KeyValue> renamedKeysList;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
        @Nonnull OmSnapshot omFromSnapshot, OmSnapshot omNextSnapshot,
        List<SnapshotMoveKeyInfos> nextDBKeysList,
-       List<SnapshotMoveKeyInfos> reclaimKeysList) {
+       List<SnapshotMoveKeyInfos> reclaimKeysList,
+       List<HddsProtos.KeyValue> renamedKeysList) {
     super(omResponse);
     this.fromSnapshot = omFromSnapshot;
     this.nextSnapshot = omNextSnapshot;
     this.nextDBKeysList = nextDBKeysList;
     this.reclaimKeysList = reclaimKeysList;
+    this.renamedKeysList = renamedKeysList;
   }
 
   /**
@@ -76,12 +80,12 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
         processKeys(writeBatch, nextSnapshot.getMetadataManager(),
-            nextDBKeysList);
+            nextDBKeysList, true);
         nextSnapshotStore.commitBatchOperation(writeBatch);
       }
     } else {
       // Handle the case where there is no next Snapshot.
-      processKeys(batchOperation, omMetadataManager, nextDBKeysList);
+      processKeys(batchOperation, omMetadataManager, nextDBKeysList, true);
     }
 
     // Update From Snapshot Deleted Table.
@@ -89,14 +93,24 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     try (BatchOperation fromSnapshotBatchOp =
              fromSnapshotStore.initBatchOperation()) {
       processKeys(fromSnapshotBatchOp, fromSnapshot.getMetadataManager(),
-          reclaimKeysList);
+          reclaimKeysList, false);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
     }
   }
 
   private void processKeys(BatchOperation batchOp,
       OMMetadataManager metadataManager,
-      List<SnapshotMoveKeyInfos> keyList) throws IOException {
+      List<SnapshotMoveKeyInfos> keyList,
+      boolean isNextDB) throws IOException {
+
+    // Move renamed keys to only the next snapshot or active DB.
+    if (isNextDB) {
+      for (HddsProtos.KeyValue renamedKey: renamedKeysList) {
+        metadataManager.getSnapshotRenamedKeyTable()
+            .putWithBatch(batchOp, renamedKey.getKey(), renamedKey.getValue());
+      }
+    }
+
     for (SnapshotMoveKeyInfos dBKey : keyList) {
       RepeatedOmKeyInfo omKeyInfos =
           createRepeatedOmKeyInfo(dBKey.getKeyInfosList());

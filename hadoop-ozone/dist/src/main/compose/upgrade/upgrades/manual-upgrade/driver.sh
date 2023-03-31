@@ -47,10 +47,10 @@ stop_docker_env
 echo "--- SETTING UP NEW VERSION $OZONE_UPGRADE_TO ---"
 OUTPUT_NAME="$OZONE_UPGRADE_TO"
 prepare_for_image "$OZONE_UPGRADE_TO"
-callback setup_new_version
+callback setup_this_version
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
 OZONE_KEEP_RESULTS=true start_docker_env
-callback with_new_version
+callback with_this_version
 
 stop_docker_env

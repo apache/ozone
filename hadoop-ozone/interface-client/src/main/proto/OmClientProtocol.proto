@@ -133,6 +133,7 @@ enum Type {
   SnapshotMoveDeletedKeys = 116;
 
   TransferLeadership = 117;
+  SnapshotPurge = 118;
 }
 
 message OMRequest {
@@ -248,6 +249,7 @@ message OMRequest {
   optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
 }
 
@@ -357,6 +359,7 @@ message OMResponse {
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
 }
 
 enum Status {
@@ -1031,10 +1034,6 @@ message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
 }
 
-message KeyRenameInfo {
-  repeated string keyNames = 1;
-}
-
 message OzoneFileStatusProto {
     optional KeyInfo keyInfo = 2;
     optional uint64 blockSize = 3;
@@ -1340,6 +1339,7 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+    optional bool dbUpdateSuccess = 4;
 }
 
 message RangerBGSyncRequest {
@@ -1711,11 +1711,16 @@ message SnapshotMoveDeletedKeysRequest {
   optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
 }
 
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+}
+
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
 }
 
 message DeleteTenantRequest {
@@ -1781,6 +1786,10 @@ message DeleteSnapshotResponse {
 }
 
 message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
 
 }
 

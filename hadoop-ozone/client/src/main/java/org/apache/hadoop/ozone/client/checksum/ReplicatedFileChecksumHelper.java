@@ -78,7 +78,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
             "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode : {}" + getCombineMode());
+                + ", checksum combine mode: " + getCombineMode());
       }
 
       currentLength += keyLocationInfo.getLength();

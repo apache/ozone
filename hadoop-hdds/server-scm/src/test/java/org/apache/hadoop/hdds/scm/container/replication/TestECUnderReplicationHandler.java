@@ -94,7 +94,7 @@ public class TestECUnderReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
@@ -119,6 +119,8 @@ public class TestECUnderReplicationHandler {
     ReplicationTestUtil.mockRMSendDatanodeCommand(
         replicationManager, commandsSent);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockSendThrottledReconstructionCommand(
         replicationManager, commandsSent);
 
     conf = SCMTestUtils.getConf();
@@ -170,6 +172,21 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
+  public void testThrowsWhenTargetsOverloaded() throws IOException {
+    Set<ContainerReplica> availableReplicas =  ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
+        .when(replicationManager).sendThrottledReconstructionCommand(
+            any(), any());
+
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 0, 0, policy));
+  }
+
+  @Test
   public void testUnderReplicationWithDecomIndex1() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
@@ -186,7 +203,8 @@ public class TestECUnderReplicationHandler {
   }
 
 
-  // Test used to reproduce the issue reported in HDDS-8171
+  // Test used to reproduce the issue reported in HDDS-8171 and then adjusted
+  // to ensure only a single command is sent for HDDS-8172.
   @Test
   public void testUnderReplicationWithDecomIndexAndMaintOnSameIndex()
       throws IOException {
@@ -214,10 +232,13 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5)));
 
+    // Note that maintenanceIndexes is set to zero as we do not expect any
+    // maintenance commands to be created, as they are solved by the earlier
+    // decommission command.
     Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(
-            Lists.emptyList(), availableReplicas, 1, 2, policy);
-    Assertions.assertEquals(2, cmds.size());
+            Lists.emptyList(), availableReplicas, 1, 0, policy);
+    Assertions.assertEquals(1, cmds.size());
     // Check the replicate command has index 1 set
     for (Pair<DatanodeDetails, SCMCommand<?>> c : cmds) {
       // Ensure neither of the commands are for the dead maintenance node
@@ -233,11 +254,11 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    doThrow(new AllSourcesOverloadedException("Overloaded"))
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
             any(), anyList(), any(), anyInt());
 
-    Assertions.assertThrows(AllSourcesOverloadedException.class, () ->
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(
             Lists.emptyList(), availableReplicas, 1, 0, policy));
   }

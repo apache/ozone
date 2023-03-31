@@ -99,7 +99,7 @@ Test Volume Acls
     ${result} =     Execute             ozone sh volume removeacl ${volume3} -a user:superuser1:xy
     ${result} =     Execute             ozone sh volume getacl ${volume3}
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh volume setacl ${volume3} -al user:superuser1:rwxy,user:testuser/scm@EXAMPLE.COM:rwxyc,group:superuser1:a[DEFAULT]
+    ${result} =     Execute             ozone sh volume setacl ${volume3} -al user:superuser1:rwxy,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${volume3}
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\"
@@ -115,7 +115,7 @@ Test Bucket Acls
     ${result} =     Execute             ozone sh bucket removeacl ${volume3}/bk1 -a user:superuser1:xy
     ${result} =     Execute             ozone sh bucket getacl ${volume3}/bk1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh bucket setacl ${volume3}/bk1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser/scm@EXAMPLE.COM:rwxyc,group:superuser1:a[DEFAULT]
+    ${result} =     Execute             ozone sh bucket setacl ${volume3}/bk1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh bucket getacl ${volume3}/bk1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\"
@@ -130,7 +130,7 @@ Test key Acls
     ${result} =     Execute             ozone sh key removeacl ${volume3}/bk1/key1 -a user:superuser1:xy
     ${result} =     Execute             ozone sh key getacl ${volume3}/bk1/key1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh key setacl ${volume3}/bk1/key1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser/scm@EXAMPLE.COM:rwxyc
+    ${result} =     Execute             ozone sh key setacl ${volume3}/bk1/key1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc
     ${result} =     Execute             ozone sh key getacl ${volume3}/bk1/key1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\"
@@ -143,16 +143,16 @@ Test native authorizer
                     Should contain      ${result}    PERMISSION_DENIED
     ${result} =     Execute And Ignore Error         ozone sh key list /${volume3}/bk1      
                     Should contain      ${result}    PERMISSION_DENIED
-    ${result} =     Execute And Ignore Error         ozone sh volume addacl ${volume3} -a user:testuser2/scm@EXAMPLE.COM:xy
-                    Should contain      ${result}    PERMISSION_DENIED User testuser2/scm@EXAMPLE.COM doesn't have WRITE_ACL permission to access volume
+    ${result} =     Execute And Ignore Error         ozone sh volume addacl ${volume3} -a user:testuser2:xy
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
     Execute         kdestroy
     Run Keyword     Kinit test user     testuser     testuser.keytab
-    Execute         ozone sh volume addacl ${volume3} -a user:testuser2/scm@EXAMPLE.COM:xyrw
+    Execute         ozone sh volume addacl ${volume3} -a user:testuser2:xyrw
     Execute         kdestroy
     Run Keyword     Kinit test user     testuser2    testuser2.keytab
     ${result} =     Execute And Ignore Error         ozone sh bucket list /${volume3}/
-                    Should contain      ${result}    PERMISSION_DENIED User testuser2/scm@EXAMPLE.COM doesn't have LIST permission to access volume
-    Execute         ozone sh volume addacl ${volume3} -a user:testuser2/scm@EXAMPLE.COM:l
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have LIST permission to access volume
+    Execute         ozone sh volume addacl ${volume3} -a user:testuser2:l
     Execute         ozone sh bucket list /${volume3}/
     Execute         ozone sh volume getacl /${volume3}/
     
@@ -160,7 +160,7 @@ Test native authorizer
     Should contain      ${result}    PERMISSION_DENIED
     Execute         kdestroy
     Run Keyword     Kinit test user     testuser     testuser.keytab
-    Execute         ozone sh bucket addacl ${volume3}/bk1 -a user:testuser2/scm@EXAMPLE.COM:a
+    Execute         ozone sh bucket addacl ${volume3}/bk1 -a user:testuser2:a
     Execute         ozone sh bucket getacl /${volume3}/bk1
     Execute         kdestroy
     Run Keyword     Kinit test user     testuser2    testuser2.keytab
@@ -176,8 +176,8 @@ Test tmp mount for shared ofs tmp dir
         Run Keyword   Kinit test user     testuser     testuser.keytab
         Execute       ozone sh volume create /${TMP_MOUNT} -u testuser
         Execute       ozone sh bucket create /${TMP_MOUNT}/${TMP_DIR} -u testuser
-        Execute       ozone sh volume addacl /${TMP_MOUNT} -a user:testuser/scm@EXAMPLE.COM:a,user:testuser2/scm@EXAMPLE.COM:rw
-        Execute       ozone sh bucket addacl /${TMP_MOUNT}/${TMP_DIR} -a user:testuser/scm@EXAMPLE.COM:a,user:testuser2/scm@EXAMPLE.COM:rwlc
+        Execute       ozone sh volume addacl /${TMP_MOUNT} -a user:testuser:a,user:testuser2:rw
+        Execute       ozone sh bucket addacl /${TMP_MOUNT}/${TMP_DIR} -a user:testuser:a,user:testuser2:rwlc
 
         ${tmpdirmount} =        Format ofs TMPMOUNT     ${TMP_MOUNT}
         ${result} =    Execute               ozone fs -put ./NOTICE.txt ${tmpdirmount}
