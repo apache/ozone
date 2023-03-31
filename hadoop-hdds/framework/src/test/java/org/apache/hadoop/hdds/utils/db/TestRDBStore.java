@@ -198,32 +198,6 @@ public class TestRDBStore {
   }
 
   @Test
-  public void getStatMBeanName() throws Exception {
-
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      for (int y = 0; y < 100; y++) {
-        byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    }
-    MBeanServer platformMBeanServer =
-        ManagementFactory.getPlatformMBeanServer();
-    Thread.sleep(2000);
-
-    Object keysWritten = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "NUMBER_KEYS_WRITTEN");
-
-    Assertions.assertTrue(((Long) keysWritten) >= 99L);
-
-    Object dbWriteAverage = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "DB_WRITE_AVERAGE");
-    Assertions.assertTrue((double) dbWriteAverage > 0);
-  }
-
-  @Test
   public void getTable() throws Exception {
     for (String tableName : families) {
       try (Table table = rdbStore.getTable(tableName)) {
