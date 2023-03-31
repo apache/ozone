@@ -94,7 +94,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
-    //allNodes.forEach(this::printDatanodeInfo);
 
     if (json) {
       List<DatanodeWithAttributes> datanodeList = allNodes.collect(Collectors.toList());
