@@ -17,14 +17,20 @@
  */
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.UUID;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -37,11 +43,57 @@ class TestDatanodeIdYaml {
     DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
     File file = new File(dir, "datanode.yaml");
 
-    DatanodeIdYaml.createDatanodeIdFile(original, file);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+
+    DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
     DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
 
     assertEquals(original, read);
     assertEquals(original.toDebugString(), read.toDebugString());
+  }
+
+  @Test
+  void testWriteReadBeforeRatisDatastreamPortLayoutVersion(@TempDir File dir)
+      throws IOException {
+    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    File file = new File(dir, "datanode.yaml");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+    layoutStorage.initialize();
+
+    DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
+    DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
+
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    // if no separate admin/server/datastream port, return single Ratis one for
+    // compat
+    assertEquals(read.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
+        read.getPort(DatanodeDetails.Port.Name.RATIS));
+  }
+
+  @Test
+  void testWriteReadAfterRatisDatastreamPortLayoutVersion(@TempDir File dir)
+      throws IOException {
+    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    File file = new File(dir, "datanode.yaml");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS
+            .layoutVersion());
+    layoutStorage.initialize();
+
+    DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
+    DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
+
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    assertEquals(original.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
+        read.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
   }
 
 }
