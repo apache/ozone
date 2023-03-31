@@ -159,6 +159,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jersey2.version>2.34</jersey2.version>
 
     <!-- jackson versions -->
+    <jackson1.version>1.9.13</jackson1.version>
+    <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
     <jackson2-bom.version>2.13.4.20221013</jackson2-bom.version>
     <woodstox.version>5.4.0</woodstox.version>
 
