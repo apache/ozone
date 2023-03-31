@@ -399,6 +399,10 @@ public final class DBStoreBuilder {
       dbOptions.setLogger(logger);
     }
 
+    // Apply WAL settings.
+    dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
+    dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
+
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
       ManagedStatistics statistics = new ManagedStatistics();
