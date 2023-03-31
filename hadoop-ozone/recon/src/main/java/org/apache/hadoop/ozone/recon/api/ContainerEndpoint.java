@@ -41,6 +41,11 @@ import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -89,6 +94,7 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   private final ReconContainerManager containerManager;
+  private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
@@ -96,6 +102,7 @@ public class ContainerEndpoint {
       ContainerHealthSchemaManager containerHealthSchemaManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
+    this.pipelineManager = reconSCM.getPipelineManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
   }
 
@@ -403,7 +410,7 @@ public class ContainerEndpoint {
   }
 
   @GET
-  @Path("insights/nonscmcontainers")
+  @Path("insights/containermismatch")
   public Response getContainerInsights() {
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         new ArrayList<>();
@@ -413,13 +420,15 @@ public class ContainerEndpoint {
       List<Long> scmContainers = containerManager.getContainers().stream()
           .map(containerInfo -> containerInfo.getContainerID()).collect(
               Collectors.toList());
-      List<Map.Entry<Long, ContainerMetadata>> notExistsAtSCMContainers =
+
+      // Filter list of container Ids which are present in OM but not in SCM.
+      List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
           omContainers.entrySet().stream().filter(containerMetadataEntry ->
                   !(scmContainers.contains(containerMetadataEntry.getKey())))
               .collect(
                   Collectors.toList());
 
-      notExistsAtSCMContainers.forEach(nonSCMContainer -> {
+      notSCMContainers.forEach(nonSCMContainer -> {
         ContainerDiscrepancyInfo containerDiscrepancyInfo =
             new ContainerDiscrepancyInfo();
         containerDiscrepancyInfo.setContainerID(nonSCMContainer.getKey());
@@ -430,14 +439,45 @@ public class ContainerEndpoint {
         containerDiscrepancyInfo.setExistsAt("OM");
         containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
       });
+
+      // Filter list of container Ids which are present in SCM but not in OM.
+      List<Long> nonOMContainers = scmContainers.stream()
+          .filter(containerId -> !omContainers.containsKey(containerId))
+          .collect(Collectors.toList());
+
+      List<Pipeline> pipelines = new ArrayList<>();
+      nonOMContainers.forEach(nonOMContainerId -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonOMContainerId);
+        containerDiscrepancyInfo.setNumberOfKeys(0);
+        try {
+          PipelineID pipelineID = containerManager.getContainer(
+                  ContainerID.valueOf(nonOMContainerId))
+              .getPipelineID();
+
+          if (null != pipelineID) {
+            pipelines.add(pipelineManager.getPipeline(pipelineID));
+          }
+        } catch (ContainerNotFoundException e) {
+          throw new RuntimeException(e);
+        } catch (PipelineNotFoundException e) {
+          throw new RuntimeException(e);
+        }
+        containerDiscrepancyInfo.setPipelines(pipelines);
+        containerDiscrepancyInfo.setExistsAt("SCM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     } catch (IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
-
     return Response.ok(containerDiscrepancyInfoList).build();
   }
-
 }
