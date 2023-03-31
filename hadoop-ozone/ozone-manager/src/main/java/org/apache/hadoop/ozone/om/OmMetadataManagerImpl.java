@@ -1396,10 +1396,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
+   * Returns a list of pending deletion key info up to the limit.
    * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
-   * with #deleting# prefix in OM DB.
+   * name and all its associated block IDs.
    *
    * @param keyCount max number of keys to return.
    * @param omSnapshotManager SnapshotManager
@@ -1442,9 +1441,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             //  4. Further optimization: Skip all snapshotted keys altogether
             //  e.g. by prefixing all unreclaimable keys, then calling seek
 
-            // TODO: [SNAPSHOT] We are not cleaning up Active DB's deletedTable
-            //  keys if any of the keys in RepeatedOmKeyInfo exists
-            //  in latest snapshot path keyTable.
             if (latestSnapshot != null) {
               Table<String, OmKeyInfo> prevKeyTable =
                   latestSnapshot.getMetadataManager().getKeyTable(
@@ -1465,6 +1461,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               OmKeyInfo omKeyInfo = prevKeyTable.get(prevDbKey);
               if (omKeyInfo != null &&
                   info.getObjectID() == omKeyInfo.getObjectID()) {
+                // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
+                //  active DB's deletedTable if any one of the keys in
+                //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
+                //  Might need to refactor OMKeyDeleteRequest first to take
+                //  actual reclaimed key objectIDs as input
+                //  in order to avoid any race condition.
                 blockGroupList.clear();
                 break;
               }
