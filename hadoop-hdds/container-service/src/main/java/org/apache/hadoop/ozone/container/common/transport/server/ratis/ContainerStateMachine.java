@@ -873,9 +873,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       removeStateMachineDataIfNeeded(index);
       // if waitOnBothFollower is false, remove the entry from the cache
       // as soon as its applied and such entry exists in the cache.
-      if (!waitOnBothFollowers) {
-        stateMachineDataCache.removeIf(k -> k <= index);
-      }
+      removeStateMachineDataIfMajorityFollowSync(index);
       DispatcherContext.Builder builder =
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
               .setLogIndex(index);
@@ -982,6 +980,14 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
   }
 
+  private void removeStateMachineDataIfMajorityFollowSync(long index) {
+    if (!waitOnBothFollowers) {
+      // if majority follow in sync, remove all cache previous to current index
+      // including current index
+      stateMachineDataCache.removeIf(k -> k <= index);
+    }
+  }
+
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
     final CompletableFuture<T> future = new CompletableFuture<>();
     future.completeExceptionally(e);
@@ -996,7 +1002,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public CompletableFuture<Void> truncate(long index) {
-    stateMachineDataCache.removeIf(k -> k <= index);
+    stateMachineDataCache.removeIf(k -> k > index);
     return CompletableFuture.completedFuture(null);
   }
 
