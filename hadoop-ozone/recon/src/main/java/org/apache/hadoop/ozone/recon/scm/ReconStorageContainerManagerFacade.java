@@ -87,6 +87,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -148,6 +150,7 @@ public class ReconStorageContainerManagerFacade
   private HDDSLayoutVersionManager scmLayoutVersionManager;
   private ReconSafeModeManager safeModeManager;
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
+  private LeaseManager<Object> leaseManager;
 
   private ScheduledExecutorService scheduler;
 
@@ -173,6 +176,11 @@ public class ReconStorageContainerManagerFacade
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+    long timeDuration = conf.getTimeDuration(
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+            .getDuration(), TimeUnit.MILLISECONDS);
+    leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
@@ -246,9 +254,14 @@ public class ReconStorageContainerManagerFacade
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmContext);
+    long closeHandlertimeDuration = conf.getTimeDuration(
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+            .getDuration(), TimeUnit.MILLISECONDS);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            leaseManager, closeHandlertimeDuration);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
     // Use the same executor for both ICR and FCR.
@@ -424,6 +437,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    leaseManager.shutdown();
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
     try {

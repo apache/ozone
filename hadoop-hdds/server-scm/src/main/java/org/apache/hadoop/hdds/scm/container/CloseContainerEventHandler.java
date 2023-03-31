@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -58,12 +60,19 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
   private final ContainerManager containerManager;
   private final SCMContext scmContext;
 
+  private final LeaseManager<Object> leaseManager;
+  private final long timeout;
+
   public CloseContainerEventHandler(final PipelineManager pipelineManager,
                                     final ContainerManager containerManager,
-                                    final SCMContext scmContext) {
+                                    final SCMContext scmContext,
+                                    LeaseManager leaseManager,
+                                    final long timeout) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.scmContext = scmContext;
+    this.leaseManager = leaseManager;
+    this.timeout = timeout;
   }
 
   @Override
@@ -104,14 +113,19 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
         command.setTerm(scmContext.getTermOfLeader());
         command.setEncodedToken(getContainerToken(containerID));
 
-        getNodes(container).forEach(node ->
-            publisher.fireEvent(DATANODE_COMMAND,
-                new CommandForDatanode<>(node.getUuid(), command)));
+        try {
+          leaseManager.acquire(command, timeout, () -> triggerCloseCallback(
+              publisher, container, command));
+        } catch (LeaseAlreadyExistException ex) {
+          LOG.debug("Close container {} in {} state already in queue.",
+              containerID, container.getState());
+        } catch (Exception ex) {
+          LOG.error("Error while scheduling close", ex);
+        }
       } else {
         LOG.debug("Cannot close container {}, which is in {} state.",
             containerID, container.getState());
       }
-
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending close container command,"
           + " since current SCM is not leader.", nle);
@@ -119,6 +133,15 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
              TimeoutException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
+  }
+
+  private Void triggerCloseCallback(
+      EventPublisher publisher, ContainerInfo container, SCMCommand<?> command)
+      throws ContainerNotFoundException {
+    getNodes(container).forEach(node ->
+        publisher.fireEvent(DATANODE_COMMAND,
+            new CommandForDatanode<>(node.getUuid(), command)));
+    return null;
   }
 
   private String getContainerToken(ContainerID containerID) {

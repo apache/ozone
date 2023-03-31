@@ -175,6 +175,7 @@ public class TestBlockManager {
     configurator.setSCMHAManager(scmHAManager);
     configurator.setScmContext(scmContext);
     scm = HddsTestUtils.getScm(conf, configurator);
+    scm.getLeaseManager().start();
 
     // Initialize these fields so that the tests can pass.
     mapping = scm.getContainerManager();
@@ -182,7 +183,8 @@ public class TestBlockManager {
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
-        new CloseContainerEventHandler(pipelineManager, mapping, scmContext);
+        new CloseContainerEventHandler(pipelineManager, mapping, scmContext,
+            scm.getLeaseManager(), 0);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);

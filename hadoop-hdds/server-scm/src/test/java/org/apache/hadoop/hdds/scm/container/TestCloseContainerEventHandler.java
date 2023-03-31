@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -38,12 +39,14 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -75,15 +78,18 @@ public class TestCloseContainerEventHandler {
   private ArgumentCaptor<CommandForDatanode> commandCaptor;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws Exception {
     MockitoAnnotations.initMocks(this);
     containerManager = Mockito.mock(ContainerManager.class);
     pipelineManager = Mockito.mock(PipelineManager.class);
     SCMContext scmContext = Mockito.mock(SCMContext.class);
     Mockito.when(scmContext.isLeader()).thenReturn(true);
     eventPublisher = Mockito.mock(EventPublisher.class);
+    LeaseManager leaseManager = Mockito.mock(LeaseManager.class);
+    Mockito.when(leaseManager.acquire(any(), anyLong(), any())).thenAnswer(
+        invocation -> invocation.getArgument(2, Callable.class).call());
     eventHandler = new CloseContainerEventHandler(
-        pipelineManager, containerManager, scmContext);
+        pipelineManager, containerManager, scmContext, leaseManager, 0);
   }
 
   @Test

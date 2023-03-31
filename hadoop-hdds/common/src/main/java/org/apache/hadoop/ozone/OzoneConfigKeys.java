@@ -616,6 +616,12 @@ public final class OzoneConfigKeys {
 
   public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
 
+  public static final TimeDuration
+      OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT =
+      TimeDuration.valueOf(150, TimeUnit.SECONDS);
+  public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
+      "ozone.scm.close.container.wait.duration";
+  
   /**
    * There is no need to instantiate this class.
    */
