@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
@@ -85,14 +84,16 @@ public class KeyInputStream extends MultipartInputStream {
               xceiverClientFactory,
               keyBlockID -> {
                 OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
-                return getPipeline(newKeyInfo, omKeyLocationInfo.getBlockID());
+                return getBlockLocationInfo(newKeyInfo,
+                    omKeyLocationInfo.getBlockID());
               });
       partStreams.add(stream);
     }
     return partStreams;
   }
 
-  private static Pipeline getPipeline(OmKeyInfo newKeyInfo, BlockID blockID) {
+  private static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
+      BlockID blockID) {
     List<OmKeyLocationInfo> collect =
         newKeyInfo.getLatestVersionLocations()
             .getLocationList()
@@ -100,7 +101,7 @@ public class KeyInputStream extends MultipartInputStream {
             .filter(l -> l.getBlockID().equals(blockID))
             .collect(Collectors.toList());
     if (CollectionUtils.isNotEmpty(collect)) {
-      return collect.get(0).getPipeline();
+      return collect.get(0);
     } else {
       return null;
     }

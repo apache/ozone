@@ -358,6 +358,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
     builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
+    builder.setDbUpdateSuccess(dbUpdatesWrapper.isDBUpdateSuccess());
     return builder.build();
   }
 
@@ -1226,7 +1227,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getFromSnapshot(),
             snapshotDiffRequest.getToSnapshot(),
             snapshotDiffRequest.getToken(),
-            snapshotDiffRequest.getPageSize());
+            snapshotDiffRequest.getPageSize(),
+            snapshotDiffRequest.getForceFullDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())

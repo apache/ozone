@@ -16,7 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -335,7 +334,7 @@ public class TestOmMetadataManager {
 
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1));
+        CacheValue.get(1, omBucketInfo));
   }
 
   @Test
@@ -501,7 +500,7 @@ public class TestOmMetadataManager {
         // Mark as deleted in cache.
         omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
             new CacheKey<>(key),
-            new CacheValue<>(Optional.absent(), 100L));
+            CacheValue.get(100L));
         deleteKeySet.add(key);
       }
     }

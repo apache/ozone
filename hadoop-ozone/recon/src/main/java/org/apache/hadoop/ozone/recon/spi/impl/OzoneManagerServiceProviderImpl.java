@@ -412,8 +412,15 @@ public class OzoneManagerServiceProviderImpl
     long inLoopLatestSequenceNumber;
     while (loopCount < deltaUpdateLoopLimit &&
         deltaUpdateCnt >= deltaUpdateLimit) {
-      innerGetAndApplyDeltaUpdatesFromOM(
-          inLoopStartSequenceNumber, omdbUpdatesHandler);
+      if (!innerGetAndApplyDeltaUpdatesFromOM(
+          inLoopStartSequenceNumber, omdbUpdatesHandler)) {
+        LOG.error(
+            "Retrieve OM DB delta update failed for sequence number : {}, " +
+                "so falling back to full snapshot.", inLoopStartSequenceNumber);
+        throw new RocksDBException(
+            "Unable to get delta updates since sequenceNumber - " +
+                inLoopStartSequenceNumber);
+      }
       inLoopLatestSequenceNumber = getCurrentOMDBSequenceNumber();
       deltaUpdateCnt = inLoopLatestSequenceNumber - inLoopStartSequenceNumber;
       inLoopStartSequenceNumber = inLoopLatestSequenceNumber;
@@ -433,7 +440,7 @@ public class OzoneManagerServiceProviderImpl
    * @throws RocksDBException when writing to RocksDB fails.
    */
   @VisibleForTesting
-  void innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
+  boolean innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
       OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
@@ -469,6 +476,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Number of updates received from OM : {}, " +
             "SequenceNumber diff: {}, SequenceNumber Lag from OM {}.",
         numUpdates, getCurrentOMDBSequenceNumber() - fromSequenceNumber, lag);
+    return null != dbUpdates && dbUpdates.isDBUpdateSuccess();
   }
 
   /**

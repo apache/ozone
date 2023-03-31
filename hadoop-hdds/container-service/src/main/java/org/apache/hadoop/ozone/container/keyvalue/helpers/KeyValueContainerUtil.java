@@ -23,7 +23,11 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.ListIterator;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -33,9 +37,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -45,6 +53,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Class which defines utility methods for KeyValueContainer.
@@ -144,7 +154,15 @@ public final class KeyValueContainerUtil {
     File chunksPath = new File(containerData.getChunksPath());
 
     if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-      BlockUtils.removeContainerFromDB(containerData, conf);
+      // DB failure is catastrophic, the disk needs to be replaced.
+      // In case of an exception, LOG the message and rethrow the exception.
+      try {
+        BlockUtils.removeContainerFromDB(containerData, conf);
+      } catch (IOException ex) {
+        LOG.error("DB failure, unable to remove container. " +
+            "Disk need to be replaced.", ex);
+        throw new IOException(ex);
+      }
     } else {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);
@@ -401,7 +419,7 @@ public final class KeyValueContainerUtil {
   }
 
   /**
-   * Container metadata directory -- here is where the level DB and
+   * Container metadata directory -- here is where the RocksDB and
    * .container file lives.
    *
    * @param kvContainerData - KeyValueContainerData
@@ -415,5 +433,168 @@ public final class KeyValueContainerUtil {
 
     return Paths.get(metadataPath);
 
+  }
+
+  /**
+   * Utilities for container_delete_service directory
+   * which is located under <volume>/hdds/<cluster-id>/tmp/.
+   * Containers will be moved under it before getting deleted
+   * to avoid, in case of failure, having artifact leftovers
+   * on the default container path on the disk.
+   *
+   * Delete operation for Schema < V3
+   * 1. Container directory renamed to tmp directory.
+   * 2. Container is removed from in memory container set.
+   * 3. Container is deleted from tmp directory.
+   *
+   * Delete operation for Schema V3
+   * 1. Container directory renamed to tmp directory.
+   * 2. Container is removed from in memory container set.
+   * 3. Container's entries are removed from RocksDB.
+   * 4. Container is deleted from tmp directory.
+   */
+  public static class ContainerDeleteDirectory {
+
+    /**
+     * Delete all files under
+     * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+     */
+    public static synchronized void cleanTmpDir(HddsVolume hddsVolume)
+        throws IOException {
+      if (hddsVolume.getStorageState() != StorageVolume.VolumeState.NORMAL) {
+        LOG.debug("Call to clean tmp dir container_delete_service directory "
+                + "for {} while VolumeState {}",
+            hddsVolume.getStorageDir(),
+            hddsVolume.getStorageState().toString());
+        return;
+      }
+
+      // getDeleteLeftovers initializes tmp and
+      // delete service directories as well
+      ListIterator<File> leftoversListIt = getDeleteLeftovers(hddsVolume);
+
+      while (leftoversListIt.hasNext()) {
+        File file = leftoversListIt.next();
+
+        // Check the case where we have Schema V3 and
+        // removing the container's entries from RocksDB fails.
+        // --------------------------------------------
+        // On datanode restart, we populate the container set
+        // based on the available datanode volumes and
+        // populate the container metadata based on the values in RocksDB.
+        // The container is in the tmp directory,
+        // so it won't be loaded in the container set
+        // but there will be orphaned entries in the volume's RocksDB.
+        // --------------------------------------------
+        // For every .container file we find under /tmp,
+        // we use it to get the RocksDB entries and delete them.
+        // If the .container file doesn't exist then the contents of the
+        // directory are probably leftovers of a failed delete and
+        // the RocksDB entries must have already been removed.
+        // In any case we can proceed with deleting the directory's contents.
+        // --------------------------------------------
+        // Get container file and check Schema version. If Schema is V3
+        // then remove the container from RocksDB.
+        File containerFile = ContainerUtils.getContainerFile(file);
+        
+        ContainerData containerData = ContainerDataYaml
+            .readContainerFile(containerFile);
+        KeyValueContainerData keyValueContainerData =
+            (KeyValueContainerData) containerData;
+
+        if (keyValueContainerData.getSchemaVersion()
+            .equals(OzoneConsts.SCHEMA_V3)) {
+          // Container file doesn't include the volume
+          // so we need to set it here in order to get the db file.
+          keyValueContainerData.setVolume(hddsVolume);
+          File dbFile = KeyValueContainerLocationUtil
+              .getContainerDBFile(keyValueContainerData);
+          keyValueContainerData.setDbFile(dbFile);
+          try {
+            // Remove container from Rocks DB
+            BlockUtils.removeContainerFromDB(keyValueContainerData,
+                hddsVolume.getConf());
+          } catch (IOException ex) {
+            LOG.error("Failed to remove container from Rocks DB", ex);
+          }
+        }
+
+        try {
+          if (file.isDirectory()) {
+            FileUtils.deleteDirectory(file);
+          } else {
+            FileUtils.delete(file);
+          }
+        } catch (IOException ex) {
+          LOG.error("Failed to delete directory or file inside " +
+              "{}", hddsVolume.getDeleteServiceDirPath().toString(), ex);
+        }
+      }
+    }
+
+    /**
+     * In the future might be used to gather metrics
+     * for the files left under
+     * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+     * @return ListIterator to all the files
+     */
+    public static ListIterator<File> getDeleteLeftovers(HddsVolume hddsVolume)
+        throws IOException {
+      List<File> leftovers = new ArrayList<>();
+
+      // Initialize tmp and delete service directories
+      hddsVolume.createDeleteServiceDir();
+
+      File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
+
+      if (tmpDir.exists() && tmpDir.isDirectory()) {
+        File[] tmpFiles = tmpDir.listFiles();
+        if (tmpFiles != null) {
+          leftovers.addAll(Arrays.asList(tmpFiles));
+        }
+      }
+
+      return leftovers.listIterator();
+    }
+
+    /**
+     * Renaming container directory path to a new location
+     * under "<volume>/hdds/<cluster-id>/tmp/container_delete_service"
+     * and updating metadata and chunks path.
+     * @param keyValueContainerData
+     * @return true if renaming was successful
+     */
+    public static boolean moveToTmpDeleteDirectory(
+        KeyValueContainerData keyValueContainerData,
+        HddsVolume hddsVolume) {
+      String containerPath = keyValueContainerData.getContainerPath();
+      File container = new File(containerPath);
+      String containerDirName = container.getName();
+
+      // Initialize delete directory
+      try {
+        hddsVolume.createDeleteServiceDir();
+      } catch (IOException ex) {
+        LOG.error("Error initializing container-service tmp dir");
+        return false;
+      }
+
+      String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
+          .resolve(Paths.get(containerDirName)).toString();
+
+      boolean success = container.renameTo(new File(destinationDirPath));
+
+      // Updating in memory values of the container's location
+      // which is used by KeyValueContainerUtil#removeContainer().
+      // In case of a datanode restart these values won't persist but
+      // tmp delete directory will be wiped, so this won't be an issue.
+      if (success) {
+        keyValueContainerData.setMetadataPath(destinationDirPath +
+            OZONE_URI_DELIMITER + OzoneConsts.CONTAINER_META_PATH);
+        keyValueContainerData.setChunksPath(destinationDirPath +
+            OZONE_URI_DELIMITER + OzoneConsts.STORAGE_DIR_CHUNKS);
+      }
+      return success;
+    }
   }
 }

@@ -270,6 +270,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           conf.getObject(ReplicationManagerConfiguration.class);
       replicationConf.setInterval(Duration.ofSeconds(10));
       replicationConf.setEventTimeout(Duration.ofSeconds(20));
+      replicationConf.setDatanodeTimeoutOffset(0);
       conf.setFromObject(replicationConf);
       conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);

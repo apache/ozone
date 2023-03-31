@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -116,8 +117,27 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
+  private void cleanTmpDir() {
+    if (datanodeStateMachine != null) {
+      MutableVolumeSet volumeSet =
+          datanodeStateMachine.getContainer().getVolumeSet();
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          try {
+            KeyValueContainerUtil.ContainerDeleteDirectory
+                .cleanTmpDir(hddsVolume);
+          } catch (IOException ex) {
+            LOG.error("Error while cleaning tmp delete directory " +
+                "under {}", hddsVolume.getWorkingDir(), ex);
+          }
+        }
+      }
+    }
+  }
+
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    * <p>
    * This method is intended for unit tests only. It suppresses the
    * startup/shutdown message and skips registering Unix signal handlers.
@@ -132,7 +152,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    *
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
@@ -335,6 +355,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      certClient.close();
       LOG.info("Re-initialize certificate client.");
       certClient = new DNCertificateClient(secConf, datanodeDetails, null,
           this::saveNewCertId, this::terminateDatanode);
@@ -496,6 +517,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void stop() {
     if (!isStopped.getAndSet(true)) {
+      // Clean <HddsVolume>/tmp/container_delete_service dir.
+      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {
@@ -560,7 +583,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
   }
 

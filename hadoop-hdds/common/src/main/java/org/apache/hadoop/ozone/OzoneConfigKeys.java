@@ -232,6 +232,16 @@ public final class OzoneConfigKeys {
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
 
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
+      "ozone.snapshot.deleting.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT = "30s";
+
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT =
+      "ozone.snapshot.deleting.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT = "300s";
+
   public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
       "ozone.block.deleting.service.workers";
   public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
@@ -605,6 +615,11 @@ public final class OzoneConfigKeys {
       "ozone.om.snapshot.force.full.diff";
 
   public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
+
+  public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
+      "ozone.om.delta.update.data.size.max.limit";
+  public static final String
+      OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT = "1024MB";
 
   /**
    * There is no need to instantiate this class.

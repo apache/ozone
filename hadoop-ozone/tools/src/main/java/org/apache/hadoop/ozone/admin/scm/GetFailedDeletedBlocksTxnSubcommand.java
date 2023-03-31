@@ -57,7 +57,7 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
     private int count;
   }
 
-  @CommandLine.Option(names = {"-s", "--startTxId"},
+  @CommandLine.Option(names = {"-s", "--startTxId", "--start-tx-id"},
       defaultValue = "0",
       description = "The least transaction ID to start with, default 0." +
           " Only work with -c/--count")

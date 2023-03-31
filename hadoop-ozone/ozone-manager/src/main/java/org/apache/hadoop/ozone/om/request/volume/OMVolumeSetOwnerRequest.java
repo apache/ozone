@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -165,15 +164,13 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),
-          new CacheValue<>(Optional.of(newOwnerVolumeList),
-              transactionLogIndex));
+          CacheValue.get(transactionLogIndex, newOwnerVolumeList));
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(oldOwner)),
-          new CacheValue<>(Optional.of(oldOwnerVolumeList),
-              transactionLogIndex));
+          CacheValue.get(transactionLogIndex, oldOwnerVolumeList));
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().setResponse(true).build());

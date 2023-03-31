@@ -157,7 +157,11 @@ public class TestS3GatewayMetrics {
           null, "random", null,
           null, null);
       fail();
-    } catch (Exception e) {
+    } catch (Exception ex) {
+      OS3Exception os3Ex = (OS3Exception) ex.getCause();
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), os3Ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          os3Ex.getErrorMessage());
     }
 
     long curMetric = metrics.getGetBucketFailure();
@@ -237,11 +241,10 @@ public class TestS3GatewayMetrics {
           null, null, 0, null,
           null, null, null, "acl", null);
       fail();
-    } catch (RuntimeException ex) {
-      OS3Exception os3Ex = (OS3Exception) ex.getCause();
-      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), os3Ex.getCode());
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
-          os3Ex.getErrorMessage());
+          ex.getErrorMessage());
     }
     long curMetric = metrics.getGetAclFailure();
     assertEquals(1L, curMetric - oriMetric);

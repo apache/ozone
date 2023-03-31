@@ -401,8 +401,10 @@ public class DeletedBlockLogImpl
   public void close() throws IOException {
   }
 
-  private void getTransaction(DeletedBlocksTransaction tx,
-      DatanodeDeletedBlockTransactions transactions) {
+  private void getTransaction(
+      DeletedBlocksTransaction tx,
+      DatanodeDeletedBlockTransactions transactions,
+      Set<DatanodeDetails> dnList) {
     try {
       DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
           .newBuilder(tx)
@@ -413,6 +415,9 @@ public class DeletedBlockLogImpl
               ContainerID.valueOf(updatedTxn.getContainerID()));
       for (ContainerReplica replica : replicas) {
         UUID dnID = replica.getDatanodeDetails().getUuid();
+        if (!dnList.contains(replica.getDatanodeDetails())) {
+          continue;
+        }
         Set<UUID> dnsWithTransactionCommitted =
             transactionToDNsCommitMap.get(updatedTxn.getTxID());
         if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
@@ -429,7 +434,8 @@ public class DeletedBlockLogImpl
 
   @Override
   public DatanodeDeletedBlockTransactions getTransactions(
-      int blockDeletionLimit) throws IOException, TimeoutException {
+      int blockDeletionLimit, Set<DatanodeDetails> dnList)
+      throws IOException, TimeoutException {
     lock.lock();
     try {
       DatanodeDeletedBlockTransactions transactions =
@@ -455,7 +461,7 @@ public class DeletedBlockLogImpl
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              getTransaction(txn, transactions);
+              getTransaction(txn, transactions, dnList);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
             }
