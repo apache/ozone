@@ -176,11 +176,6 @@ public class ReconStorageContainerManagerFacade
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
-    long timeDuration = conf.getTimeDuration(
-        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
-        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
-            .getDuration(), TimeUnit.MILLISECONDS);
-    leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
 
     this.scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
@@ -199,12 +194,9 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
-        conf,
-        nodeManager,
+        conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-        eventQueue,
-        scmhaManager,
-        scmContext);
+        eventQueue, scmhaManager, scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         conf, Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
@@ -229,17 +221,12 @@ public class ReconStorageContainerManagerFacade
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
+        pipelineManager, nodeManager, scmServiceProvider, reconTaskStatusDao,
         reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
-        containerManager,
-        scmServiceProvider,
+        containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig);
+        containerPlacementPolicy, reconTaskConfig);
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
@@ -254,14 +241,15 @@ public class ReconStorageContainerManagerFacade
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmContext);
-    long closeHandlertimeDuration = conf.getTimeDuration(
+    long timeDuration = conf.getTimeDuration(
         OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
         OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
             .getDuration(), TimeUnit.MILLISECONDS);
+    leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
             pipelineManager, containerManager, scmContext,
-            leaseManager, closeHandlertimeDuration);
+            leaseManager, timeDuration);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
     // Use the same executor for both ICR and FCR.
