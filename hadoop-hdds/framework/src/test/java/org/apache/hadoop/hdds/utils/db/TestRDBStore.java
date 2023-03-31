@@ -19,10 +19,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.MBeanServer;
 import java.io.File;
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
