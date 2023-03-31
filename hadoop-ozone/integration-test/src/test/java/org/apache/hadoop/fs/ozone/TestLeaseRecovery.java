@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -133,5 +134,22 @@ public class TestLeaseRecovery {
       assertEquals(readBytes, 1 << 20);
       assertArrayEquals(readData, data);
     }
+  }
+
+  @Test
+  public void testOBSRecoveryShouldFail() throws Exception {
+    // Set the fs.defaultFS
+    bucket = TestDataUtil.createVolumeAndBucket(client,
+        "vol2", "obs", BucketLayout.OBJECT_STORE);
+    final String rootPath = String.format("%s://%s/", OZONE_OFS_URI_SCHEME,
+        conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName() +
+        OZONE_URI_DELIMITER + bucket.getName();
+    final Path file = new Path(dir, "file");
+
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
+    assertThrows(IllegalArgumentException.class, () -> fs.recoverLease(file));
   }
 }

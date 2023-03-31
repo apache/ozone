@@ -70,7 +70,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    verifyTables(true, false);
+    verifyTables(true, true);
   }
 
   /**
