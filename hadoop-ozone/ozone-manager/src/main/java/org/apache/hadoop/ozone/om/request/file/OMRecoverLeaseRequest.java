@@ -77,6 +77,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String volumeName;
   private String bucketName;
   private String keyName;
+  private OmKeyInfo keyInfo;
+  private String dbFileKey;
 
   private OMMetadataManager omMetadataManager;
 
@@ -142,17 +144,19 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      String openKeyEntryName = doWork(ozoneManager, recoverLeaseRequest,
-          transactionLogIndex);
+      String openKeyEntryName = doWork(ozoneManager, transactionLogIndex);
 
       // Prepare response
       boolean responseCode = true;
-      omResponse.setRecoverLeaseResponse(RecoverLeaseResponse.newBuilder()
-              .setResponse(responseCode).build())
+      omResponse
+          .setRecoverLeaseResponse(
+              RecoverLeaseResponse.newBuilder()
+                  .setResponse(responseCode)
+                  .build())
           .setCmdType(RecoverLease);
       omClientResponse =
           new OMRecoverLeaseResponse(omResponse.build(), getBucketLayout(),
-              openKeyEntryName);
+              keyInfo, dbFileKey, openKeyEntryName);
       omMetrics.incNumRecoverLease();
       LOG.debug("Key recovered. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
@@ -165,11 +169,8 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omClientResponse = new OMRecoverLeaseResponse(
           createErrorOMResponse(omResponse, ex), getBucketLayout());
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -184,8 +185,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private String doWork(OzoneManager ozoneManager,
-      RecoverLeaseRequest recoverLeaseRequest, long transactionLogIndex)
+  private String doWork(OzoneManager ozoneManager, long transactionLogIndex)
       throws IOException {
 
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
@@ -197,85 +197,48 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         "Cannot recover file : " + keyName
             + " as parent directory doesn't exist");
     String fileName = OzoneFSUtils.getFileName(keyName);
-    String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+    dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
         parentID, fileName);
 
-    OmKeyInfo keyInfo = getKey(dbFileKey);
+    keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
       throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
     }
-    final String clientId = keyInfo.getMetadata().get(
+    final String clientId = keyInfo.getMetadata().remove(
         OzoneConsts.HSYNC_CLIENT_ID);
     if (clientId == null) {
-      LOG.warn("Key:" + keyName + " is closed");
+      // if file is closed, do nothing and return right away.
+      LOG.warn("Key:" + keyName + " is already closed");
+      return null;
     }
-    String openKeyEntryName = getOpenFileEntryName(volumeId, bucketId,
-        parentID, fileName);
-    if (openKeyEntryName != null) {
-      checkFileState(keyInfo, openKeyEntryName);
-      commitKey(dbFileKey, keyInfo, ozoneManager, transactionLogIndex);
-      removeOpenKey(openKeyEntryName, transactionLogIndex);
+    String openFileDBKey = omMetadataManager.getOpenFileName(
+            volumeId, bucketId, parentID, fileName, Long.parseLong(clientId));
+    if (openFileDBKey != null) {
+      commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
+          transactionLogIndex);
+      removeOpenKey(openFileDBKey, fileName, transactionLogIndex);
     }
 
-    return openKeyEntryName;
+    return openFileDBKey;
   }
 
   private OmKeyInfo getKey(String dbOzoneKey) throws IOException {
     return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
   }
 
-  private String getOpenFileEntryName(long volumeId, long bucketId,
-      long parentObjectId, String fileName) throws IOException {
-    String openFileEntryName = null;
-    String dbOpenKeyPrefix =
-        omMetadataManager.getOpenFileNamePrefix(volumeId, bucketId,
-            parentObjectId, fileName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iter = omMetadataManager.getOpenKeyTable(getBucketLayout())
-        .iterator(dbOpenKeyPrefix)) {
-
-      while (iter.hasNext()) {
-        if (openFileEntryName != null) {
-          throw new IOException("Found more than two keys in the" +
-            " open key table for file" + fileName);
-        }
-        openFileEntryName = iter.next().getKey();
-      }
-    }
-    /*if (openFileEntryName == null) {
-      throw new IOException("Unable to find the corresponding key in " +
-        "the open key table for file " + fileName);
-    }*/
-    return openFileEntryName;
-  }
-
-  private void checkFileState(OmKeyInfo keyInfo, String openKeyEntryName)
-      throws IOException {
-
-    // if file is closed, do nothing and return right away.
-    if (openKeyEntryName.isEmpty()) {
-      return; // ("File is closed");
-    }
-    // if file is open, no sync, fail right away.
-    if (keyInfo == null) {
-      throw new IOException("file is open but not yet sync'ed");
-    }
-  }
-
   private void commitKey(String dbOzoneKey, OmKeyInfo omKeyInfo,
-      OzoneManager ozoneManager, long transactionLogIndex) throws IOException {
+      String fileName, OzoneManager ozoneManager,
+      long transactionLogIndex) throws IOException {
     omKeyInfo.setModificationTime(Time.now());
     omKeyInfo.setUpdateID(transactionLogIndex, ozoneManager.isRatisEnabled());
 
-    omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-      new CacheKey<>(dbOzoneKey),
-      new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+    OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbOzoneKey,
+        omKeyInfo, fileName, transactionLogIndex);
   }
 
-  private void removeOpenKey(String openKeyName, long transactionLogIndex)
-      throws IOException {
-    omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-      new CacheKey<>(openKeyName),
-      new CacheValue<>(Optional.absent(), transactionLogIndex));
+  private void removeOpenKey(String openKeyName, String fileName,
+      long transactionLogIndex) {
+    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+        openKeyName, null, fileName, transactionLogIndex);
   }
 }

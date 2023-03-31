@@ -3,6 +3,8 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -20,10 +22,15 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, OPEN_FILE_TABLE})
 public class OMRecoverLeaseResponse extends OmKeyResponse {
 
+  private OmKeyInfo keyInfo;
+  private String dbFileKey;
   private String openKeyName;
   public OMRecoverLeaseResponse(@Nonnull OMResponse omResponse,
-      BucketLayout bucketLayout, String openKeyName) {
+      BucketLayout bucketLayout, OmKeyInfo keyInfo, String dbFileKey,
+      String openKeyName) {
     super(omResponse, bucketLayout);
+    this.keyInfo = keyInfo;
+    this.dbFileKey = dbFileKey;
     this.openKeyName = openKeyName;
   }
 
@@ -45,6 +52,8 @@ public class OMRecoverLeaseResponse extends OmKeyResponse {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
           batchOperation, openKeyName);
     }
+    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .putWithBatch(batchOperation, dbFileKey, keyInfo);
   }
 
   @Override
