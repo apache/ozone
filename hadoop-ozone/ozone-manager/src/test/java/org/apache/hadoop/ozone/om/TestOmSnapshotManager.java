@@ -74,7 +74,7 @@ public class TestOmSnapshotManager {
 
     // Only allow one entry in cache so each new one causes an eviction
     configuration.setInt(
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
+        OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();

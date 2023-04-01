@@ -590,32 +590,6 @@ public final class OzoneConfigKeys {
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
       "org.apache.hadoop.ozone.om.TrashPolicyOzone";
 
-
-  public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
-      "ozone.om.snapshot.cache.max.size";
-  public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
-
-  public static final String
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
-      "ozone.om.snapshot.compaction.dag.max.time.allowed";
-
-  public static final long
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT =
-      TimeUnit.DAYS.toMillis(30);
-
-  public static final String
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL =
-      "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval";
-
-  public static final long
-      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
-
-  public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
-      "ozone.om.snapshot.force.full.diff";
-
-  public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
-
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
       "ozone.om.delta.update.data.size.max.limit";
   public static final String

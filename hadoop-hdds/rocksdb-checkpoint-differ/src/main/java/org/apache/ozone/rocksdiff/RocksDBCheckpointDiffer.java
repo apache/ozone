@@ -28,6 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -68,6 +69,10 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 
 // TODO
 //  8. Handle bootstrapping rocksDB for a new OM follower node
@@ -181,16 +186,59 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @param sstBackupDirName Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
    * @param activeDBLocationName Active RocksDB directory's location.
-   * @param maxTimeAllowedForSnapshotInDagInMs Time after which snapshot will be
-   *                                           pruned from the DAG by daemon.
-   * @param pruneCompactionDagDaemonRunIntervalInMs Internal at which DAG
-   *                                               pruning daemon will run.
+   * @param configuration ConfigurationSource.
    */
   public RocksDBCheckpointDiffer(String metadataDirName,
                                  String sstBackupDirName,
                                  String compactionLogDirName,
                                  String activeDBLocationName,
-                                 long maxTimeAllowedForSnapshotInDagInMs,
+                                 ConfigurationSource configuration) {
+    Preconditions.checkNotNull(metadataDirName);
+    Preconditions.checkNotNull(sstBackupDirName);
+    Preconditions.checkNotNull(compactionLogDirName);
+    Preconditions.checkNotNull(activeDBLocationName);
+
+    this.compactionLogDir =
+        createCompactionLogDir(metadataDirName, compactionLogDirName);
+    this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
+    createSstBackUpDir();
+
+    // Active DB location is used in getSSTFileSummary
+    this.activeDBLocationStr = activeDBLocationName + "/";
+    this.maxAllowedTimeInDag = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    long pruneCompactionDagDaemonRunIntervalInMs = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
+      this.executor = Executors.newSingleThreadScheduledExecutor();
+      this.executor.scheduleWithFixedDelay(
+          this::pruneOlderSnapshotsWithCompactionHistory,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS);
+
+      this.executor.scheduleWithFixedDelay(
+          this::pruneSstFiles,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS
+      );
+    } else {
+      this.executor = null;
+    }
+  }
+
+  public RocksDBCheckpointDiffer(String metadataDirName,
+                                 String sstBackupDirName,
+                                 String compactionLogDirName,
+                                 String activeDBLocationName,
+                                 long maxAllowedTimeInDag,
                                  long pruneCompactionDagDaemonRunIntervalInMs) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
@@ -204,7 +252,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     // Active DB location is used in getSSTFileSummary
     this.activeDBLocationStr = activeDBLocationName + "/";
-    this.maxAllowedTimeInDag = maxTimeAllowedForSnapshotInDagInMs;
+    this.maxAllowedTimeInDag = maxAllowedTimeInDag;
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.executor = Executors.newSingleThreadScheduledExecutor();
