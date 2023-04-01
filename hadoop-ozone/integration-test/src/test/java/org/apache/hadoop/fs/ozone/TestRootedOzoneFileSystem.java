@@ -105,7 +105,10 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -337,7 +340,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
@@ -2058,7 +2061,7 @@ public class TestRootedOzoneFileSystem {
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
-            new ECReplicationConfig("RS-3-2-1024")));
+            new ECReplicationConfig("RS-3-2-1024k")));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
@@ -2117,7 +2120,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
@@ -2127,7 +2130,7 @@ public class TestRootedOzoneFileSystem {
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
     long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
-            new ECReplicationConfig(3, 2, RS, 1024));
+        new ECReplicationConfig(3, 2, RS, (int) OzoneConsts.MB));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
     //clean up
     ofs.delete(filePath, true);
@@ -2251,5 +2254,11 @@ public class TestRootedOzoneFileSystem {
     } catch (Exception e) {
       Assert.fail("Failed to read/list on snapshotPath, exception: " + e);
     }
+  }
+
+  @Test
+  public void testFileSystemDeclaresCapability() throws Throwable {
+    assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
+    assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
   }
 }

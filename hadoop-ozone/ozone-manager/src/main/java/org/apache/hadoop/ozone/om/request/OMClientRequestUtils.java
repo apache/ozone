@@ -17,10 +17,23 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Utility class for OMClientRequest. Validates that the bucket layout expected
@@ -46,5 +59,44 @@ public final class OMClientRequestUtils {
           errMsg,
           OMException.ResultCodes.INTERNAL_ERROR);
     }
+  }
+
+  public static boolean isSnapshotBucket(OMMetadataManager omMetadataManager,
+      OmKeyInfo keyInfo) throws IOException {
+
+    String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
+        keyInfo.getVolumeName(), keyInfo.getBucketName())
+        + OM_KEY_PREFIX;
+
+    return checkInSnapshotCache(omMetadataManager, dbSnapshotBucketKey) ||
+        checkInSnapshotDB(omMetadataManager, dbSnapshotBucketKey);
+  }
+
+  private static boolean checkInSnapshotDB(OMMetadataManager omMetadataManager,
+      String dbSnapshotBucketKey) throws IOException {
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
+      iterator.seek(dbSnapshotBucketKey);
+      return iterator.hasNext() && iterator.next().getKey()
+          .startsWith(dbSnapshotBucketKey);
+    }
+  }
+
+  private static boolean checkInSnapshotCache(
+      OMMetadataManager omMetadataManager,
+      String dbSnapshotBucketKey) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> cacheIter =
+        omMetadataManager.getSnapshotInfoTable().cacheIterator();
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
+          cacheIter.next();
+      String cacheKey = cacheKeyValue.getKey().getCacheKey();
+      SnapshotInfo cacheValue = cacheKeyValue.getValue().getCacheValue();
+      if (cacheKey.startsWith(dbSnapshotBucketKey) && cacheValue != null) {
+        return true;
+      }
+    }
+    return false;
   }
 }

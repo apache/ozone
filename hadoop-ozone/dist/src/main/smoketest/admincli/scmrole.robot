@@ -14,28 +14,15 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Check Metadata layout version present in a version file.
+Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${version_prefix}    layoutVersion=
-
-*** Keywords ***
-Check version
-    ${version_file_contents} =    Get file    ${VERSION_FILE}
-    ${version_line} =    Catenate    SEPARATOR=   ${version_prefix}    ${VERSION}
-    Should contain    ${version_file_contents}    ${version_line}
 
 *** Test Cases ***
-Check MLV
-    # Fail if required variables are not set.
-    Should not be empty    ${VERSION_FILE}
-    Should not be empty    ${VERSION}
-
-    File should exist    ${VERSION_FILE}
-    File should not be empty    ${VERSION_FILE}
-
-    Wait until keyword succeeds    3min    10sec    Check version
+Run scm roles
+    ${output} =         Execute          ozone admin scm roles
+                        Should Match Regexp   ${output}  [scm:9894(:LEADER|)]

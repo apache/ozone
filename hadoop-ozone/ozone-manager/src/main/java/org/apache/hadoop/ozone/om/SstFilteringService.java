@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -144,9 +145,12 @@ public class SstFilteringService extends BackgroundService {
 
           String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
 
+          String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
+              OM_SNAPSHOT_CHECKPOINT_DIR;
           try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
-                  dbName, true, Optional.of(Boolean.TRUE))) {
+              .loadDB(ozoneManager.getConfiguration(),
+                      new File(snapshotCheckpointDir),
+                      dbName, true, Optional.of(Boolean.TRUE))) {
             RocksDatabase db = rdbStore.getDb();
             db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
           }

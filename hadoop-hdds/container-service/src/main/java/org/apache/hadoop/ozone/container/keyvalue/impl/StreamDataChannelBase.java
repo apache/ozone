@@ -31,6 +31,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+
 /**
  * For write state machine data.
  */
@@ -64,9 +66,18 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
     return randomAccessFile.getChannel();
   }
 
+  protected void checkVolume() {
+    onFailure(containerData.getVolume());
+  }
+
   @Override
   public final void force(boolean metadata) throws IOException {
-    getChannel().force(metadata);
+    try {
+      getChannel().force(metadata);
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
   }
 
   @Override
@@ -76,14 +87,24 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
 
   @Override
   public void close() throws IOException {
-    randomAccessFile.close();
+    try {
+      randomAccessFile.close();
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
   }
 
   final int writeFileChannel(ByteBuffer src) throws IOException {
-    final int writeBytes = getChannel().write(src);
-    metrics.incContainerBytesStats(getType(), writeBytes);
-    containerData.updateWriteStats(writeBytes, false);
-    return writeBytes;
+    try {
+      final int writeBytes = getChannel().write(src);
+      metrics.incContainerBytesStats(getType(), writeBytes);
+      containerData.updateWriteStats(writeBytes, false);
+      return writeBytes;
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
   }
 
   @Override

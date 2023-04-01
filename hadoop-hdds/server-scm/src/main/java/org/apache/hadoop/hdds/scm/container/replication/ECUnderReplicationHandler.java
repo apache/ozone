@@ -315,8 +315,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 sourceDatanodesWithIndex, selectedDatanodes,
                 int2byte(missingIndexes),
                 repConfig);
-        replicationManager.sendDatanodeCommand(reconstructionCommand,
-            container, selectedDatanodes.get(0));
+        replicationManager.sendThrottledReconstructionCommand(
+            container, reconstructionCommand);
+        for (int i = 0; i < missingIndexes.size(); i++) {
+          adjustPendingOps(
+              replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));
+        }
         commandsSent++;
       }
     } else {
@@ -367,7 +371,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 selectedDatanodes, excludedNodes, decomIndexes);
             break;
           }
-          createReplicateCommand(container, iterator, sourceReplica);
+          createReplicateCommand(
+              container, iterator, sourceReplica, replicaCount);
           commandsSent++;
         }
       }
@@ -429,7 +434,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             targets, excludedNodes, maintIndexes);
         break;
       }
-      createReplicateCommand(container, iterator, sourceReplica);
+      createReplicateCommand(container, iterator, sourceReplica, replicaCount);
       commandsSent++;
       additionalMaintenanceCopiesNeeded -= 1;
     }
@@ -438,8 +443,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   private void createReplicateCommand(
       ContainerInfo container, Iterator<DatanodeDetails> iterator,
-      ContainerReplica replica)
-      throws AllSourcesOverloadedException, NotLeaderException {
+      ContainerReplica replica, ECContainerReplicaCount replicaCount)
+      throws CommandTargetOverloadedException, NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
@@ -459,6 +464,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       replicationManager.sendDatanodeCommand(replicateCommand, container,
           target);
     }
+    adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
+  }
+
+  private void adjustPendingOps(ECContainerReplicaCount replicaCount,
+                                DatanodeDetails target, int replicaIndex) {
+    replicaCount.addPendingOp(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex,
+        Long.MAX_VALUE));
   }
 
   private static byte[] int2byte(List<Integer> src) {

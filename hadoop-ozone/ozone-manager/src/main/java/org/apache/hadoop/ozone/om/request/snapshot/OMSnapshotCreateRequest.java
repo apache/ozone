@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -26,8 +25,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -115,9 +114,10 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
-        ozoneManager.getSnapshotChainManager();
+        omMetadataManager.getSnapshotChainManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -172,7 +172,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, snapshotInfo));
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
