@@ -596,7 +596,7 @@ public class ReplicationManager implements SCMService {
         if (totalCount >= datanodeReplicationLimit) {
           LOG.debug("Datanode {} has reached the maximum number of queued " +
               "commands, replication + reconstruction * {}: {})",
-              reconstructionCommandWeight, dn, totalCount);
+              dn, reconstructionCommandWeight, totalCount);
           addExcludedNode(dn);
           continue;
         }
@@ -838,26 +838,21 @@ public class ReplicationManager implements SCMService {
   public void datanodeCommandCountUpdated(DatanodeDetails datanode) {
     LOG.debug("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
-    excludedNodes.compute(datanode, (k, v) -> {
-      if (v != null) {
-        // There is an existing mapping, so we may need to remove it
-        try {
-          if (getDatanodeQueuedReplicationCount(datanode)
-              < datanodeReplicationLimit) {
-            // Returning null removes the entry from the map
-            return null;
-          } else {
-            return 1;
-          }
-        } catch (NodeNotFoundException e) {
-          LOG.warn("Unable to find datanode {} in nodeManager. " +
-              "Should not happen.", datanode);
+    // If there is an existing mapping, we may need to remove it
+    excludedNodes.computeIfPresent(datanode, (k, v) -> {
+      try {
+        if (getDatanodeQueuedReplicationCount(datanode)
+            < datanodeReplicationLimit) {
+          // Returning null removes the entry from the map
           return null;
+        } else {
+          return 1;
         }
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Unable to find datanode {} in nodeManager. " +
+            "Should not happen.", datanode);
+        return null;
       }
-      // If there is no existing mapping, then return null as we don't want to
-      // add a mapping.
-      return null;
     });
   }
 
