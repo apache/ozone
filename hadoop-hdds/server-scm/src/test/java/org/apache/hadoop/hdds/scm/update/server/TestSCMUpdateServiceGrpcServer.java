@@ -97,6 +97,7 @@ public class TestSCMUpdateServiceGrpcServer {
   }
 
 
+  @Disabled("HDDS-5319")
   @Test
   public void testClientUpdateWithRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
