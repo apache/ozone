@@ -20,10 +20,6 @@ package org.apache.hadoop.ozone.s3.signature;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
 import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -217,7 +213,8 @@ public final class StringToSignProducer {
       // Note: The x-amz-content-sha256 header is required
       // for all AWS Signature Version 4 requests.(using Authorization header)
       if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
-        LOG.error("The request must include x-amz-content-sha256 header");
+        LOG.error("The request must include x-amz-content-sha256 header "
+                + "for signed paylods");
         throw S3_AUTHINFO_CREATION_ERROR;
       }
       payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
@@ -315,15 +312,7 @@ public final class StringToSignProducer {
       throws OS3Exception, DateTimeParseException {
     switch (header) {
     case HOST:
-      try {
-        URI hostUri = new URI(schema + "://" + headerValue);
-        InetAddress.getByName(hostUri.getHost());
-        // TODO: Validate if current request is coming from same host.
-      } catch (UnknownHostException | URISyntaxException e) {
-        LOG.error("Host value mentioned in signed header is not valid. " +
-            "Host:{}", headerValue);
-        throw S3_AUTHINFO_CREATION_ERROR;
-      }
+      // TODO: Placeholder for any host validations.
       break;
     case X_AMAZ_DATE:
       LocalDateTime date = LocalDateTime.parse(headerValue, TIME_FORMATTER);
@@ -346,12 +335,9 @@ public final class StringToSignProducer {
   }
 
   /** According to AWS Sig V4 documentation
-   * https://docs.aws.amazon.com/AmazonS3/latest/API/
-   * sig-v4-header-based-auth.html
+   * https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
    * The CanonicalHeaders list must include the following:
-   * HTTP host header.
-   * If the Content-Type header is present in the request,
-   * you must add it to the CanonicalHeaders list.
+   * HTTP host header..
    * Any x-amz-* headers that you plan to include
    * in your request must also be added.
    *
@@ -366,13 +352,6 @@ public final class StringToSignProducer {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw S3_AUTHINFO_CREATION_ERROR;
-    }
-    if (!unsignedPaylod && headers.containsKey("content-type")) {
-      if (!canonicalHeaders.contains("content-type:")) {
-        LOG.error("The SignedHeaders list must include Content-Type " +
-                "header if it is in the request");
-        throw S3_AUTHINFO_CREATION_ERROR;
-      }
     }
     for (String header : headers.keySet().stream()
             .filter(s -> s.startsWith("x-amz-"))

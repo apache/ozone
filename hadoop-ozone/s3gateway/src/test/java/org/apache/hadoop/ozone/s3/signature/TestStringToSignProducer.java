@@ -154,35 +154,30 @@ public class TestStringToSignProducer {
     headersMap1.putSingle("Host", "0.0.0.0:9878");
     headersMap1.putSingle("X-Amz-Content-Sha256", "Content-SHA");
     headersMap1.putSingle("X-Amz-Date", DATETIME);
-    // Invalid Host header
+    //Missing X-Amz-Date Header
     MultivaluedMap<String, String> headersMap2 =
             new MultivaluedHashMap<String, String>(headersMap1);
-    headersMap2.remove("Host");
-    headersMap2.putSingle("Host", "invalidhost");
-    //Missing X-Amz-Date Header
+    headersMap2.remove("X-Amz-Date");
+    // Invalid X-Amz-Date format
     MultivaluedMap<String, String> headersMap3 =
             new MultivaluedHashMap<String, String>(headersMap1);
     headersMap3.remove("X-Amz-Date");
-    // Invalid X-Amz-Date format
+    headersMap3.putSingle("X-Amz-Date", LocalDateTime.now().toString());
+    // Expired X-Amz-Date
     MultivaluedMap<String, String> headersMap4 =
             new MultivaluedHashMap<String, String>(headersMap1);
     headersMap4.remove("X-Amz-Date");
-    headersMap4.putSingle("X-Amz-Date", LocalDateTime.now().toString());
-    // Expired X-Amz-Date
+    headersMap4.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
+            format(LocalDateTime.now().minusDays(8)));
     MultivaluedMap<String, String> headersMap5 =
             new MultivaluedHashMap<String, String>(headersMap1);
     headersMap5.remove("X-Amz-Date");
     headersMap5.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
-            format(LocalDateTime.now().minusDays(8)));
-    MultivaluedMap<String, String> headersMap6 =
-            new MultivaluedHashMap<String, String>(headersMap1);
-    headersMap6.remove("X-Amz-Date");
-    headersMap6.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
             format(LocalDateTime.now().plusDays(8)));
     // Missing X-Amz-Content-Sha256
-    MultivaluedMap<String, String> headersMap7 =
+    MultivaluedMap<String, String> headersMap6 =
             new MultivaluedHashMap<String, String>(headersMap1);
-    headersMap7.remove("X-Amz-Content-Sha256");
+    headersMap6.remove("X-Amz-Content-Sha256");
 
     return Stream.of(
             arguments(headersMap1, "success"),
@@ -190,8 +185,7 @@ public class TestStringToSignProducer {
             arguments(headersMap3, S3_AUTHINFO_CREATION_ERROR.getCode()),
             arguments(headersMap4, S3_AUTHINFO_CREATION_ERROR.getCode()),
             arguments(headersMap5, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap7, S3_AUTHINFO_CREATION_ERROR.getCode())
+            arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode())
     );
   }
   @ParameterizedTest
@@ -226,10 +220,6 @@ public class TestStringToSignProducer {
                     "success"),
             // No host signed header
             arguments("content-type;x-amz-content-sha256;" +
-                            "x-amz-date;x-amz-security-token",
-                    S3_AUTHINFO_CREATION_ERROR.getCode()),
-            // No content-type signed header
-            arguments("host;x-amz-content-sha256;" +
                             "x-amz-date;x-amz-security-token",
                     S3_AUTHINFO_CREATION_ERROR.getCode()),
             // Missing x-amz-* i.e., x-amz-security-token signed header

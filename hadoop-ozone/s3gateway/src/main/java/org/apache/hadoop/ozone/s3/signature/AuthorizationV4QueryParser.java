@@ -205,7 +205,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   private void validateSignature()
           throws MalformedResourceException {
     String signature = queryParameters.get("X-Amz-Signature");
-    if (signature == null || isEmpty(signature)) {
+    if (isEmpty(signature)) {
       throw new MalformedResourceException("Signature can't be empty.");
     }
     try {
