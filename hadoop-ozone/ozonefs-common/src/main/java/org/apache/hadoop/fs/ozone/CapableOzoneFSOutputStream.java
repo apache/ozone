@@ -38,12 +38,18 @@ import java.io.OutputStream;
  */
 public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
     implements StreamCapabilities {
-  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream) {
+  private final boolean isEnabled;
+  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream,
+      boolean enabled) {
     super(outputStream.getWrappedOutputStream());
+    this.isEnabled = enabled;
   }
 
   @Override
   public boolean hasCapability(String capability) {
+    if (!isEnabled) {
+      return false;
+    }
     OutputStream os = getWrappedOutputStream().getOutputStream();
 
     if (os instanceof CryptoOutputStream) {
