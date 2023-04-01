@@ -851,7 +851,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               .getFollowerNextIndices()).min().getAsLong();
           LOG.debug("Removing data corresponding to log index {} min index {} "
                   + "from cache", index, minIndex);
-          stateMachineDataCache.removeIf(k -> k <= (Math.min(minIndex, index)));
+          removeCacheDataUpTo(Math.min(minIndex, index));
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -984,8 +984,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (!waitOnBothFollowers) {
       // if majority follow in sync, remove all cache previous to current index
       // including current index
-      stateMachineDataCache.removeIf(k -> k <= index);
+      removeCacheDataUpTo(index);
     }
+  }
+
+  private void removeCacheDataUpTo(long index) {
+    stateMachineDataCache.removeIf(k -> k <= index);
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
