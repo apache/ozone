@@ -212,7 +212,7 @@ public final class StringToSignProducer {
       // sig-v4-header-based-auth.html
       // Note: The x-amz-content-sha256 header is required
       // for all AWS Signature Version 4 requests.(using Authorization header)
-      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
+      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {D
         LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
             + " header for signed payload");
         throw S3_AUTHINFO_CREATION_ERROR;
