@@ -73,8 +73,8 @@ public final class ReconConstants {
 
   // 1125899906842624L = 1PB
   public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;
-  // 1073741824L = 1GB
-  public static final long MIN_CONTAINER_SIZE_UPPER_BOUND = 1073741824L;
+  // 536870912L = 512MB
+  public static final long MIN_CONTAINER_SIZE_UPPER_BOUND = 536870912L;
   // 14 bins
   public static final int NUM_OF_CONTAINER_SIZE_BINS = (int) Math.ceil(Math.log(
       (double) MAX_CONTAINER_SIZE_UPPER_BOUND /

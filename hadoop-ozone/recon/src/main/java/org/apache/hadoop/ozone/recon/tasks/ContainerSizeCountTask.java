@@ -154,8 +154,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
-        // The containers present in both the processed containers map and
-        // also in cache are the ones that have not been deleted
+        // The containers present in the cache hence it is not yet deleted
         deletedContainers.remove(container.containerID());
         // For New Container being created
         if (!processedContainers.containsKey(container.containerID())) {

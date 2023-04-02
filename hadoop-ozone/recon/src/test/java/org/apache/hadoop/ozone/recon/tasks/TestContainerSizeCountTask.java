@@ -82,11 +82,11 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     // Write 2 keys
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
-    given(omContainerInfo1.getUsedBytes()).willReturn(2000L);
+    given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
 
     ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
-    given(omContainerInfo2.getUsedBytes()).willReturn(10000L);
+    given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
 
     // mock getContainers method to return a list of containers
     List<ContainerInfo> containers = new ArrayList<>();
@@ -98,15 +98,18 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     // Verify 2 containers are in correct bins.
     assertEquals(2, containerCountBySizeDao.count());
 
+    // container size upper bound for
+    // 1500000000L (1.5GB) is 2147483648L = 2^31 = 2GB (next highest power of 2)
     Record1<Long> recordToFind =
         dslContext.newRecord(
                 CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
-            .value1(2048L);
+            .value1(2147483648L);
     assertEquals(1L,
         containerCountBySizeDao.findById(recordToFind.value1()).getCount()
             .longValue());
-    // container size upper bound for 10000L is 16384L (next highest power of 2)
-    recordToFind.value1(16384L);
+    // container size upper bound for
+    // 2500000000L (2.5GB) is 4294967296L = 2^32 = 4GB (next highest power of 2)
+    recordToFind.value1(4294967296L);
     assertEquals(1L,
         containerCountBySizeDao.findById(recordToFind.value1()).getCount()
             .longValue());
@@ -114,37 +117,38 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     // Add a new key
     ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
     given(omContainerInfo3.containerID()).willReturn(new ContainerID(3));
-    given(omContainerInfo3.getUsedBytes()).willReturn(1000L);
+    given(omContainerInfo3.getUsedBytes()).willReturn(1000000000L); // 1GB
     containers.add(omContainerInfo3);
 
     // Update existing key.
     given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
-    given(omContainerInfo2.getUsedBytes()).willReturn(50000L);
+    given(omContainerInfo2.getUsedBytes()).willReturn(50000L); // 50KB
 
     task.process(containers);
 
     // Total size groups added to the database
     assertEquals(4, containerCountBySizeDao.count());
 
-    // Check whether container size upper bound for 50000L is 65536L
-    // (next highest power of 2)
-    recordToFind.value1(65536L);
+    // Check whether container size upper bound for
+    // 50000L is 536870912L = 2^29 = 512MB (next highest power of 2)
+    recordToFind.value1(536870912L);
     assertEquals(1, containerCountBySizeDao
         .findById(recordToFind.value1())
         .getCount()
         .longValue());
 
-    // Check whether container size of 10000L has been successfully updated
-    recordToFind.value1(16384L);
+    // Check whether container size of 1000000000L has been successfully updated
+    // The previous value upperbound was 4294967296L which is no longer there
+    recordToFind.value1(4294967296L);
     assertEquals(0, containerCountBySizeDao
         .findById(recordToFind.value1())
         .getCount()
         .longValue());
 
-    // Remove the container having size 2000L
+    // Remove the container having size 1.5GB and upperbound 2147483648L
     containers.remove(omContainerInfo1);
     task.process(containers);
-    recordToFind.value1(2048L);
+    recordToFind.value1(2147483648L);
     assertEquals(0, containerCountBySizeDao
         .findById(recordToFind.value1())
         .getCount()
