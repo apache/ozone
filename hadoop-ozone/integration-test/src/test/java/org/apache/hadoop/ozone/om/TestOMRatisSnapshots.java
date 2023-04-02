@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
@@ -159,6 +160,7 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @Flaky("HDDS-8355")
   public void testInstallSnapshot() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
