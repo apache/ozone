@@ -446,22 +446,6 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.cache.max.size";
   public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
 
-  public static final String
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
-      "ozone.om.snapshot.compaction.dag.max.time.allowed";
-
-  public static final long
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT =
-      TimeUnit.DAYS.toMillis(30);
-
-  public static final String
-      OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL =
-      "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval";
-
-  public static final long
-      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
-
   public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
       "ozone.om.snapshot.force.full.diff";
 
