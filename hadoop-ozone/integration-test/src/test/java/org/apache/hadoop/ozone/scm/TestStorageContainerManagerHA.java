@@ -67,6 +67,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 /**
  * Base class for SCM HA tests.
  */
+@Timeout(300)
 public class TestStorageContainerManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -116,7 +117,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testAllSCMAreRunning() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
@@ -143,7 +143,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testPutKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -223,7 +222,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testPrimordialSCM() throws Exception {
     StorageContainerManager scm1 = cluster.getStorageContainerManagers().get(0);
     StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
@@ -281,7 +279,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testBootStrapSCM() throws Exception {
     StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
     OzoneConfiguration conf2 = scm2.getConfiguration();
@@ -301,7 +298,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testGetRatisRolesDetail() throws IOException {
     Set<String> resultSet = new HashSet<>();
     for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
@@ -314,7 +310,6 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  @Timeout(300)
   public void testSCMHAMetrics() throws InterruptedException, TimeoutException {
     waitForLeaderToBeReady();
 
@@ -354,6 +349,7 @@ public class TestStorageContainerManagerHA {
       } catch (Exception e) {
         return false;
       }
-    }, 1000, 80000);
+    }, 1000, (int) ScmConfigKeys
+        .OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT);
   }
 }
