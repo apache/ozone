@@ -165,4 +165,28 @@ public class TestObjectHead {
     Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
     bucket.deleteKey(keyPath);
   }
+
+  @Test
+  public void testHeadWhenKeyIsAFileAndKeyPathEndsWithASlash()
+      throws IOException, OS3Exception {
+    // GIVEN
+    final String keyPath = "keyFile";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    String keyContent = "content";
+    OzoneOutputStream out = bucket.createKey(keyPath,
+        keyContent.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(keyContent.getBytes(UTF_8));
+    out.close();
+
+    // WHEN
+    final Response response = keyEndpoint.head(bucketName, keyPath + "/");
+
+    // THEN
+    Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
+    bucket.deleteKey(keyPath);
+  }
 }
