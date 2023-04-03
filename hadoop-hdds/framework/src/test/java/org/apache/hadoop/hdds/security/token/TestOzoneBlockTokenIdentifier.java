@@ -162,12 +162,12 @@ public class TestOzoneBlockTokenIdentifier {
     byte[] signedToken = signTokenAsymmetric(tokenId, privateKey);
 
 
-    Token<OzoneBlockTokenIdentifier> token = new Token(tokenId.getBytes(),
+    Token<OzoneBlockTokenIdentifier> token = new Token<>(tokenId.getBytes(),
         signedToken, tokenId.getKind(), new Text("host:port"));
 
     String encodeToUrlString = token.encodeToUrlString();
 
-    Token<OzoneBlockTokenIdentifier>decodedToken = new Token();
+    Token<OzoneBlockTokenIdentifier>decodedToken = new Token<>();
     decodedToken.decodeFromUrlString(encodeToUrlString);
 
     OzoneBlockTokenIdentifier decodedTokenId = new OzoneBlockTokenIdentifier();
