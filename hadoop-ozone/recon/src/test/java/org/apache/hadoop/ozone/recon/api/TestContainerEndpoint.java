@@ -1005,7 +1005,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetContainerInsights_NonSCMContainers()
+  public void testGetContainerInsightsNonSCMContainers()
       throws IOException, TimeoutException {
     Map<Long, ContainerMetadata> omContainers =
         reconContainerMetadataManager.getContainers(-1, 0);
@@ -1025,7 +1025,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetContainerInsights_NonOMContainers()
+  public void testGetContainerInsightsNonOMContainers()
       throws IOException, TimeoutException {
     putContainerInfos(2);
     List<ContainerKeyPrefix> deletedContainerKeyList =
