@@ -127,17 +127,25 @@ public final class HddsClientUtils {
     }
   }
 
-  private static boolean isSupportedCharacter(char c) {
-    return (c == '.' || c == '-' ||
-        Character.isLowerCase(c) || Character.isDigit(c));
+  private static boolean isSupportedCharacter(char c, boolean isNamespaceS3RuleCompliant) {
+    if (isNamespaceS3RuleCompliant) {
+      return (c == '.' || c == '-' ||
+              Character.isLowerCase(c) || Character.isDigit(c));
+    } else {
+      // allow ozone namespace to follow other volume/bucket naming convention,
+      // for example, here adds 'underscore',
+      // which is a valid character in POSIX-compliant system, like HDFS.
+      return (c == '.' || c == '-' || c == '_' ||
+              Character.isLowerCase(c) || Character.isDigit(c));
+    }
   }
 
-  private static void doCharacterChecks(char currChar, char prev) {
+  private static void doCharacterChecks(char currChar, char prev, boolean isNamespaceS3RuleCompliant) {
     if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
     }
-    if (!isSupportedCharacter(currChar)) {
+    if (!isSupportedCharacter(currChar, isNamespaceS3RuleCompliant)) {
       throw new IllegalArgumentException("Bucket or Volume name has an " +
           "unsupported character : " + currChar);
     }
@@ -174,13 +182,42 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      doCharacterChecks(currChar, prev);
+      doCharacterChecks(currChar, prev, true);
       prev = currChar;
     }
 
     if (isIPv4) {
       throw new IllegalArgumentException(
           "Bucket or Volume name cannot be an IPv4 address or all numeric");
+    }
+  }
+
+  /**
+   * verifies that bucket name / volume name is a valid DNS name.
+   *
+   * @param resName Bucket or volume Name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyResourceName(String resName, boolean isNamespaceS3RuleCompliant) {
+
+    doNameChecks(resName);
+
+    boolean isIPv4 = true;
+    char prev = (char) 0;
+
+    for (int index = 0; index < resName.length(); index++) {
+      char currChar = resName.charAt(index);
+      if (currChar != '.') {
+        isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
+      }
+      doCharacterChecks(currChar, prev, isNamespaceS3RuleCompliant);
+      prev = currChar;
+    }
+
+    if (isIPv4) {
+      throw new IllegalArgumentException(
+              "Bucket or Volume name cannot be an IPv4 address or all numeric");
     }
   }
 

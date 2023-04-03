@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMBucketCreateRequest class, which handles CreateBucket request.
@@ -208,6 +209,19 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     Assert.assertEquals(resp.getOMResponse().getStatus().toString(),
         OMException.ResultCodes.QUOTA_ERROR.toString());
+  }
+
+  @Test
+  public void testCreateBucketWithOMConfigNonS3RuleCompliantSetToFalse() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucketname_with_underscore";
+    when(ozoneManager.isNamespaceS3RuleCompliant()).thenReturn(false);
+
+    OMBucketCreateRequest omBucketCreateRequest =
+            doPreExecute(volumeName, bucketName);
+
+    doValidateAndUpdateCache(volumeName, bucketName,
+            omBucketCreateRequest.getOmRequest());
   }
 
   private OMBucketCreateRequest doPreExecute(String volumeName,

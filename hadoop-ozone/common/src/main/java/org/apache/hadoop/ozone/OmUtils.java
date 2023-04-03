@@ -498,10 +498,10 @@ public final class OmUtils {
   /**
    * Verify bucket name is a valid DNS name.
    */
-  public static void validateBucketName(String bucketName)
+  public static void validateBucketName(String bucketName, boolean isNamespaceS3RuleCompliant)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName);
+      HddsClientUtils.verifyResourceName(bucketName, isNamespaceS3RuleCompliant);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);

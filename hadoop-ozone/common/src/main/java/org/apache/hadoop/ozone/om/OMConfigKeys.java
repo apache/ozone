@@ -357,6 +357,12 @@ public final class OMConfigKeys {
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
       false;
+
+  public static final String OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT =
+          "ozone.om.s3.naming.rule_compliant";
+  public static final boolean OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT_DEFAULT =
+          true;
+
   /**
    * Configuration properties for OMAdminProtcol service.
    */

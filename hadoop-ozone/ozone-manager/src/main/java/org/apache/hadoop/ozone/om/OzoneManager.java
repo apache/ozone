@@ -262,6 +262,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
@@ -409,7 +411,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ReplicationConfig defaultReplicationConfig;
 
   private boolean isS3MultiTenancyEnabled;
-
+  private boolean isNamespaceS3RuleCompliant;
   private ExitManager exitManager;
 
   private OzoneManagerPrepareState prepareState;
@@ -522,6 +524,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
     this.useRatisForReplication = conf.getBoolean(
         DFS_CONTAINER_RATIS_ENABLED_KEY, DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+    this.isNamespaceS3RuleCompliant = conf.getBoolean(
+            OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT,
+            OZONE_OM_NAMESPACE_S3_RULE_COMPLIANT_DEFAULT);
+
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
     //  replicated (for HA).
@@ -850,6 +856,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isS3MultiTenancyEnabled() {
     return isS3MultiTenancyEnabled;
+  }
+
+  public boolean isNamespaceS3RuleCompliant() {
+    return isNamespaceS3RuleCompliant;
   }
 
   /**
