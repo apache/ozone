@@ -52,6 +52,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -76,7 +77,7 @@ class TestOzoneBlockTokenIdentifier {
   static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
-    base.mkdirs();
+    Assumptions.assumeTrue(base.mkdirs());
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
 
     // Create Ozone Master key pair.
