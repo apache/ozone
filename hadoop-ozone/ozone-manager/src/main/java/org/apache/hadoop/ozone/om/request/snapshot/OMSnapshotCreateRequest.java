@@ -180,6 +180,18 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotCreateResponse(
           omResponse.build(), snapshotInfo);
     } catch (IOException ex) {
+      // Remove snapshot from the SnapshotChainManager in case of any failure.
+      // It is possible that createSnapshot request fails after snapshot gets
+      // added to snapshot chain manager because couldn't add it to cache/DB.
+      // In that scenario, SnapshotChainManager#globalSnapshotId will point to
+      // failed createSnapshot request's snapshotId but in actual it doesn't
+      // exist in the SnapshotInfo table.
+      // If it doesn't get removed, OM restart will crash on
+      // SnapshotChainManager#loadFromSnapshotInfoTable because it could not
+      // find the previous snapshot which doesn't exist because it was never
+      // added to the SnapshotInfo table.
+      removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
+          snapshotInfo);
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -210,5 +222,19 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     }
     return omClientResponse;
   }
-  
+
+  /**
+   * Removes the snapshot from the SnapshotChainManager.
+   */
+  private void removeSnapshotInfoFromSnapshotChainManager(
+      SnapshotChainManager snapshotChainManager,
+      SnapshotInfo snapshotInfo
+  ) {
+    try {
+      snapshotChainManager.deleteSnapshot(snapshotInfo);
+    } catch (IOException exception) {
+      LOG.warn("Failed to remove snapshot: {} from SnapshotChainManager.",
+          snapshotInfo, exception);
+    }
+  }
 }
