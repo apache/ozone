@@ -50,6 +50,7 @@ import org.rocksdb.StatsLevel;
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
@@ -74,7 +75,8 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
   @AfterEach
@@ -262,7 +264,7 @@ public class TestRDBStore {
 
     RDBStore restoredStoreFromCheckPoint =
         new RDBStore(checkpoint.getCheckpointLocation().toFile(),
-            options, configSet);
+            options, configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
 
     // Let us make sure that our estimate is not off by 10%
     Assertions.assertTrue(
@@ -318,11 +320,24 @@ public class TestRDBStore {
           org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
           org.apache.commons.codec.binary.StringUtils
               .getBytesUtf16("Value2"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key3"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value3"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key4"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value4"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key5"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value5"));
     }
-    Assertions.assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
+    Assertions.assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
 
-    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 1);
-    Assertions.assertEquals(1, dbUpdatesSince.getData().size());
+    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
+    Assertions.assertEquals(2, dbUpdatesSince.getData().size());
+    Assertions.assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
   }
 
   @Test
@@ -352,7 +367,8 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet);
+    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
       try (Table table = rdbStore.getTable(family)) {
         Assertions.assertNotNull(table, family + "is null");

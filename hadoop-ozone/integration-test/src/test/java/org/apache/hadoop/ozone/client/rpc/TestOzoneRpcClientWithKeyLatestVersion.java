@@ -184,9 +184,10 @@ public class TestOzoneRpcClientWithKeyLatestVersion {
       String keyName, String value) throws Exception {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket ozoneBucket = volume.getBucket(bucketName);
-    OzoneInputStream is = ozoneBucket.readKey(keyName);
     byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-    is.read(fileContent);
+    try (OzoneInputStream is = ozoneBucket.readKey(keyName)) {
+      is.read(fileContent);
+    }
     Assert.assertEquals(value, new String(fileContent, UTF_8));
   }
 

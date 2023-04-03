@@ -172,20 +172,11 @@ public interface MiniOzoneCluster {
 
   /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
+   * The caller is responsible for closing the client after use.
    *
    * @return {@link OzoneClient}
-   * @throws IOException
    */
-  OzoneClient getClient() throws IOException;
-
-  /**
-   * Returns an RPC based {@link OzoneClient} to access the
-   * {@link MiniOzoneCluster}.
-   *
-   * @return {@link OzoneClient}
-   * @throws IOException
-   */
-  OzoneClient getRpcClient() throws IOException;
+  OzoneClient newClient() throws IOException;
 
   /**
    * Returns StorageContainerLocationClient to communicate with

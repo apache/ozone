@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -206,9 +205,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         Table<String, OmKeyInfo> keyTable =
             omMetadataManager.getKeyTable(getBucketLayout());
         keyTable.addCacheEntry(new CacheKey<>(fromKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
+            CacheValue.get(trxnLogIndex));
         keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+            CacheValue.get(trxnLogIndex, fromKeyValue));
         renamedKeys.put(fromKeyName, toKeyName);
         fromKeyAndToKeyInfo.put(fromKeyName, fromKeyValue);
       }

@@ -71,7 +71,6 @@ public class OzoneAdmins {
   public boolean isAdmin(UserGroupInformation user) {
     return adminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)
         || adminUsernames.contains(user.getShortUserName())
-        || adminUsernames.contains(user.getUserName())
         || hasAdminGroup(user.getGroups());
   }
 

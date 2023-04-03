@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.metrics;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +58,7 @@ public class TestSCMContainerManagerMetrics {
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
+  private OzoneClient client;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -64,12 +67,14 @@ public class TestSCMContainerManagerMetrics {
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     scm = cluster.getStorageContainerManager();
   }
 
 
   @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
 
@@ -142,11 +147,11 @@ public class TestSCMContainerManagerMetrics {
         getLongCounter("NumContainerReportsProcessedSuccessful", metrics));
 
     // Create key should create container on DN.
-    cluster.getRpcClient().getObjectStore().getClientProxy()
+    client.getObjectStore().getClientProxy()
         .createVolume(volumeName);
-    cluster.getRpcClient().getObjectStore().getClientProxy()
+    client.getObjectStore().getClientProxy()
         .createBucket(volumeName, bucketName);
-    OzoneOutputStream ozoneOutputStream = cluster.getRpcClient()
+    OzoneOutputStream ozoneOutputStream = client
         .getObjectStore().getClientProxy().createKey(volumeName, bucketName,
             key, 0, ReplicationType.RATIS, ReplicationFactor.ONE,
             new HashMap<>());

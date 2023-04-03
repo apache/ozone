@@ -99,3 +99,12 @@ Test Invalid Replication Parameters
     ${message} =    Execute And Ignore Error    ozone sh key put --replication=rs-3-2-1024k --type=STAND_ALONE /${VOLUME}/foo/bar /tmp/1mb
                     Should contain              ${message}          STAND_ALONE
                     Should contain              ${message}          Invalid value
+
+Invalid Replication With Misconfigured Client
+    # client disabled replication config validation
+    # 2-1 is unsupported EC scheme
+    ${message} =    Execute And Ignore Error    ozone sh -Dozone.replication.allowed-configs="" bucket create --replication=rs-2-1-1024k --type=EC /${VOLUME}/invalid
+                    Should contain              ${message}          INVALID_REQUEST Invalid replication config
+    # 1024 is unsupported EC chunk size
+    ${message} =    Execute And Ignore Error    ozone sh -Dozone.replication.allowed-configs="" key put --replication=rs-3-2-1024 --type=EC /${VOLUME}/ecbucket/invalid /tmp/1mb
+                    Should contain              ${message}          INVALID_REQUEST Invalid replication config

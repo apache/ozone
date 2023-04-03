@@ -483,8 +483,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    *                     and throwOnPermissionDenied set to true.
    */
   public boolean checkAcls(OzoneObj obj, RequestContext context,
-                           boolean throwIfPermissionDenied)
-      throws OMException {
+      boolean throwIfPermissionDenied) throws OMException {
 
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
@@ -495,9 +494,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getUserName(), context.getAclRights(),
+            context.getClientUgi().getShortUserName(), context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
-        throw new OMException("User " + context.getClientUgi().getUserName() +
+        throw new OMException(
+            "User " + context.getClientUgi().getShortUserName() +
             " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);

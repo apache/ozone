@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -177,6 +178,7 @@ public class TestContainerStateMachineFailures {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -788,13 +790,11 @@ public class TestContainerStateMachineFailures {
 
       Assert.assertEquals(locationCount,
           keyInfo.getLatestVersionLocations().getLocationListCount());
-      OzoneInputStream
-          o = objectStore
-          .getVolume(volumeName)
-          .getBucket(bucketName)
-          .readKey(key);
       byte[] buffer = new byte[1024];
-      o.read(buffer, 0, 1024);
+      try (OzoneInputStream o = objectStore.getVolume(volumeName)
+          .getBucket(bucketName).readKey(key)) {
+        o.read(buffer, 0, 1024);
+      }
       int end = ArrayUtils.indexOf(buffer, (byte) 0);
       String response = new String(buffer, 0,
           end,

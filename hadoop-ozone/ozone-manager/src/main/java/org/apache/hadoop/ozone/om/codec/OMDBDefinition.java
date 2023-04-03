@@ -35,12 +35,12 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
@@ -230,14 +230,24 @@ public class OMDBDefinition implements DBDefinition {
           SnapshotInfo.class,
           new OmDBSnapshotInfoCodec());
 
-  public static final DBColumnFamilyDefinition<String, OmKeyRenameInfo>
-      RENAMED_KEY_TABLE =
+  /**
+   * SnapshotRenamedKeyTable that complements the keyTable (or fileTable)
+   * entries of the immediately previous snapshot in the same snapshot
+   * scope (bucket or volume).
+   * <p>
+   * Key renames between the two subsequent snapshots are captured, this
+   * information is used in {@link SnapshotDeletingService} to check if the
+   * renamedKey is present in the previous snapshot's keyTable
+   * (or fileTable).
+   */
+  public static final DBColumnFamilyDefinition<String, String>
+      SNAPSHOT_RENAMED_KEY_TABLE =
       new DBColumnFamilyDefinition<>(
-          OmMetadataManagerImpl.RENAMED_KEY_TABLE,
+          OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE,
           String.class,  // /volumeName/bucketName/objectID
           new StringCodec(),
-          OmKeyRenameInfo.class, // list of key renames
-          new OmKeyRenameInfoCodec());
+          String.class, // path to the key in previous snapshot's key(file)Table
+          new StringCodec());
 
   @Override
   public String getName() {
@@ -258,7 +268,7 @@ public class OMDBDefinition implements DBDefinition {
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        SNAPSHOT_INFO_TABLE, RENAMED_KEY_TABLE};
+        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_KEY_TABLE};
   }
 }
 

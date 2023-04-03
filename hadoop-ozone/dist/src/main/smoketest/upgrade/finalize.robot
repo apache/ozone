@@ -14,18 +14,16 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Finalize Upgrade of OMs and SCM
+Documentation       Finalize Upgrade of the Ozone cluster
 Resource            ../commonlib.robot
 Test Timeout        10 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
-Finalize SCM
+Finalize HDDS
     ${result} =        Execute      ozone admin scm finalizeupgrade
-                       #Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!
                        Log    ${result}
 
 Finalize OMs
     ${result} =        Execute      ozone admin om finalizeupgrade -id %{OM_SERVICE_ID}
-                       #Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!
                        Log    ${result}

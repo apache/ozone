@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -28,15 +27,14 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -57,18 +55,18 @@ public abstract class MisReplicationHandler implements
           LoggerFactory.getLogger(MisReplicationHandler.class);
   private final PlacementPolicy<ContainerReplica> containerPlacement;
   private final long currentContainerSize;
-  private final NodeManager nodeManager;
+  private final ReplicationManager replicationManager;
   private boolean push;
 
   public MisReplicationHandler(
           final PlacementPolicy<ContainerReplica> containerPlacement,
-          final ConfigurationSource conf, NodeManager nodeManager,
+          final ConfigurationSource conf, ReplicationManager replicationManager,
       final boolean push) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
+    this.replicationManager = replicationManager;
     this.push = push;
   }
 
@@ -104,8 +102,14 @@ public abstract class MisReplicationHandler implements
                 StorageContainerDatanodeProtocolProtos
                     .ContainerReplicaProto.State.QUASI_CLOSED
         )
-        .filter(r -> ReplicationManager.getNodeStatus(
-            r.getDatanodeDetails(), nodeManager).isHealthy())
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
         .filter(r -> r.getDatanodeDetails().getPersistedOpState()
             == HddsProtos.NodeOperationalState.IN_SERVICE)
         .collect(Collectors.toSet());
@@ -114,11 +118,12 @@ public abstract class MisReplicationHandler implements
   protected abstract ReplicateContainerCommand updateReplicateCommand(
           ReplicateContainerCommand command, ContainerReplica replica);
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> getReplicateCommands(
-          ContainerInfo containerInfo,
-          Set<ContainerReplica> replicasToBeReplicated,
-          List<DatanodeDetails> targetDns) {
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commandMap = new HashSet<>();
+  private int sendReplicateCommands(
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> targetDns)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    int commandsSent = 0;
     int datanodeIdx = 0;
     for (ContainerReplica replica : replicasToBeReplicated) {
       if (datanodeIdx == targetDns.size()) {
@@ -127,19 +132,24 @@ public abstract class MisReplicationHandler implements
       long containerID = containerInfo.getContainerID();
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
-      ReplicateContainerCommand replicateCommand = push
-          ? ReplicateContainerCommand.toTarget(containerID, target)
-          : ReplicateContainerCommand.fromSources(containerID,
-              Collections.singletonList(source));
-      replicateCommand = updateReplicateCommand(replicateCommand, replica);
-      commandMap.add(Pair.of(push ? source : target, replicateCommand));
+      if (push) {
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            Collections.singletonList(source), target,
+            replica.getReplicaIndex());
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, Collections.singletonList(source));
+        updateReplicateCommand(cmd, replica);
+        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+      }
+      commandsSent++;
       datanodeIdx += 1;
     }
-    return commandMap;
-
+    return commandsSent;
   }
+
   @Override
-  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
+  public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
       throws IOException {
@@ -148,7 +158,7 @@ public abstract class MisReplicationHandler implements
       LOG.info("Skipping Mis-Replication for Container {}, " +
                "as there are still some pending ops for the container: {}",
               container, pendingOps);
-      return Collections.emptySet();
+      return 0;
     }
     ContainerReplicaCount replicaCount = getContainerReplicaCount(container,
             replicas, Collections.emptyList(), remainingMaintenanceRedundancy);
@@ -162,7 +172,7 @@ public abstract class MisReplicationHandler implements
               container.getContainerID(),
               !replicaCount.isSufficientlyReplicated(),
               replicaCount.isOverReplicated());
-      return Collections.emptySet();
+      return 0;
     }
 
     List<DatanodeDetails> usedDns = replicas.stream()
@@ -172,7 +182,7 @@ public abstract class MisReplicationHandler implements
             usedDns.size()).isPolicySatisfied()) {
       LOG.info("Container {} is currently not misreplicated",
               container.getContainerID());
-      return Collections.emptySet();
+      return 0;
     }
 
     Set<ContainerReplica> sources = filterSources(replicas);
@@ -194,7 +204,8 @@ public abstract class MisReplicationHandler implements
               container.getContainerID(), replicasToBeReplicated.size(),
               usedDns);
     }
-    return getReplicateCommands(container, replicasToBeReplicated,
-            targetDatanodes);
+
+    return sendReplicateCommands(container, replicasToBeReplicated,
+        targetDatanodes);
   }
 }

@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,8 +44,11 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -55,6 +57,13 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpoint
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -71,12 +80,10 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -88,7 +95,6 @@ public class TestEndPoint {
   private static RPC.Server scmServer;
   private static ScmTestMock scmServerImpl;
   private static File testDir;
-  private static OzoneConfiguration config;
 
   @AfterAll
   public static void tearDown() throws Exception {
@@ -105,20 +111,13 @@ public class TestEndPoint {
     scmServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
         scmServerImpl, serverAddress, 10);
     testDir = PathUtils.getTestDir(TestEndPoint.class);
-    config = SCMTestUtils.getConf();
-    config.set(DFS_DATANODE_DATA_DIR_KEY, testDir.getAbsolutePath());
-    config.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    config
-        .setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
-    config.set(HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL, "1s");
-    config.setFromObject(new ReplicationConfig().setPort(0));
   }
 
-  @Test
   /**
    * This test asserts that we are able to make a version call to SCM server
    * and gets back the expected values.
    */
+  @Test
   public void testGetVersion() throws Exception {
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
@@ -133,11 +132,11 @@ public class TestEndPoint {
     }
   }
 
-  @Test
   /**
    * We make getVersion RPC call, but via the VersionEndpointTask which is
    * how the state machine would make the call.
    */
+  @Test
   public void testGetVersionTask() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     conf.setFromObject(new ReplicationConfig().setPort(0));
@@ -165,14 +164,93 @@ public class TestEndPoint {
     }
   }
 
+
+  /**
+   * Writing data to tmp dir and checking if it has been cleaned.
+   * Add some entries to DatanodeStore.MetadataTable and check
+   * that they have been deleted during tmp dir cleanup.
+   */
+  @Test
+  public void testTmpDirCleanup() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+        true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      OzoneContainer ozoneContainer = new OzoneContainer(
+          datanodeDetails, conf, getContext(datanodeDetails), null);
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+
+      String clusterId = scmServerImpl.getClusterId();
+
+      MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+      ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
+          clusterId, clusterId, conf);
+      // VolumeSet for this test, contains only 1 volume
+      Assertions.assertEquals(1, volumeSet.getVolumesList().size());
+      StorageVolume volume = volumeSet.getVolumesList().get(0);
+
+      // Check instanceof and typecast
+      Assertions.assertTrue(volume instanceof HddsVolume);
+      HddsVolume hddsVolume = (HddsVolume) volume;
+
+      // Write some data before calling versionTask.call()
+      // Create a container and move it under the tmp delete dir.
+      KeyValueContainer container = ContainerTestUtils.
+          setUpTestContainerUnderTmpDir(hddsVolume, clusterId,
+              conf, OzoneConsts.SCHEMA_V3);
+      File containerDBFile = container.getContainerDBFile();
+
+      Assertions.assertTrue(container.getContainerFile().exists());
+      Assertions.assertTrue(containerDBFile.exists());
+
+      KeyValueContainerData containerData = container.getContainerData();
+
+      // Get DBHandle
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+
+        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+            dbHandle.getStore();
+        Table<String, Long> metadataTable = store.getMetadataTable();
+
+        // DB MetadataTable is empty
+        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+
+        // Add some keys to MetadataTable
+        metadataTable.put(containerData.getBytesUsedKey(), 0L);
+        metadataTable.put(containerData.getBlockCountKey(), 0L);
+        metadataTable.put(containerData.getPendingDeleteBlockCountKey(), 0L);
+
+        // The new keys should have been added in the MetadataTable
+        Assertions.assertEquals(3, metadataTable.getEstimatedKeyCount());
+
+        // versionTask.call() cleans the tmp dir and removes container from DB
+        VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+            conf, ozoneContainer);
+        EndpointStateMachine.EndPointStates newState = versionTask.call();
+
+        Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+            newState);
+
+        // assert that tmp dir is empty
+        Assertions.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+            .getDeleteLeftovers(hddsVolume).hasNext());
+        // All DB keys have been deleted, MetadataTable should be empty
+        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+      }
+    }
+  }
+
   @Test
   public void testCheckVersionResponse() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         true);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     conf.setBoolean(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
@@ -207,22 +285,22 @@ public class TestEndPoint {
           newState);
       List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
           ozoneContainer.getVolumeSet().getFailedVolumesList());
-      assertEquals(1, volumesList.size());
+      Assertions.assertEquals(1, volumesList.size());
       Assertions.assertTrue(logCapturer.getOutput()
           .contains("org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
-      assertEquals(0, ozoneContainer.getVolumeSet().getVolumesList().size());
-      assertEquals(1, ozoneContainer.getVolumeSet().getFailedVolumesList()
-          .size());
-
+      Assertions.assertEquals(0,
+          ozoneContainer.getVolumeSet().getVolumesList().size());
+      Assertions.assertEquals(1,
+          ozoneContainer.getVolumeSet().getFailedVolumesList().size());
     }
   }
 
-  @Test
   /**
    * This test makes a call to end point where there is no SCM server. We
    * expect that versionTask should be able to handle it.
    */
+  @Test
   public void testGetVersionToInvalidEndpoint() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     InetSocketAddress nonExistentServerAddress = SCMTestUtils
@@ -244,12 +322,12 @@ public class TestEndPoint {
     }
   }
 
-  @Test
   /**
    * This test makes a getVersionRPC call, but the DummyStorageServer is
    * going to respond little slowly. We will assert that we are still in the
    * GETVERSION state after the timeout.
    */
+  @Test
   public void testGetVersionAssertRpcTimeOut() throws Exception {
     final long rpcTimeout = 1000;
     final long tolerance = 100;
@@ -431,19 +509,19 @@ public class TestEndPoint {
 
       SCMHeartbeatResponseProto responseProto = rpcEndPoint.getEndPoint()
           .sendHeartbeat(request);
-      assertNotNull(responseProto);
-      assertEquals(3, responseProto.getCommandsCount());
-      assertEquals(0, scmServerImpl.getCommandStatusReportCount());
+      Assertions.assertNotNull(responseProto);
+      Assertions.assertEquals(3, responseProto.getCommandsCount());
+      Assertions.assertEquals(0, scmServerImpl.getCommandStatusReportCount());
 
       // Send heartbeat again from heartbeat endpoint task
       final StateContext stateContext = heartbeatTaskHelper(
           serverAddress, 3000);
       Map<Long, CommandStatus> map = stateContext.getCommandStatusMap();
-      assertNotNull(map);
-      assertEquals(1, map.size(), "Should have 1 objects");
-      assertTrue(map.containsKey(3L));
-      assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
-      assertEquals(Status.PENDING, map.get(3L).getStatus());
+      Assertions.assertNotNull(map);
+      Assertions.assertEquals(1, map.size(), "Should have 1 objects");
+      Assertions.assertTrue(map.containsKey(3L));
+      Assertions.assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
+      Assertions.assertEquals(Status.PENDING, map.get(3L).getStatus());
 
       scmServerImpl.clearScmCommandRequests();
     }

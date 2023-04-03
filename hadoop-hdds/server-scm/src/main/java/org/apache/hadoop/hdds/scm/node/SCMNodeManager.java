@@ -819,6 +819,37 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Get the total number of pending commands of the given types on the given
+   * datanode. For each command, this includes both the number of commands
+   * queued in SCM which will be sent to the datanode on the next heartbeat,
+   * and the number of commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * All commands are retrieved under a single read lock, so the counts are
+   * consistent.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The list of command Types To query.
+   * @return A Map of commandType to Integer with an entry for each command type
+   *         passed.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType)
+      throws NodeNotFoundException {
+    Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+    readLock().lock();
+    try {
+      for (SCMCommandProto.Type type : cmdType) {
+        counts.put(type, getTotalDatanodeCommandCount(datanodeDetails, type));
+      }
+      return counts;
+    } finally {
+      readLock().unlock();
+    }
+  }
+
+  /**
    * Returns the aggregated node stats.
    *
    * @return the aggregated node stats.

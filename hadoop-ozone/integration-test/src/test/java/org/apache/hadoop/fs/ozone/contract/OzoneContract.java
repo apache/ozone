@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -67,6 +69,7 @@ class OzoneContract extends AbstractFSContract {
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
   private static boolean fsOptimizedServer;
+  private static OzoneClient client;
 
   OzoneContract(Configuration conf) {
     super(conf);
@@ -123,6 +126,7 @@ class OzoneContract extends AbstractFSContract {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
               180000);
+      client = cluster.newClient();
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -135,9 +139,9 @@ class OzoneContract extends AbstractFSContract {
   @Override
   public FileSystem getTestFileSystem() throws IOException {
     //assumes cluster is not null
-    Assert.assertNotNull("cluster not created", cluster);
+    Assert.assertNotNull("cluster not created", client);
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     String uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
@@ -148,6 +152,7 @@ class OzoneContract extends AbstractFSContract {
   }
 
   public static void destroyCluster() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       cluster = null;
