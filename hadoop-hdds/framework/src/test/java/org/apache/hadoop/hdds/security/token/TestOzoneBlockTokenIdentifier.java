@@ -190,8 +190,7 @@ public class TestOzoneBlockTokenIdentifier {
     Signature rsaSignature = Signature.getInstance("SHA256withRSA");
     rsaSignature.initSign(privateKey);
     rsaSignature.update(tokenId.getBytes());
-    byte[] signature = rsaSignature.sign();
-    return signature;
+    return rsaSignature.sign();
   }
 
   public boolean verifyTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
@@ -200,8 +199,7 @@ public class TestOzoneBlockTokenIdentifier {
     Signature rsaSignature = Signature.getInstance("SHA256withRSA");
     rsaSignature.initVerify(certificate);
     rsaSignature.update(tokenId.getBytes());
-    boolean isValid = rsaSignature.verify(signature);
-    return isValid;
+    return rsaSignature.verify(signature);
   }
 
   private byte[] signTokenSymmetric(OzoneBlockTokenIdentifier identifier,
