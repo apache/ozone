@@ -657,9 +657,8 @@ public class BasicRootedOzoneClientAdapterImpl
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
       throws IOException {
     String key = ofsPath.getKeyName();
-    OzoneBucket bucket = null;
     try {
-      bucket = getBucket(ofsPath, false);
+      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotIndicator(
