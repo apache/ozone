@@ -302,7 +302,7 @@ public class TestOzoneBlockTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
-        hmacAlgorithm, keyLen, duration / testTokenCount);
+        hmacAlgorithm, keyLen, duration / tokenPasswordSym.size());
   }
 
   // TODO: verify certificate with a trust store
