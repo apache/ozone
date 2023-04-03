@@ -119,7 +119,10 @@ public interface SCMMetadataStore extends DBStoreHAManager {
    * that the CRL Sequence Ids are monotonically increasing.
    *
    * @return Table.
+   *
+   * Deprecated Use SequenceIdGenerator
    */
+  @Deprecated
   Table<String, Long> getCRLSequenceIdTable();
 
   /**

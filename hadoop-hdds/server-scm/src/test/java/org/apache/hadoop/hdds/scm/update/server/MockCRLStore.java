@@ -56,7 +56,6 @@ import java.util.concurrent.TimeoutException;
 public class MockCRLStore implements CRLStore {
 
   private static final String COMPONENT_NAME = "scm";
-  private static final Long INITIAL_SEQUENCE_ID = 0L;
 
   private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
@@ -79,7 +78,6 @@ public class MockCRLStore implements CRLStore {
 
     scmMetadataStore = new SCMMetadataStoreImpl(config);
     scmCertStore = new SCMCertStore.Builder().setRatisServer(null)
-        .setCRLSequenceId(INITIAL_SEQUENCE_ID)
         .setMetadaStore(scmMetadataStore)
         .build();
     crlApprover = new DefaultCRLApprover(securityConfig,

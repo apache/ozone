@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +67,7 @@ public class SequenceIdGenerator {
   public static final String LOCAL_ID = "localId";
   public static final String DEL_TXN_ID = "delTxnId";
   public static final String CONTAINER_ID = "containerId";
+  public static final String CRL_SEQUENCE_ID = OzoneConsts.CRL_SEQUENCE_ID_KEY;
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
@@ -81,6 +83,15 @@ public class SequenceIdGenerator {
   private final Lock lock;
   private final long batchSize;
   private final StateManager stateManager;
+
+  /*
+   * TODO: Refactor!
+   *  Create a new instance of sequenceId generator for every
+   *  type, rather than having the name of sequence passed to getNextId
+   *  everytime.
+   *  The current implementation is also error prone as anyone can pass
+   *  an arbitrary string to getNextId.
+   */
 
   /**
    * @param conf            : conf
@@ -375,6 +386,16 @@ public class SequenceIdGenerator {
       sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
           CONTAINER_ID, sequenceIdTable.get(CONTAINER_ID));
+    }
+
+    // upgrade CRLSequence
+    if (sequenceIdTable.get(CRL_SEQUENCE_ID) == null) {
+      Long latestCRLSequence = scmMetadataStore
+          .getCRLSequenceIdTable().get(CRL_SEQUENCE_ID);
+      sequenceIdTable.put(CRL_SEQUENCE_ID,
+          latestCRLSequence != null ? latestCRLSequence : 0L);
+      LOG.info("upgrade {} to {}", CRL_SEQUENCE_ID,
+          sequenceIdTable.get(CRL_SEQUENCE_ID));
     }
   }
 }

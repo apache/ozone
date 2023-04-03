@@ -20,6 +20,10 @@ package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -62,7 +66,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 
 /**
  * Test class for @{@link SCMCertStore}.
@@ -70,7 +73,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 public class TestSCMCertStore {
 
   private static final String COMPONENT_NAME = "scm";
-  private static final Long INITIAL_SEQUENCE_ID = 1L;
 
   private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
@@ -91,9 +93,16 @@ public class TestSCMCertStore {
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
 
     scmMetadataStore = new SCMMetadataStoreImpl(config);
+
+    SCMHAManager scmHAManager = SCMHAManagerStub
+        .getInstance(true, new SCMDBTransactionBufferImpl());
+
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
+        config, scmHAManager, scmMetadataStore.getSequenceIdTable());
+
     scmCertStore = new SCMCertStore.Builder().setRatisServer(null)
-        .setCRLSequenceId(INITIAL_SEQUENCE_ID)
         .setMetadaStore(scmMetadataStore)
+        .setSequenceIdGenerator(sequenceIdGen)
         .build();
 
     Files.createDirectories(securityConfig.getKeyLocation(COMPONENT_NAME));
@@ -121,6 +130,7 @@ public class TestSCMCertStore {
         scmCertStore.getCertificateByID(serialID,
         VALID_CERTS));
 
+    final long lastCRLId = scmCertStore.getLatestCrlId();
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
     List<BigInteger> certs = new ArrayList<>();
@@ -130,7 +140,7 @@ public class TestSCMCertStore {
         CRLReason.lookup(CRLReason.keyCompromise), now, crlApprover);
 
     assertTrue(sequenceId.isPresent());
-    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long) sequenceId.get());
+    assertEquals(lastCRLId + 1L, (long) sequenceId.get());
 
     assertNull(
         scmCertStore.getCertificateByID(serialID,
@@ -152,10 +162,6 @@ public class TestSCMCertStore {
     // CRL Info table should have a CRL with sequence id
     assertNotNull(scmMetadataStore.getCRLInfoTable()
         .get(sequenceId.get()));
-
-    // Check the sequence ID table for latest sequence id
-    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long)
-        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
 
     CRLInfo crlInfo = crls.get(0);
 
@@ -196,14 +202,10 @@ public class TestSCMCertStore {
     assertTrue(sequenceId.isPresent());
     assertEquals(sequenceId.get().longValue(),
         scmCertStore.getLatestCrlId());
-    assertEquals(INITIAL_SEQUENCE_ID + 2L, (long) sequenceId.get());
-
-    // Check the sequence ID table for latest sequence id
-    assertEquals(INITIAL_SEQUENCE_ID + 2L, (long)
-        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY));
+    assertEquals(lastCRLId + 2L, (long) sequenceId.get());
 
     CRLInfo newCrlInfo = scmCertStore.getCrls(Arrays.asList(
-        INITIAL_SEQUENCE_ID + 2)).get(0);
+        lastCRLId + 2)).get(0);
     revokedCertificates = newCrlInfo.getX509CRL().getRevokedCertificates();
     assertEquals(2L, revokedCertificates.size());
     assertNotNull(
@@ -238,6 +240,7 @@ public class TestSCMCertStore {
     Date now = new Date();
     // Set revocation time in the future
     Date revocationTime = new Date(now.getTime() + 500);
+    final long lastCRLId = scmCertStore.getLatestCrlId();
 
     X509CertificateHolder caCertificateHolder =
         new X509CertificateHolder(generateX509Cert().getEncoded());
@@ -249,7 +252,7 @@ public class TestSCMCertStore {
         crlApprover);
 
     assertTrue(sequenceId.isPresent());
-    assertEquals(INITIAL_SEQUENCE_ID + 1L, (long) sequenceId.get());
+    assertEquals(lastCRLId + 1L, (long) sequenceId.get());
 
     assertNotNull(
         scmCertStore.getCertificateByID(serialID,

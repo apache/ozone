@@ -188,7 +188,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EX
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
@@ -804,7 +803,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     certificateStore =
         new SCMCertStore.Builder().setMetadaStore(scmMetadataStore)
             .setRatisServer(scmHAManager.getRatisServer())
-            .setCRLSequenceId(getLastSequenceIdForCRL()).build();
+            .setSequenceIdGenerator(sequenceIdGen).build();
 
 
     final CertificateServer scmCertificateServer;
@@ -1009,19 +1008,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
       LOG.info("SCM login successful.");
     }
-  }
-
-  long getLastSequenceIdForCRL() throws IOException {
-    Long sequenceId =
-        scmMetadataStore.getCRLSequenceIdTable().get(CRL_SEQUENCE_ID_KEY);
-    // If the CRL_SEQUENCE_ID_KEY does not exist in DB return 0 so that new
-    // CRL requests can have sequence id starting from 1.
-    if (sequenceId == null) {
-      return 0L;
-    }
-    // If there exists a last sequence id in the DB, the new incoming
-    // CRL requests must have sequence ids greater than the one stored in the DB
-    return sequenceId;
   }
 
   /**

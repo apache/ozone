@@ -33,13 +33,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -58,7 +60,6 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 
@@ -70,13 +71,14 @@ public final class SCMCertStore implements CertificateStore {
       LoggerFactory.getLogger(SCMCertStore.class);
   private SCMMetadataStore scmMetadataStore;
   private final Lock lock;
-  private final AtomicLong crlSequenceId;
+  private final SequenceIdGenerator sequenceIdGenerator;
   private final Map<UUID, CRLStatus> crlStatusMap;
 
-  private SCMCertStore(SCMMetadataStore dbStore, long sequenceId) {
+  private SCMCertStore(SCMMetadataStore dbStore,
+                       SequenceIdGenerator sequenceIdGenerator) {
     this.scmMetadataStore = dbStore;
+    this.sequenceIdGenerator = sequenceIdGenerator;
     lock = new ReentrantLock();
-    crlSequenceId = new AtomicLong(sequenceId);
     crlStatusMap = new ConcurrentHashMap<>();
   }
 
@@ -142,7 +144,7 @@ public final class SCMCertStore implements CertificateStore {
       CRLReason reason,
       Date revocationTime,
       CRLApprover crlApprover)
-      throws IOException {
+      throws IOException, TimeoutException {
     Date now = new Date();
     X509v2CRLBuilder builder =
         new X509v2CRLBuilder(caCertificateHolder.getIssuer(), now);
@@ -190,7 +192,11 @@ public final class SCMCertStore implements CertificateStore {
                   .deleteWithBatch(batch, cert.getSerialNumber());
             }
           }
-          long id = crlSequenceId.incrementAndGet();
+          // TODO: This will be moved out of SCMCertStore in next patch.
+          //  getNextId can end up making a Ratis call. We should not make
+          //  a Ratis call inside a ratis call.
+          long id = sequenceIdGenerator.getNextId(
+              SequenceIdGenerator.CRL_SEQUENCE_ID);
           CRLInfo crlInfo = new CRLInfo.Builder()
               .setX509CRL(crl)
               .setCreationTimestamp(now.getTime())
@@ -198,10 +204,6 @@ public final class SCMCertStore implements CertificateStore {
               .build();
           scmMetadataStore.getCRLInfoTable().putWithBatch(
               batch, id, crlInfo);
-
-          // Update the CRL Sequence Id Table with the last sequence id.
-          scmMetadataStore.getCRLSequenceIdTable().putWithBatch(batch,
-              CRL_SEQUENCE_ID_KEY, id);
           scmMetadataStore.getStore().commitBatchOperation(batch);
           sequenceId = Optional.of(id);
         }
@@ -312,17 +314,12 @@ public final class SCMCertStore implements CertificateStore {
   public static class Builder {
 
     private SCMMetadataStore metadataStore;
-    private long crlSequenceId;
     private SCMRatisServer scmRatisServer;
+    private SequenceIdGenerator sequenceIdGenerator;
 
 
     public Builder setMetadaStore(SCMMetadataStore scmMetadataStore) {
       this.metadataStore = scmMetadataStore;
-      return this;
-    }
-
-    public Builder setCRLSequenceId(long sequenceId) {
-      this.crlSequenceId = sequenceId;
       return this;
     }
 
@@ -331,9 +328,15 @@ public final class SCMCertStore implements CertificateStore {
       return this;
     }
 
+    public Builder setSequenceIdGenerator(
+        SequenceIdGenerator seqIdGenerator) {
+      sequenceIdGenerator = seqIdGenerator;
+      return this;
+    }
+
     public CertificateStore build() {
       final SCMCertStore scmCertStore = new SCMCertStore(metadataStore,
-          crlSequenceId);
+          sequenceIdGenerator);
 
       final SCMHAInvocationHandler scmhaInvocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.CERT_STORE,
@@ -345,6 +348,7 @@ public final class SCMCertStore implements CertificateStore {
 
     }
   }
+
 
   @Override
   public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
@@ -366,7 +370,16 @@ public final class SCMCertStore implements CertificateStore {
 
   @Override
   public long getLatestCrlId() {
-    return crlSequenceId.get();
+    try (TableIterator<Long, ? extends Table.KeyValue<Long, CRLInfo>> iterator
+             = scmMetadataStore.getCRLInfoTable().iterator()) {
+      iterator.seekToLast();
+      if (iterator.hasNext()) {
+        return iterator.next().getKey();
+      }
+    } catch (IOException e) {
+      LOG.warn("Exception in getLatestCrlId.", e);
+    }
+    return 0L;
   }
 
   @Override
