@@ -84,7 +84,7 @@ public class SnapshotChainManager {
     if (prevGlobalID != null &&
         !snapshotChainGlobal.containsKey(prevGlobalID)) {
       throw new IOException("Snapshot Chain corruption: "
-          + " previous snapshotID given but no associated snapshot "
+          + "previous snapshotID given but no associated snapshot "
           + "found in snapshot chain: SnapshotID "
           + prevGlobalID);
     }
