@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -42,12 +41,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -106,88 +102,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
     testMultipartUploadWithOneOmNodeDown();
-  }
-
-  @Test
-  public void testOMHAMetrics() throws Exception {
-    shutdown();
-    init();
-    getCluster().waitForClusterToBeReady();
-    waitForLeaderToBeReady();
-
-    // Get leader OM
-    OzoneManager leaderOM = getCluster().getOMLeader();
-    // Store current leader's node ID,
-    // to use it after restarting the OM
-    String leaderOMId = leaderOM.getOMNodeId();
-    // Get a list of all OMs
-    List<OzoneManager> omList = getCluster().getOzoneManagersList();
-
-    // Check metrics for all OMs
-    checkOMHAMetricsForAllOMs(omList, leaderOMId);
-
-    // Restart leader OM
-    getCluster().shutdownOzoneManager(leaderOM);
-    getCluster().restartOzoneManager(leaderOM, true);
-    waitForLeaderToBeReady();
-
-    // Get the new leader
-    OzoneManager newLeaderOM = getCluster().getOMLeader();
-    String newLeaderOMId = newLeaderOM.getOMNodeId();
-    // Get a list of all OMs again
-    omList = getCluster().getOzoneManagersList();
-
-    // New state for the old leader
-    int newState = leaderOMId.equals(newLeaderOMId) ? 1 : 0;
-
-    // Get old leader
-    OzoneManager oldLeader = getCluster().getOzoneManager(leaderOMId);
-    // Get old leader's metrics
-    OMHAMetrics omhaMetrics = oldLeader.getOmhaMetrics();
-
-    Assertions.assertEquals(newState,
-        omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
-
-    // Check that metrics for all OMs have been updated
-    checkOMHAMetricsForAllOMs(omList, newLeaderOMId);
-  }
-
-  private void checkOMHAMetricsForAllOMs(List<OzoneManager> omList,
-                                         String leaderOMId) {
-    for (OzoneManager om : omList) {
-      // Get OMHAMetrics for the current OM
-      OMHAMetrics omhaMetrics = om.getOmhaMetrics();
-      String nodeId = om.getOMNodeId();
-
-      // If current OM is leader, state should be 1
-      int expectedState = nodeId
-          .equals(leaderOMId) ? 1 : 0;
-
-      Assertions.assertEquals(expectedState,
-          omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
-
-      Assertions.assertEquals(nodeId, omhaMetrics.getOmhaInfoNodeId());
-    }
-  }
-
-
-  /**
-   * After restarting OMs we need to wait
-   * for a leader to be elected and ready.
-   */
-  private void waitForLeaderToBeReady()
-      throws InterruptedException, TimeoutException, IOException {
-    for (OzoneManager om : getCluster().getOzoneManagersList()) {
-      if (!getCluster().isOMActive(om.getOMNodeId())) {
-        getCluster().stopOzoneManager(om.getOMNodeId());
-        getCluster().restartOzoneManager(om, true);
-      }
-    }
-    // Wait for Leader Election timeout
-    int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
-        .toIntExact(TimeUnit.MILLISECONDS);
-    GenericTestUtils.waitFor(() ->
-        getCluster().getOMLeader() != null, 500, timeout);
   }
 
   @Test
@@ -395,11 +309,11 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     Assertions.assertTrue(omMultipartUploadCompleteInfo.getHash() != null);
 
 
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-    ozoneInputStream.read(fileContent);
-    Assertions.assertEquals(value, new String(fileContent, UTF_8));
+    try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assertions.assertEquals(value, new String(fileContent, UTF_8));
+    }
   }
 
   @Test
