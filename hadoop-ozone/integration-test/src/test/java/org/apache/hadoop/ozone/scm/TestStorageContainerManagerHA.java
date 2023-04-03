@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -61,6 +62,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -315,5 +317,48 @@ public class TestStorageContainerManagerHA {
     Assert.assertEquals(3, resultSet.size());
     Assert.assertEquals(1,
         resultSet.stream().filter(x -> x.contains("LEADER")).count());
+  }
+
+  @Test
+  public void testSCMHAMetrics() throws InterruptedException, TimeoutException {
+    waitForLeaderToBeReady();
+
+    StorageContainerManager leaderSCM = cluster.getActiveSCM();
+    String leaderSCMId = leaderSCM.getScmId();
+    List<StorageContainerManager> scms =
+        cluster.getStorageContainerManagersList();
+
+    checkSCMHAMetricsForAllSCMs(scms, leaderSCMId);
+  }
+
+  private void checkSCMHAMetricsForAllSCMs(List<StorageContainerManager> scms,
+      String leaderSCMId) {
+    for (StorageContainerManager scm : scms) {
+      String nodeId = scm.getScmId();
+
+      SCMHAMetrics scmHAMetrics = scm.getScmHAMetrics();
+      // If current SCM is leader, state should be 1
+      int expectedState = nodeId.equals(leaderSCMId) ? 1 : 0;
+
+      Assertions.assertEquals(expectedState,
+          scmHAMetrics.getSCMHAMetricsInfoLeaderState());
+      Assertions.assertEquals(nodeId, scmHAMetrics.getSCMHAMetricsInfoNodeId());
+    }
+  }
+
+  /**
+   * Some tests are stopping or restarting SCMs.
+   * There are test cases where we might need to
+   * wait for a leader to be elected and ready.
+   */
+  private void waitForLeaderToBeReady()
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return cluster.getActiveSCM().checkLeader();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 80000);
   }
 }
