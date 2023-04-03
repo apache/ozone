@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -106,8 +107,6 @@ public abstract class BaseHttpServer {
       HttpServer2.Builder builder = newHttpServer2BuilderForOzone(
           conf, httpAddress, httpsAddress, name);
 
-      boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
-          OzoneSecurityUtil.isHttpSecurityEnabled(conf);
       LOG.info("Hadoop Security Enabled: {} " +
               "Ozone Security Enabled: {} " +
               "Ozone HTTP Security Enabled: {} ",
@@ -117,7 +116,7 @@ public abstract class BaseHttpServer {
           conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
               OZONE_HTTP_SECURITY_ENABLED_DEFAULT));
 
-      if (isSecurityEnabled) {
+      if (isSecurityEnabled()) {
         String httpAuthType = conf.get(getHttpAuthType(), "simple");
         LOG.info("HttpAuthType: {} = {}", getHttpAuthType(), httpAuthType);
         // Ozone config prefix must be set to avoid AuthenticationFilter
@@ -127,6 +126,8 @@ public abstract class BaseHttpServer {
           builder.setSecurityEnabled(true);
           builder.setUsernameConfKey(getSpnegoPrincipal());
           builder.setKeytabConfKey(getKeytabFile());
+          builder.setGlobalFilterEnabled(
+              conf.getBoolean(getGlobalAuth(), false));
         }
       }
 
@@ -257,6 +258,16 @@ public abstract class BaseHttpServer {
     httpServer.addInternalServlet(servletName, pathSpec, clazz);
   }
 
+  /**
+   * Add a filter to BaseHttpServer
+   *
+   * @param name       The name of the filter
+   * @param classname  The filter class
+   * @param parameters The filter parameters
+   */
+  protected void addFilter(String name, String classname, Map<String, String> parameters) {
+    httpServer.addFilter(name, classname, parameters);
+  }
 
   /**
    * Returns the WebAppContext associated with this HttpServer.
@@ -436,6 +447,11 @@ public abstract class BaseHttpServer {
     return httpsAddress;
   }
 
+  public boolean isSecurityEnabled() {
+    return UserGroupInformation.isSecurityEnabled() &&
+        OzoneSecurityUtil.isHttpSecurityEnabled(conf);
+  }
+
   protected abstract String getHttpAddressKey();
 
   protected abstract String getHttpsAddressKey();
@@ -459,5 +475,9 @@ public abstract class BaseHttpServer {
   protected abstract String getHttpAuthType();
 
   protected abstract String getHttpAuthConfigPrefix();
+
+  protected String getGlobalAuth() {
+    return getHttpAuthConfigPrefix() + "globalEnabled";
+  }
 
 }

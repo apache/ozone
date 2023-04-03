@@ -15,15 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3;
 
-import org.glassfish.jersey.server.ResourceConfig;
+package org.apache.hadoop.ozone.s3secret;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
 
 /**
- * JaxRS resource definition.
+ * Revoke secret endpoint.
  */
-public class GatewayApplication extends ResourceConfig {
-  public GatewayApplication() {
-    packages("org.apache.hadoop.ozone.s3", "org.apache.hadoop.ozone.s3secret");
+@Path("/secret/revoke")
+public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
+
+  @GET
+  public Response get() throws IOException {
+    revokeSecret();
+    return Response.ok().build();
   }
+
+  private void revokeSecret() throws IOException {
+    getClient().getObjectStore().revokeS3Secret(shortNameFromRequest());
+  }
+
 }

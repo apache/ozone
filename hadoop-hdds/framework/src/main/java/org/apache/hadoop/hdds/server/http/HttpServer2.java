@@ -65,7 +65,6 @@ import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
@@ -110,6 +109,8 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterHolder;
+import static org.apache.hadoop.hdds.server.http.ServletElementsFactory.createFilterMapping;
 import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
@@ -217,6 +218,7 @@ public final class HttpServer2 implements FilterContainer {
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
     private boolean securityEnabled = false;
+    private boolean globalAuthFilterEnabled = true;
     private String usernameConfKey;
     private String keytabConfKey;
     private boolean needsClientAuth;
@@ -340,6 +342,11 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
+    public Builder setGlobalFilterEnabled(boolean enabled) {
+      this.globalAuthFilterEnabled = enabled;
+      return this;
+    }
+
     public Builder setUsernameConfKey(String confKey) {
       this.usernameConfKey = confKey;
       return this;
@@ -451,12 +458,6 @@ public final class HttpServer2 implements FilterContainer {
       }
 
       HttpServer2 server = new HttpServer2(this);
-
-      if (this.securityEnabled) {
-        LOG.info("Initialize spnego with host: {} userKey: {} keytabKey: {}",
-            hostName, usernameConfKey, keytabConfKey);
-        server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
-      }
 
       for (URI ep : endpoints) {
         if (HTTPS_SCHEME.equals(ep.getScheme())) {
@@ -585,13 +586,14 @@ public final class HttpServer2 implements FilterContainer {
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
     initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
-        b.authFilterConfigurationPrefix, b.securityEnabled);
+        b.authFilterConfigurationPrefix, b.securityEnabled,
+        b.globalAuthFilterEnabled);
   }
 
   private void initializeWebServer(String name, String hostName,
       MutableConfigurationSource conf, String[] pathSpecs,
       String authFilterConfigPrefix,
-      boolean securityEnabled) throws IOException {
+      boolean securityEnabled, boolean globalAuth) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -634,8 +636,13 @@ public final class HttpServer2 implements FilterContainer {
           authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
         if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
-          addFilter("authentication",
-              AuthenticationFilter.class.getName(), filterConfig);
+          if (globalAuth) {
+            addGlobalFilter("authentication",
+                AuthenticationFilter.class.getName(), filterConfig);
+          } else {
+            addFilter("authentication",
+                AuthenticationFilter.class.getName(), filterConfig);
+          }
         } else {
           c.initFilter(this, hadoopConf);
         }
@@ -758,7 +765,6 @@ public final class HttpServer2 implements FilterContainer {
       if (conf.getBoolean(
           CommonConfigurationKeys.HADOOP_JETTY_LOGS_SERVE_ALIASES,
           CommonConfigurationKeys.DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
-        @SuppressWarnings("unchecked")
         Map<String, String> params = logContext.getInitParams();
         params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
       }
@@ -777,7 +783,6 @@ public final class HttpServer2 implements FilterContainer {
     staticContext.setResourceBase(appDir + "/static");
     staticContext.addServlet(DefaultServlet.class, "/*");
     staticContext.setDisplayName("static");
-    @SuppressWarnings("unchecked")
     Map<String, String> params = staticContext.getInitParams();
     params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
     params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
@@ -1000,13 +1005,13 @@ public final class HttpServer2 implements FilterContainer {
   public void addFilter(String name, String classname,
       Map<String, String> parameters) {
 
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
     FilterMapping fmap =
-        getFilterMapping(name, new String[] {"*.html", "*.jsp"});
+        createFilterMapping(name, new String[] {"*.html", "*.jsp"});
     defineFilter(webAppContext, filterHolder, fmap);
     LOG.info("Added filter {} (class={}) to context {}", name, classname,
             webAppContext.getDisplayName());
-    fmap = getFilterMapping(name, new String[] {"/*"});
+    fmap = createFilterMapping(name, new String[] {"/*"});
     for (Map.Entry<ServletContextHandler, Boolean> e
         : defaultContexts.entrySet()) {
       if (e.getValue()) {
@@ -1022,8 +1027,8 @@ public final class HttpServer2 implements FilterContainer {
   @Override
   public void addGlobalFilter(String name, String classname,
       Map<String, String> parameters) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, new String[] {"/*"});
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, new String[] {"/*"});
     defineFilter(webAppContext, filterHolder, fmap);
     for (ServletContextHandler ctx : defaultContexts.keySet()) {
       defineFilter(ctx, filterHolder, fmap);
@@ -1036,8 +1041,8 @@ public final class HttpServer2 implements FilterContainer {
    */
   private static void defineFilter(ServletContextHandler ctx, String name,
       String classname, Map<String, String> parameters, String[] urls) {
-    FilterHolder filterHolder = getFilterHolder(name, classname, parameters);
-    FilterMapping fmap = getFilterMapping(name, urls);
+    FilterHolder filterHolder = createFilterHolder(name, classname, parameters);
+    FilterMapping fmap = createFilterMapping(name, urls);
     defineFilter(ctx, filterHolder, fmap);
   }
 
@@ -1048,25 +1053,6 @@ public final class HttpServer2 implements FilterContainer {
       FilterHolder holder, FilterMapping fmap) {
     ServletHandler handler = ctx.getServletHandler();
     handler.addFilter(holder, fmap);
-  }
-
-  private static FilterMapping getFilterMapping(String name, String[] urls) {
-    FilterMapping fmap = new FilterMapping();
-    fmap.setPathSpecs(urls);
-    fmap.setDispatches(FilterMapping.ALL);
-    fmap.setFilterName(name);
-    return fmap;
-  }
-
-  private static FilterHolder getFilterHolder(String name, String classname,
-      Map<String, String> parameters) {
-    FilterHolder holder = new FilterHolder();
-    holder.setName(name);
-    holder.setClassName(classname);
-    if (parameters != null) {
-      holder.setInitParameters(parameters);
-    }
-    return holder;
   }
 
   /**
@@ -1169,23 +1155,6 @@ public final class HttpServer2 implements FilterContainer {
     QueuedThreadPool pool = (QueuedThreadPool) webServer.getThreadPool();
     pool.setMinThreads(min);
     pool.setMaxThreads(max);
-  }
-
-  private void initSpnego(ConfigurationSource conf, String hostName,
-      String usernameConfKey, String keytabConfKey) throws IOException {
-    Map<String, String> params = new HashMap<>();
-    String principalInConf = conf.get(usernameConfKey);
-    if (principalInConf != null && !principalInConf.isEmpty()) {
-      params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-          principalInConf, hostName));
-    }
-    String httpKeytab = conf.get(keytabConfKey);
-    if (httpKeytab != null && !httpKeytab.isEmpty()) {
-      params.put("kerberos.keytab", httpKeytab);
-    }
-    params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
-    defineFilter(webAppContext, SPNEGO_FILTER,
-        AuthenticationFilter.class.getName(), params, null);
   }
 
   /**
@@ -1569,7 +1538,6 @@ public final class HttpServer2 implements FilterContainer {
       /**
        * Return the set of parameter names, quoting each name.
        */
-      @SuppressWarnings("unchecked")
       @Override
       public Enumeration<String> getParameterNames() {
         return new Enumeration<String>() {
@@ -1610,7 +1578,6 @@ public final class HttpServer2 implements FilterContainer {
         return result;
       }
 
-      @SuppressWarnings("unchecked")
       @Override
       public Map<String, String[]> getParameterMap() {
         Map<String, String[]> result = new HashMap<>();
