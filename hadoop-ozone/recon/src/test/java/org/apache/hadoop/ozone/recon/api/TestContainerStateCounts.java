@@ -405,7 +405,8 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     // then container is not added until the next container report is processed
     StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
         heartbeatRequestProto =
-        StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto.newBuilder()
+        StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
+            .newBuilder()
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
