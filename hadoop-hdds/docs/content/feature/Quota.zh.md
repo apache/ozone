@@ -43,7 +43,7 @@ menu:
  
  f. 如果volume quota被启用，那么bucket quota将不能被清除。
 
- g. 具有链接桶的卷不消耗链接桶内键的空间配额。链接的桶键将消耗源卷和源桶的空间配额。
+ g. Volume内的linked bucket不消耗Volume的空间配额。linked bcuket将消耗源Volume和源Bucket的空间配额。
 
 2. 命名空间配额
 
@@ -55,14 +55,14 @@ menu:
 
  c. 当bucket的命名空间配额启用时，该bucket的key数目不能超过此配额。
 
- d. Linked bucket没有定义单独的命名空间配额，它是由源桶的命名空间配额为链接桶内的键引用的。
+ d. Linked bucket 上不支持定义单独的命名空间配额，它直接引用源bucket的命名空间配额。
 
  e. Linked bucket将消耗卷的命名空间配额
 
  f. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
 
 ### 笔记
-- 对于递归删除目录的 FSO 桶，配额的释放在子目录和文件被删除后异步发生（当目录被删除时，递归删除可以在后台进行）。
+- 对于FSO bucket，当递归删除目录时，配额将在子目录和文件被异步删除后释放（当目录被删除时，递归删除在后台进行）。
 
 ## 客户端用法
 ### Storage space级别配额
