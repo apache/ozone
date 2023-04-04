@@ -272,6 +272,7 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
    */
   @Override
   public Object clone() throws CloneNotSupportedException {
-    return this.copyObject();
+    OmDirectoryInfo omDirectoryInfo = (OmDirectoryInfo) super.clone();
+    return omDirectoryInfo.copyObject();
   }
 }

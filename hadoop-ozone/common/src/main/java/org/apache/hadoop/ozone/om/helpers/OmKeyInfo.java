@@ -794,7 +794,8 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
    */
   @Override
   public Object clone() throws CloneNotSupportedException {
-    return this.copyObject();
+    OmKeyInfo omKeyInfo = (OmKeyInfo) super.clone();
+    return omKeyInfo.copyObject();
   }
 
   /**
