@@ -48,11 +48,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-
 
 /**
  * Handles CreateSnapshot Request.
@@ -190,8 +190,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // SnapshotChainManager#loadFromSnapshotInfoTable because it could not
       // find the previous snapshot which doesn't exist because it was never
       // added to the SnapshotInfo table.
-      removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
-          snapshotInfo);
+      if (Objects.equals(snapshotInfo.getSnapshotID(),
+          snapshotChainManager.getLatestGlobalSnapshot())) {
+        removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
+            snapshotInfo);
+      }
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -228,13 +231,13 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    */
   private void removeSnapshotInfoFromSnapshotChainManager(
       SnapshotChainManager snapshotChainManager,
-      SnapshotInfo snapshotInfo
+      SnapshotInfo info
   ) {
     try {
-      snapshotChainManager.deleteSnapshot(snapshotInfo);
+      snapshotChainManager.deleteSnapshot(info);
     } catch (IOException exception) {
       LOG.warn("Failed to remove snapshot: {} from SnapshotChainManager.",
-          snapshotInfo, exception);
+          info, exception);
     }
   }
 }
