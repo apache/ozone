@@ -67,6 +67,12 @@ public final class ClusterStateResponse {
   private int openContainers;
 
   /**
+   * Total count of deleted containers in the cluster.
+   */
+  @JsonProperty("deletedContainers")
+  private int deletedContainers;
+
+  /**
    * Total count of volumes in the cluster.
    */
   @JsonProperty("volumes")
@@ -118,6 +124,7 @@ public final class ClusterStateResponse {
     this.openContainers = b.openContainers;
     this.deletedKeys = b.deletedKeys;
     this.deletedDirs = b.deletedDirs;
+    this.deletedContainers = b.deletedContainers;
   }
 
   /**
@@ -132,6 +139,7 @@ public final class ClusterStateResponse {
     private int containers;
     private int missingContainers;
     private int openContainers;
+    private int deletedContainers;
     private long volumes;
     private long buckets;
     private long keys;
@@ -143,6 +151,7 @@ public final class ClusterStateResponse {
       this.containers = 0;
       this.missingContainers = 0;
       this.openContainers = 0;
+      this.deletedContainers = 0;
       this.volumes = 0;
       this.buckets = 0;
       this.keys = 0;
@@ -185,6 +194,11 @@ public final class ClusterStateResponse {
 
     public Builder setOpenContainers(int openContainers) {
       this.openContainers = openContainers;
+      return this;
+    }
+
+    public Builder setDeletedContainers(int deletedContainers) {
+      this.deletedContainers = deletedContainers;
       return this;
     }
 
@@ -248,6 +262,10 @@ public final class ClusterStateResponse {
 
   public int getOpenContainers() {
     return openContainers;
+  }
+
+  public int getDeletedContainers() {
+    return deletedContainers;
   }
 
   public long getBuckets() {
