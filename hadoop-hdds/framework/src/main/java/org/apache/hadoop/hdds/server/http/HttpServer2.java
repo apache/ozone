@@ -65,6 +65,7 @@ import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
@@ -458,6 +459,12 @@ public final class HttpServer2 implements FilterContainer {
       }
 
       HttpServer2 server = new HttpServer2(this);
+
+      if (this.securityEnabled) {
+        LOG.info("Initialize spnego with host: {} userKey: {} keytabKey: {}",
+            hostName, usernameConfKey, keytabConfKey);
+        server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
+      }
 
       for (URI ep : endpoints) {
         if (HTTPS_SCHEME.equals(ep.getScheme())) {
@@ -1155,6 +1162,24 @@ public final class HttpServer2 implements FilterContainer {
     QueuedThreadPool pool = (QueuedThreadPool) webServer.getThreadPool();
     pool.setMinThreads(min);
     pool.setMaxThreads(max);
+  }
+
+  private void initSpnego(ConfigurationSource conf, String hostName,
+                          String usernameConfKey, String keytabConfKey)
+      throws IOException {
+    Map<String, String> params = new HashMap<>();
+    String principalInConf = conf.get(usernameConfKey);
+    if (principalInConf != null && !principalInConf.isEmpty()) {
+      params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
+          principalInConf, hostName));
+    }
+    String httpKeytab = conf.get(keytabConfKey);
+    if (httpKeytab != null && !httpKeytab.isEmpty()) {
+      params.put("kerberos.keytab", httpKeytab);
+    }
+    params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
+    defineFilter(webAppContext, SPNEGO_FILTER,
+        AuthenticationFilter.class.getName(), params, null);
   }
 
   /**

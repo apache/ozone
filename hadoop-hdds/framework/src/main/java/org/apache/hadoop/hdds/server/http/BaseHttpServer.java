@@ -259,14 +259,15 @@ public abstract class BaseHttpServer {
   }
 
   /**
-   * Add a filter to BaseHttpServer
+   * Add a filter to BaseHttpServer.
    *
-   * @param name       The name of the filter
+   * @param filterName The name of the filter
    * @param classname  The filter class
    * @param parameters The filter parameters
    */
-  protected void addFilter(String name, String classname, Map<String, String> parameters) {
-    httpServer.addFilter(name, classname, parameters);
+  protected void addFilter(String filterName, String classname,
+                           Map<String, String> parameters) {
+    httpServer.addFilter(filterName, classname, parameters);
   }
 
   /**

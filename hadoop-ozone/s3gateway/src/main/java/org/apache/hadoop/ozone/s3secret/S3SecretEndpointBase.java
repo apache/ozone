@@ -18,19 +18,16 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
-import org.apache.hadoop.security.HadoopKerberosName;
 
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Context;
-import java.io.IOException;
 import java.util.Map;
 
 /**
