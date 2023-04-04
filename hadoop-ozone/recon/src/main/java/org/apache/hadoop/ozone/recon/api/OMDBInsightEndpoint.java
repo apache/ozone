@@ -19,14 +19,21 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResp;
+import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -34,11 +41,15 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
@@ -58,11 +69,18 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 @Produces(MediaType.APPLICATION_JSON)
 public class OMDBInsightEndpoint {
 
+  @Inject
+  private ContainerEndpoint containerEndpoint;
+  @Inject
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
+  private final ReconContainerManager containerManager;
 
   @Inject
-  public OMDBInsightEndpoint(
-      ReconOMMetadataManager omMetadataManager) {
+  public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
+                             ReconOMMetadataManager omMetadataManager) {
+    this.containerManager =
+        (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
   }
 
@@ -182,8 +200,14 @@ public class OMDBInsightEndpoint {
             break;
           }
         }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+      } catch (IOException ex) {
+        throw new WebApplicationException(ex,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      } catch (IllegalArgumentException e) {
+        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      } catch (Exception ex) {
+        throw new WebApplicationException(ex,
+            Response.Status.INTERNAL_SERVER_ERROR);
       }
       if (recordsFetchedLimitReached) {
         break;
@@ -261,8 +285,14 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     return pendingForDeletionKeyInfo;
   }
@@ -309,8 +339,14 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     return deletedKeyAndDirInsightInfo;
   }
@@ -326,5 +362,50 @@ public class OMDBInsightEndpoint {
           deletedKeyAndDirInsightInfo.getReplicatedTotal() +
               omKeyInfo.getReplicatedSize());
     });
+  }
+
+  /** This method retrieves set of keys/files/dirs which are mapped to
+   * containers in DELETED state in SCM. */
+  @GET
+  @Path("deletedcontainerkeys")
+  public Response getDeletedContainerKeysInfo(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
+      String prevKeyPrefix) {
+    List<KeysResponse> keysResponseList = new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(-1, 0);
+      List<ContainerInfo> deletedStateSCMContainers =
+          containerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+      List<Long> deletedStateSCMContainerIds =
+          deletedStateSCMContainers.stream()
+              .map(containerInfo -> containerInfo.getContainerID()).collect(
+                  Collectors.toList());
+
+      List<Long> omContainerIdsMappedToDeletedSCMContainers =
+          omContainers.entrySet().stream()
+              .filter(
+                  map -> deletedStateSCMContainerIds.contains(map.getKey()))
+              .map(map -> map.getKey()).collect(Collectors.toList());
+
+      omContainerIdsMappedToDeletedSCMContainers.forEach(containerId -> {
+        Response keysForContainer =
+            containerEndpoint.getKeysForContainer(containerId, limit,
+                prevKeyPrefix);
+        KeysResponse keysResponse = (KeysResponse) keysForContainer.getEntity();
+        keysResponseList.add(keysResponse);
+      });
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(keysResponseList).build();
   }
 }
