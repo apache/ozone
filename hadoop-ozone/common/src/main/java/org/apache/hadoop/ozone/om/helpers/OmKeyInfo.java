@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithParentObjectId {
+public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
   private final String volumeName;
   private final String bucketName;
@@ -787,6 +787,14 @@ public final class OmKeyInfo extends WithParentObjectId {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  @Override
+  public Object clone() throws CloneNotSupportedException {
+    return this.copyObject();
   }
 
   /**

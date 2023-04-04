@@ -33,7 +33,7 @@ import java.util.Objects;
  * in the user given path and a pointer to its parent directory element in the
  * path. Also, it stores directory node related metdata details.
  */
-public class OmDirectoryInfo extends WithParentObjectId {
+public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
   private String name; // directory name
 
   private long creationTime;
@@ -265,5 +265,13 @@ public class OmDirectoryInfo extends WithParentObjectId {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  @Override
+  public Object clone() throws CloneNotSupportedException {
+    return this.copyObject();
   }
 }
