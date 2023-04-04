@@ -67,7 +67,6 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
