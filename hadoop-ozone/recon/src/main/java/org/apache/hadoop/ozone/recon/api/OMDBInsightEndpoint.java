@@ -19,8 +19,14 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.recon.api.types.OpenKeyInsightInfoResp;
-import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
+import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResp;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -30,6 +36,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
@@ -49,14 +58,65 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 @Produces(MediaType.APPLICATION_JSON)
 public class OMDBInsightEndpoint {
 
-  private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private final ReconOMMetadataManager omMetadataManager;
 
   @Inject
   public OMDBInsightEndpoint(
-      OzoneManagerServiceProvider ozoneManagerServiceProvider) {
-    this.ozoneManagerServiceProvider = ozoneManagerServiceProvider;
+      ReconOMMetadataManager omMetadataManager) {
+    this.omMetadataManager = omMetadataManager;
   }
 
+  /**
+   * This method retrieves set of keys/files which are open.
+   *
+   * @return the http json response wrapped in below format:
+   * {
+   *     replicatedTotal: 13824,
+   *     unreplicatedTotal: 4608,
+   *     entities: [
+   *     {
+   *         path: “/vol1/bucket1/key1”,
+   *         keyState: “Open”,
+   *         inStateSince: 1667564193026,
+   *         size: 1024,
+   *         replicatedSize: 3072,
+   *         unreplicatedSize: 1024,
+   *         replicationType: RATIS,
+   *         replicationFactor: THREE
+   *     }.
+   *    {
+   *         path: “/vol1/bucket1/key2”,
+   *         keyState: “Open”,
+   *         inStateSince: 1667564193026,
+   *         size: 512,
+   *         replicatedSize: 1536,
+   *         unreplicatedSize: 512,
+   *         replicationType: RATIS,
+   *         replicationFactor: THREE
+   *     }.
+   *     {
+   *         path: “/vol1/fso-bucket/dir1/file1”,
+   *         keyState: “Open”,
+   *         inStateSince: 1667564193026,
+   *         size: 1024,
+   *         replicatedSize: 3072,
+   *         unreplicatedSize: 1024,
+   *         replicationType: RATIS,
+   *         replicationFactor: THREE
+   *     }.
+   *     {
+   *         path: “/vol1/fso-bucket/dir1/dir2/file2”,
+   *         keyState: “Open”,
+   *         inStateSince: 1667564193026,
+   *         size: 2048,
+   *         replicatedSize: 6144,
+   *         unreplicatedSize: 2048,
+   *         replicationType: RATIS,
+   *         replicationFactor: THREE
+   *     }
+   *   ]
+   * }
+   */
   @GET
   @Path("openkeyinfo")
   public Response getOpenKeyInfo(
@@ -64,8 +124,207 @@ public class OMDBInsightEndpoint {
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
       String prevKeyPrefix) {
-    OpenKeyInsightInfoResp openKeyInsightInfoResp =
-        ozoneManagerServiceProvider.retrieveOpenKeyInfo(limit, prevKeyPrefix);
-    return Response.ok(openKeyInsightInfoResp).build();
+    KeyInsightInfoResp openKeyInsightInfo = new KeyInsightInfoResp();
+    List<KeyEntityInfo> nonFSOKeyInfoList =
+        openKeyInsightInfo.getNonFSOKeyInfoList();
+    boolean isLegacyBucketLayout = true;
+    boolean recordsFetchedLimitReached = false;
+    List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
+    for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      isLegacyBucketLayout = (layout == BucketLayout.LEGACY);
+      Table<String, OmKeyInfo> openKeyTable =
+          omMetadataManager.getOpenKeyTable(layout);
+      try (
+          TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+              keyIter = openKeyTable.iterator()) {
+        boolean skipPrevKey = false;
+        String seekKey = prevKeyPrefix;
+        if (StringUtils.isNotBlank(prevKeyPrefix)) {
+          skipPrevKey = true;
+          Table.KeyValue<String, OmKeyInfo> seekKeyValue =
+              keyIter.seek(seekKey);
+          // check if RocksDB was able to seek correctly to the given key prefix
+          // if not, then return empty result
+          // In case of an empty prevKeyPrefix, all the keys are returned
+          if (seekKeyValue == null ||
+              (StringUtils.isNotBlank(prevKeyPrefix) &&
+                  !seekKeyValue.getKey().equals(prevKeyPrefix))) {
+            return Response.ok(openKeyInsightInfo).build();
+          }
+        }
+        while (keyIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+          String key = kv.getKey();
+          OmKeyInfo omKeyInfo = kv.getValue();
+          // skip the prev key if prev key is present
+          if (skipPrevKey && key.equals(prevKeyPrefix)) {
+            continue;
+          }
+          KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+          keyEntityInfo.setKey(key);
+          keyEntityInfo.setPath(omKeyInfo.getKeyName());
+          keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
+          keyEntityInfo.setSize(omKeyInfo.getDataSize());
+          keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+          keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
+          openKeyInsightInfo.setUnreplicatedTotal(
+              openKeyInsightInfo.getUnreplicatedTotal() +
+                  keyEntityInfo.getSize());
+          openKeyInsightInfo.setReplicatedTotal(
+              openKeyInsightInfo.getReplicatedTotal() +
+                  keyEntityInfo.getReplicatedSize());
+          boolean added =
+              isLegacyBucketLayout ? nonFSOKeyInfoList.add(keyEntityInfo) :
+                  fsoKeyInfoList.add(keyEntityInfo);
+          if ((nonFSOKeyInfoList.size() + fsoKeyInfoList.size()) == limit) {
+            recordsFetchedLimitReached = true;
+            break;
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      if (recordsFetchedLimitReached) {
+        break;
+      }
+    }
+    return Response.ok(openKeyInsightInfo).build();
+  }
+
+  /** This method retrieves set of keys/files/dirs pending for deletion. */
+  @GET
+  @Path("deletekeyinfo")
+  public Response getDeletedKeyInfo(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
+      String prevKeyPrefix) {
+    KeyInsightInfoResp deletedKeyAndDirInsightInfo = new KeyInsightInfoResp();
+    KeyInsightInfoResp pendingForDeletionKeyInfo =
+        getPendingForDeletionKeyInfo(limit, prevKeyPrefix,
+            deletedKeyAndDirInsightInfo);
+    return Response.ok(getPendingForDeletionDirInfo(limit, prevKeyPrefix,
+        pendingForDeletionKeyInfo)).build();
+  }
+
+  private KeyInsightInfoResp getPendingForDeletionDirInfo(
+      int limit, String prevKeyPrefix,
+      KeyInsightInfoResp pendingForDeletionKeyInfo) {
+
+    List<KeyEntityInfo> deletedDirInfoList =
+        pendingForDeletionKeyInfo.getDeletedDirInfoList();
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        omMetadataManager.getDeletedDirTable();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            keyIter = deletedDirTable.iterator()) {
+      boolean skipPrevKey = false;
+      String seekKey = prevKeyPrefix;
+      if (StringUtils.isNotBlank(prevKeyPrefix)) {
+        skipPrevKey = true;
+        Table.KeyValue<String, OmKeyInfo> seekKeyValue =
+            keyIter.seek(seekKey);
+        // check if RocksDB was able to seek correctly to the given key prefix
+        // if not, then return empty result
+        // In case of an empty prevKeyPrefix, all the keys are returned
+        if (seekKeyValue == null ||
+            (StringUtils.isNotBlank(prevKeyPrefix) &&
+                !seekKeyValue.getKey().equals(prevKeyPrefix))) {
+          return pendingForDeletionKeyInfo;
+        }
+      }
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        String key = kv.getKey();
+        OmKeyInfo omKeyInfo = kv.getValue();
+        // skip the prev key if prev key is present
+        if (skipPrevKey && key.equals(prevKeyPrefix)) {
+          continue;
+        }
+        KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+        keyEntityInfo.setKey(key);
+        keyEntityInfo.setPath(omKeyInfo.getKeyName());
+        keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
+        keyEntityInfo.setSize(omKeyInfo.getDataSize());
+        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+        keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
+        pendingForDeletionKeyInfo.setUnreplicatedTotal(
+            pendingForDeletionKeyInfo.getUnreplicatedTotal() +
+                keyEntityInfo.getSize());
+        pendingForDeletionKeyInfo.setReplicatedTotal(
+            pendingForDeletionKeyInfo.getReplicatedTotal() +
+                keyEntityInfo.getReplicatedSize());
+        deletedDirInfoList.add(keyEntityInfo);
+        if (deletedDirInfoList.size() == limit) {
+          break;
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return pendingForDeletionKeyInfo;
+  }
+
+  private KeyInsightInfoResp getPendingForDeletionKeyInfo(
+      int limit,
+      String prevKeyPrefix,
+      KeyInsightInfoResp deletedKeyAndDirInsightInfo) {
+    List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
+        deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
+    Table<String, RepeatedOmKeyInfo> deletedTable =
+        omMetadataManager.getDeletedTable();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String,
+            RepeatedOmKeyInfo>>
+            keyIter = deletedTable.iterator()) {
+      boolean skipPrevKey = false;
+      String seekKey = prevKeyPrefix;
+      if (StringUtils.isNotBlank(prevKeyPrefix)) {
+        skipPrevKey = true;
+        Table.KeyValue<String, RepeatedOmKeyInfo> seekKeyValue =
+            keyIter.seek(seekKey);
+        // check if RocksDB was able to seek correctly to the given key prefix
+        // if not, then return empty result
+        // In case of an empty prevKeyPrefix, all the keys are returned
+        if (seekKeyValue == null ||
+            (StringUtils.isNotBlank(prevKeyPrefix) &&
+                !seekKeyValue.getKey().equals(prevKeyPrefix))) {
+          return deletedKeyAndDirInsightInfo;
+        }
+      }
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+        String key = kv.getKey();
+        RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
+        // skip the prev key if prev key is present
+        if (skipPrevKey && key.equals(prevKeyPrefix)) {
+          continue;
+        }
+        updateReplicatedAndUnReplicatedTotal(deletedKeyAndDirInsightInfo,
+            repeatedOmKeyInfo);
+        repeatedOmKeyInfoList.add(repeatedOmKeyInfo);
+        if ((repeatedOmKeyInfoList.size()) == limit) {
+          break;
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return deletedKeyAndDirInsightInfo;
+  }
+
+  private void updateReplicatedAndUnReplicatedTotal(
+      KeyInsightInfoResp deletedKeyAndDirInsightInfo,
+      RepeatedOmKeyInfo repeatedOmKeyInfo) {
+    repeatedOmKeyInfo.getOmKeyInfoList().forEach(omKeyInfo -> {
+      deletedKeyAndDirInsightInfo.setUnreplicatedTotal(
+          deletedKeyAndDirInsightInfo.getUnreplicatedTotal() +
+              omKeyInfo.getDataSize());
+      deletedKeyAndDirInsightInfo.setReplicatedTotal(
+          deletedKeyAndDirInsightInfo.getReplicatedTotal() +
+              omKeyInfo.getReplicatedSize());
+    });
   }
 }

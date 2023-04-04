@@ -18,43 +18,58 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * HTTP Response wrapped for Open keys insights.
+ * HTTP Response wrapped for keys insights.
  */
-public class OpenKeyInsightInfoResp {
+public class KeyInsightInfoResp {
 
-  /** Amount of data mapped to all open keys and files in
+  /** Amount of data mapped to all keys and files in
    * a cluster across all DNs. */
   @JsonProperty("replicatedTotal")
   private long replicatedTotal;
 
-  /** Amount of data mapped to all open keys and files on a single DN. */
+  /** Amount of data mapped to all keys and files on a single DN. */
   @JsonProperty("unreplicatedTotal")
   private long unreplicatedTotal;
 
-  /** List of all open non-fso keys. */
+  /** List of all non-fso keys. */
   @JsonProperty("non-fso")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<KeyEntityInfo> nonFSOKeyInfoList;
 
-  /** List of all open fso keys. */
-  @JsonProperty("non-fso")
+  /** List of all fso keys. */
+  @JsonProperty("fso")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<KeyEntityInfo> fsoKeyInfoList;
+
+  /** List of all deleted and repeatedly deleted keys.  */
+  @JsonProperty("deletedkeyinfo")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<RepeatedOmKeyInfo> repeatedOmKeyInfoList;
+
+  @JsonProperty("deleteddirinfo")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<KeyEntityInfo> deletedDirInfoList;
 
   /** Path status. */
   @JsonProperty("status")
   private ResponseStatus responseCode;
 
-  public OpenKeyInsightInfoResp() {
+  public KeyInsightInfoResp() {
     responseCode = ResponseStatus.OK;
     replicatedTotal = 0L;
     unreplicatedTotal = 0L;
     nonFSOKeyInfoList = new ArrayList<>();
     fsoKeyInfoList = new ArrayList<>();
+    repeatedOmKeyInfoList = new ArrayList<>();
+    deletedDirInfoList = new ArrayList<>();
   }
 
   public long getReplicatedTotal() {
@@ -91,6 +106,24 @@ public class OpenKeyInsightInfoResp {
     this.fsoKeyInfoList = fsoKeyInfoList;
   }
 
+  public List<RepeatedOmKeyInfo> getRepeatedOmKeyInfoList() {
+    return repeatedOmKeyInfoList;
+  }
+
+  public void setRepeatedOmKeyInfoList(
+      List<RepeatedOmKeyInfo> repeatedOmKeyInfoList) {
+    this.repeatedOmKeyInfoList = repeatedOmKeyInfoList;
+  }
+
+  public List<KeyEntityInfo> getDeletedDirInfoList() {
+    return deletedDirInfoList;
+  }
+
+  public void setDeletedDirInfoList(
+      List<KeyEntityInfo> deletedDirInfoList) {
+    this.deletedDirInfoList = deletedDirInfoList;
+  }
+
   public ResponseStatus getResponseCode() {
     return responseCode;
   }
@@ -98,4 +131,5 @@ public class OpenKeyInsightInfoResp {
   public void setResponseCode(ResponseStatus responseCode) {
     this.responseCode = responseCode;
   }
+
 }

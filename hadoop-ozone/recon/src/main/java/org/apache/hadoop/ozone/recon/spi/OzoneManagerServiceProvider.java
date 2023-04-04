@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.spi;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.api.types.OpenKeyInsightInfoResp;
 
 /**
  * Interface to access OM endpoints.
@@ -47,9 +46,4 @@ public interface OzoneManagerServiceProvider {
    */
   boolean triggerSyncDataFromOMImmediately();
 
-  /**
-   * This method retrieves set of keys/files which are open.
-   * @return
-   */
-  OpenKeyInsightInfoResp retrieveOpenKeyInfo(int limit, String prevKeyPrefix);
 }
