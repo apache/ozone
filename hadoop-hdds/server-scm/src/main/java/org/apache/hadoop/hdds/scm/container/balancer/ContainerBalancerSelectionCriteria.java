@@ -120,7 +120,8 @@ public class ContainerBalancerSelectionCriteria {
    * @param second second container to compare
    * @return An integer greater than 0 if first is more used, 0 if they're
    * the same containers or a container is not found, and a value less than 0
-   * if first is not more used than second.
+   * if first is less used than second. If both containers have equal used
+   * space, they're compared using {@link ContainerID#compareTo(ContainerID)}.
    */
   private int isContainerMoreUsed(ContainerID first,
                                   ContainerID second) {
