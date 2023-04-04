@@ -65,6 +65,8 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
   public boolean addAll(PersistentList<E> from) {
     try (ClosableIterator<E> iterator = from.iterator()) {
       iterator.forEachRemaining(this::add);
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
     }
     return true;
   }

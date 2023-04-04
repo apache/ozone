@@ -17,12 +17,11 @@
  */
 package org.apache.hadoop.util;
 
+import java.io.Closeable;
 import java.util.Iterator;
 
 /**
  * An {@link Iterator} that may hold resources until it is closed.
  */
-public interface ClosableIterator<E> extends Iterator<E>, AutoCloseable {
-  @Override
-  void close();
+public interface ClosableIterator<E> extends Iterator<E>, Closeable {
 }

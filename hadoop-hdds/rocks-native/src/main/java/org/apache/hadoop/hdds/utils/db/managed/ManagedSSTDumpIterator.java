@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.CloseableIterator;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
 
@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  * Iterator to Parse output of RocksDBSSTDumpTool.
  */
 public abstract class ManagedSSTDumpIterator<T> implements
-        CloseableIterator<T> {
+    ClosableIterator<T> {
 
   private static final String PATTERN_REGEX =
           "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";

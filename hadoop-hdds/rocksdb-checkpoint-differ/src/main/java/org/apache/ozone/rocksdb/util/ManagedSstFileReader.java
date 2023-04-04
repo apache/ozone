@@ -18,7 +18,7 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import org.apache.hadoop.hdds.utils.CloseableIterator;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
@@ -54,7 +54,7 @@ public class ManagedSstFileReader {
   }
 
   public static <T> Stream<T> getStreamFromIterator(
-          CloseableIterator<T> itr) {
+          ClosableIterator<T> itr) {
     final Spliterator<T> spliterator = Spliterators
             .spliteratorUnknownSize(itr, 0);
     return StreamSupport.stream(spliterator, false).onClose(() -> {
@@ -74,7 +74,7 @@ public class ManagedSstFileReader {
             private ManagedOptions options = new ManagedOptions();
             private ReadOptions readOptions = new ManagedReadOptions();
           @Override
-          protected CloseableIterator<String>
+          protected ClosableIterator<String>
               getKeyIteratorForFile(String file) throws RocksDBException {
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
@@ -103,7 +103,7 @@ public class ManagedSstFileReader {
           //TODO: [SNAPSHOT] Check if default Options is enough.
           private ManagedOptions options = new ManagedOptions();
           @Override
-          protected CloseableIterator<String>
+          protected ClosableIterator<String>
               getKeyIteratorForFile(String file)
                   throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
@@ -125,7 +125,7 @@ public class ManagedSstFileReader {
   }
 
   private abstract static class ManagedSstFileIterator implements
-          CloseableIterator<String> {
+      ClosableIterator<String> {
     private SstFileReader fileReader;
     private SstFileReaderIterator fileReaderIterator;
 
@@ -139,7 +139,7 @@ public class ManagedSstFileReader {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
       this.fileReaderIterator.close();
       this.fileReader.close();
     }
@@ -160,12 +160,12 @@ public class ManagedSstFileReader {
   }
 
   private abstract static class MultipleSstFileIterator<T> implements
-          CloseableIterator<T> {
+      ClosableIterator<T> {
 
     private final Iterator<String> fileNameIterator;
 
     private String currentFile;
-    private CloseableIterator<T> currentFileIterator;
+    private ClosableIterator<T> currentFileIterator;
 
     private MultipleSstFileIterator(Collection<String> files)
             throws IOException, RocksDBException,
@@ -174,7 +174,7 @@ public class ManagedSstFileReader {
       moveToNextFile();
     }
 
-    protected abstract CloseableIterator<T> getKeyIteratorForFile(String file)
+    protected abstract ClosableIterator<T> getKeyIteratorForFile(String file)
             throws RocksDBException, NativeLibraryNotLoadedException,
             IOException;
 

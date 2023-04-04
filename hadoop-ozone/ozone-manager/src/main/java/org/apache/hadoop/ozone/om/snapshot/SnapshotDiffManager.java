@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeConstants;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -186,34 +188,33 @@ public class SnapshotDiffManager implements AutoCloseable {
     isNativeRocksToolsLoaded = NativeLibraryLoader.getInstance()
             .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     if (isNativeRocksToolsLoaded) {
-      try {
-        initSSTDumpTool(configuration);
-        isNativeRocksToolsLoaded = true;
-      } catch (NativeLibraryNotLoadedException e) {
-        LOG.error("Unable to load SSTDumpTool", e);
-        isNativeRocksToolsLoaded = false;
-      }
+      isNativeRocksToolsLoaded = initSSTDumpTool(
+          ozoneManager.getConfiguration());
     }
   }
 
-  private void initSSTDumpTool(OzoneConfiguration conf)
-          throws NativeLibraryNotLoadedException {
-    int threadPoolSize = conf.getInt(
-            OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
-            OzoneConfigKeys
-                    .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
-    int bufferSize = (int) conf.getStorageSize(
-            OzoneConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
-            OzoneConfigKeys
-                .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
-            StorageUnit.BYTES);
-    ExecutorService execService = new ThreadPoolExecutor(0,
-            threadPoolSize, 60, TimeUnit.SECONDS,
-            new SynchronousQueue<>(), new ThreadFactoryBuilder()
-            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
-            .build(),
-            new ThreadPoolExecutor.DiscardPolicy());
-    sstDumpTool = new ManagedSSTDumpTool(execService, bufferSize);
+  private boolean initSSTDumpTool(OzoneConfiguration conf) {
+    try {
+      int threadPoolSize = conf.getInt(
+              OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
+              OMConfigKeys
+                  .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
+      int bufferSize = (int) conf.getStorageSize(
+          OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
+          OMConfigKeys
+              .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
+              StorageUnit.BYTES);
+      ExecutorService execService = new ThreadPoolExecutor(0,
+              threadPoolSize, 60, TimeUnit.SECONDS,
+              new SynchronousQueue<>(), new ThreadFactoryBuilder()
+              .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
+              .build(),
+              new ThreadPoolExecutor.DiscardPolicy());
+      sstDumpTool = new ManagedSSTDumpTool(execService, bufferSize);
+    } catch (NativeLibraryNotLoadedException e) {
+      return false;
+    }
+    return true;
   }
 
   private Map<String, String> getTablePrefixes(
