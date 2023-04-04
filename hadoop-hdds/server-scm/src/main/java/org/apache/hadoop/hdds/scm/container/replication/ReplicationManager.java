@@ -712,8 +712,26 @@ public class ReplicationManager implements SCMService {
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(),
-          targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+
+      if (rcc.getTargetDatanode() == null) {
+        /*
+        This means the target will pull a replica from a source, so the
+        op's target Datanode should be the Datanode this command is being
+        sent to.
+         */
+        containerReplicaPendingOps.scheduleAddReplica(
+            containerInfo.containerID(),
+            targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+      } else {
+        /*
+        This means the source will push replica to the target, so the op's
+        target Datanode should be the Datanode the replica will be pushed to.
+         */
+        containerReplicaPendingOps.scheduleAddReplica(
+            containerInfo.containerID(),
+            rcc.getTargetDatanode(), rcc.getReplicaIndex(), scmDeadlineEpochMs);
+      }
+
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
