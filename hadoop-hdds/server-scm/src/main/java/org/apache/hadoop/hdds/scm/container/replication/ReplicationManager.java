@@ -994,14 +994,16 @@ public class ReplicationManager implements SCMService {
    */
   public ContainerHealthResult getContainerReplicationHealth(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder request = new ContainerCheckRequest.Builder()
         .setContainerInfo(containerInfo)
         .setContainerReplicas(replicas)
-        .build();
+        .setPendingOps(getPendingReplicationOps(containerInfo.containerID()));
     if (containerInfo.getReplicationConfig().getReplicationType() == EC) {
-      return ecReplicationCheckHandler.checkHealth(request);
+      request.setMaintenanceRedundancy(maintenanceRedundancy);
+      return ecReplicationCheckHandler.checkHealth(request.build());
     } else {
-      return ratisReplicationCheckHandler.checkHealth(request);
+      request.setMaintenanceRedundancy(ratisMaintenanceMinReplicas);
+      return ratisReplicationCheckHandler.checkHealth(request.build());
     }
   }
 
