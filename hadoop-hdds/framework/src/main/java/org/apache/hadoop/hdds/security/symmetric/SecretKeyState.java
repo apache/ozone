@@ -52,4 +52,9 @@ public interface SecretKeyState {
    */
   @Replicate
   void updateKeys(List<ManagedSecretKey> newKeys) throws TimeoutException;
+
+  /**
+   * Update SecretKeys from a snapshot from SCM leader.
+   */
+  void reinitialize(List<ManagedSecretKey> secretKeys);
 }

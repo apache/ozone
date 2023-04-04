@@ -29,6 +29,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -133,6 +134,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public DBCheckpoint downloadCheckpointFromLeader(String leaderId) {
+    return null;
+  }
+
+  @Override
+  public List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID) {
     return null;
   }
 
