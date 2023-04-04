@@ -132,8 +132,10 @@ public class ContainerBalancerSelectionCriteria {
       ContainerInfo secondInfo = containerManager.getContainer(second);
       if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
         return 1;
-      } else {
+      } else if (firstInfo.getUsedBytes() < secondInfo.getUsedBytes()) {
         return -1;
+      } else {
+        return first.compareTo(second);
       }
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not retrieve ContainerInfo from container manager for " +
