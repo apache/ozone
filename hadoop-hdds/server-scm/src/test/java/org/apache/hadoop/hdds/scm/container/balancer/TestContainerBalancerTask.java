@@ -1163,7 +1163,8 @@ public class TestContainerBalancerTask {
 
         // randomly pick a datanode for this replica
         int datanodeIndex = RANDOM.nextInt(0, numberOfNodes);
-        if (nodeUtilizations.get(i) != 0.0d) {
+        // don't put replicas in DNs that are supposed to have 0 utilization
+        if (Math.abs(nodeUtilizations.get(datanodeIndex) - 0.0d) > 0.00001) {
           DatanodeDetails node =
               nodesInCluster.get(datanodeIndex).getDatanodeDetails();
           Set<ContainerReplica> replicas =
@@ -1171,6 +1172,8 @@ public class TestContainerBalancerTask {
           replicas.add(createReplica(container.containerID(), node,
               container.getUsedBytes()));
           cidToReplicasMap.put(container.containerID(), replicas);
+          datanodeToContainersMap.get(nodesInCluster.get(datanodeIndex))
+              .add(container.containerID());
         }
       }
     }

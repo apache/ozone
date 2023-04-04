@@ -123,7 +123,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   // TODO: [SNAPSHOT] create config for max allowed page size.
   private final int maxPageSize = 1000;
 
-  OmSnapshotManager(OzoneManager ozoneManager) {
+  public OmSnapshotManager(OzoneManager ozoneManager) {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();

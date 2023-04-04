@@ -59,7 +59,7 @@ menu:
 
 ## 客户端用法
 ### Storage space级别配额
- Storage space级别配额允许使用 KB（k），MB（m），GB（g），TB（t）， PB（p）等单位。表示将使用多少个存储空间。
+Storage space级别配额允许使用 B, KB ，MB ，GB ，TB 等单位。表示将使用多少个存储空间。
 #### Volume Space quota用法
 ```shell
 bin/ozone sh volume create --space-quota 5MB /volume1

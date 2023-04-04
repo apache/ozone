@@ -66,6 +66,7 @@ import org.apache.ratis.rpc.RpcType;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.Assert;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.apache.ozone.test.tag.Slow;
 import org.junit.jupiter.api.Disabled;
@@ -89,6 +90,11 @@ public class TestContainerServer {
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
     caClient = new DNCertificateClient(new SecurityConfig(CONF),
         null, null, null, null);
+  }
+
+  @AfterAll
+  public static void tearDown() throws Exception {
+    caClient.close();
   }
 
   @Test

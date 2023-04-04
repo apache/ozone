@@ -34,18 +34,8 @@ import org.rocksdb.TickerType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.Attribute;
-import javax.management.AttributeList;
-import javax.management.AttributeNotFoundException;
-import javax.management.DynamicMBean;
-import javax.management.InvalidAttributeValueException;
-import javax.management.MBeanAttributeInfo;
-import javax.management.MBeanException;
-import javax.management.MBeanInfo;
-import javax.management.ReflectionException;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,9 +43,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Adapter JMX bean to publish all the Rocksdb metrics.
+ * All Rocksdb metrics.
  */
-public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
+public class RocksDBStoreMetrics implements MetricsSource {
 
   private Statistics statistics;
 
@@ -66,10 +56,11 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   private String contextName;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(RocksDBStoreMBean.class);
+      LoggerFactory.getLogger(RocksDBStoreMetrics.class);
 
   public static final String ROCKSDB_CONTEXT_PREFIX = "Rocksdb_";
   public static final String ROCKSDB_PROPERTY_PREFIX = "rocksdb.";
+  private static final String BLOB_DB_PREFIX = "BLOB_DB_";
 
   // RocksDB properties
   // Column1: rocksDB property original name
@@ -114,7 +105,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
   private static final String NUM_FILES_AT_LEVEL = "num_files_at_level";
   private static final String SIZE_AT_LEVEL = "size_at_level";
 
-  public RocksDBStoreMBean(Statistics statistics, RocksDatabase db,
+  public RocksDBStoreMetrics(Statistics statistics, RocksDatabase db,
       String dbName) {
     this.contextName = ROCKSDB_CONTEXT_PREFIX + dbName;
     this.statistics = statistics;
@@ -132,104 +123,22 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
     }
   }
 
-  public static RocksDBStoreMBean create(Statistics statistics,
+  public static RocksDBStoreMetrics create(Statistics statistics,
       RocksDatabase db, String contextName) {
-    RocksDBStoreMBean rocksDBStoreMBean = new RocksDBStoreMBean(
+    RocksDBStoreMetrics metrics = new RocksDBStoreMetrics(
         statistics, db, contextName);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    MetricsSource metricsSource = ms.getSource(rocksDBStoreMBean.contextName);
+    MetricsSource metricsSource = ms.getSource(metrics.contextName);
     if (metricsSource != null) {
-      return (RocksDBStoreMBean)metricsSource;
+      return (RocksDBStoreMetrics)metricsSource;
     } else {
-      return ms.register(rocksDBStoreMBean.contextName,
-          "RocksDB Metrics",
-          rocksDBStoreMBean);
+      return ms.register(metrics.contextName, "RocksDB Metrics", metrics);
     }
   }
 
-  @Override
-  public Object getAttribute(String attribute)
-      throws AttributeNotFoundException, MBeanException, ReflectionException {
-    for (String histogramAttribute : histogramAttributes) {
-      if (attribute.endsWith("_" + histogramAttribute.toUpperCase())) {
-        String keyName = attribute
-            .substring(0, attribute.length() - histogramAttribute.length() - 1);
-        try {
-          HistogramData histogram =
-              statistics.getHistogramData(HistogramType.valueOf(keyName));
-          try {
-            Method method =
-                HistogramData.class.getMethod("get" + histogramAttribute);
-            return method.invoke(histogram);
-          } catch (Exception e) {
-            throw new ReflectionException(e,
-                "Can't read attribute " + attribute);
-          }
-        } catch (IllegalArgumentException exception) {
-          throw new AttributeNotFoundException(
-              "No such attribute in RocksDB stats: " + attribute);
-        }
-      }
-    }
-    try {
-      return statistics.getTickerCount(TickerType.valueOf(attribute));
-    } catch (IllegalArgumentException ex) {
-      throw new AttributeNotFoundException(
-          "No such attribute in RocksDB stats: " + attribute);
-    }
-  }
-
-  @Override
-  public void setAttribute(Attribute attribute)
-      throws AttributeNotFoundException, InvalidAttributeValueException,
-      MBeanException, ReflectionException {
-  }
-
-  @Override
-  public AttributeList getAttributes(String[] attributes) {
-    AttributeList result = new AttributeList();
-    for (String attributeName : attributes) {
-      try {
-        Object value = getAttribute(attributeName);
-        result.add(value);
-      } catch (Exception e) {
-        //TODO
-      }
-    }
-    return result;
-  }
-
-  @Override
-  public AttributeList setAttributes(AttributeList attributes) {
-    return null;
-  }
-
-  @Override
-  public Object invoke(String actionName, Object[] params, String[] signature)
-      throws MBeanException, ReflectionException {
-    return null;
-  }
-
-  @Override
-  public MBeanInfo getMBeanInfo() {
-
-    List<MBeanAttributeInfo> attributes = new ArrayList<>();
-    for (TickerType tickerType : TickerType.values()) {
-      attributes.add(new MBeanAttributeInfo(tickerType.name(), "long",
-          "RocksDBStat: " + tickerType.name(), true, false, false));
-    }
-    for (HistogramType histogramType : HistogramType.values()) {
-      for (String histogramAttribute : histogramAttributes) {
-        attributes.add(new MBeanAttributeInfo(
-            histogramType.name() + "_" + histogramAttribute.toUpperCase(),
-            "long", "RocksDBStat: " + histogramType.name(), true, false,
-            false));
-      }
-    }
-
-    return new MBeanInfo("", "RocksDBStat",
-        attributes.toArray(new MBeanAttributeInfo[0]), null, null, null);
-
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(this.contextName);
   }
 
   @Override
@@ -245,7 +154,13 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
    * @param rb Metrics Record Builder.
    */
   private void getHistogramData(MetricsRecordBuilder rb) {
+    if (this.statistics == null) {
+      return;
+    }
     for (HistogramType histogramType : HistogramType.values()) {
+      if (histogramType.name().startsWith(BLOB_DB_PREFIX)) {
+        continue;
+      }
       HistogramData histogram =
           statistics.getHistogramData(
               HistogramType.valueOf(histogramType.name()));
@@ -269,7 +184,13 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
    * @param rb Metrics Record Builder.
    */
   private void getTickerTypeData(MetricsRecordBuilder rb) {
+    if (this.statistics == null) {
+      return;
+    }
     for (TickerType tickerType : TickerType.values()) {
+      if (tickerType.name().startsWith(BLOB_DB_PREFIX)) {
+        continue;
+      }
       rb.addCounter(Interns.info(tickerType.name(), "RocksDBStat"),
           statistics.getTickerCount(tickerType));
     }
