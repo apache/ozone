@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -372,9 +372,8 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
       Response response1 = clusterStateEndpoint.getClusterState();
       ClusterStateResponse clusterStateResponse1 =
           (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 4);
+      return (clusterStateResponse1.getContainers() == 5);
     });
-
     // Total Available Containers = Total - Deleted Containers = 10 - 5 = 5
     // Total Deleted Containers = 5
     // Total Open Containers = 3
@@ -403,14 +402,11 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
       throws Exception {
     // if container report is processed first, and pipeline does not exist
     // then container is not added until the next container report is processed
-    StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
-        heartbeatRequestProto =
-        StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
-            .newBuilder()
+    SCMHeartbeatRequestProto heartbeatRequestProto =
+        SCMHeartbeatRequestProto.newBuilder()
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
