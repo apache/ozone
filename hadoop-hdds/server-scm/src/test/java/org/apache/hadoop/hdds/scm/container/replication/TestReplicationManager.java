@@ -404,6 +404,37 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
+  /**
+   * {@link
+   * ReplicationManager#getContainerReplicationHealth(ContainerInfo, Set)}
+   * should return under replicated result for an under replicated container.
+   */
+  @Test
+  public void testGetContainerReplicationHealthForUnderReplicatedContainer() {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+
+    ContainerHealthResult result =
+        replicationManager.getContainerReplicationHealth(container, replicas);
+    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
+        result.getHealthState());
+
+    // Test the same for a RATIS container
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    container = createContainerInfo(ratisRepConfig, 1L,
+        HddsProtos.LifeCycleState.CLOSED);
+    replicas = addReplicas(container, ContainerReplicaProto.State.CLOSED, 0,
+        0);
+
+    result =
+        replicationManager.getContainerReplicationHealth(container, replicas);
+    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
+        result.getHealthState());
+  }
+
   @Test
   public void testUnderReplicatedContainerFixedByPending()
       throws ContainerNotFoundException {
