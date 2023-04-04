@@ -79,6 +79,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -146,6 +147,16 @@ public class ReplicationManager implements SCMService {
    * for now, it is used to process non-EC container.
    */
   private LegacyReplicationManager legacyReplicationManager;
+
+  /**
+   * Set of nodes which have been excluded for replication commands due to the
+   * number of commands queued on a datanode. This can be used when generating
+   * reconstruction commands to avoid nodes which are already overloaded. When
+   * the datanode heartbeat is received, the node is removed from this set if
+   * the command count has dropped below the limit.
+   */
+  private final Map<DatanodeDetails, Integer> excludedNodes =
+      new ConcurrentHashMap<>();
 
   /**
    * SCMService related variables.
@@ -526,13 +537,13 @@ public class ReplicationManager implements SCMService {
           "available for replication of container " + containerID + " to " +
           target);
     }
-    // Put the least loaded source first
-    sourceWithCmds.sort(Comparator.comparingInt(Pair::getLeft));
+    DatanodeDetails source = selectAndOptionallyExcludeDatanode(
+        1, sourceWithCmds);
 
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
     cmd.setReplicaIndex(replicaIndex);
-    sendDatanodeCommand(cmd, containerInfo, sourceWithCmds.get(0).getRight());
+    sendDatanodeCommand(cmd, containerInfo, source);
   }
 
   public void sendThrottledReconstructionCommand(ContainerInfo containerInfo,
@@ -545,10 +556,24 @@ public class ReplicationManager implements SCMService {
       throw new CommandTargetOverloadedException("No target with capacity " +
           "available for reconstruction of " + containerInfo.getContainerID());
     }
-    // Put the least loaded target first
-    targetWithCmds.sort(Comparator.comparingInt(Pair::getLeft));
-    sendDatanodeCommand(command, containerInfo,
-        targetWithCmds.get(0).getRight());
+    DatanodeDetails target = selectAndOptionallyExcludeDatanode(
+        reconstructionCommandWeight, targetWithCmds);
+    sendDatanodeCommand(command, containerInfo, target);
+  }
+
+  private DatanodeDetails selectAndOptionallyExcludeDatanode(
+      int additionalCmdCount, List<Pair<Integer, DatanodeDetails>> datanodes) {
+    if (datanodes.isEmpty()) {
+      return null;
+    }
+    // Put the least loaded datanode first
+    datanodes.sort(Comparator.comparingInt(Pair::getLeft));
+    DatanodeDetails datanode = datanodes.get(0).getRight();
+    int currentCount = datanodes.get(0).getLeft();
+    if (currentCount + additionalCmdCount >= datanodeReplicationLimit) {
+      addExcludedNode(datanode);
+    }
+    return datanode;
   }
 
   /**
@@ -567,18 +592,12 @@ public class ReplicationManager implements SCMService {
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
-        Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
-            dn, Type.replicateContainerCommand,
-            Type.reconstructECContainersCommand);
-        int replicateCount = counts.get(Type.replicateContainerCommand);
-        int reconstructCount = counts.get(Type.reconstructECContainersCommand);
-        int totalCount = replicateCount
-            + reconstructCount * reconstructionCommandWeight;
+        int totalCount = getDatanodeQueuedReplicationCount(dn);
         if (totalCount >= datanodeReplicationLimit) {
           LOG.debug("Datanode {} has reached the maximum number of queued " +
-              "commands, replication: {}, reconstruction: {} * {})",
-              dn, replicateCount, reconstructCount,
-              reconstructionCommandWeight);
+              "commands, replication + reconstruction * {}: {})",
+              dn, reconstructionCommandWeight, totalCount);
+          addExcludedNode(dn);
           continue;
         }
         datanodeWithCommandCount.add(Pair.of(totalCount, dn));
@@ -588,6 +607,16 @@ public class ReplicationManager implements SCMService {
       }
     }
     return datanodeWithCommandCount;
+  }
+
+  private int getDatanodeQueuedReplicationCount(DatanodeDetails datanode)
+      throws NodeNotFoundException {
+    Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
+        datanode, Type.replicateContainerCommand,
+        Type.reconstructECContainersCommand);
+    int replicateCount = counts.get(Type.replicateContainerCommand);
+    int reconstructCount = counts.get(Type.reconstructECContainersCommand);
+    return replicateCount + reconstructCount * reconstructionCommandWeight;
   }
 
   /**
@@ -804,15 +833,40 @@ public class ReplicationManager implements SCMService {
    * Notify ReplicationManager that the command counts on a datanode have been
    * updated via a heartbeat received. This will allow RM to consider the node
    * for container operations if it was previously excluded due to load.
-   * @param datanodeDetails The datanode for which the commands have been
-   *                        updated.
+   * @param datanode The datanode for which the commands have been updated.
    */
-  public void datanodeCommandCountUpdated(DatanodeDetails datanodeDetails) {
-    // For now this is a NOOP, as the plan is to use this notification in a
-    // future change to limit the number of commands scheduled against a DN by
-    // RM.
+  public void datanodeCommandCountUpdated(DatanodeDetails datanode) {
     LOG.debug("Received a notification that the DN command count " +
-        "has been updated for {}", datanodeDetails);
+        "has been updated for {}", datanode);
+    // If there is an existing mapping, we may need to remove it
+    excludedNodes.computeIfPresent(datanode, (k, v) -> {
+      try {
+        if (getDatanodeQueuedReplicationCount(datanode)
+            < datanodeReplicationLimit) {
+          // Returning null removes the entry from the map
+          return null;
+        } else {
+          return 1;
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Unable to find datanode {} in nodeManager. " +
+            "Should not happen.", datanode);
+        return null;
+      }
+    });
+  }
+
+  /**
+   * Returns the list of datanodes that are currently excluded from being
+   * targets for container replication due to queued commands.
+   * @return Set of excluded DatanodeDetails.
+   */
+  public Set<DatanodeDetails> getExcludedNodes() {
+    return excludedNodes.keySet();
+  }
+
+  private void addExcludedNode(DatanodeDetails dn) {
+    excludedNodes.put(dn, 1);
   }
 
   protected void processContainer(ContainerInfo containerInfo,

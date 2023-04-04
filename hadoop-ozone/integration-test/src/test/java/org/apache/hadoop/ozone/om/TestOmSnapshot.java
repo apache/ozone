@@ -319,6 +319,7 @@ public class TestOmSnapshot {
   }
 
   @Test
+  @Ignore("HDDS-8089")
   public void checkKey() throws Exception {
     String s = "testData";
     String dir1 = "dir1";
