@@ -1896,9 +1896,8 @@ public class KeyManagerImpl implements KeyManager {
             parentInfo.getObjectID())) {
           break;
         }
-        fileInfo.setFileName(fileInfo.getKeyName());
         String fullKeyPath = OMFileRequest.getAbsolutePath(
-            parentInfo.getKeyName(), fileInfo.getKeyName());
+            parentInfo.getKeyName(), fileInfo.getFileName());
         fileInfo.setKeyName(fullKeyPath);
 
         files.add(fileInfo);
