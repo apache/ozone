@@ -1196,10 +1196,10 @@ message DeletedKeys {
     repeated string keys = 3;
 }
 
-
-
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
+    // if set, will purge keys in a snapshot DB instead of active DB
+    optional string snapshotTableKey = 2;
 }
 
 message PurgeKeysResponse {
