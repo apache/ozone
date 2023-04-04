@@ -92,7 +92,6 @@ public class TestOmDBInsightEndPoint {
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private Pipeline pipeline;
   private PipelineID pipelineID;
@@ -103,7 +102,6 @@ public class TestOmDBInsightEndPoint {
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
     ReconTestInjector reconTestInjector =
