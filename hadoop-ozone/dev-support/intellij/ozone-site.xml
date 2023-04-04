@@ -91,4 +91,9 @@
     <name>ozone.scm.dead.node.interval</name>
     <value>10m</value>
   </property>
+
+  <property>
+    <name>ozone.metastore.rocksdb.statistics</name>
+    <value>ALL</value>
+  </property>
 </configuration>

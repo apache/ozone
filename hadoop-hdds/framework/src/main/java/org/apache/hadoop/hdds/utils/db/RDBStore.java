@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -30,16 +29,15 @@ import java.util.Map;
 import java.util.Set;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.hdds.HddsUtils;
+
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
+import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -67,7 +65,7 @@ public class RDBStore implements DBStore {
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;
-  private ObjectName statMBeanName;
+  private RocksDBStoreMetrics metrics;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
   private final String snapshotsParentDir;
@@ -122,20 +120,16 @@ public class RDBStore implements DBStore {
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
-      if (dbOptions.statistics() != null) {
-        Map<String, String> jmxProperties = new HashMap<>();
-        jmxProperties.put("dbName", dbJmxBeanName);
-        statMBeanName = HddsUtils.registerWithJmxProperties(
-            "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), db,
-                dbJmxBeanName));
-        if (statMBeanName == null) {
-          LOG.warn("jmx registration failed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        } else {
-          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        }
+      // dbOptions.statistics() only contribute to part of RocksDB metrics in
+      // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
+      metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
+          dbJmxBeanName);
+      if (metrics == null) {
+        LOG.warn("Metrics registration failed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
+      } else {
+        LOG.debug("Metrics registration succeed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
       }
 
       //create checkpoints directory if not exists.
@@ -219,9 +213,9 @@ public class RDBStore implements DBStore {
 
   @Override
   public void close() throws IOException {
-    if (statMBeanName != null) {
-      MBeans.unregister(statMBeanName);
-      statMBeanName = null;
+    if (metrics != null) {
+      metrics.unregister();
+      metrics = null;
     }
 
     RDBMetrics.unRegister();
@@ -273,12 +267,6 @@ public class RDBStore implements DBStore {
   public void commitBatchOperation(BatchOperation operation)
       throws IOException {
     ((RDBBatchOperation) operation).commit(db);
-  }
-
-
-  @VisibleForTesting
-  protected ObjectName getStatMBeanName() {
-    return statMBeanName;
   }
 
   @Override

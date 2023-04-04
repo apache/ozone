@@ -28,6 +28,8 @@ import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -37,6 +39,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -48,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
@@ -89,6 +94,10 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.when;
 
 /**
  * Helper class to test OMClientRequest classes.
@@ -581,47 +590,26 @@ public final class OMRequestTestUtils {
         CacheValue.get(1L, omBucketInfo));
   }
 
-  public static OzoneManagerProtocolProtos.OMRequest createBucketRequest(
-      String bucketName, String volumeName, boolean isVersionEnabled,
-      OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
-    OzoneManagerProtocolProtos.BucketInfo bucketInfo =
-        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
-            .setBucketName(bucketName)
-            .setVolumeName(volumeName)
-            .setIsVersionEnabled(isVersionEnabled)
-            .setStorageType(storageTypeProto)
-            .addAllMetadata(getMetadataList()).build();
+  public static BucketInfo.Builder newBucketInfoBuilder(
+      String bucketName, String volumeName) {
+    return BucketInfo.newBuilder()
+        .setBucketName(bucketName)
+        .setVolumeName(volumeName)
+        .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.SSD)
+        .setIsVersionEnabled(false)
+        .addAllMetadata(getMetadataList());
+  }
+
+  public static OMRequest.Builder newCreateBucketRequest(
+      BucketInfo.Builder bucketInfo) {
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
         OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
+    return OMRequest.newBuilder()
         .setCreateBucketRequest(req)
         .setVersion(ClientVersion.CURRENT_VERSION)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  public static OzoneManagerProtocolProtos.OMRequest createBucketReqFSO(
-          String bucketName, String volumeName, boolean isVersionEnabled,
-          OzoneManagerProtocolProtos.StorageTypeProto storageTypeProto) {
-    OzoneManagerProtocolProtos.BucketInfo bucketInfo =
-        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
-            .setBucketName(bucketName)
-            .setVolumeName(volumeName)
-            .setIsVersionEnabled(isVersionEnabled)
-            .setStorageType(storageTypeProto)
-            .addAllMetadata(getMetadataListFSO()).setBucketLayout(
-                OzoneManagerProtocolProtos.BucketLayoutProto.
-                    FILE_SYSTEM_OPTIMIZED)
-            .build();
-    OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
-            OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
-    req.setBucketInfo(bucketInfo);
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCreateBucketRequest(req)
-            .setVersion(ClientVersion.CURRENT_VERSION)
-            .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
-            .setClientId(UUID.randomUUID().toString()).build();
+        .setClientId(UUID.randomUUID().toString());
   }
 
   public static List< HddsProtos.KeyValue> getMetadataList() {
@@ -633,16 +621,11 @@ public final class OMRequestTestUtils {
     return metadataList;
   }
 
-  public static List< HddsProtos.KeyValue> getMetadataListFSO() {
-    List<HddsProtos.KeyValue> metadataList = new ArrayList<>();
-    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key1").setValue(
-            "value1").build());
-    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey("key2").setValue(
-            "value2").build());
-    metadataList.add(HddsProtos.KeyValue.newBuilder().setKey(
-            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS).setValue(
-            "false").build());
-    return metadataList;
+  public static HddsProtos.KeyValue fsoMetadata() {
+    return HddsProtos.KeyValue.newBuilder()
+        .setKey(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS)
+        .setValue(Boolean.FALSE.toString())
+        .build();
   }
 
   /**
@@ -1349,5 +1332,15 @@ public final class OMRequestTestUtils {
 
   private static BucketLayout getDefaultBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  public static void setupReplicationConfigValidation(
+      OzoneManager ozoneManager, ConfigurationSource ozoneConfiguration)
+      throws OMException {
+    ReplicationConfigValidator validator =
+        ozoneConfiguration.getObject(ReplicationConfigValidator.class);
+    when(ozoneManager.getReplicationConfigValidator())
+        .thenReturn(validator);
+    doCallRealMethod().when(ozoneManager).validateReplicationConfig(any());
   }
 }

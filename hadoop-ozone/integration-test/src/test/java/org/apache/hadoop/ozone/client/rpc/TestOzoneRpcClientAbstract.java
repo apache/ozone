@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -4087,7 +4088,7 @@ public abstract class TestOzoneRpcClientAbstract {
             HddsProtos.ReplicationFactor.ONE),
         currentReplicationConfig);
     ECReplicationConfig ecReplicationConfig =
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+        new ECReplicationConfig(3, 2, EcCodec.RS, (int) OzoneConsts.MB);
     bucket.setReplicationConfig(ecReplicationConfig);
 
     // Get the bucket and check the updated config.

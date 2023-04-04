@@ -332,7 +332,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                1024)));
+                (int) OzoneConsts.MB)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     return volume.getBucket(myBucket);
