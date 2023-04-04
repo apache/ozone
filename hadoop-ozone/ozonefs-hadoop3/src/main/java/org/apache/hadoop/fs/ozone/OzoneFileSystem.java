@@ -48,7 +48,6 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
 
   private OzoneFSStorageStatistics storageStatistics;
 
-
   public OzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
   }
