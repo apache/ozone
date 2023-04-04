@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +66,7 @@ import java.net.HttpURLConnection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
@@ -235,7 +238,7 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     // Generate container reports with different states
     for (long i = 1L; i < 11L; i++) {
       ContainerReplicaProto.State state;
-      if (i < 5L) {
+      if (i <= 5L) {
         state = ContainerReplicaProto.State.DELETED;
       } else if (i < 8L) {
         state = ContainerReplicaProto.State.CLOSED;
@@ -363,7 +366,14 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testDeletedContainerCount() throws Exception {
+  public void testContainerStatsCount() throws Exception {
+
+    waitAndCheckConditionAfterHeartbeat(() -> {
+      Response response1 = clusterStateEndpoint.getClusterState();
+      ClusterStateResponse clusterStateResponse1 =
+          (ClusterStateResponse) response1.getEntity();
+      return (clusterStateResponse1.getContainers() == 4);
+    });
 
     // Total Available Containers = Total - Deleted Containers = 10 - 5 = 5
     // Total Deleted Containers = 5
@@ -387,6 +397,22 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     Assertions.assertEquals(5, clusterStateResponse1.getDeletedContainers());
     // Test for OPEN containers
     Assertions.assertEquals(3, clusterStateResponse1.getOpenContainers());
+  }
+
+  private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
+      throws Exception {
+    // if container report is processed first, and pipeline does not exist
+    // then container is not added until the next container report is processed
+    StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto
+        heartbeatRequestProto =
+        StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto.newBuilder()
+            .setContainerReport(containerReportsProto)
+            .setDatanodeDetails(extendedDatanodeDetailsProto
+                .getDatanodeDetails())
+            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
+            .build();
+    reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
+    LambdaTestUtils.await(30000, 1000, check);
   }
 
 }
