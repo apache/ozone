@@ -55,9 +55,11 @@ menu:
 
  c. 当bucket的命名空间配额启用时，该bucket的key数目不能超过此配额。
 
- d. Linked bucket没有定义单独的命名空间配额，它是由源桶的命名空间配额引用的。
+ d. Linked bucket没有定义单独的命名空间配额，它是由源桶的命名空间配额为链接桶内的键引用的。
 
- e. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
+ e. Linked bucket将消耗卷的命名空间配额
+
+ f. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
 
 ### 笔记
 - 对于递归删除目录的 FSO 桶，配额的释放在子目录和文件被删除后异步发生（当目录被删除时，递归删除可以在后台进行）。
