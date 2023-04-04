@@ -17,22 +17,19 @@
  */
 
 package org.apache.hadoop.ozone.recon.api;
+
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos
-    .ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -55,22 +52,10 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
@@ -78,13 +63,22 @@ import java.net.HttpURLConnection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
- * Test for Recon API endpoints.
+ * Test for clusterStateEndpoint for checking deletedContainers count.
  */
-public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
+public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   private NodeEndpoint nodeEndpoint;
   private ClusterStateEndpoint clusterStateEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -94,7 +88,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
   private DatanodeDetails datanodeDetails;
   private DatanodeDetails datanodeDetails2;
   private ContainerReportsProto containerReportsProto;
-  private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
+  private HddsProtos.ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private Pipeline pipeline, pipeline2;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -132,18 +126,20 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
     when(mockScmServiceProvider.getPipeline(
         pipeline2.getId().getProtobuf())).thenReturn(pipeline2);
 
-    // Open 5 containers on pipeline 1
+    // Initialize 5 DELETED containers associated with pipeline 1
+    // which is associated with DataNode1
     containerIDs = new LinkedList<>();
     cpw = new LinkedList<>();
     for (long i = 1L; i <= 5L; ++i) {
       ContainerInfo containerInfo = new ContainerInfo.Builder()
           .setContainerID(i)
-          .setReplicationConfig(
-              RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
-          .setState(LifeCycleState.OPEN)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.ONE))
+          .setState(LifeCycleState.DELETED)
           .setOwner("test")
           .setPipelineID(pipeline.getId())
           .build();
+
       ContainerWithPipeline containerWithPipeline =
           new ContainerWithPipeline(containerInfo, pipeline);
       when(mockScmServiceProvider.getContainerWithPipeline(i))
@@ -152,13 +148,18 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
       cpw.add(containerWithPipeline);
     }
 
-    // Open 5 containers on pipeline 2
+
+    // Initialize 2 CLOSED and 3 OPEN containers associated with pipeline 2
+    // which is associated with DataNode2
     for (long i = 6L; i <= 10L; ++i) {
+      LifeCycleState lifeCycleState = (i == 6L || i == 7L) ?
+          LifeCycleState.CLOSED : LifeCycleState.OPEN;
       ContainerInfo containerInfo = new ContainerInfo.Builder()
           .setContainerID(i)
           .setReplicationConfig(
-              RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
-          .setState(LifeCycleState.OPEN)
+              RatisReplicationConfig.getInstance(
+                  HddsProtos.ReplicationFactor.ONE))
+          .setState(lifeCycleState)
           .setOwner("test")
           .setPipelineID(pipeline2.getId())
           .build();
@@ -169,6 +170,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
       containerIDs.add(i);
       cpw.add(containerWithPipeline);
     }
+
 
     when(mockScmServiceProvider
         .getExistContainerWithPipelinesInBatch(containerIDs))
@@ -213,43 +215,51 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    // The following setup runs only once
+    // Check if the setup has already been done
     if (!isSetupDone) {
+      // Initialize the injector if setup has not been done
       initializeInjector();
+      // Mark the setup as done
       isSetupDone = true;
     }
+    // Get UUIDs for datanodes
     String datanodeId = datanodeDetails.getUuid().toString();
     String datanodeId2 = datanodeDetails2.getUuid().toString();
 
     // initialize container report
     builder = ContainerReportsProto.newBuilder();
-    for (long i = 1L; i <= 10L; i++) {
-      if (i >= 1L && i < 6L) {
-        builder.addReports(
-            ContainerReplicaProto.newBuilder()
-                .setContainerID(i)
-                .setState(ContainerReplicaProto.State.OPEN)
-                .setOriginNodeId(datanodeId)
-                .build()
-        );
+    builder = ContainerReportsProto.newBuilder();
+
+    // Generate container reports with different states
+    for (long i = 1L; i < 11L; i++) {
+      ContainerReplicaProto.State state;
+      if (i < 5L) {
+        state = ContainerReplicaProto.State.DELETED;
+      } else if (i < 8L) {
+        state = ContainerReplicaProto.State.CLOSED;
       } else {
-        builder.addReports(
-            ContainerReplicaProto.newBuilder()
-                .setContainerID(i)
-                .setState(ContainerReplicaProto.State.OPEN)
-                .setOriginNodeId(datanodeId2)
-                .build()
-        );
+        state = ContainerReplicaProto.State.OPEN;
       }
+
+      builder.addReports(
+          ContainerReplicaProto.newBuilder()
+              .setContainerID(i)
+              .setState(state)
+              .setOriginNodeId(i < 5L ? datanodeId : datanodeId2)
+              .build()
+      );
     }
+    // Build container reports
     containerReportsProto = builder.build();
 
+    // Build UUID object for pipeline
     UUID pipelineUuid = UUID.fromString(pipelineId);
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(pipelineUuid.getMostSignificantBits())
         .setLeastSigBits(pipelineUuid.getLeastSignificantBits())
         .build();
 
+    // Build pipeline report for pipeline 1
     PipelineReport pipelineReport = PipelineReport.newBuilder()
         .setPipelineID(
             PipelineID.newBuilder().setId(pipelineId).setUuid128(uuid128)
@@ -292,6 +302,8 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
         .setMostSigBits(pipelineUuid2.getMostSignificantBits())
         .setLeastSigBits(pipelineUuid2.getLeastSignificantBits())
         .build();
+
+    // Build pipeline report for pipeline 2
     PipelineReport pipelineReport2 = PipelineReport.newBuilder()
         .setPipelineID(
             PipelineID.newBuilder().setId(pipelineId2).setUuid128(uuid128)
@@ -307,7 +319,7 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
             .setUuid(datanodeId2)
             .setIpAddress(IP2)
             .build();
-    ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
+    HddsProtos.ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
         ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(datanodeDetailsProto2)
             .setVersion("0.6.0")
@@ -349,48 +361,30 @@ public class TestTotalOpenContainerCount extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testOpenContainerCount() throws Exception {
+  public void testDeletedContainerCount() throws Exception {
 
-    waitAndCheckConditionAfterHeartbeat(() -> {
-      Response response1 = clusterStateEndpoint.getClusterState();
-      ClusterStateResponse clusterStateResponse1 =
-          (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 10);
-    });
+    // Total Available Containers = Total - Deleted Containers = 10 - 5 = 5
+    // Total Deleted Containers = 5
+    // Total Open Containers = 3
+    // Total Closed Containers = 2
 
-    Response response = clusterStateEndpoint.getClusterState();
-    response = nodeEndpoint.getDatanodes();
+    Response response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
         (DatanodesResponse) response.getEntity();
     Assertions.assertEquals(2, datanodesResponse.getTotalCount());
-    AtomicInteger expectedCount = new AtomicInteger();
 
     Response response1 = clusterStateEndpoint.getClusterState();
     ClusterStateResponse clusterStateResponse1 =
         (ClusterStateResponse) response1.getEntity();
-    // Get the total count of Open containers across all DataNodes
-    datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
-      expectedCount.set(
-          expectedCount.get() +
-              datanodeMetadata.getOpenContainers());
-    });
 
-    Assertions.assertEquals(expectedCount.intValue(),
-        clusterStateResponse1.getOpenContainers());
+    // Test for total pipelines
+    Assertions.assertEquals(2, clusterStateResponse1.getPipelines());
+    // Test for total containers
+    Assertions.assertEquals(5, clusterStateResponse1.getContainers());
+    // Test for total deleted containers
+    Assertions.assertEquals(5, clusterStateResponse1.getDeletedContainers());
+    // Test for OPEN containers
+    Assertions.assertEquals(3, clusterStateResponse1.getOpenContainers());
   }
 
-  private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
-      throws Exception {
-    // if container report is processed first, and pipeline does not exist
-    // then container is not added until the next container report is processed
-    SCMHeartbeatRequestProto heartbeatRequestProto =
-        SCMHeartbeatRequestProto.newBuilder()
-            .setContainerReport(containerReportsProto)
-            .setDatanodeDetails(extendedDatanodeDetailsProto
-                .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
-            .build();
-    reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
-    LambdaTestUtils.await(30000, 1000, check);
-  }
 }
