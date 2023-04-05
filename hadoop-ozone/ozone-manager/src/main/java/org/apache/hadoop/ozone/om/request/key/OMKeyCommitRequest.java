@@ -105,7 +105,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).setUserInfo(getUserInfo()).build();
+            .setKeyArgs(newKeyArgs))
+        .setUserInfo(getUserIfNotExists(ozoneManager)).build();
   }
 
   @Override
