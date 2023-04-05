@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -49,13 +50,15 @@ public class ContainerBalancerSelectionCriteria {
   private Set<ContainerID> selectedContainers;
   private Set<ContainerID> excludeContainers;
   private FindSourceStrategy findSourceStrategy;
+  private OzoneConfiguration ozoneConfiguration;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
       NodeManager nodeManager,
       ReplicationManager replicationManager,
       ContainerManager containerManager,
-      FindSourceStrategy findSourceStrategy) {
+      FindSourceStrategy findSourceStrategy,
+      OzoneConfiguration ozoneConfiguration) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
@@ -63,6 +66,7 @@ public class ContainerBalancerSelectionCriteria {
     selectedContainers = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
     this.findSourceStrategy = findSourceStrategy;
+    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   /**
@@ -158,10 +162,14 @@ public class ContainerBalancerSelectionCriteria {
    * Checks whether a Container has the ReplicationType
    * {@link HddsProtos.ReplicationType#EC}.
    * @param container container to check
-   * @return true if the ReplicationType is EC, else false
+   * @return true if the ReplicationType is EC and "hdds.scm.replication
+   * .enable.legacy" is true, else false
    */
   private boolean isECContainer(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
+    boolean legacyEnabled = ozoneConfiguration.
+        getBoolean("hdds.scm.replication.enable.legacy", true);
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
+        && legacyEnabled;
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
