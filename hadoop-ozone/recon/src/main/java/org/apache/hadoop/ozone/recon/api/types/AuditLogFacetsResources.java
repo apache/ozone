@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import java.util.Arrays;
-
 /**
  * This class is used to encapsulate entity's audit log event metadata objects.
  */
@@ -27,10 +25,10 @@ public class AuditLogFacetsResources {
   private EntityMetaData[] buckets;
 
   public EntityMetaData[] getBuckets() {
-    return Arrays.copyOfRange(buckets, 0, buckets.length);
+    return buckets;
   }
 
   public void setBuckets(EntityMetaData[] buckets) {
-    this.buckets = Arrays.copyOfRange(buckets, 0, buckets.length);
+    this.buckets = buckets;
   }
 }

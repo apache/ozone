@@ -48,7 +48,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 public class SolrAccessAuditsService extends AccessAuditsService {
   private static final Logger LOG =
       LoggerFactory.getLogger(SolrAccessAuditsService.class);
-  private UserGroupInformation reconUser;
+  private static UserGroupInformation reconUser;
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
