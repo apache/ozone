@@ -391,7 +391,8 @@ public abstract class SCMCommonPlacementPolicy implements
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas);
-    if (topology == null || replicas == 1 || requiredRacks == 1) {
+    int numRacks = topology != null ? topology.getRackCount() : 1;
+    if (numRacks == 1 || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
@@ -402,10 +403,6 @@ public abstract class SCMCommonPlacementPolicy implements
     Map<Node, Long> currentRackCount = dns.stream()
             .collect(Collectors.groupingBy(this::getPlacementGroup,
                     Collectors.counting()));
-    final int maxLevel = topology.getMaxLevel();
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    int numRacks = topology.getNumOfNodes(maxLevel - 1);
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
