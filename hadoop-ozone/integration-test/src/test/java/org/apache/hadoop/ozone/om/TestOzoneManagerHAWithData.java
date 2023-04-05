@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -42,7 +41,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
@@ -104,85 +102,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
     testMultipartUploadWithOneOmNodeDown();
-  }
-
-  @Test
-  @Flaky("HDDS-8035")
-  public void testOMHAMetrics() throws InterruptedException,
-      TimeoutException, IOException {
-    waitForLeaderToBeReady();
-
-    // Get leader OM
-    OzoneManager leaderOM = getCluster().getOMLeader();
-    // Store current leader's node ID,
-    // to use it after restarting the OM
-    String leaderOMId = leaderOM.getOMNodeId();
-    // Get a list of all OMs
-    List<OzoneManager> omList = getCluster().getOzoneManagersList();
-
-    // Check metrics for all OMs
-    checkOMHAMetricsForAllOMs(omList, leaderOMId);
-
-    // Restart current leader OM
-    leaderOM.stop();
-    leaderOM.restart();
-
-    waitForLeaderToBeReady();
-
-    // Get the new leader
-    OzoneManager newLeaderOM = getCluster().getOMLeader();
-    String newLeaderOMId = newLeaderOM.getOMNodeId();
-    // Get a list of all OMs again
-    omList = getCluster().getOzoneManagersList();
-
-    // New state for the old leader
-    int newState = leaderOMId.equals(newLeaderOMId) ? 1 : 0;
-
-    // Get old leader
-    OzoneManager oldLeader = getCluster().getOzoneManager(leaderOMId);
-    // Get old leader's metrics
-    OMHAMetrics omhaMetrics = oldLeader.getOmhaMetrics();
-
-    Assertions.assertEquals(newState,
-        omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
-
-    // Check that metrics for all OMs have been updated
-    checkOMHAMetricsForAllOMs(omList, newLeaderOMId);
-  }
-
-  private void checkOMHAMetricsForAllOMs(List<OzoneManager> omList,
-                                         String leaderOMId) {
-    for (OzoneManager om : omList) {
-      // Get OMHAMetrics for the current OM
-      OMHAMetrics omhaMetrics = om.getOmhaMetrics();
-      String nodeId = om.getOMNodeId();
-
-      // If current OM is leader, state should be 1
-      int expectedState = nodeId
-          .equals(leaderOMId) ? 1 : 0;
-
-      Assertions.assertEquals(expectedState,
-          omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
-
-      Assertions.assertEquals(nodeId, omhaMetrics.getOmhaInfoNodeId());
-    }
-  }
-
-
-  /**
-   * Some tests are stopping or restarting OMs.
-   * There are test cases where we might need to
-   * wait for a leader to be elected and ready.
-   */
-  private void waitForLeaderToBeReady()
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return getCluster().getOMLeader().isLeaderReady();
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, 80000);
   }
 
   @Test
@@ -528,7 +447,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     followerOM1.stop();
 
     // Do more transactions. Stopped OM should miss these transactions and
-    // the logs corresponding to atleast some of the missed transactions
+    // the logs corresponding to at least some missed transactions
     // should be purged. This will force the OM to install snapshot when
     // restarted.
     long minNewTxIndex = followerOM1LastAppliedIndex + getLogPurgeGap() * 10L;
