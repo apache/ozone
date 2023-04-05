@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.solr.SolrAccessAuditsService;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -116,6 +118,9 @@ public class ReconControllerModule extends AbstractModule {
     bind(OzoneStorageContainerManager.class)
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
     bind(MetricsServiceProviderFactory.class).in(Singleton.class);
+
+    bind(ReconHttpClient.class).in(Singleton.class);
+    bind(SolrAccessAuditsService.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {

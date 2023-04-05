@@ -234,7 +234,9 @@ public class ReconServer extends GenericCli {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
-      reconTaskStatusMetrics.register();
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.register();
+      }
       if (httpServer != null) {
         httpServer.start();
       }

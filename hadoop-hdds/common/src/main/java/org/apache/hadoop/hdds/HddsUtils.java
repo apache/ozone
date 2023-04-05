@@ -67,6 +67,8 @@ import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESE
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_SERVER_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
@@ -347,6 +349,40 @@ public final class HddsUtils {
           + name);
     }
     int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return NetUtils.createSocketAddr(hostname.get(), port);
+  }
+
+  /**
+   * Retrieve the socket addresses of Apache Solr Server.
+   *
+   * @return Apache Solr server address
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static InetSocketAddress getSolrAddress(
+      ConfigurationSource conf) {
+    String name = conf.get(OZONE_SOLR_ADDRESS_KEY);
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+    Optional<String> hostname = getHostName(name);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Solr Server: "
+          + name);
+    }
+    int port = OZONE_SOLR_SERVER_PORT_DEFAULT;
+    try {
+      port = getHostPort(name).orElse(OZONE_SOLR_SERVER_PORT_DEFAULT);
+    } catch (Exception exp) {
+      String[] hostPort = name.split(":");
+      if (hostPort.length > 1) {
+        // Below split is done to extract out port number from
+        // SOLR HOST URL format in zookeeper node.
+        // URL format: https://<host>:<port>_solr
+        String[] portSplit = hostPort[1].split("_");
+        port = portSplit.length > 1 ? Integer.parseInt(portSplit[0]) :
+            OZONE_SOLR_SERVER_PORT_DEFAULT;
+      }
+    }
     return NetUtils.createSocketAddr(hostname.get(), port);
   }
 

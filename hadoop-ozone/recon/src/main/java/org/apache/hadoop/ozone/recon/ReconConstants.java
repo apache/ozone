@@ -32,6 +32,9 @@ public final class ReconConstants {
 
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
+  public static final String RECON_ACCESS_METADATA_DB =
+      "recon-access-metadata.db";
+
   public static final String CONTAINER_COUNT_KEY = "containerCount";
 
   public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
@@ -53,6 +56,9 @@ public final class ReconConstants {
   public static final String RECON_QUERY_VOLUME = "volume";
   public static final String RECON_QUERY_BUCKET = "bucket";
   public static final String RECON_QUERY_FILE_SIZE = "fileSize";
+  public static final String RECON_ENTITY_PATH = "path";
+  public static final String RECON_ENTITY_TYPE = "entityType";
+  public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";
 
   public static final String RECON_SCM_CONTAINER_DB =
       "recon-" + CONTAINER_DB_SUFFIX;

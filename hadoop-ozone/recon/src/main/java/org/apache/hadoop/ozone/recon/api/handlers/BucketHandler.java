@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -196,8 +197,12 @@ public abstract class BucketHandler {
       String volumeName, String bucketName) throws IOException {
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo bucketInfo = omMetadataManager
-        .getBucketTable().getSkipCache(bucketKey);
+    Table<String, OmBucketInfo> bucketTable =
+        omMetadataManager.getBucketTable();
+    OmBucketInfo bucketInfo = null;
+    if (null != bucketTable) {
+      bucketInfo = bucketTable.getSkipCache(bucketKey);
+    }
 
     return getBucketHandler(reconNamespaceSummaryManager,
         omMetadataManager, reconSCM, bucketInfo);

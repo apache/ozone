@@ -24,8 +24,10 @@ import com.google.inject.servlet.ServletModule;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.AdminOnly;
+import org.apache.hadoop.ozone.recon.api.InternalOnly;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAdminFilter;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAuthFilter;
+import org.apache.hadoop.ozone.recon.api.filters.ReconInternalComponentFilter;
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.jersey.internal.inject.InjectionManager;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -76,6 +78,7 @@ public class ReconRestServletModule extends ServletModule {
   private void configureApi(String baseApiPath, String... packages) {
     StringBuilder sb = new StringBuilder();
     Set<String> adminEndpoints = new HashSet<>();
+    Set<String> internalOnlyEndpoints = new HashSet<>();
 
     for (String pkg : packages) {
       if (sb.length() > 0) {
@@ -96,6 +99,7 @@ public class ReconRestServletModule extends ServletModule {
         LOG.debug("Registered the following endpoint classes as admin only: {}",
             adminEndpointClasses);
       }
+      getInternalOnlyEndPoints(internalOnlyEndpoints, reflections);
     }
     Map<String, String> params = new HashMap<>();
     params.put("javax.ws.rs.Application",
@@ -109,6 +113,45 @@ public class ReconRestServletModule extends ServletModule {
         UriBuilder.fromPath(baseApiPath).path("*").build().toString();
     serve(allApiPath).with(ServletContainer.class, params);
     addFilters(baseApiPath, adminEndpoints);
+    // This is part of framework now for all internal endpoints.
+    addFiltersForInternalOnlyEndPoints(baseApiPath, internalOnlyEndpoints);
+  }
+
+  private void addFiltersForInternalOnlyEndPoints(
+      String basePath,
+      Set<String> internalOnlyEndpoints) {
+    for (String path: internalOnlyEndpoints) {
+      String internalOnlyPath =
+          UriBuilder.fromPath(basePath).path(path + "*").build().toString();
+      filter(internalOnlyPath).through(ReconInternalComponentFilter.class);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Added recon internal filter to path {}", internalOnlyPath);
+      }
+    }
+  }
+
+  private void getInternalOnlyEndPoints(Set<String> internalOnlyEndpoints,
+                                        Reflections reflections) {
+    Set<Class<?>> internalOnlyEndpointClasses =
+        reflections.getTypesAnnotatedWith(InternalOnly.class);
+    internalOnlyEndpointClasses.stream()
+        .map(clss -> UriBuilder.fromResource(clss).build().toString())
+        .forEachOrdered(internalOnlyEndpoints::add);
+
+    Map<String, Map<String, String>> internalEndpointMap = new HashMap<>();
+    internalOnlyEndpointClasses.forEach(cl -> {
+      String endPointURL = UriBuilder.fromResource(cl).build().toString();
+      InternalOnly internalOnly = cl.getAnnotation(InternalOnly.class);
+      Map<String, String> featureDescMap = new HashMap<>();
+      featureDescMap.put("feature", internalOnly.feature());
+      featureDescMap.put("description", internalOnly.description());
+      internalEndpointMap.put(endPointURL, featureDescMap);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Registered the following endpoint classes as internal only: {}",
+            internalEndpointMap);
+      }
+    });
   }
 
   private void addFilters(String basePath, Set<String> adminSubPaths) {
