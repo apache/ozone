@@ -1014,7 +1014,7 @@ public class TestContainerEndpoint {
     assertEquals(omContainers.size(), scmContainers.size());
     // delete container Id 1 from SCM
     reconContainerManager.deleteContainer(ContainerID.valueOf(1));
-    Response containerInsights = containerEndpoint.getContainerInsights();
+    Response containerInsights = containerEndpoint.getContainerMisMatchInsights();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
@@ -1041,7 +1041,7 @@ public class TestContainerEndpoint {
         LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       }
     });
-    Response containerInsights = containerEndpoint.getContainerInsights();
+    Response containerInsights = containerEndpoint.getContainerMisMatchInsights();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
     ContainerDiscrepancyInfo containerDiscrepancyInfo =

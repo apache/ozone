@@ -428,7 +428,7 @@ public class ContainerEndpoint {
 
   @GET
   @Path("insights/containermismatch")
-  public Response getContainerInsights() {
+  public Response getContainerMisMatchInsights() {
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         new ArrayList<>();
     try {
@@ -468,8 +468,9 @@ public class ContainerEndpoint {
             new ContainerDiscrepancyInfo();
         containerDiscrepancyInfo.setContainerID(nonOMContainerId);
         containerDiscrepancyInfo.setNumberOfKeys(0);
+        PipelineID pipelineID = null;
         try {
-          PipelineID pipelineID = containerManager.getContainer(
+          pipelineID = containerManager.getContainer(
                   ContainerID.valueOf(nonOMContainerId))
               .getPipelineID();
 
@@ -477,9 +478,10 @@ public class ContainerEndpoint {
             pipelines.add(pipelineManager.getPipeline(pipelineID));
           }
         } catch (ContainerNotFoundException e) {
-          throw new RuntimeException(e);
+          LOG.warn("Container {} not found in SCM: {}", nonOMContainerId, e);
         } catch (PipelineNotFoundException e) {
-          throw new RuntimeException(e);
+          LOG.debug("Pipeline not found for container: {} and pipelineId: {}",
+              nonOMContainerId, pipelineID, e);
         }
         containerDiscrepancyInfo.setPipelines(pipelines);
         containerDiscrepancyInfo.setExistsAt("SCM");
