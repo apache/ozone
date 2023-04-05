@@ -238,6 +238,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     } catch (IOException exception) {
       LOG.warn("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
+      throw new IllegalStateException("Snapshot chain manager is corrupted.",
+          exception);
     }
   }
 }
