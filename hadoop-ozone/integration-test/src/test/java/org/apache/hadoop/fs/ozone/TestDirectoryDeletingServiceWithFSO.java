@@ -172,7 +172,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(root.getName(),
         dirTable.iterator().next().getValue().getName());
 
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
   }
 
   /**
@@ -221,7 +221,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
-    long preRunCount = dirDeletingService.getRunCount();
+    long preRunCount = dirDeletingService.getRunCount().get();
 
     // Delete the appRoot
     fs.delete(appRoot, true);
@@ -238,8 +238,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
-    long elapsedRunCount = dirDeletingService.getRunCount() - preRunCount;
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
     assertTrue(elapsedRunCount >= 7);
   }
@@ -290,7 +290,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
   }
 
   @Test
