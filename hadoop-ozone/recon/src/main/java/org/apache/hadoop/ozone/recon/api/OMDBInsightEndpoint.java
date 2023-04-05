@@ -219,7 +219,7 @@ public class OMDBInsightEndpoint {
 
   /** This method retrieves set of keys/files/dirs pending for deletion. */
   @GET
-  @Path("deletekeyinfo")
+  @Path("pendingfordeletionkeyinfo")
   public Response getDeletedKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
