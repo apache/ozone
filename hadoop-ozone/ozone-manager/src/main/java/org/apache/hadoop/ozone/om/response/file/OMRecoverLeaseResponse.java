@@ -68,9 +68,9 @@ public class OMRecoverLeaseResponse extends OmKeyResponse {
     if (openKeyName != null) {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
           batchOperation, openKeyName);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation, dbFileKey, keyInfo);
     }
-    omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .putWithBatch(batchOperation, dbFileKey, keyInfo);
   }
 
   @Override

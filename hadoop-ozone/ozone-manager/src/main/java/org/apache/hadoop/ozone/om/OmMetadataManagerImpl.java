@@ -1749,19 +1749,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
-
-  @Override
-  public String getOpenFileNamePrefix(long volumeId, long bucketId,
-      long parentID, String fileName) {
-    StringBuilder openKey = new StringBuilder();
-    openKey.append(OM_KEY_PREFIX).append(volumeId);
-    openKey.append(OM_KEY_PREFIX).append(bucketId);
-    openKey.append(OM_KEY_PREFIX).append(parentID);
-    openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX);
-    return openKey.toString();
-  }
-
   @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,
