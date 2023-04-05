@@ -262,6 +262,5 @@ public class OMException extends IOException {
     INVALID_SNAPSHOT_ERROR,
     CONTAINS_SNAPSHOT,
     SSL_CONNECTION_FAILURE,
-    KEY_ALREADY_CLOSED,
   }
 }
