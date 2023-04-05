@@ -24,7 +24,11 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
@@ -126,6 +130,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           long startTime = Time.monotonicNow();
           while (remainNum > 0 && deleteTableIterator.hasNext()) {
             pendingDeletedDirInfo = deleteTableIterator.next();
+            // Do not reclaim if the directory is still being referenced by
+            // the previous snapshot.
+            if (checkDirPartOfPreviousSnapshot(pendingDeletedDirInfo)) {
+              continue;
+            }
 
             PurgePathRequest request = prepareDeleteDirRequest(
                 remainNum, pendingDeletedDirInfo.getValue(),
@@ -154,6 +163,32 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
       // place holder by returning empty results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
+    }
+
+    private boolean checkDirPartOfPreviousSnapshot(
+        KeyValue<String, OmKeyInfo> pendingDeletedDirInfo) throws IOException {
+      String key = pendingDeletedDirInfo.getKey();
+      OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
+      OmSnapshotManager omSnapshotManager =
+          getOzoneManager().getOmSnapshotManager();
+      OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
+          getOzoneManager().getMetadataManager();
+
+      OmSnapshot latestSnapshot =
+          metadataManager.getLatestSnapshot(deletedDirInfo.getVolumeName(),
+              deletedDirInfo.getBucketName(), omSnapshotManager);
+
+      if (latestSnapshot != null) {
+        Table<String, OmDirectoryInfo> prevDirTable =
+            latestSnapshot.getMetadataManager().getDirectoryTable();
+        // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
+        // OzoneDeletePathKey. Changing it back to check the previous DirTable.
+        String prevDbKey = metadataManager.getOzoneDeletePathToOzonePath(key);
+        OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
+        return prevDirInfo != null &&
+            prevDirInfo.getObjectID() == prevDirInfo.getObjectID();
+      }
+      return false;
     }
   }
 

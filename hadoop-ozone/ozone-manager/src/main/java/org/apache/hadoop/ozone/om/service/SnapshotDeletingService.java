@@ -451,14 +451,18 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         return true;
       }
 
-      String key = deletedDir.getKey();
-      OmKeyInfo value = deletedDir.getValue();
-      OmDirectoryInfo omDirectoryInfo = previousDirTable.get(key);
-      if (omDirectoryInfo == null) {
+      String deletedDirDbKey = deletedDir.getKey();
+      OmKeyInfo deletedDirInfo = deletedDir.getValue();
+      // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
+      // OzoneDeletePathKey. Changing it back to check the previous DirTable.
+      String prevDbKey = ozoneManager.getMetadataManager()
+          .getOzoneDeletePathToOzonePath(deletedDirDbKey);
+      OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
+      if (prevDirectoryInfo == null) {
         return true;
       }
 
-      return omDirectoryInfo.getObjectID() != value.getObjectID();
+      return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
     }
 
     private boolean checkKeyReclaimable(
