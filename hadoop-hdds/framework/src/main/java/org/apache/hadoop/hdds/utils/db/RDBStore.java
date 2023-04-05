@@ -21,6 +21,8 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -84,7 +86,7 @@ public class RDBStore implements DBStore {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
         TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
-        maxDbUpdatesSizeThreshold);
+        maxDbUpdatesSizeThreshold, true);
   }
 
   @SuppressWarnings("parameternumber")
@@ -94,7 +96,9 @@ public class RDBStore implements DBStore {
                   String dbJmxBeanNameName, boolean enableCompactionLog,
                   long maxTimeAllowedForSnapshotInDag,
                   long compactionDagDaemonInterval,
-                  long maxDbUpdatesSizeThreshold)
+                  long maxDbUpdatesSizeThreshold,
+                  boolean createCheckpointDirs)
+
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -133,29 +137,22 @@ public class RDBStore implements DBStore {
       }
 
       //create checkpoints directory if not exists.
-      checkpointsParentDir =
-          dbLocation.getParent() + OM_KEY_PREFIX + OM_CHECKPOINT_DIR;
-      File checkpointsDir = new File(checkpointsParentDir);
-      if (!checkpointsDir.exists()) {
-        boolean success = checkpointsDir.mkdir();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB checkpoint directory: " +
-              checkpointsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        checkpointsParentDir = null;
+      } else {
+        Path checkpointsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
+        checkpointsParentDir = checkpointsParentDirPath.toString();
+        Files.createDirectories(checkpointsParentDirPath);
       }
-
       //create snapshot checkpoint directory if does not exist.
-      snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_CHECKPOINT_DIR).toString();
-      File snapshotsDir = new File(snapshotsParentDir);
-      if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdirs();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB snapshot checkpoint directory: " +
-              snapshotsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        snapshotsParentDir = null;
+      } else {
+        Path snapshotsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
+        snapshotsParentDir = snapshotsParentDirPath.toString();
+        Files.createDirectories(snapshotsParentDirPath);
       }
 
       if (enableCompactionLog) {
