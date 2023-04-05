@@ -108,6 +108,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_SOLR_TIMEZONE_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,

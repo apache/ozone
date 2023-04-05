@@ -17,13 +17,10 @@
  * under the License.
  */
 
-/**
- *
- */
 package org.apache.hadoop.ozone.recon.solr;
 
 /**
- *
+ * This class is defining sort field parameters in Solr Query.
  */
 public class SortField {
   private String paramName;
