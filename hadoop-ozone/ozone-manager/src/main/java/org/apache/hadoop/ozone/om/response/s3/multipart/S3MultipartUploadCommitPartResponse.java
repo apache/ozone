@@ -100,17 +100,13 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
     if (getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
       // Means by the time we try to commit part, some one has aborted this
       // multipart upload. So, delete this part information.
-
       RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(openKey);
-
-      repeatedOmKeyInfo =
           OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
-          repeatedOmKeyInfo, openPartKeyInfoToBeDeleted.getUpdateID(),
-              isRatisEnabled);
-
+              openPartKeyInfoToBeDeleted.getUpdateID(), isRatisEnabled);
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          openPartKeyInfoToBeDeleted.getObjectID(), openKey);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          openKey, repeatedOmKeyInfo);
+          deleteKey, repeatedOmKeyInfo);
     }
 
     if (getOMResponse().getStatus() == OK) {
@@ -135,15 +131,14 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       OmKeyInfo partKeyToBeDeleted =
           OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
 
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable()
-              .get(oldPartKeyInfo.getPartName());
+      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          partKeyToBeDeleted, omMultipartKeyInfo.getUpdateID(),
+          isRatisEnabled);
 
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKeyToBeDeleted,
-          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
-
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          partKeyToBeDeleted.getObjectID(), openKey);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          oldPartKeyInfo.getPartName(), repeatedOmKeyInfo);
+          deleteKey, repeatedOmKeyInfo);
     }
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,

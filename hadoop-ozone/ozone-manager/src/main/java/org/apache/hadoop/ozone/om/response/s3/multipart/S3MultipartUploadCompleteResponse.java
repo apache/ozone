@@ -113,8 +113,10 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
       }
     }
     if (keyVersionsToDelete != null) {
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), multipartOpenKey);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          ozoneKey, keyVersionsToDelete);
+          deleteKey, keyVersionsToDelete);
     }
 
     // update bucket usedBytes, only when total bucket size has changed

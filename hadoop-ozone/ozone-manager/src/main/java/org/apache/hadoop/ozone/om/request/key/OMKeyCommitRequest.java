@@ -261,11 +261,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
-      //if (oldKeyVersionsToDelete != null) {
-      //  OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-      //      oldKeyVersionsToDelete, trxnLogIndex);
-      //}
-
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
