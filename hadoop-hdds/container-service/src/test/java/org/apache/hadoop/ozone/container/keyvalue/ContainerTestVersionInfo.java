@@ -65,6 +65,11 @@ public class ContainerTestVersionInfo {
         .collect(toList());
   }
 
+  @Override
+  public String toString() {
+    return "schema=" + schemaVersion + ", layout=" + layout;
+  }
+
   public static List<ContainerTestVersionInfo> getLayoutList() {
     return layoutList;
   }
