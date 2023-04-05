@@ -161,6 +161,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
@@ -183,6 +184,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setParentID(parentID)
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();

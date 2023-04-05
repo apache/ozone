@@ -236,44 +236,6 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             omMetadataManager.getDeletedTable()));
   }
 
-  @Test
-  public void testAddDBToBatchWithPartsWithKeyInDeleteTable() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = getKeyName();
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager);
-    createParentPath(volumeName, bucketName);
-
-    // Put an entry to delete table with the same key prior to multipart commit
-    OmKeyInfo prevKey = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE,
-            parentID + 8,
-            parentID, 8, Time.now());
-    RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey);
-    String ozoneKey = omMetadataManager
-            .getOzoneKey(prevKey.getVolumeName(),
-                    prevKey.getBucketName(), prevKey.getFileName());
-    omMetadataManager.getDeletedTable().put(ozoneKey, prevKeys);
-
-    long oId = runAddDBToBatchWithParts(volumeName, bucketName, keyName, 1);
-
-    // Make sure new object isn't in delete table
-    RepeatedOmKeyInfo ds = omMetadataManager.getDeletedTable().get(ozoneKey);
-    for (OmKeyInfo omKeyInfo : ds.getOmKeyInfoList()) {
-      Assert.assertNotEquals(oId, omKeyInfo.getObjectID());
-    }
-
-    // As 1 unused parts and 1 previously put-and-deleted object exist,
-    // so 2 entries should be there in delete table.
-    Assert.assertEquals(2, omMetadataManager.countRowsInTable(
-            omMetadataManager.getDeletedTable()));
-  }
-
   private long runAddDBToBatchWithParts(String volumeName,
       String bucketName, String keyName, int deleteEntryCount)
           throws Exception {
@@ -383,7 +345,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), openKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

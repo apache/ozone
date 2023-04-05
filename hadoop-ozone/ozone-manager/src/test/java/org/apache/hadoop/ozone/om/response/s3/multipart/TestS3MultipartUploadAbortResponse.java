@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -168,10 +170,14 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getDeletedTable()) == 2);
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), multipartOpenKey);
 
     String part2DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(2).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(2).getPartKeyInfo()
+                .getObjectID(), multipartOpenKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

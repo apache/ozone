@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -149,8 +151,9 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
         omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
-
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), openKey);
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));
 
@@ -223,9 +226,10 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     // openkey entry should be there in delete table.
     Assert.assertEquals(1, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
-
-    Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
-            openKey));
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, openKey);
+    Assert.assertTrue(rangeKVs.size() > 0);
   }
 
   private String getKeyName() {

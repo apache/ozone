@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -75,19 +77,21 @@ public class TestS3MultipartUploadCompleteRequest
   public void checkDeleteTableCount(String volumeName,
       String bucketName, String keyName, int count) throws Exception {
     String dbOzoneKey = getOzoneDBKey(volumeName, bucketName, keyName);
-    RepeatedOmKeyInfo keysToDelete =
-        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+            null, 100, dbOzoneKey);
 
     // deleted key entries count is expected to be 0
     if (count == 0) {
-      Assert.assertNull(keysToDelete);
+      Assert.assertTrue(rangeKVs.size() == 0);
       return;
     }
 
-    Assert.assertNotNull(keysToDelete);
+    Assert.assertTrue(rangeKVs.size() == 1);
 
     // Count must consider unused parts on commit
-    Assert.assertEquals(count, keysToDelete.getOmKeyInfoList().size());
+    Assert.assertEquals(count,
+        rangeKVs.get(0).getValue().getOmKeyInfoList().size());
   }
 
   private void checkValidateAndUpdateCacheSuccess(String volumeName,
@@ -135,6 +139,10 @@ public class TestS3MultipartUploadCompleteRequest
     omClientResponse =
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L, ozoneManagerDoubleBufferHelper);
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
