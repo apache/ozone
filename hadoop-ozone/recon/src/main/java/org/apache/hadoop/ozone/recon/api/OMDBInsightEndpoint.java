@@ -67,6 +67,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  */
 @Path("/omdbinsight")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class OMDBInsightEndpoint {
 
   @Inject
