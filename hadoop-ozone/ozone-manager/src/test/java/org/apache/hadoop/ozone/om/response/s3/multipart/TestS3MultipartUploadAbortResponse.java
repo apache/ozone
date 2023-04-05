@@ -19,10 +19,8 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;

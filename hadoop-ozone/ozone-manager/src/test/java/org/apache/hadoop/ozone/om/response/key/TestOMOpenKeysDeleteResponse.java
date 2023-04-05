@@ -125,7 +125,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
           omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           keysToKeep.get(key).getObjectID(), key);
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(deleteKey));
+      Assert.assertFalse(omMetadataManager.getDeletedTable()
+          .isExist(deleteKey));
     }
   }
 

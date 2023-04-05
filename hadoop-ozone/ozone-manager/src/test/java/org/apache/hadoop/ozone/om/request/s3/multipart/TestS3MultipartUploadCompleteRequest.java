@@ -140,7 +140,8 @@ public class TestS3MultipartUploadCompleteRequest
         s3MultipartUploadCompleteRequest.validateAndUpdateCache(ozoneManager,
             3L, ozoneManagerDoubleBufferHelper);
 
-    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    BatchOperation batchOperation
+        = omMetadataManager.getStore().initBatchOperation();
     omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 

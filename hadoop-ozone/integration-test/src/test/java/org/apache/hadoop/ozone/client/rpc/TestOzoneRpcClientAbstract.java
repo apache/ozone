@@ -4040,8 +4040,9 @@ public abstract class TestOzoneRpcClientAbstract {
       //    .getOzoneManager().getMetadataManager()
       //    .getDeletedTable().get();
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
-          = cluster.getOzoneManager().getMetadataManager().getDeletedTable().getRangeKVs(
-          null, 100, cluster.getOzoneManager().getMetadataManager()
+          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+          .getRangeKVs(null, 100,
+              cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
       Assert.assertTrue(rangeKVs.size() > 0);
       Assert.assertEquals(expectedCount,
