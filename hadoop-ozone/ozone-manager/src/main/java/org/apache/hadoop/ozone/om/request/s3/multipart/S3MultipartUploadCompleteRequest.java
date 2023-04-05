@@ -248,10 +248,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         updateCache(omMetadataManager, dbBucketKey, omBucketInfo, dbOzoneKey,
             dbMultipartOpenKey, multipartKey, omKeyInfo, trxnLogIndex);
 
-        if (oldKeyVersionsToDelete != null) {
-          OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-              oldKeyVersionsToDelete, trxnLogIndex);
-        }
+        //if (oldKeyVersionsToDelete != null) {
+        //  OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
+        //      oldKeyVersionsToDelete, trxnLogIndex);
+        //}
 
         omResponse.setCompleteMultiPartUploadResponse(
             MultipartUploadCompleteResponse.newBuilder()

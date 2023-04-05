@@ -811,8 +811,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // Past keys that was deleted but still in deleted table,
     // waiting for deletion service.
+    String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+        keyToDelete.getObjectID(), dbOzoneKey);
     RepeatedOmKeyInfo keysToDelete =
-        omMetadataManager.getDeletedTable().get(dbOzoneKey);
+        omMetadataManager.getDeletedTable().get(deleteKey);
 
     return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);

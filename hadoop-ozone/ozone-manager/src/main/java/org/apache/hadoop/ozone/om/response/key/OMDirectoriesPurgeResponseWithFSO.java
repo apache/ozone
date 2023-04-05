@@ -115,8 +115,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
                 keyInfo, null, keyInfo.getUpdateID(), isRatisEnabled);
 
         String deletedKey = omMetadataManager
-                .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
-                        keyInfo.getKeyName());
+                .getOzoneDeletePathKey(keyInfo.getObjectID(), ozoneDbKey);
 
         // TODO: [SNAPSHOT] Acquire deletedTable write table lock
 

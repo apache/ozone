@@ -521,12 +521,12 @@ public final class OMFileRequest {
    * @param keysToDelete      Repeated OMKeyInfos
    * @param trxnLogIndex      transaction log index
    */
-  public static void addDeletedTableCacheEntry(
-          OMMetadataManager omMetadataManager, String dbDeletedKey,
-          RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
-    omMetadataManager.getDeletedTable().addCacheEntry(
-        dbDeletedKey, keysToDelete, trxnLogIndex);
-  }
+  //public static void addDeletedTableCacheEntry(
+  //        OMMetadataManager omMetadataManager, String dbDeletedKey,
+  //        RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
+  //  omMetadataManager.getDeletedTable().addCacheEntry(
+  //      dbDeletedKey, keysToDelete, trxnLogIndex);
+  //}
 
   /**
    * Adding omKeyInfo to open file table.

@@ -96,8 +96,7 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
       // required for moving the sub-files to KeyDeletionService.
       omKeyInfo.setKeyName(keyName);
       String deletedKey = omMetadataManager
-          .getOzoneKey(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-              omKeyInfo.getKeyName());
+          .getOzoneDeletePathKey(omKeyInfo.getObjectID(), ozoneDbKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
           ozoneDbKey, deletedKey, omKeyInfo);
     }
