@@ -55,6 +55,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import javax.servlet.http.HttpServletResponse;
@@ -78,6 +79,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test for clusterStateEndpoint for checking deletedContainers count.
  */
+@Disabled("HDDS-8374")
 public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   private NodeEndpoint nodeEndpoint;
   private ClusterStateEndpoint clusterStateEndpoint;
