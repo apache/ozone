@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests OMBucketCreateRequest class, which handles CreateBucket request.
