@@ -211,20 +211,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         OMException.ResultCodes.QUOTA_ERROR.toString());
   }
 
-  @Test
-  public void testCreateBucketWithOMConfigNonS3RuleCompliantSetToFalse() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = "bucketname_with_underscore";
-    when(ozoneManager.isNamespaceS3RuleCompliant()).thenReturn(false);
-
-    OMBucketCreateRequest omBucketCreateRequest =
-            doPreExecute(volumeName, bucketName);
-
-    doValidateAndUpdateCache(volumeName, bucketName,
-            omBucketCreateRequest.getOmRequest());
-  }
-
-  private OMBucketCreateRequest doPreExecute(String volumeName,
+  protected OMBucketCreateRequest doPreExecute(String volumeName,
       String bucketName) throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
     OMRequest originalRequest =
@@ -239,7 +226,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     return new OMBucketCreateRequest(modifiedRequest);
   }
 
-  private void doValidateAndUpdateCache(String volumeName, String bucketName,
+  protected void doValidateAndUpdateCache(String volumeName, String bucketName,
       OMRequest modifiedRequest) throws Exception {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
