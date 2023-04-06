@@ -29,8 +29,4 @@
     <Class name="org.apache.hadoop.hdds.utils.BufferedMetricsCollector$BufferedMetricsRecordBuilderImpl"></Class>
     <Bug pattern="URF_UNREAD_FIELD" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.security.token.TestOzoneBlockTokenIdentifier"></Class>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
 </FindBugsFilter>

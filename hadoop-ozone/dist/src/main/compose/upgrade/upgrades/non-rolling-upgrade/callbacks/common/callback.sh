@@ -17,47 +17,45 @@
 
 source "$TEST_DIR"/testlib.sh
 
-# Helper function, not a callback.
-_check_hdds_mlvs() {
-  mlv="$1"
-  check_scm_mlv scm "$mlv"
-  check_dn_mlv dn1 "$mlv"
-  check_dn_mlv dn2 "$mlv"
-  check_dn_mlv dn3 "$mlv"
+### HELPER METHODS ###
+
+## @description Generates data on the cluster.
+## @param The prefix to use for data generated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+generate() {
+    execute_robot_test "$SCM" -v PREFIX:"$1" ${@:2} upgrade/generate.robot
 }
 
-# Helper function, not a callback.
-_check_om_mlvs() {
-  mlv="$1"
-  check_om_mlv om1 "$mlv"
-  check_om_mlv om2 "$mlv"
-  check_om_mlv om3 "$mlv"
+## @description Validates that data exists on the cluster.
+## @param The prefix of the data to be validated.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+validate() {
+    execute_robot_test "$SCM" -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
 
-setup() {
-  export OZONE_OM_PREPARE='true'
-}
+### CALLBACKS ###
 
 with_old_version() {
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   generate old1
   validate old1
 }
 
-with_new_version_pre_finalized() {
-  _check_hdds_mlvs 2
-  _check_om_mlvs 0
-
+with_this_version_pre_finalized() {
+  # No check for pre-finalized status here, because the release may not have
+  # added layout features to OM or HDDS.
   validate old1
-#   HDDS-6261: overwrite the same keys intentionally
+  # HDDS-6261: overwrite the same keys intentionally
   generate old1 --exclude create-volume-and-bucket
 
   generate new1
   validate new1
-
-  check_ec_is_disabled
 }
 
 with_old_version_downgraded() {
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
 
@@ -69,16 +67,12 @@ with_old_version_downgraded() {
   generate old1 --exclude create-volume-and-bucket
 }
 
-with_new_version_finalized() {
-  _check_hdds_mlvs 4
-  _check_om_mlvs 3
-
+with_this_version_finalized() {
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   validate old1
   validate new1
   validate old2
 
   generate new2
   validate new2
-
-  check_ec_is_enabled
 }

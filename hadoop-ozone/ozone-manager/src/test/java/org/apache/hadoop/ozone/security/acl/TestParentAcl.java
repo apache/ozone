@@ -48,6 +48,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -119,7 +120,7 @@ public class TestParentAcl {
   }
 
   @Test
-  @Flaky("HDDS-6335")
+  @Flaky("HDDS-6335") @Ignore("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;

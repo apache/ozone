@@ -120,6 +120,8 @@ public class TestECUnderReplicationHandler {
         replicationManager, commandsSent);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
         replicationManager, commandsSent);
+    ReplicationTestUtil.mockSendThrottledReconstructionCommand(
+        replicationManager, commandsSent);
 
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(DATA, PARITY);
@@ -167,6 +169,21 @@ public class TestECUnderReplicationHandler {
     Set<ContainerReplica> availableReplicas = new HashSet<>();
     testUnderReplicationWithMissingIndexes(ImmutableList.of(1, 2, 3, 4, 5),
         availableReplicas, 0, 0, policy);
+  }
+
+  @Test
+  public void testThrowsWhenTargetsOverloaded() throws IOException {
+    Set<ContainerReplica> availableReplicas =  ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
+        .when(replicationManager).sendThrottledReconstructionCommand(
+            any(), any());
+
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 0, 0, policy));
   }
 
   @Test

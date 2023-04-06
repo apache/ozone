@@ -355,6 +355,12 @@ public final class RocksDatabase {
 
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
+      // Wait for all background work to be cancelled first. e.g. RDB compaction
+      db.get().cancelAllBackgroundWork(true);
+
+      // Then close all attached listeners
+      dbOptions.listeners().forEach(listener -> listener.close());
+
       if (columnFamilies != null) {
         columnFamilies.values().stream().forEach(f -> f.markClosed());
       }

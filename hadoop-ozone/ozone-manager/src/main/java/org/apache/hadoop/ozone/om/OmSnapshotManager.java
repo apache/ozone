@@ -23,7 +23,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -58,6 +57,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
@@ -73,12 +73,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
@@ -86,6 +89,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamily
  * This class is used to manage/create OM snapshots.
  */
 public final class OmSnapshotManager implements AutoCloseable {
+  public static final String OM_HARDLINK_FILE = "hardLinkFile";
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
@@ -146,7 +150,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   // TODO: [SNAPSHOT] create config for max allowed page size.
   private final int maxPageSize = 1000;
 
-  OmSnapshotManager(OzoneManager ozoneManager) {
+  public OmSnapshotManager(OzoneManager ozoneManager) {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
@@ -207,6 +211,28 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
+        // Block snapshot from loading when it is no longer active e.g. DELETED,
+        // unless this is called from SnapshotDeletingService.
+        // TODO: [SNAPSHOT] However, snapshotCache.get() from other requests
+        //  (not from SDS) would be able to piggyback off of this because
+        //  snapshot still in cache won't trigger loader again.
+        //  This needs proper addressal in e.g. HDDS-7935
+        //  by introducing another cache just for SDS.
+        //  While the snapshotCache would host ACTIVE snapshots only.
+        if (!snapshotInfo.getSnapshotStatus().equals(
+                SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          if (isCalledFromSnapshotDeletingService()) {
+            LOG.debug("Permitting {} to load snapshot {} in status: {}",
+                SnapshotDeletingService.class.getSimpleName(),
+                snapshotInfo.getTableKey(),
+                snapshotInfo.getSnapshotStatus());
+          } else {
+            throw new OMException("Unable to load snapshot. " +
+                "Snapshot with table key '" + snapshotTableKey +
+                "' is no longer active", FILE_NOT_FOUND);
+          }
+        }
+
         CacheValue<SnapshotInfo> cacheValue =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .getCacheValue(new CacheKey<>(snapshotTableKey));
@@ -247,6 +273,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         = notification -> {
           try {
             // close snapshot's rocksdb on eviction
+            LOG.debug("Closing snapshot: {}", notification.getKey());
+            // TODO: [SNAPSHOT] HDDS-7935.Close only when refcount reaches zero?
             notification.getValue().close();
           } catch (IOException e) {
             LOG.error("Failed to close snapshot: {} {}",
@@ -293,6 +321,32 @@ public final class OmSnapshotManager implements AutoCloseable {
         new SnapshotDiffJob.SnapshotDiffJobCodec());
 
     return registry;
+  }
+
+  /**
+   * Helper method to check whether the loader is called from
+   * SnapshotDeletingTask (return true) or not (return false).
+   */
+  private boolean isCalledFromSnapshotDeletingService() {
+
+    StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+    for (StackTraceElement elem : stackTrace) {
+      // Allow as long as loader is called from SDS. e.g. SnapshotDeletingTask
+      if (elem.getClassName().startsWith(
+          SnapshotDeletingService.class.getName())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get snapshot instance LRU cache.
+   * @return LoadingCache
+   */
+  public LoadingCache<String, OmSnapshot> getSnapshotCache() {
+    return snapshotCache;
   }
 
   /**
@@ -461,6 +515,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   public static String getSnapshotPrefix(String snapshotName) {
     return OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX +
         snapshotName + OM_KEY_PREFIX;
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+                                     SnapshotInfo snapshotInfo) {
+    return OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {

@@ -93,11 +93,14 @@ share/ozone/lib/ion-java.jar
 share/ozone/lib/istack-commons-runtime.jar
 share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
+share/ozone/lib/jackson-core-asl.jar
 share/ozone/lib/jackson-core.jar
 share/ozone/lib/jackson-databind.jar
 share/ozone/lib/jackson-dataformat-cbor.jar
 share/ozone/lib/jackson-dataformat-xml.jar
 share/ozone/lib/jackson-datatype-jsr310.jar
+share/ozone/lib/jackson-jaxrs.jar
+share/ozone/lib/jackson-mapper-asl.jar
 share/ozone/lib/jackson-module-jaxb-annotations.jar
 share/ozone/lib/jaeger-client.jar
 share/ozone/lib/jaeger-core.jar
