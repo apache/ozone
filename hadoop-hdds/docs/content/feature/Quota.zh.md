@@ -57,7 +57,7 @@ menu:
 
  d. Linked bucket 上不支持定义单独的命名空间配额，它直接引用源bucket的命名空间配额。
 
- e. Linked bucket将消耗卷的命名空间配额
+ e. Linked bucket将消耗卷的命名空间配额。
 
  f. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
 
