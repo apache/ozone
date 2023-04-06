@@ -41,13 +41,6 @@ public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
-  public static final String HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY
-      = "hdds.datanode.disk.balancer.volume.choosing.policy";
-
-  public static final String
-      HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY =
-      "hdds.datanode.disk.balancer.container.choosing.policy";
-
   @Config(key = "info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
       description = "The path where datanode diskBalancer's conf is to be " +
@@ -131,6 +124,29 @@ public final class DiskBalancerConfiguration {
 
   public void setDiskBalancerTimeout(Duration duration) {
     this.diskBalancerTimeout = duration.toMillis();
+  }
+
+  @Config(key = "volume.choosing.policy", type = ConfigType.CLASS,
+      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
+          ".DefaultVolumeChoosingPolicy",
+      tags = {ConfigTag.DISKBALANCER},
+      description = "The volume choosing policy of the disk balancer service.")
+  private Class<?> volumeChoosingPolicyClass;
+
+  public Class<?> getVolumeChoosingPolicyClass() {
+    return volumeChoosingPolicyClass;
+  }
+
+  @Config(key = "container.choosing.policy", type = ConfigType.CLASS,
+      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
+          ".DefaultContainerChoosingPolicy",
+      tags = {ConfigTag.DISKBALANCER},
+      description = "The container choosing policy of the disk balancer " +
+          "service.")
+  private Class<?> containerChoosingPolicyClass;
+
+  public Class<?> getContainerChoosingPolicyClass() {
+    return containerChoosingPolicyClass;
   }
 
   public DiskBalancerConfiguration() {

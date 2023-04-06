@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
@@ -55,9 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY;
-import static org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY;
 
 /**
  * A per-datanode disk balancing service takes in charge
@@ -120,14 +115,12 @@ public class DiskBalancerService extends BackgroundService {
     volumeSet = ozoneContainer.getVolumeSet();
 
     try {
-      volumeChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_DISK_BALANCER_VOLUME_CHOOSING_POLICY,
-          DefaultVolumeChoosingPolicy.class,
-          VolumeChoosingPolicy.class).newInstance();
-      containerChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_DISK_BALANCER_CONTAINER_CHOOSING_POLICY,
-          DefaultContainerChoosingPolicy.class,
-          ContainerChoosingPolicy.class).newInstance();
+      volumeChoosingPolicy = (VolumeChoosingPolicy)
+          conf.getObject(DiskBalancerConfiguration.class)
+          .getVolumeChoosingPolicyClass().newInstance();
+      containerChoosingPolicy = (ContainerChoosingPolicy)
+          conf.getObject(DiskBalancerConfiguration.class)
+              .getContainerChoosingPolicyClass().newInstance();
     } catch (Exception e) {
       LOG.error("Got exception when initializing DiskBalancerService", e);
       throw new RuntimeException(e);
