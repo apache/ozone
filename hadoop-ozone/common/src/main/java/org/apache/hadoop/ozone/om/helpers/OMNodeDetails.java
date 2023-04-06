@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.commons.lang3.StringUtils;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;

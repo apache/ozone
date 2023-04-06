@@ -529,7 +529,7 @@ public final class HddsServerUtil {
    * @param checkpoint    checkpoint file
    * @param destination   destination output stream.
    * @param toExcludeList the files to be excluded
-   * @return List<String> excluded file
+   * @return excluded file list
    * @throws IOException
    */
   public static List<String> writeDBCheckpointToStream(DBCheckpoint checkpoint,

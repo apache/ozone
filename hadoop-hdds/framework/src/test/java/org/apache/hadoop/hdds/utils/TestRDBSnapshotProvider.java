@@ -69,6 +69,7 @@ public class TestRDBSnapshotProvider {
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third");
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
 
   private RDBStore rdbStore = null;
   private ManagedDBOptions options = null;
@@ -90,7 +91,8 @@ public class TestRDBSnapshotProvider {
       configSet.add(newConfig);
     }
     testDir = tempDir;
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
       public void close() throws IOException {
@@ -175,9 +177,9 @@ public class TestRDBSnapshotProvider {
   public void compareDB(File db1, File db2, int columnFamilyUsed)
       throws Exception {
     try (RDBStore rdbStore1 = new RDBStore(db1, getNewDBOptions(),
-             configSet);
+             configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
          RDBStore rdbStore2 = new RDBStore(db2, getNewDBOptions(),
-             configSet)) {
+             configSet, MAX_DB_UPDATES_SIZE_THRESHOLD)) {
       // all entries should be same from two DB
       for (int i = 0; i < columnFamilyUsed; i++) {
         try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator

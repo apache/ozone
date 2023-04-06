@@ -180,17 +180,17 @@ public class DBCheckpointServlet extends HttpServlet {
                file + ".tar\"");
 
       Instant start = Instant.now();
-      List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(
-          checkpoint, response.getOutputStream(), receivedSstList);
-      writeDbDataToStream(checkpoint, request,
-          response.getOutputStream());
+      List<String> excluded = writeDbDataToStream(checkpoint, request,
+          response.getOutputStream(), receivedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+
       if (!excluded.isEmpty()) {
         LOG.info("Excluded SST {} from the latest checkpoint.", excluded);
+        dbMetrics.incNumCheckpoints();
         dbMetrics.incNumIncrementalCheckpoint();
         dbMetrics.setLastCheckpointStreamingNumSSTExcluded(excluded.size());
       } else {
@@ -223,11 +223,15 @@ public class DBCheckpointServlet extends HttpServlet {
    * @param ignoredRequest The httpRequest which generated this checkpoint.
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
+   * @param toExcludeList the files to be excluded
+   * @return excluded file list
    */
-  public void writeDbDataToStream(DBCheckpoint checkpoint,
+  public List<String>  writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
-      OutputStream destination)
+      OutputStream destination,
+      List<String> toExcludeList)
       throws IOException, InterruptedException {
-    writeDBCheckpointToStream(checkpoint, destination);
+
+    return writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
   }
 }

@@ -63,6 +63,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -3536,10 +3537,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    DBCheckpoint omDBCheckpoint = getDBCheckpointFromLeader(leaderId);
-    if (omDBCheckpoint == null) {
+    DBCheckpoint omDBCheckpoint;
+    try {
+      omDBCheckpoint = omRatisSnapshotProvider.
+          downloadDBSnapshotFromLeader(leaderId);
+    } catch (IOException ex) {
+      LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
       return null;
     }
+
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
         leaderId, omDBCheckpoint.getCheckpointLocation());
 
@@ -3633,8 +3639,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       try {
         time = Time.monotonicNow();
-        dbBackup = HAUtils.replaceDBWithCheckpoint(lastAppliedIndex,
-            oldDBLocation, checkpointLocation, OzoneConsts.OM_DB_BACKUP_PREFIX);
+        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex,
+            oldDBLocation, checkpointLocation);
         term = checkpointTrxnInfo.getTerm();
         lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
@@ -3721,19 +3727,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newTermIndex;
   }
 
-
-  /**
-   * Download the latest OM DB checkpoint from the leader OM.
-   *
-   * @param leaderId OMNodeID of the leader OM node.
-   * @return latest DB checkpoint from leader OM.
-   * @throws IOException
-   */
-  private DBCheckpoint getDBCheckpointFromLeader(String leaderId)
-      throws IOException {
-    return omSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
-  }
-
   private void stopTrashEmptier() {
     if (this.emptier != null) {
       emptier.interrupt();
@@ -3789,7 +3782,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // an inconsistent state and this marker file will fail OM from
       // starting up.
       Files.createFile(markerFile);
-      FileUtils.moveDirectory(checkpointPath, oldDB.toPath());
+      // Copy the candidate DB to real DB
+      org.apache.commons.io.FileUtils.copyDirectory(checkpointPath.toFile(),
+          oldDB);
       moveOmSnapshotData(oldDB.toPath(), dbSnapshotsDir.toPath());
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
@@ -3797,6 +3792,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               "directory {}. Resetting to original DB.", checkpointPath,
           oldDB.toPath());
       try {
+        FileUtil.fullyDelete(oldDB);
         Files.move(dbBackup.toPath(), oldDB.toPath());
         if (dbSnapshotsBackup.exists()) {
           Files.move(dbSnapshotsBackup.toPath(), dbSnapshotsDir.toPath());
