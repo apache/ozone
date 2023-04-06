@@ -56,6 +56,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +100,7 @@ public class TestContainerBalancerTask {
   private MockNodeManager mockNodeManager;
   private StorageContainerManager scm;
   private OzoneConfiguration conf;
+  private ReplicationManagerConfiguration rmConf;
   private PlacementPolicy placementPolicy;
   private PlacementPolicy ecPlacementPolicy;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
@@ -125,6 +127,7 @@ public class TestContainerBalancerTask {
   public void setup() throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
+    rmConf = new ReplicationManagerConfiguration();
     scm = Mockito.mock(StorageContainerManager.class);
     containerManager = Mockito.mock(ContainerManager.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -140,7 +143,8 @@ public class TestContainerBalancerTask {
     Disable LegacyReplicationManager. This means balancer should select RATIS
      as well as EC containers for balancing. Also, MoveManager will be used.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    rmConf.setEnableLegacy(false);
     // these configs will usually be specified in each test
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
@@ -513,7 +517,8 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     balancerConfiguration.setIterations(1);
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+    rmConf.setEnableLegacy(true);
+
     startBalancer(balancerConfiguration);
 
     stopBalancer();
@@ -536,7 +541,7 @@ public class TestContainerBalancerTask {
      Try the same test by disabling LegacyReplicationManager so that
      MoveManager is used.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     stopBalancer();
     numContainers = containerBalancerTask.getContainerToTargetMap().size();
@@ -776,6 +781,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    rmConf.setEnableLegacy(true);
 
     startBalancer(balancerConfiguration);
 
@@ -809,7 +815,7 @@ public class TestContainerBalancerTask {
     /*
     Try the same but use MoveManager for container move instead of legacy RM.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
@@ -842,7 +848,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+    rmConf.setEnableLegacy(true);
     startBalancer(balancerConfiguration);
 
     /*
@@ -864,7 +870,7 @@ public class TestContainerBalancerTask {
     The first move being 10ms falls within the timeout duration of 500ms. It
     should be successful. The rest should fail.
      */
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
             Mockito.any(DatanodeDetails.class),
             Mockito.any(DatanodeDetails.class)))
@@ -905,8 +911,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
-
+    rmConf.setEnableLegacy(true);
     startBalancer(balancerConfiguration);
 
     Assertions.assertTrue(containerBalancerTask.getMetrics()
@@ -923,7 +928,7 @@ public class TestContainerBalancerTask {
             Mockito.any(DatanodeDetails.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);
 
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertTrue(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration() > 0);
@@ -961,7 +966,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(500));
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+    rmConf.setEnableLegacy(true);
 
     startBalancer(balancerConfiguration);
 
@@ -989,7 +994,7 @@ public class TestContainerBalancerTask {
         .thenThrow(new ContainerNotFoundException("Test Container not found"))
         .thenReturn(future);
 
-    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+    rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
@@ -1045,7 +1050,7 @@ public class TestContainerBalancerTask {
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException {
     // Enable LegacyReplicationManager
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+    rmConf.setEnableLegacy(true);
     balancerConfiguration.setThreshold(10);
     balancerConfiguration.setIterations(1);
     balancerConfiguration.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);

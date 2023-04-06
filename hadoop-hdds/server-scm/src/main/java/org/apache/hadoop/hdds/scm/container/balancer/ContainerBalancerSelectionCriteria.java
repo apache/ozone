@@ -166,10 +166,8 @@ public class ContainerBalancerSelectionCriteria {
    * .enable.legacy" is true, else false
    */
   private boolean isECContainer(ContainerInfo container) {
-    boolean legacyEnabled = ozoneConfiguration.
-        getBoolean("hdds.scm.replication.enable.legacy", true);
     return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
-        && legacyEnabled;
+        && replicationManager.getConfig().isLegacyEnabled();
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
