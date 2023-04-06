@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.helpers;
 
+import io.netty.util.internal.StringUtil;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.IdentityProvider;
 import org.apache.hadoop.ipc.Schedulable;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import java.io.IOException;
 
 /**
  * Ozone implementation of IdentityProvider used by
@@ -34,12 +34,13 @@ public class OzoneIdentityProvider implements IdentityProvider {
 
   @Override
   public String makeIdentity(Schedulable schedulable) {
-    UserGroupInformation ugi;
-    try {
-      ugi = UserGroupInformation.getCurrentUser();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    UserGroupInformation ugi = schedulable.getUserGroupInformation();
+    CallerContext callerContext = schedulable.getCallerContext();
+    if (callerContext != null) {
+      if (!StringUtil.isNullOrEmpty(callerContext.getContext())) {
+        return callerContext.getContext();
+      }
     }
-    return ugi == null ? null : ugi.getShortUserName();
+    return ugi.getShortUserName() == null ? null : ugi.getShortUserName();
   }
 }

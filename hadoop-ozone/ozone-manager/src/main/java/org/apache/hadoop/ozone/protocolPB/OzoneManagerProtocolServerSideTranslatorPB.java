@@ -49,7 +49,6 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -126,6 +125,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
                 ValidationContext.of(ozoneManager.getVersionManager(),
                     ozoneManager.getMetadataManager()))
             .load();
+
   }
 
   /**
@@ -144,33 +144,26 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throw new ServiceException(e);
     }
 
-    OMResponse response = 
-        dispatcher.processRequest(validatedRequest, this::processRequest,
-        request.getCmdType(), request.getTraceID());
-    
+    OMResponse response = dispatcher.processRequest(validatedRequest,
+        this::processRequest,
+        request.getCmdType(),
+        request.getTraceID());
+
     return requestValidations.validateResponse(request, response);
   }
 
-  private OMResponse processRequest(OMRequest request) throws
-      ServiceException {
+  private OMResponse processRequest(OMRequest request) throws ServiceException {
     OMClientRequest omClientRequest = null;
-
     boolean s3Auth = false;
+
     try {
       if (request.hasS3Authentication()) {
         OzoneManager.setS3Auth(request.getS3Authentication());
         try {
           s3Auth = true;
-          // If Request has S3Authentication validate S3 credentials
-          // if current OM is leader and then proceed with
-          // processing the request.
+          // If request has S3Authentication, validate S3 credentials.
+          // If current OM is leader and then proceed with the request.
           S3SecurityUtil.validateS3Credential(request, ozoneManager);
-
-          String accessId = request.getS3Authentication().getAccessId();
-          UserGroupInformation s3Ugi =
-              UserGroupInformation.createRemoteUser(accessId);
-          // This is set to be accessed by the OzoneIdentityProvider.
-          UserGroupInformation.setLoginUser(s3Ugi);
         } catch (IOException ex) {
           // If validate credentials fail return error OM Response.
           return createErrorResponse(request, ex);

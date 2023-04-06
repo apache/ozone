@@ -25,7 +25,7 @@ There is no implementation for gRPC yet.
 
 There is a custom `IdentityProvider` implementation for Ozone that must be specified in the configuration, otherwise
 there is no S3G impersonation which makes the `FairCallQueue` ineffective since it's only reading one user, 
-the Ozone super user instead of the S3G client user.
+the S3G special user instead of the S3G client user.
 
 ## Configuration
 
@@ -60,7 +60,7 @@ Port used for below examples : 9862
 </property>
 <property>
    <name>ipc.9862.identity-provider.impl</name>
-   <value>org.apache.hadoop.ozone.om.OzoneIdentityProvider</value>
+   <value>org.apache.hadoop.ozone.om.helpers.OzoneIdentityProvider</value>
 </property>
 <property>
    <name>ipc.9862.scheduler.priority.levels</name>
@@ -72,10 +72,10 @@ Port used for below examples : 9862
 </property>
 <property>
    <name>ipc.9862.faircallqueue.multiplexer.weights</name>
-   <value>99,1</value>
+   <value>2,1</value>
 </property>
 <property>
     <name>ipc.9862.decay-scheduler.thresholds</name>
-    <value>90</value>
+    <value>50</value>
 </property>
 ```
