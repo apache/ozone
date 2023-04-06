@@ -52,6 +52,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -60,7 +61,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class for {@link OzoneBlockTokenIdentifier}.
  */
-public class TestOzoneBlockTokenIdentifier {
+class TestOzoneBlockTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneBlockTokenIdentifier.class);
@@ -73,10 +74,10 @@ public class TestOzoneBlockTokenIdentifier {
   private static X509Certificate cert;
 
   @BeforeAll
-  public static void setUp() throws Exception {
+  static void setUp() throws Exception {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
-    base.mkdirs();
+    Assumptions.assumeTrue(base.mkdirs());
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
 
     // Create Ozone Master key pair.
@@ -87,12 +88,12 @@ public class TestOzoneBlockTokenIdentifier {
   }
 
   @AfterEach
-  public void cleanUp() throws Exception {
+  void cleanUp() {
     // KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
   }
 
   @Test
-  public void testSignToken() throws GeneralSecurityException, IOException {
+  void testSignToken() throws GeneralSecurityException, IOException {
     String keystore = new File(KEYSTORES_DIR, "keystore.jks")
         .getAbsolutePath();
     String truststore = new File(KEYSTORES_DIR, "truststore.jks")
@@ -134,7 +135,7 @@ public class TestOzoneBlockTokenIdentifier {
   }
 
   @Test
-  public void testTokenSerialization() throws GeneralSecurityException,
+  void testTokenSerialization() throws GeneralSecurityException,
       IOException {
     String keystore = new File(KEYSTORES_DIR, "keystore.jks")
         .getAbsolutePath();
@@ -162,12 +163,12 @@ public class TestOzoneBlockTokenIdentifier {
     byte[] signedToken = signTokenAsymmetric(tokenId, privateKey);
 
 
-    Token<OzoneBlockTokenIdentifier> token = new Token(tokenId.getBytes(),
+    Token<OzoneBlockTokenIdentifier> token = new Token<>(tokenId.getBytes(),
         signedToken, tokenId.getKind(), new Text("host:port"));
 
     String encodeToUrlString = token.encodeToUrlString();
 
-    Token<OzoneBlockTokenIdentifier>decodedToken = new Token();
+    Token<OzoneBlockTokenIdentifier>decodedToken = new Token<>();
     decodedToken.decodeFromUrlString(encodeToUrlString);
 
     OzoneBlockTokenIdentifier decodedTokenId = new OzoneBlockTokenIdentifier();
@@ -184,24 +185,22 @@ public class TestOzoneBlockTokenIdentifier {
   }
 
 
-  public byte[] signTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
+  private byte[] signTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
       PrivateKey privateKey) throws NoSuchAlgorithmException,
       InvalidKeyException, SignatureException {
     Signature rsaSignature = Signature.getInstance("SHA256withRSA");
     rsaSignature.initSign(privateKey);
     rsaSignature.update(tokenId.getBytes());
-    byte[] signature = rsaSignature.sign();
-    return signature;
+    return rsaSignature.sign();
   }
 
-  public boolean verifyTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
+  private boolean verifyTokenAsymmetric(OzoneBlockTokenIdentifier tokenId,
       byte[] signature, Certificate certificate) throws InvalidKeyException,
       NoSuchAlgorithmException, SignatureException {
     Signature rsaSignature = Signature.getInstance("SHA256withRSA");
     rsaSignature.initVerify(certificate);
     rsaSignature.update(tokenId.getBytes());
-    boolean isValid = rsaSignature.verify(signature);
-    return isValid;
+    return rsaSignature.verify(signature);
   }
 
   private byte[] signTokenSymmetric(OzoneBlockTokenIdentifier identifier,
@@ -215,7 +214,7 @@ public class TestOzoneBlockTokenIdentifier {
     return mac.doFinal(identifier.getBytes());
   }
 
-  OzoneBlockTokenIdentifier generateTestToken() {
+  private OzoneBlockTokenIdentifier generateTestToken() {
     return new OzoneBlockTokenIdentifier(RandomStringUtils.randomAlphabetic(6),
         RandomStringUtils.randomAlphabetic(5),
         EnumSet.allOf(HddsProtos.BlockTokenSecretProto.AccessModeProto.class),
@@ -223,7 +222,7 @@ public class TestOzoneBlockTokenIdentifier {
   }
 
   @Test
-  public void testAsymmetricTokenPerf() throws NoSuchAlgorithmException,
+  void testAsymmetricTokenPerf() throws NoSuchAlgorithmException,
       CertificateEncodingException, NoSuchProviderException,
       InvalidKeyException, SignatureException {
     final int testTokenCount = 1000;
@@ -260,7 +259,7 @@ public class TestOzoneBlockTokenIdentifier {
   }
 
   @Test
-  public void testSymmetricTokenPerf() {
+  void testSymmetricTokenPerf() {
     String hmacSHA1 = "HmacSHA1";
     String hmacSHA256 = "HmacSHA256";
 
@@ -268,7 +267,7 @@ public class TestOzoneBlockTokenIdentifier {
     testSymmetricTokenPerfHelper(hmacSHA256, 1024);
   }
 
-  public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
+  private void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
     List<OzoneBlockTokenIdentifier> tokenIds = new ArrayList<>();
     List<byte[]> tokenPasswordSym = new ArrayList<>();
@@ -302,11 +301,6 @@ public class TestOzoneBlockTokenIdentifier {
     }
     long duration = Time.monotonicNowNanos() - startTime;
     LOG.info("Average token sign time with {}({} symmetric key) is {} ns",
-        hmacAlgorithm, keyLen, duration / testTokenCount);
-  }
-
-  // TODO: verify certificate with a trust store
-  public boolean verifyCert(Certificate certificate) {
-    return true;
+        hmacAlgorithm, keyLen, duration / tokenPasswordSym.size());
   }
 }

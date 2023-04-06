@@ -125,7 +125,7 @@ public class TestContainerCommandsEC {
   private static final int EC_DATA = 3;
   private static final int EC_PARITY = 2;
   private static final EcCodec EC_CODEC = EcCodec.RS;
-  private static final int EC_CHUNK_SIZE = 1024;
+  private static final int EC_CHUNK_SIZE = 1024 * 1024;
   private static final int STRIPE_DATA_SIZE = EC_DATA * EC_CHUNK_SIZE;
   private static final int NUM_DN = EC_DATA + EC_PARITY + 3;
   private static byte[][] inputChunks = new byte[EC_DATA][EC_CHUNK_SIZE];
@@ -533,7 +533,8 @@ public class TestContainerCommandsEC {
       inputChunks[i] = getBytesWith(i + 1, EC_CHUNK_SIZE);
     }
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
-        new ECReplicationConfig(3, 2, EcCodec.RS, 1024), new HashMap<>())) {
+        new ECReplicationConfig(3, 2, EcCodec.RS, EC_CHUNK_SIZE),
+        new HashMap<>())) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);

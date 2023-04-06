@@ -558,7 +558,7 @@ public final class HddsServerUtil {
     return excluded;
   }
 
-  private static void includeFile(File file, String entryName,
+  public static void includeFile(File file, String entryName,
                                  ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =

@@ -223,7 +223,7 @@ public final class ECStreamTestUtil {
         new LinkedHashMap<>();
     private List<ByteBuffer> blockStreamData;
     // List of EC indexes that should fail immediately on read
-    private List<Integer> failIndexes = new ArrayList<>();
+    private final List<Integer> failIndexes = new ArrayList<>();
 
     private Pipeline currentPipeline;
 
@@ -249,8 +249,9 @@ public final class ECStreamTestUtil {
       this.currentPipeline = pipeline;
     }
 
-    public synchronized void setFailIndexes(List<Integer> fail) {
-      failIndexes.addAll(fail);
+    // fail each index in the list once
+    public synchronized void setFailIndexes(Integer... fail) {
+      failIndexes.addAll(Arrays.asList(fail));
     }
 
     public synchronized BlockExtendedInputStream create(
@@ -264,7 +265,7 @@ public final class ECStreamTestUtil {
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
           blockStreamData.get(repInd - 1), repInd);
-      if (failIndexes.contains(repInd)) {
+      if (failIndexes.remove(Integer.valueOf(repInd))) {
         stream.setShouldError(true);
       }
       blockStreams.put(repInd, stream);

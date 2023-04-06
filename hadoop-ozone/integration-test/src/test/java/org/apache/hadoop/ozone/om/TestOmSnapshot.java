@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -45,6 +46,8 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -73,9 +76,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -92,6 +93,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @RunWith(Parameterized.class)
 @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
 public class TestOmSnapshot {
+
+  static {
+    Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);
+  }
+
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
   private static String volumeName;
@@ -101,7 +107,7 @@ public class TestOmSnapshot {
   private static boolean enabledFileSystemPaths;
   private static boolean forceFullSnapshotDiff;
   private static ObjectStore store;
-  private static File metaDir;
+  private static OzoneConfiguration leaderConfig;
   private static OzoneManager leaderOzoneManager;
 
   private static RDBStore rdbStore;
@@ -174,9 +180,9 @@ public class TestOmSnapshot {
     bucketName = ozoneBucket.getName();
 
     leaderOzoneManager = ((MiniOzoneHAClusterImpl) cluster).getOMLeader();
+    leaderConfig = leaderOzoneManager.getConfiguration();
     rdbStore =
         (RDBStore) leaderOzoneManager.getMetadataManager().getStore();
-    OzoneConfiguration leaderConfig = leaderOzoneManager.getConfiguration();
     cluster.setConf(leaderConfig);
 
     store = client.getObjectStore();
@@ -187,7 +193,6 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(leaderConfig);
   }
 
   @AfterClass
@@ -314,6 +319,7 @@ public class TestOmSnapshot {
   }
 
   @Test
+  @Ignore("HDDS-8089")
   public void checkKey() throws Exception {
     String s = "testData";
     String dir1 = "dir1";
@@ -837,8 +843,8 @@ public class TestOmSnapshot {
         leaderOzoneManager.getMetadataManager().getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName =
-        metaDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME
-            + snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+        OmSnapshotManager.getSnapshotPath(leaderConfig, snapshotInfo) +
+        OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils
         .waitFor(() -> new File(snapshotDirName).exists(), 1000, 120000);
     return snapshotKeyPrefix;

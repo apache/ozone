@@ -19,13 +19,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.MBeanServer;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
@@ -49,12 +44,11 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-
 /**
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
@@ -66,14 +60,21 @@ public class TestRDBStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
-    options = getNewDBOptions();
+    options = new ManagedDBOptions();
+    options.setCreateIfMissing(true);
+    options.setCreateMissingColumnFamilies(true);
+
+    Statistics statistics = new Statistics();
+    statistics.setStatsLevel(StatsLevel.ALL);
+    options.setStatistics(statistics);
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
   @AfterEach
@@ -82,22 +83,9 @@ public class TestRDBStore {
       rdbStore.close();
     }
   }
-
-  public ManagedDBOptions getNewDBOptions() {
-    ManagedDBOptions managedOptions = new ManagedDBOptions();
-    managedOptions.setCreateIfMissing(true);
-    managedOptions.setCreateMissingColumnFamilies(true);
-
-    Statistics statistics = new Statistics();
-    statistics.setStatsLevel(StatsLevel.ALL);
-    managedOptions.setStatistics(statistics);
-    return managedOptions;
-  }
-
-  public void insertRandomData(RDBStore dbStore, int familyIndex)
-      throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
+  private void insertRandomData(RDBStore dbStore, int familyIndex)
+      throws Exception {
+    try (Table firstTable = dbStore.getTable(families.get(familyIndex))) {
       Assertions.assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
@@ -106,8 +94,6 @@ public class TestRDBStore {
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 
@@ -210,32 +196,6 @@ public class TestRDBStore {
   }
 
   @Test
-  public void getStatMBeanName() throws Exception {
-
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      for (int y = 0; y < 100; y++) {
-        byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    }
-    MBeanServer platformMBeanServer =
-        ManagementFactory.getPlatformMBeanServer();
-    Thread.sleep(2000);
-
-    Object keysWritten = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "NUMBER_KEYS_WRITTEN");
-
-    Assertions.assertTrue(((Long) keysWritten) >= 99L);
-
-    Object dbWriteAverage = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "DB_WRITE_AVERAGE");
-    Assertions.assertTrue((double) dbWriteAverage > 0);
-  }
-
-  @Test
   public void getTable() throws Exception {
     for (String tableName : families) {
       try (Table table = rdbStore.getTable(tableName)) {
@@ -276,7 +236,7 @@ public class TestRDBStore {
 
     RDBStore restoredStoreFromCheckPoint =
         new RDBStore(checkpoint.getCheckpointLocation().toFile(),
-            options, configSet);
+            options, configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
 
     // Let us make sure that our estimate is not off by 10%
     Assertions.assertTrue(
@@ -332,11 +292,24 @@ public class TestRDBStore {
           org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
           org.apache.commons.codec.binary.StringUtils
               .getBytesUtf16("Value2"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key3"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value3"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key4"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value4"));
+      firstTable.put(
+          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key5"),
+          org.apache.commons.codec.binary.StringUtils
+              .getBytesUtf16("Value5"));
     }
-    Assertions.assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
+    Assertions.assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
 
-    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 1);
-    Assertions.assertEquals(1, dbUpdatesSince.getData().size());
+    DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
+    Assertions.assertEquals(2, dbUpdatesSince.getData().size());
+    Assertions.assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
   }
 
   @Test
@@ -366,7 +339,8 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet);
+    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
       try (Table table = rdbStore.getTable(family)) {
         Assertions.assertNotNull(table, family + "is null");
@@ -385,58 +359,4 @@ public class TestRDBStore {
     }
   }
 
-  @Test
-  public void testSstConsistency() throws IOException {
-    for (int i = 0; i < 10; i++) {
-      insertRandomData(rdbStore, 0);
-      insertRandomData(rdbStore, 1);
-      insertRandomData(rdbStore, 2);
-    }
-    DBCheckpoint dbCheckpoint1 = rdbStore.getCheckpoint(true);
-
-    for (int i = 0; i < 10; i++) {
-      insertRandomData(rdbStore, 0);
-      insertRandomData(rdbStore, 1);
-      insertRandomData(rdbStore, 2);
-    }
-    DBCheckpoint dbCheckpoint2 = rdbStore.getCheckpoint(true);
-    compareSstWithSameName(dbCheckpoint1.getCheckpointLocation().toFile(),
-        dbCheckpoint2.getCheckpointLocation().toFile());
-
-    for (int i = 0; i < 10; i++) {
-      insertRandomData(rdbStore, 0);
-      insertRandomData(rdbStore, 1);
-      insertRandomData(rdbStore, 2);
-    }
-    DBCheckpoint dbCheckpoint3 = rdbStore.getCheckpoint(true);
-    compareSstWithSameName(dbCheckpoint2.getCheckpointLocation().toFile(),
-        dbCheckpoint3.getCheckpointLocation().toFile());
-  }
-
-  private void compareSstWithSameName(File checkpoint1, File checkpoint2)
-      throws IOException {
-    FilenameFilter filter = (dir, name) -> name.endsWith(ROCKSDB_SST_SUFFIX);
-    String[] files1 = checkpoint1.list(filter);
-    String[] files2 = checkpoint1.list(filter);
-    assert files1 != null;
-    assert files2 != null;
-    // Get all file names in the both checkpoints
-    List<String> result = Arrays.asList(files1);
-    result.retainAll(Arrays.asList(files2));
-
-    for (String name: result) {
-      File fileInCk1 = new File(checkpoint1.getAbsoluteFile(), name);
-      File fileInCk2 = new File(checkpoint2.getAbsoluteFile(), name);
-      long length1 = fileInCk1.length();
-      long length2 = fileInCk2.length();
-      Assertions.assertEquals(length1, length2, name);
-
-      try (InputStream fileStream1 = new FileInputStream(fileInCk1);
-           InputStream fileStream2 = new FileInputStream(fileInCk2)) {
-        byte[] content1 = new byte[fileStream1.available()];
-        byte[] content2 = new byte[fileStream2.available()];
-        Assertions.assertArrayEquals(content1, content2);
-      }
-    }
-  }
 }

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.commons.lang3.StringUtils;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -33,6 +35,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_SST;
@@ -171,6 +174,7 @@ public final class OMNodeDetails extends NodeDetails {
           setScheme(isHttp ? "http" : "https").
           setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
           setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT).
+          addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
           addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
               flush ? "true" : "false");
       if (sstList != null && !sstList.isEmpty()) {

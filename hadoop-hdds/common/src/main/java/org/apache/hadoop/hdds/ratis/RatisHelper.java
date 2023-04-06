@@ -501,11 +501,11 @@ public final class RatisHelper {
    * @throws IOException
    */
   public static void transferRatisLeadership(ConfigurationSource conf,
-      RaftGroup raftGroup, RaftPeerId targetPeerId)
+      RaftGroup raftGroup, RaftPeerId targetPeerId, GrpcTlsConfig tlsConfig)
       throws IOException {
     // TODO: need a common raft client related conf.
     try (RaftClient raftClient = newRaftClient(SupportedRpcType.GRPC, null,
-        null, raftGroup, createRetryPolicy(conf), null, conf)) {
+        null, raftGroup, createRetryPolicy(conf), tlsConfig, conf)) {
       if (raftGroup.getPeer(targetPeerId) == null) {
         throw new IOException("Cannot choose the target leader. The expected " +
             "leader RaftPeerId is " + targetPeerId + " and the peers are " +

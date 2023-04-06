@@ -67,7 +67,9 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
+  // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
+  private final KeyManager keyManager;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -81,9 +83,9 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
+    this.keyManager = keyManager;
     this.omMetadataManager = keyManager.getMetadataManager();
   }
-
 
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
@@ -135,7 +137,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    // TODO: handle denormalization
+    // TODO: [SNAPSHOT] handle denormalization
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
   }
 
@@ -261,5 +263,9 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   @VisibleForTesting
   public OMMetadataManager getMetadataManager() {
     return omMetadataManager;
+  }
+
+  public KeyManager getKeyManager() {
+    return keyManager;
   }
 }

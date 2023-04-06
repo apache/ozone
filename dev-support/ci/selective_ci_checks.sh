@@ -253,6 +253,7 @@ function get_count_integration_files() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
@@ -434,6 +435,7 @@ function check_needs_unit_test() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/unit.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "src/test/java"
         "src/test/resources"
     )

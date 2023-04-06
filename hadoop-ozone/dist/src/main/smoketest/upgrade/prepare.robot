@@ -21,6 +21,7 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 
 *** Test Cases ***
 Prepare Ozone Manager
+    Pass Execution If    '%{OZONE_UPGRADE_FROM}' == '1.1.0'    OM prepare is skipped for version %{OZONE_UPGRADE_FROM}
     ${result} =        Execute      ozone admin om prepare -id %{OM_SERVICE_ID}
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   OM Preparation successful!
 

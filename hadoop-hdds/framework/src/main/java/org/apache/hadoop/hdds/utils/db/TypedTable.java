@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -110,7 +109,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           // NEVER. Setting epoch value -1, so that when it is marked for
           // delete, this will be considered for cleanup.
           cache.loadInitial(new CacheKey<>(kv.getKey()),
-              new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
+              CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
     } else {

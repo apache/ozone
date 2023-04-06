@@ -22,6 +22,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 
 import org.apache.commons.lang3.StringUtils;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
@@ -180,6 +182,8 @@ public class DBCheckpointServlet extends HttpServlet {
       Instant start = Instant.now();
       List<String> excluded = HddsServerUtil.writeDBCheckpointToStream(
           checkpoint, response.getOutputStream(), receivedSstList);
+      writeDbDataToStream(checkpoint, request,
+          response.getOutputStream());
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -194,7 +198,7 @@ public class DBCheckpointServlet extends HttpServlet {
         dbMetrics.setLastCheckpointStreamingNumSSTExcluded(0);
       }
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
-
+      dbMetrics.incNumCheckpoints();
     } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
@@ -210,5 +214,20 @@ public class DBCheckpointServlet extends HttpServlet {
         }
       }
     }
+  }
+
+  /**
+   * Write checkpoint to the stream.
+   *
+   * @param checkpoint The checkpoint to be written.
+   * @param ignoredRequest The httpRequest which generated this checkpoint.
+   *        (Parameter is ignored in this class but used in child classes).
+   * @param destination The stream to write to.
+   */
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
+      HttpServletRequest ignoredRequest,
+      OutputStream destination)
+      throws IOException, InterruptedException {
+    writeDBCheckpointToStream(checkpoint, destination);
   }
 }
