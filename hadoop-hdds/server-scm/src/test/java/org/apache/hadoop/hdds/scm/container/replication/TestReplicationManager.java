@@ -858,6 +858,49 @@ public class TestReplicationManager {
         .getNumReplicationCmdsSent());
   }
 
+  /**
+   * Tests that a ReplicateContainerCommand that is sent from source to
+   * target has the correct deadline and that ContainerReplicaOp for
+   * replica ADD is created correctly.
+   */
+  @Test
+  public void testReplicateContainerCommandToTarget()
+      throws NotLeaderException {
+    // create a closed EC container
+    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    // command will be pushed from source to target
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        containerInfo.getContainerID(), target);
+    command.setReplicaIndex(1);
+    replicationManager.sendDatanodeCommand(command, containerInfo, source);
+
+    // check the command's deadline
+    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
+        rmConf.getDatanodeTimeoutOffset();
+    Assert.assertEquals(expectedDeadline, command.getDeadline());
+
+    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
+        containerInfo.containerID());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcReplicationCmdsSentTotal());
+    Assertions.assertEquals(0, replicationManager.getMetrics()
+        .getNumReplicationCmdsSent());
+  }
+
   @Test
   public void testSendLowPriorityReplicateContainerCommand()
       throws NotLeaderException {
