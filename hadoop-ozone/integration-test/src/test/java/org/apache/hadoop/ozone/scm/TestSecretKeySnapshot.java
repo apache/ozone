@@ -75,7 +75,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Integration test to verify symmetric secret keys .
+ * Integration test to verify that symmetric secret keys in correctly
+ * synchronized from leader to follower during snapshot installation.
  */
 public final class TestSecretKeySnapshot {
   private static final Logger LOG = LoggerFactory
