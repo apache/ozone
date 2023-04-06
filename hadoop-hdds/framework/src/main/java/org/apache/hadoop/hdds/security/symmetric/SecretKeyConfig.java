@@ -58,23 +58,33 @@ public class SecretKeyConfig {
         HDDS_SECRET_KEY_FILE_DEFAULT);
     localSecretKeyFile = Paths.get(metadataDir, component, keyDir, fileName);
 
-    long rotateDurationInMs = conf.getTimeDuration(
-        HDDS_SECRET_KEY_ROTATE_DURATION,
-        HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
-    this.rotateDuration = Duration.ofMillis(rotateDurationInMs);
-
-    long expiryDurationInMs = conf.getTimeDuration(
-        HDDS_SECRET_KEY_EXPIRY_DURATION,
-        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
-    this.expiryDuration = Duration.ofMillis(expiryDurationInMs);
+    this.rotateDuration = parseRotateDuration(conf);
+    this.expiryDuration = parseExpiryDuration(conf);
+    this.rotationCheckDuration = parseRotateCheckDuration(conf);
 
     this.algorithm = conf.get(HDDS_SECRET_KEY_ALGORITHM,
         HDDS_SECRET_KEY_ALGORITHM_DEFAULT);
+  }
 
+  public static Duration parseExpiryDuration(ConfigurationSource conf) {
+    long expiryDurationInMs = conf.getTimeDuration(
+        HDDS_SECRET_KEY_EXPIRY_DURATION,
+        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    return Duration.ofMillis(expiryDurationInMs);
+  }
+
+  public static Duration parseRotateDuration(ConfigurationSource conf) {
+    long rotateDurationInMs = conf.getTimeDuration(
+        HDDS_SECRET_KEY_ROTATE_DURATION,
+        HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
+    return Duration.ofMillis(rotateDurationInMs);
+  }
+
+  public static Duration parseRotateCheckDuration(ConfigurationSource conf) {
     long rotationCheckInMs = conf.getTimeDuration(
         HDDS_SECRET_KEY_ROTATE_CHECK_DURATION,
         HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT, TimeUnit.MILLISECONDS);
-    this.rotationCheckDuration = Duration.ofMillis(rotationCheckInMs);
+    return Duration.ofMillis(rotationCheckInMs);
   }
 
   public Path getLocalSecretKeyFile() {

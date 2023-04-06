@@ -45,10 +45,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.InsufficientLocationsException;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -112,7 +113,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
 
 /**
@@ -151,6 +151,7 @@ public class TestContainerCommandsEC {
   private static Token<ContainerTokenIdentifier> containerToken;
   private static ContainerTokenSecretManager containerTokenGenerator;
   private static OzoneBlockTokenSecretManager blockTokenGenerator;
+  private static SecretKeyClient secretKeyClient;
   private List<XceiverClientSpi> clients = null;
   private static OzoneConfiguration config;
   private static CertificateClient certClient;
@@ -582,7 +583,7 @@ public class TestContainerCommandsEC {
         XceiverClientManager xceiverClientManager =
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
-            new ECReconstructionCoordinator(config, certClient,
+            new ECReconstructionCoordinator(config, certClient, secretKeyClient,
                  null, ECReconstructionMetrics.create())) {
 
       ECReconstructionMetrics metrics =
@@ -778,7 +779,7 @@ public class TestContainerCommandsEC {
 
     Assert.assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
-          new ECReconstructionCoordinator(config, certClient,
+          new ECReconstructionCoordinator(config, certClient,  secretKeyClient,
               null, ECReconstructionMetrics.create())) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
@@ -840,10 +841,12 @@ public class TestContainerCommandsEC {
 
     OzoneManager.setTestSecureOmFlag(true);
     certClient = new CertificateClientTestImpl(conf);
+    secretKeyClient = new SecretKeyTestClient();
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(NUM_DN)
         .setScmId(SCM_ID).setClusterId(CLUSTER_ID)
         .setCertificateClient(certClient)
+        .setSecretKeyClient(secretKeyClient)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
@@ -887,16 +890,11 @@ public class TestContainerCommandsEC {
     pipeline = pipelines.get(0);
     datanodeDetails = pipeline.getNodes();
 
-    OzoneConfiguration tweakedConfig = new OzoneConfiguration(config);
-    tweakedConfig.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    SecurityConfig conf = new SecurityConfig(tweakedConfig);
     long tokenLifetime = TimeUnit.DAYS.toMillis(1);
     containerTokenGenerator = new ContainerTokenSecretManager(
-        conf, tokenLifetime);
-    containerTokenGenerator.start(certClient);
+        tokenLifetime, secretKeyClient);
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
-        conf, tokenLifetime);
-    blockTokenGenerator.start(certClient);
+        tokenLifetime, secretKeyClient);
     containerToken = containerTokenGenerator
         .generateToken(ANY_USER, new ContainerID(containerID));
   }
@@ -912,14 +910,6 @@ public class TestContainerCommandsEC {
 
     if (cluster != null) {
       cluster.shutdown();
-    }
-
-    if (blockTokenGenerator != null) {
-      blockTokenGenerator.stop();
-    }
-
-    if (containerTokenGenerator != null) {
-      containerTokenGenerator.stop();
     }
   }
 

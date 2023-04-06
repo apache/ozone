@@ -37,7 +37,7 @@ import static java.util.stream.Collectors.toList;
  * This component manages symmetric SecretKey life-cycle, including generation,
  * rotation and destruction.
  */
-public class SecretKeyManager {
+public class SecretKeyManager implements SecretKeyClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyManager.class);
 
@@ -129,11 +129,13 @@ public class SecretKeyManager {
     return false;
   }
 
-  public ManagedSecretKey getCurrentKey() {
+  @Override
+  public ManagedSecretKey getCurrentSecretKey() {
     return state.getCurrentKey();
   }
 
-  public ManagedSecretKey getKey(UUID id) {
+  @Override
+  public ManagedSecretKey getSecretKey(UUID id) {
     return state.getKey(id);
   }
 

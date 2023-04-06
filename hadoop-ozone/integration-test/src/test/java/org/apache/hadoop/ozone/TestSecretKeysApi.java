@@ -179,7 +179,6 @@ public final class TestSecretKeysApi {
         ozoneKeytab.getAbsolutePath());
   }
 
-
   /**
    * Test secret key apis in happy case.
    */

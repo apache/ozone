@@ -20,17 +20,15 @@ package org.apache.hadoop.hdds.security.token;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateNotYetValidException;
-import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -42,13 +40,13 @@ public abstract class
     ShortLivedTokenVerifier<T extends ShortLivedTokenIdentifier>
     implements TokenVerifier {
 
-  private final CertificateClient caClient;
   private final SecurityConfig conf;
+  private final SecretKeyVerifierClient secretKeyClient;
 
   protected ShortLivedTokenVerifier(SecurityConfig conf,
-      CertificateClient caClient) {
+      SecretKeyVerifierClient secretKeyClient) {
     this.conf = conf;
-    this.caClient = caClient;
+    this.secretKeyClient = secretKeyClient;
   }
 
   /** Whether the specific kind of token is required for {@code cmdType}. */
@@ -75,11 +73,6 @@ public abstract class
       return;
     }
 
-    if (caClient == null) {
-      throw new SCMSecurityException("Certificate client not available " +
-          "to validate token");
-    }
-
     T tokenId = createTokenIdentifier();
     try {
       tokenId.readFields(new DataInputStream(new ByteArrayInputStream(
@@ -88,31 +81,9 @@ public abstract class
       throw new BlockTokenException("Failed to decode token : " + token);
     }
 
+    verifyTokenPassword(tokenId, token.getPassword());
+
     UserGroupInformation tokenUser = tokenId.getUser();
-    X509Certificate signerCert =
-        caClient.getCertificate(tokenId.getCertSerialId());
-
-    if (signerCert == null) {
-      throw new BlockTokenException("Can't find signer certificate " +
-          "(CertSerialId: " + tokenId.getCertSerialId() +
-          ") of the token for user: " + tokenUser);
-    }
-
-    try {
-      signerCert.checkValidity();
-    } catch (CertificateExpiredException exExp) {
-      throw new BlockTokenException("Token can't be verified due to " +
-          "expired certificate " + tokenId.getCertSerialId());
-    } catch (CertificateNotYetValidException exNyv) {
-      throw new BlockTokenException("Token can't be verified due to " +
-          "not yet valid certificate " + tokenId.getCertSerialId());
-    }
-
-    if (!caClient.verifySignature(tokenId.getBytes(), token.getPassword(),
-        signerCert)) {
-      throw new BlockTokenException("Invalid token for user: " + tokenUser);
-    }
-
     // check expiration
     if (tokenId.isExpired(Instant.now())) {
       throw new BlockTokenException("Expired token for user: " + tokenUser);
@@ -131,5 +102,28 @@ public abstract class
 
   protected SecurityConfig getConf() {
     return conf;
+  }
+
+  private void verifyTokenPassword(
+      ShortLivedTokenIdentifier tokenId, byte[] password)
+      throws SCMSecurityException {
+
+    ManagedSecretKey secretKey = secretKeyClient.getSecretKey(
+        tokenId.getSecretKeyId());
+    if (secretKey == null) {
+      throw new BlockTokenException("Can't find the signer secret key " +
+          tokenId.getSecretKeyId() + " of the token for user: " +
+          tokenId.getUser());
+    }
+
+    if (secretKey.isExpired()) {
+      throw new BlockTokenException("Token can't be verified due to " +
+          "expired secret key " + tokenId.getSecretKeyId());
+    }
+
+    if (!secretKey.isValidSignature(tokenId, password)) {
+      throw new BlockTokenException("Invalid token for user: " +
+          tokenId.getUser());
+    }
   }
 }

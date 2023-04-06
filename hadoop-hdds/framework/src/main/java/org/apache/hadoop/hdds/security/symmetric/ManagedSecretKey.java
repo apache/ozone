@@ -20,11 +20,15 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtobufUtils;
 
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.Serializable;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,11 +36,12 @@ import java.util.UUID;
  * Enclosed a symmetric {@link SecretKey} with additional data for life-cycle
  * management.
  */
-public final class ManagedSecretKey implements Serializable {
+public final class ManagedSecretKey {
   private final UUID id;
   private final Instant creationTime;
   private final Instant expiryTime;
   private final SecretKey secretKey;
+  private final ThreadLocal<Mac> macInstances;
 
   public ManagedSecretKey(UUID id,
                           Instant creationTime,
@@ -46,6 +51,16 @@ public final class ManagedSecretKey implements Serializable {
     this.creationTime = creationTime;
     this.expiryTime = expiryTime;
     this.secretKey = secretKey;
+
+    // This help reuse Mac instances for the same thread.
+    macInstances = ThreadLocal.withInitial(() -> {
+      try {
+        return Mac.getInstance(secretKey.getAlgorithm());
+      } catch (NoSuchAlgorithmException e) {
+        throw new IllegalArgumentException(
+            "Invalid algorithm " + secretKey.getAlgorithm(), e);
+      }
+    });
   }
 
   public boolean isExpired() {
@@ -86,6 +101,29 @@ public final class ManagedSecretKey implements Serializable {
   public String toString() {
     return "SecretKey(id = " + id + ", creation at: "
         + creationTime + ", expire at: " + expiryTime + ")";
+  }
+
+  public byte[] sign(byte[] data) {
+    try {
+      Mac mac = macInstances.get();
+      mac.init(secretKey);
+      return mac.doFinal(data);
+    } catch (InvalidKeyException e) {
+      throw new IllegalArgumentException("Invalid key to HMAC computation", e);
+    }
+  }
+
+  public byte[] sign(TokenIdentifier tokenId) {
+    return sign(tokenId.getBytes());
+  }
+
+  public boolean isValidSignature(byte[] data, byte[] signature) {
+    byte[] expectedSignature = sign(data);
+    return MessageDigest.isEqual(expectedSignature, signature);
+  }
+
+  public boolean isValidSignature(TokenIdentifier tokenId, byte[] signature) {
+    return isValidSignature(tokenId.getBytes(), signature);
   }
 
   /**
