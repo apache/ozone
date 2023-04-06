@@ -19,23 +19,25 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -93,6 +95,7 @@ public class TestSecureOzoneContainer {
   private final boolean hasToken;
   private final boolean tokenExpired;
   private CertificateClientTestImpl caClient;
+  private SecretKeyClient secretKeyClient;
   private ContainerTokenSecretManager secretManager;
 
   public TestSecureOzoneContainer(Boolean requireToken,
@@ -122,8 +125,9 @@ public class TestSecureOzoneContainer {
     conf.set(OZONE_METADATA_DIRS, ozoneMetaPath);
     secConfig = new SecurityConfig(conf);
     caClient = new CertificateClientTestImpl(conf);
+    secretKeyClient = new SecretKeyTestClient();
     secretManager = new ContainerTokenSecretManager(
-        new SecurityConfig(conf), TimeUnit.DAYS.toMillis(1));
+        TimeUnit.DAYS.toMillis(1), secretKeyClient);
   }
 
   @Test
@@ -146,7 +150,8 @@ public class TestSecureOzoneContainer {
       conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
+          secretKeyClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -159,7 +164,6 @@ public class TestSecureOzoneContainer {
         port = secConfig.getConfiguration().getInt(OzoneConfigKeys
                 .DFS_CONTAINER_IPC_PORT, DFS_CONTAINER_IPC_PORT_DEFAULT);
       }
-      secretManager.start(caClient);
 
       ugi.doAs((PrivilegedAction<Void>) () -> {
         try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
@@ -172,7 +176,7 @@ public class TestSecureOzoneContainer {
                 : Instant.now().plusSeconds(3600);
             ContainerTokenIdentifier tokenIdentifier =
                 new ContainerTokenIdentifier(user, containerID,
-                    caClient.getCertificate().getSerialNumber().toString(),
+                    secretKeyClient.getCurrentSecretKey().getId(),
                     expiryDate);
             token = secretManager.generateToken(tokenIdentifier);
           }

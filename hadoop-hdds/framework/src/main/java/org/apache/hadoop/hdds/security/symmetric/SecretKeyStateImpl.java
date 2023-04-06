@@ -127,5 +127,4 @@ public final class SecretKeyStateImpl implements SecretKeyState {
       lock.writeLock().unlock();
     }
   }
-
 }

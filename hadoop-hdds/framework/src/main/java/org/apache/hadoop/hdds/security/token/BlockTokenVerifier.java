@@ -26,8 +26,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,8 +54,9 @@ public class BlockTokenVerifier extends
     return String.valueOf(blockID);
   }
 
-  public BlockTokenVerifier(SecurityConfig conf, CertificateClient caClient) {
-    super(conf, caClient);
+  public BlockTokenVerifier(SecurityConfig conf,
+                            SecretKeyVerifierClient secretKeyClient) {
+    super(conf, secretKeyClient);
   }
 
   @Override

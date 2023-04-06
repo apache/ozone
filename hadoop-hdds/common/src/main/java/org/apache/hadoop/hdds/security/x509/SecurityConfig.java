@@ -487,4 +487,8 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
   }
+
+  public boolean isTokenEnabled() {
+    return blockTokenEnabled || containerTokenEnabled;
+  }
 }

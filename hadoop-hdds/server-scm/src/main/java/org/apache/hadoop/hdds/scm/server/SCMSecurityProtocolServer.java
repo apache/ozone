@@ -178,13 +178,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   @Override
   public ManagedSecretKey getCurrentSecretKey() throws SCMSecurityException {
     validateSecretKeyStatus();
-    return secretKeyManager.getCurrentKey();
+    return secretKeyManager.getCurrentSecretKey();
   }
 
   @Override
   public ManagedSecretKey getSecretKey(UUID id) throws SCMSecurityException {
     validateSecretKeyStatus();
-    return secretKeyManager.getKey(id);
+    return secretKeyManager.getSecretKey(id);
   }
 
   @Override

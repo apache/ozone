@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerTokenSecretProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -28,6 +29,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Token identifier for container operations, similar to block token.
@@ -43,9 +45,16 @@ public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
   }
 
   public ContainerTokenIdentifier(String ownerId, ContainerID containerID,
-      String certSerialId, Instant expiryDate) {
-    super(ownerId, expiryDate, certSerialId);
+                                  Instant expiryDate) {
+    super(ownerId, expiryDate);
     this.containerID = containerID;
+  }
+
+  public ContainerTokenIdentifier(String ownerId, ContainerID containerID,
+                                  UUID secretKeyId,
+                                  Instant expiryDate) {
+    this(ownerId, containerID, expiryDate);
+    setSecretKeyId(secretKeyId);
   }
 
   @Override
@@ -58,7 +67,7 @@ public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
     ContainerTokenSecretProto.Builder builder = ContainerTokenSecretProto
         .newBuilder()
         .setOwnerId(getOwnerId())
-        .setCertSerialId(getCertSerialId())
+        .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
         .setExpiryDate(getExpiry().toEpochMilli())
         .setContainerId(containerID.getProtobuf());
     out.write(builder.build().toByteArray());
@@ -72,7 +81,7 @@ public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
     }
     ContainerTokenSecretProto proto =
         ContainerTokenSecretProto.parseFrom((DataInputStream) in);
-    setCertSerialId(proto.getCertSerialId());
+    setSecretKeyId(ProtobufUtils.fromProtobuf(proto.getSecretKeyId()));
     setExpiry(Instant.ofEpochMilli(proto.getExpiryDate()));
     setOwnerId(proto.getOwnerId());
     this.containerID = ContainerID.getFromProtobuf(proto.getContainerId());

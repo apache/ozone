@@ -27,12 +27,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -99,6 +100,7 @@ public class TestOzoneContainerWithTLS {
   private OzoneConfiguration conf;
   private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
+  private SecretKeyClient secretKeyClient;
   private boolean containerTokenEnabled;
   private int certLifetime = 15 * 1000; // 15s
 
@@ -144,8 +146,9 @@ public class TestOzoneContainerWithTLS {
         TimeUnit.MILLISECONDS);
 
     caClient = new CertificateClientTestImpl(conf);
-    secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime);
+    secretKeyClient = new SecretKeyTestClient();
+    secretManager = new ContainerTokenSecretManager(expiryTime,
+        secretKeyClient);
   }
 
   @Test(expected = CertificateExpiredException.class)
@@ -177,7 +180,8 @@ public class TestOzoneContainerWithTLS {
       conf.setBoolean(
           OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
+          secretKeyClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
@@ -185,7 +189,6 @@ public class TestOzoneContainerWithTLS {
           Collections.singletonList(caClient.getCACertificate()))) {
 
         if (containerTokenEnabled) {
-          secretManager.start(caClient);
           client.connect();
           createSecureContainer(client, containerId,
               secretManager.generateToken(
@@ -217,14 +220,11 @@ public class TestOzoneContainerWithTLS {
 
     OzoneContainer container = null;
     try {
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
+          secretKeyClient);
 
       // Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
-
-      if (containerTokenEnabled) {
-        secretManager.start(caClient);
-      }
 
       // Create containers
       long containerId = ContainerTestHelper.getTestContainerID();

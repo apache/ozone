@@ -532,7 +532,8 @@ message ContainerTokenSecretProto {
     required string ownerId = 1;
     required ContainerID containerId = 2;
     required uint64 expiryDate = 3;
-    required string certSerialId = 4;
+    optional string certSerialId = 4 [deprecated=true];
+    optional UUID secretKeyId = 5;
 }
 
 message GetContainerTokenRequestProto {
