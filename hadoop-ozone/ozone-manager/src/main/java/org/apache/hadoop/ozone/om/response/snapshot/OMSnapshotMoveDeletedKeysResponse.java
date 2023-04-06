@@ -118,7 +118,6 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
   }
 
-
   private void processKeys(BatchOperation batchOp,
       OMMetadataManager metadataManager,
       List<SnapshotMoveKeyInfos> keyList,

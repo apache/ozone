@@ -1713,7 +1713,7 @@ message SnapshotMoveDeletedKeysRequest {
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
-  repeated string dirsToMove = 5;
+  repeated string deletedDirsToMove = 5;
 }
 
 message SnapshotMoveKeyInfos {

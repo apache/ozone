@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -72,7 +71,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 
 /**
  * Background Service to clean-up deleted snapshot and reclaim space.
@@ -170,8 +168,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               .getBucketTable().get(dbBucketKey);
 
           if (bucketInfo == null) {
-            throw new OMException("Bucket " + snapInfo.getBucketName() +
-                " is not found", BUCKET_NOT_FOUND);
+            throw new IllegalStateException("Bucket " + "/" +
+                snapInfo.getVolumeName() + "/" + snapInfo.getBucketName() +
+                " is not found. BucketInfo should not be null for snapshotted" +
+                " bucket. The OM is in unexpected state.");
           }
 
           String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
@@ -215,7 +215,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           long remainNum = handleDirectoryCleanUp(snapshotDeletedDirTable,
               previousDirTable, dbBucketKeyForDir, snapInfo, omSnapshot,
               dirsToMove);
-
+          int deletionCount = 0;
 
           try (TableIterator<String, ? extends Table.KeyValue<String,
               RepeatedOmKeyInfo>> deletedIterator = snapshotDeletedTable
@@ -224,7 +224,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             List<BlockGroup> keysToPurge = new ArrayList<>();
             deletedIterator.seek(snapshotBucketKey);
 
-            int deletionCount = 0;
             while (deletedIterator.hasNext() &&
                 deletionCount < remainNum) {
               Table.KeyValue<String, RepeatedOmKeyInfo>
@@ -282,7 +281,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getTableKey());
             successRunCount.incrementAndGet();
           } catch (IOException ex) {
-            LOG.error("Error while running Snapshot Deleting Service", ex);
+            LOG.error("Error while running Snapshot Deleting Service for " +
+                "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
+                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                " keys and " + (keyLimitPerSnapshot - remainNum) +
+                " directories and files", ex);
           }
           snapshotLimit--;
           // Submit Move request to OM.
@@ -329,13 +332,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         SnapshotInfo snapInfo, OmSnapshot omSnapshot,
         List<String> dirsToMove) {
 
-      int dirNum = 0;
-      int subDirNum = 0;
-      int subFileNum = 0;
+      long dirNum = 0L;
+      long subDirNum = 0L;
+      long subFileNum = 0L;
       long remainNum = keyLimitPerSnapshot;
       List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
       List<Pair<String, OmKeyInfo>> allSubDirList
-          = new ArrayList<>((int) remainNum);
+          = new ArrayList<>(keyLimitPerSnapshot);
       try (TableIterator<String, ? extends
           Table.KeyValue<String, OmKeyInfo>> deletedDirIterator =
                snapshotDeletedDirTable.iterator()) {
@@ -371,8 +374,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             subDirNum, subFileNum, allSubDirList, purgePathRequestList,
             snapInfo.getTableKey(), startTime);
       } catch (IOException e) {
-        LOG.error("Error while running delete directories and files in" +
-            "Snapshot deleting background task. Will retry at next run.", e);
+        LOG.error("Error while running delete directories and files for " +
+            "snapshot " + snapInfo.getTableKey() + " in snapshot deleting " +
+            "background task. Will retry at next run.", e);
       }
 
       return remainNum;
@@ -431,7 +435,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .addAllReclaimKeys(toReclaimList)
           .addAllNextDBKeys(toNextDBList)
           .addAllRenamedKeys(renamedKeysList)
-          .addAllDirsToMove(dirsToMove)
+          .addAllDeletedDirsToMove(dirsToMove)
           .build();
 
       OMRequest omRequest = OMRequest.newBuilder()
@@ -456,7 +460,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
       // OzoneDeletePathKey. Changing it back to check the previous DirTable.
       String prevDbKey = ozoneManager.getMetadataManager()
-          .getOzoneDeletePathToOzonePath(deletedDirDbKey);
+          .getOzoneDeletePathDirKey(deletedDirDbKey);
       OmDirectoryInfo prevDirectoryInfo = previousDirTable.get(prevDbKey);
       if (prevDirectoryInfo == null) {
         return true;

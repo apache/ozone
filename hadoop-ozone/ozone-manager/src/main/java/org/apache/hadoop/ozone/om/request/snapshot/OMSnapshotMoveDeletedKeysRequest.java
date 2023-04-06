@@ -92,7 +92,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<HddsProtos.KeyValue> renamedKeysList =
           moveDeletedKeysRequest.getRenamedKeysList();
       List<String> movedDirs =
-          moveDeletedKeysRequest.getDirsToMoveList();
+          moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
       OmSnapshot omNextSnapshot = null;
 

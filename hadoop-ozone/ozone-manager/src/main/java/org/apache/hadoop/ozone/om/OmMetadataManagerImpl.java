@@ -1837,7 +1837,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public String getOzoneDeletePathToOzonePath(String ozoneDeletePath) {
+  public String getOzoneDeletePathDirKey(String ozoneDeletePath) {
     return ozoneDeletePath.substring(0,
         ozoneDeletePath.lastIndexOf(OM_KEY_PREFIX));
   }

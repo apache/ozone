@@ -56,7 +56,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
- * Abstract's KeyDeletingService.
+ * Abstracts common code from KeyDeletingService and DirectoryDeletingService
+ * which is used by SnapshotDeletingService.
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService {
 
@@ -343,7 +344,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public long optimizeDirDeletesAndSubmitRequest(long remainNum,
-      int dirNum, int subDirNum, int subFileNum,
+      long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime) {

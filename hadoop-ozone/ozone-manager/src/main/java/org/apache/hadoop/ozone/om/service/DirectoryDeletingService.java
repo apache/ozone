@@ -114,9 +114,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.debug("Running DirectoryDeletingService");
         }
         getRunCount().incrementAndGet();
-        int dirNum = 0;
-        int subDirNum = 0;
-        int subFileNum = 0;
+        long dirNum = 0L;
+        long subDirNum = 0L;
+        long subFileNum = 0L;
         long remainNum = pathLimitPerTask;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
@@ -132,7 +132,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             pendingDeletedDirInfo = deleteTableIterator.next();
             // Do not reclaim if the directory is still being referenced by
             // the previous snapshot.
-            if (checkDirPartOfPreviousSnapshot(pendingDeletedDirInfo)) {
+            if (previousSnapshotHasDir(pendingDeletedDirInfo)) {
               continue;
             }
 
@@ -165,7 +165,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private boolean checkDirPartOfPreviousSnapshot(
+    private boolean previousSnapshotHasDir(
         KeyValue<String, OmKeyInfo> pendingDeletedDirInfo) throws IOException {
       String key = pendingDeletedDirInfo.getKey();
       OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
@@ -183,10 +183,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             latestSnapshot.getMetadataManager().getDirectoryTable();
         // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
         // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-        String prevDbKey = metadataManager.getOzoneDeletePathToOzonePath(key);
+        String prevDbKey = metadataManager.getOzoneDeletePathDirKey(key);
         OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
         return prevDirInfo != null &&
-            prevDirInfo.getObjectID() == prevDirInfo.getObjectID();
+            prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
       }
       return false;
     }
