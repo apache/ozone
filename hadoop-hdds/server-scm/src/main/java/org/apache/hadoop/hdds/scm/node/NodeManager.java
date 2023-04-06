@@ -380,4 +380,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   default void forceNodesToHealthyReadOnly() { }
+
+  @Override
+  default Map<String, Map<String, String>> getNodeStatusInfo() {
+    return null;
+  }
 }

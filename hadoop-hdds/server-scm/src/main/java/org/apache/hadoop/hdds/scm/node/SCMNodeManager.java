@@ -89,6 +89,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
+import static java.util.Objects.nonNull;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
@@ -129,7 +132,8 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
-
+  private final String opeState = "OPSTATE";
+  private final String comState = "COMSTATE";
   /**
    * Constructs SCM machine Manager.
    */
@@ -963,7 +967,39 @@ public class SCMNodeManager implements NodeManager {
     }
     return nodeInfo;
   }
-
+  @Override
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
+    Map<String, Map<String, String>> nodes = new HashMap<>();
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      String hostName = dni.getHostName();
+      DatanodeDetails.Port httpPort = dni.getPort(HTTP);
+      DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
+      NodeStatus nodestatus = null;
+      NodeState health = null;
+      NodeOperationalState operationalState = null;
+      if (nonNull(dni.getNodeStatus())) {
+        nodestatus = dni.getNodeStatus();
+      }
+      if (nonNull(nodestatus.getHealth())) {
+        health = nodestatus.getHealth();
+      }
+      if (nonNull(nodestatus.getOperationalState())) {
+        operationalState = nodestatus.getOperationalState();
+      }
+      Map<String, String> map = new HashMap<>();
+      map.put(opeState, operationalState.toString());
+      map.put(comState, health.toString());
+      if (httpPort != null) {
+        map.put(httpPort.getName().toString(), httpPort.getValue().toString());
+      }
+      if (httpsPort != null) {
+        map.put(httpsPort.getName().toString(),
+                httpsPort.getValue().toString());
+      }
+      nodes.put(hostName, map);
+    }
+    return nodes;
+  }
   private enum UsageMetrics {
     DiskCapacity,
     DiskUsed,
