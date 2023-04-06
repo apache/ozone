@@ -20,31 +20,35 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Iterator to Parse output of RocksDBSSTDumpTool.
  */
-public abstract class ManagedSSTDumpIterator<T> implements
-    ClosableIterator<T> {
+public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ManagedSSTDumpIterator.class);
   private static final String PATTERN_REGEX =
-          "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
+      "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
 
   public static final int PATTERN_KEY_GROUP_NUMBER = 1;
   public static final int PATTERN_SEQ_GROUP_NUMBER = 2;
   public static final int PATTERN_TYPE_GROUP_NUMBER = 3;
-  private static final Pattern PATTERN_MATCHER =
-          Pattern.compile(PATTERN_REGEX);
+  private static final Pattern PATTERN_MATCHER = Pattern.compile(PATTERN_REGEX);
   private BufferedReader processOutput;
   private StringBuilder stdoutString;
 
@@ -56,32 +60,33 @@ public abstract class ManagedSSTDumpIterator<T> implements
 
   private ManagedSSTDumpTool.SSTDumpToolTask sstDumpToolTask;
   private AtomicBoolean open;
+  private StackTraceElement[] stackTrace;
 
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
-                                String sstFilePath,
-                                ManagedOptions options) throws IOException,
-          NativeLibraryNotLoadedException {
+                                String sstFilePath, ManagedOptions options)
+      throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
       throw new IOException(String.format("File in path : %s doesn't exist",
-              sstFile.getAbsolutePath()));
+          sstFile.getAbsolutePath()));
     }
     if (!sstFile.isFile()) {
       throw new IOException(String.format("Path given: %s is not a file",
-              sstFile.getAbsolutePath()));
+          sstFile.getAbsolutePath()));
     }
     init(sstDumpTool, sstFile, options);
+    this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
                     ManagedOptions options)
-          throws NativeLibraryNotLoadedException {
-    String[] args = {"--file=" + sstFile.getAbsolutePath(),
-                     "--command=scan"};
+      throws NativeLibraryNotLoadedException {
+    String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
-    processOutput = new BufferedReader(new InputStreamReader(
-            sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
+    processOutput = new BufferedReader(
+        new InputStreamReader(sstDumpToolTask.getPipedOutput(),
+            StandardCharsets.UTF_8));
     stdoutString = new StringBuilder();
     currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
     charBuffer = new char[8192];
@@ -97,15 +102,16 @@ public abstract class ManagedSSTDumpIterator<T> implements
     if (!this.open.get()) {
       throw new RuntimeException("Iterator has been closed");
     }
-    if (sstDumpToolTask.getFuture().isDone()
-            && sstDumpToolTask.exitValue() != 0) {
+    if (sstDumpToolTask.getFuture().isDone() &&
+        sstDumpToolTask.exitValue() != 0) {
       throw new RuntimeException("Process Terminated with non zero " +
-              String.format("exit value %d", sstDumpToolTask.exitValue()));
+          String.format("exit value %d", sstDumpToolTask.exitValue()));
     }
   }
 
   /**
    * Checks the status of the process & sees if there is another record.
+   *
    * @return True if next exists & false otherwise
    * Throws Runtime Exception in case of SST File read failure
    */
@@ -118,6 +124,7 @@ public abstract class ManagedSSTDumpIterator<T> implements
 
   /**
    * Transforms Key to a certain value.
+   *
    * @param value
    * @return transformed Value
    */
@@ -125,6 +132,7 @@ public abstract class ManagedSSTDumpIterator<T> implements
 
   /**
    * Returns the next record from SSTDumpTool.
+   *
    * @return next Key
    * Throws Runtime Exception incase of failure.
    */
@@ -136,8 +144,8 @@ public abstract class ManagedSSTDumpIterator<T> implements
     while (!currentMatcher.find()) {
       try {
         if (prevMatchEndIndex != 0) {
-          stdoutString = new StringBuilder(stdoutString.substring(
-                  prevMatchEndIndex, stdoutString.length()));
+          stdoutString = new StringBuilder(
+              stdoutString.substring(prevMatchEndIndex, stdoutString.length()));
           prevMatchEndIndex = 0;
           currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
         }
@@ -145,7 +153,7 @@ public abstract class ManagedSSTDumpIterator<T> implements
         if (numberOfCharsRead < 0) {
           if (currentKey != null) {
             currentKey.setValue(stdoutString.substring(0,
-                    Math.max(stdoutString.length() - 1, 0)));
+                Math.max(stdoutString.length() - 1, 0)));
             return getTransformedValue(currentKey);
           }
           throw new NoSuchElementException("No more elements found");
@@ -158,13 +166,12 @@ public abstract class ManagedSSTDumpIterator<T> implements
     }
     if (currentKey != null) {
       currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-              currentMatcher.start() - 1));
+          currentMatcher.start() - 1));
     }
     prevMatchEndIndex = currentMatcher.end();
-    nextKey = new KeyValue(
-            currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
-            currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
-            currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
+    nextKey = new KeyValue(currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
+        currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
+        currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
     return getTransformedValue(currentKey);
   }
 
@@ -181,7 +188,16 @@ public abstract class ManagedSSTDumpIterator<T> implements
 
   @Override
   protected void finalize() throws Throwable {
+    if (open.get()) {
+      LOG.warn("{}  is not closed properly." +
+              " StackTrace for unclosed instance: {}",
+          this.getClass().getName(),
+          Arrays.stream(stackTrace)
+              .map(StackTraceElement::toString).collect(
+                  Collectors.joining("\n")));
+    }
     this.close();
+    super.finalize();
   }
 
   /**
@@ -222,12 +238,8 @@ public abstract class ManagedSSTDumpIterator<T> implements
 
     @Override
     public String toString() {
-      return "KeyValue{" +
-              "key='" + key + '\'' +
-              ", sequence=" + sequence +
-              ", type=" + type +
-              ", value='" + value + '\'' +
-              '}';
+      return "KeyValue{" + "key='" + key + '\'' + ", sequence=" + sequence +
+          ", type=" + type + ", value='" + value + '\'' + '}';
     }
   }
 }

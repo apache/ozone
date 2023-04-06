@@ -54,9 +54,9 @@ public class ManagedSstFileReader {
   }
 
   public static <T> Stream<T> getStreamFromIterator(
-          ClosableIterator<T> itr) {
+      ClosableIterator<T> itr) {
     final Spliterator<T> spliterator = Spliterators
-            .spliteratorUnknownSize(itr, 0);
+        .spliteratorUnknownSize(itr, 0);
     return StreamSupport.stream(spliterator, false).onClose(() -> {
       try {
         itr.close();
@@ -67,19 +67,20 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStream() throws RocksDBException,
-          NativeLibraryNotLoadedException, IOException {
+      NativeLibraryNotLoadedException, IOException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
-            new MultipleSstFileIterator<String>(sstFiles) {
-            private ManagedOptions options = new ManagedOptions();
-            private ReadOptions readOptions = new ManagedReadOptions();
+        new MultipleSstFileIterator<String>(sstFiles) {
+          private ManagedOptions options = new ManagedOptions();
+          private ReadOptions readOptions = new ManagedReadOptions();
+
           @Override
           protected ClosableIterator<String>
-              getKeyIteratorForFile(String file) throws RocksDBException {
+          getKeyIteratorForFile(String file) throws RocksDBException {
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
-                      SstFileReaderIterator iterator) {
+                  SstFileReaderIterator iterator) {
                 return new String(iterator.key(), UTF_8);
               }
             };
@@ -96,18 +97,19 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStreamWithTombstone(
-          ManagedSSTDumpTool sstDumpTool) throws IOException, RocksDBException,
-          NativeLibraryNotLoadedException {
+      ManagedSSTDumpTool sstDumpTool) throws IOException, RocksDBException,
+      NativeLibraryNotLoadedException {
     final MultipleSstFileIterator<String> itr =
-            new MultipleSstFileIterator<String>(sstFiles) {
+        new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
           private ManagedOptions options = new ManagedOptions();
+
           @Override
           protected ClosableIterator<String>
-              getKeyIteratorForFile(String file)
-                  throws NativeLibraryNotLoadedException, IOException {
+          getKeyIteratorForFile(String file)
+              throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                    options) {
+                options) {
               @Override
               protected String getTransformedValue(KeyValue value) {
                 return value.getKey();
@@ -131,7 +133,7 @@ public class ManagedSstFileReader {
 
     ManagedSstFileIterator(String path, ManagedOptions options,
                            ReadOptions readOptions)
-            throws RocksDBException {
+        throws RocksDBException {
       this.fileReader = new SstFileReader(options);
       this.fileReader.open(path);
       this.fileReaderIterator = fileReader.newIterator(readOptions);
@@ -168,15 +170,15 @@ public class ManagedSstFileReader {
     private ClosableIterator<T> currentFileIterator;
 
     private MultipleSstFileIterator(Collection<String> files)
-            throws IOException, RocksDBException,
-            NativeLibraryNotLoadedException {
+        throws IOException, RocksDBException,
+        NativeLibraryNotLoadedException {
       this.fileNameIterator = files.iterator();
       moveToNextFile();
     }
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file)
-            throws RocksDBException, NativeLibraryNotLoadedException,
-            IOException;
+        throws RocksDBException, NativeLibraryNotLoadedException,
+        IOException;
 
     @Override
     public boolean hasNext() {
@@ -209,7 +211,7 @@ public class ManagedSstFileReader {
     }
 
     private boolean moveToNextFile() throws IOException, RocksDBException,
-            NativeLibraryNotLoadedException {
+        NativeLibraryNotLoadedException {
       if (fileNameIterator.hasNext()) {
         closeCurrentFile();
         currentFile = fileNameIterator.next();
