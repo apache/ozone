@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -45,6 +44,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +62,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLoca
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -142,6 +140,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
+    boolean isHSync = commitKeyRequest.hasHsync() &&
+            commitKeyRequest.getHsync();
     try {
       commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
       volumeName = commitKeyArgs.getVolumeName();
@@ -158,19 +158,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, commitKeyRequest.getClientID());
 
-      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-        OmKeyLocationInfo locationInfo =
-            OmKeyLocationInfo.getFromProtobuf(keyLocation);
-
-        // Strip out tokens before adding to cache.
-        // This way during listStatus token information does not pass on to
-        // client when returning from cache.
-        if (ozoneManager.isGrpcBlockTokenEnabled()) {
-          locationInfo.setToken(null);
-        }
-        locationInfoList.add(locationInfo);
-      }
+      List<OmKeyLocationInfo>
+          locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
       bucketLockAcquired =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -212,8 +201,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
       if (omKeyInfo == null) {
-        throw new OMException("Failed to commit key, as " + dbOpenKey +
+        String action = "commit";
+        if (isHSync) {
+          action = "hsync";
+        }
+        throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+      }
+      if (isHSync) {
+        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+            String.valueOf(commitKeyRequest.getClientID()));
       }
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
@@ -235,10 +232,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
-        checkBucketQuotaInBytes(omBucketInfo, correctedSpace);
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
         omBucketInfo.incrUsedNamespace(1L);
       }
 
@@ -255,13 +254,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       // Add to cache of open key table and key table.
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOpenKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+      if (!isHSync) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+            dbOpenKey, trxnLogIndex);
+      }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOzoneKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+          dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       if (oldKeyVersionsToDelete != null) {
         OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
@@ -272,7 +271,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDelete);
+          oldKeyVersionsToDelete, isHSync);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -290,13 +289,33 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
-          exception, getOmRequest().getUserInfo()));
-
-    processResult(commitKeyRequest, volumeName, bucketName, keyName, omMetrics,
-            exception, omKeyInfo, result);
+    if (!isHSync) {
+      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+              exception, getOmRequest().getUserInfo()));
+      processResult(commitKeyRequest, volumeName, bucketName, keyName,
+          omMetrics, exception, omKeyInfo, result);
+    }
 
     return omClientResponse;
+  }
+
+  @NotNull
+  protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
+      OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+      OmKeyLocationInfo locationInfo =
+          OmKeyLocationInfo.getFromProtobuf(keyLocation);
+
+      // Strip out tokens before adding to cache.
+      // This way during listStatus token information does not pass on to
+      // client when returning from cache.
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        locationInfo.setToken(null);
+      }
+      locationInfoList.add(locationInfo);
+    }
+    return locationInfoList;
   }
 
   /**
@@ -309,6 +328,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
    * @param omMetrics        om metrics
    * @param exception        exception trace
    * @param omKeyInfo        omKeyInfo
+   * @param result           result
    * @param result           stores the result of the execution
    */
   @SuppressWarnings("parameternumber")
@@ -335,8 +355,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
-              volumeName, bucketName, keyName, exception);
+      LOG.error("Key committed failed. Volume:{}, Bucket:{}, Key:{}. " +
+          "Exception:{}", volumeName, bucketName, keyName, exception);
       if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
         omMetrics.incEcKeyCreateFailsTotal();
       }

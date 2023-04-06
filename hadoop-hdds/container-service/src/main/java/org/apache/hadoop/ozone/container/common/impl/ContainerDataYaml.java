@@ -50,9 +50,11 @@ import static org.apache.hadoop.ozone.container.keyvalue
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
-import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
@@ -160,7 +162,7 @@ public final class ContainerDataYaml {
         KeyValueContainerData.getYamlFields());
     representer.setPropertyUtils(propertyUtils);
 
-    Constructor containerDataConstructor = new ContainerDataConstructor();
+    SafeConstructor containerDataConstructor = new ContainerDataConstructor();
 
     Yaml yaml = new Yaml(containerDataConstructor, representer);
     yaml.setBeanAccess(BeanAccess.FIELD);
@@ -200,7 +202,7 @@ public final class ContainerDataYaml {
           KeyValueContainerData.class,
           KEYVALUE_YAML_TAG);
 
-      Constructor keyValueDataConstructor = new ContainerDataConstructor();
+      SafeConstructor keyValueDataConstructor = new ContainerDataConstructor();
 
       return new Yaml(keyValueDataConstructor, representer);
     }
@@ -217,6 +219,7 @@ public final class ContainerDataYaml {
     private List<String> yamlFields;
 
     ContainerDataRepresenter(List<String> yamlFields) {
+      super(new DumperOptions());
       this.yamlFields = yamlFields;
     }
 
@@ -255,8 +258,9 @@ public final class ContainerDataYaml {
   /**
    * Constructor class for KeyValueData, which will be used by Yaml.
    */
-  private static class ContainerDataConstructor extends Constructor {
+  private static class ContainerDataConstructor extends SafeConstructor {
     ContainerDataConstructor() {
+      super(new LoaderOptions());
       //Adding our own specific constructors for tags.
       // When a new Container type is added, we need to add yamlConstructor
       // for that

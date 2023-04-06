@@ -42,11 +42,12 @@ Setup ACL tests
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
     Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/readable-link
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/link-to-unreadable-bucket
+
+    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
+    Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
+    Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/readable-link
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/link-to-unreadable-bucket
 
 Can follow link with read access
     Execute             kdestroy
@@ -68,6 +69,17 @@ ACL verified on source bucket
                         Should Not Contain          ${result}         PERMISSION_DENIED
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
+
+Create link loop
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
+                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
+                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+
+Delete link loop
+                        Execute                     ozone sh bucket delete ${target}/loop1
+                        Execute                     ozone sh bucket delete ${target}/loop2
+                        Execute                     ozone sh bucket delete ${target}/loop3
 
 *** Test Cases ***
 Link to non-existent bucket
@@ -140,11 +152,10 @@ ACL verified on source bucket
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source bucket
 
 Loop in link chain is detected
-                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
-                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
-                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+    [setup]             Create link loop
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/loop2
                         Should Contain              ${result}    DETECTED_LOOP
+    [teardown]          Delete link loop
 
 Multiple links to same bucket are allowed
     Execute                         ozone sh bucket link ${source}/bucket1 ${target}/link3

@@ -25,11 +25,15 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -700,6 +704,31 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return builder.build();
 
+  }
+
+  @Override
+  public void transferLeadership(String nodeId)
+      throws IOException {
+    TransferLeadershipRequestProto.Builder reqBuilder =
+        TransferLeadershipRequestProto.newBuilder();
+    reqBuilder.setNewLeaderId(nodeId);
+    submitRequest(Type.TransferLeadership,
+        builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
+  }
+
+  @Override
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException {
+    GetFailedDeletedBlocksTxnRequestProto request =
+        GetFailedDeletedBlocksTxnRequestProto.newBuilder()
+            .setCount(count)
+            .setStartTxId(startTxId)
+            .build();
+    GetFailedDeletedBlocksTxnResponseProto resp = submitRequest(
+        Type.GetFailedDeletedBlocksTransaction,
+        builder -> builder.setGetFailedDeletedBlocksTxnRequest(request)).
+        getGetFailedDeletedBlocksTxnResponse();
+    return resp.getDeletedBlocksTransactionsList();
   }
 
   @Override

@@ -49,10 +49,10 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -130,17 +130,15 @@ public class TestSecureContainerServer {
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
 
-    String certSerialId =
-        caClient.getCertificate().getSerialNumber().toString();
     SecurityConfig secConf = new SecurityConfig(CONF);
     long tokenLifetime = TimeUnit.HOURS.toMillis(1);
 
     blockTokenSecretManager = new OzoneBlockTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     blockTokenSecretManager.start(caClient);
 
     containerTokenSecretManager = new ContainerTokenSecretManager(
-        secConf, tokenLifetime, certSerialId);
+        secConf, tokenLifetime);
     containerTokenSecretManager.start(caClient);
   }
 

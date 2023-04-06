@@ -20,9 +20,7 @@
 <!-- wish to modify from this file into ozone-site.xml and change them -->
 <!-- there.  If ozone-site.xml does not already exist, create it.      -->
 
-<!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
-<!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE                                    -->
+<!--Tags supported are defined in org.apache.hadoop.hdds.conf.ConfigTag-->
 
 <configuration>
 
@@ -494,6 +492,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.key.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of deleted keys to be scanned by Snapshot
+      Deleting Service per snapshot run.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.service.ids</name>
     <value/>
     <tag>OM, HA</tag>
@@ -691,6 +698,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.metastore.rocksdb.cf.write.buffer.size</name>
+    <value>128MB</value>
+    <tag>OZONE, OM, SCM, STORAGE, PERFORMANCE</tag>
+    <description>
+      The write buffer (memtable) size for each column family of the rocksdb
+      store. Check the rocksdb documentation for more details.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
     <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>
@@ -831,9 +847,7 @@
   </property>
   <property>
     <name>ozone.scm.keyvalue.container.deletion-choosing.policy</name>
-    <value>
-      org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy
-    </value>
+    <value>org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The policy used for choosing desired keyvalue containers for block deletion.
@@ -856,9 +870,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.impl</name>
-    <value>
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom
-    </value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -870,9 +882,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.ec.impl</name>
-    <value>
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter
-    </value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -937,9 +947,7 @@
   </property>
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
-    <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
-    </value>
+    <value>org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       The policy used for choosing desired leader for pipeline creation.
@@ -1339,19 +1347,6 @@
   </property>
 
   <property>
-    <name>hadoop.tags.custom</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,
-      CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,RECON</value>
-  </property>
-
-  <property>
-    <name>ozone.tags.system</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,
-      CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,TOKEN,TLS,RECON</value>
-  </property>
-
-
-  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1467,15 +1462,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.expired.container.replica.op.time.out</name>
-    <value>30m</value>
-    <tag>OZONE, SCM, CONTAINER</tag>
-    <description>
-      Timeout for the container replica operations(ADD/DELETE).After this
-      timeout the command will be retied
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -1579,9 +1565,9 @@
   <property>
     <name>hdds.datanode.replication.work.dir</name>
     <tag>DATANODE</tag>
-    <description>Temporary which is used during the container replication
-      betweeen datanodes. Should have enough space to store multiple container
-      (in compressed format), but doesn't require fast io access such as SSD.
+    <description>This configuration is deprecated. Temporary sub directory under
+      each hdds.datanode.dir will be used during the container replication between
+      datanodes to save the downloaded container(in compressed format).
     </description>
   </property>
 
@@ -1887,7 +1873,23 @@
       its log segments after taking snapshot.
     </description>
   </property>
-
+  <property>
+    <name>ozone.om.ratis.log.purge.upto.snapshot.index</name>
+    <value>true</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Enable/disable Raft server to purge its log up to the snapshot index
+      after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.purge.preservation.log.num</name>
+    <value>0</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      The number of latest Raft logs to not be purged after taking snapshot.
+    </description>
+  </property>
   <property>
     <name>ozone.om.ratis.server.request.timeout</name>
     <value>3s</value>
@@ -1921,7 +1923,7 @@
 
   <property>
     <name>ozone.om.ratis.server.leaderelection.pre-vote </name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>Enable/disable OM HA leader election pre-vote phase.
     </description>
@@ -1973,6 +1975,15 @@
     <description>
       Connection request timeout for HTTP call made by OM Snapshot Provider to
       request OM snapshot from OM Leader.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.fs.snapshot.max.limit</name>
+    <value>1000</value>
+    <tag>OZONE, OM, MANAGEMENT</tag>
+    <description>
+      The maximum number of filesystem snapshot allowed in an Ozone Manager.
     </description>
   </property>
 
@@ -2456,24 +2467,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.security.ssl.keystore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the keystore
-      certificates file has changed and needs reloading. Default is 60s. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>hdds.security.ssl.truststore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the truststore
-      certificates file has changed and needs reloading. Default is 60s. Unit could
-      be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>
@@ -2729,7 +2722,7 @@
   <property>
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
-    <tag>S3G, SECURITY, KERBEROS</tag>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
@@ -2859,6 +2852,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.delta.update.data.size.max.limit</name>
+    <value>1024MB</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Recon get a limited delta updates from OM periodically since sequence number.
+      Based on sequence number passed, OM DB delta update may have large number of
+      log files and each log batch data may be huge depending on frequent writes and
+      updates by ozone client, so to avoid increase in heap memory, this config is used
+      as limiting factor of default 1 GB while preparing DB updates object.
+    </description>
+  </property>
+  <property>
     <name>recon.om.delta.update.loop.limit</name>
     <value>10</value>
     <tag>OZONE, RECON</tag>
@@ -2926,11 +2931,10 @@
     <description>
       The base dir for HTTP Jetty server to extract contents. If this property
       is not configured, by default, Jetty will create a directory inside the
-      directory named by the java.io.tmpdir System property（/tmp by default）.
-      While in production environment, it's strongly suggested to instruct Jetty
-      to use a different parent directory by setting this property to the name
-      of the desired parent directory. The value of the property will be used to
-      set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      directory named by the ${ozone.metadata.dirs}/webserver. While in production environment,
+      it's strongly suggested instructing Jetty to use a different parent directory by
+      setting this property to the name of the desired parent directory. The value of the
+      property will be used to set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
       The directory named by this property must exist and be writeable.
     </description>
   </property>
@@ -3139,6 +3143,55 @@
       directory deleting service per time interval.
     </description>
   </property>
+  <property>
+    <name>ozone.snapshot.filtering.limit.per.task</name>
+    <value>2</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of snapshots to be filtered by
+      sst filtering service per time interval.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.deleting.limit.per.task</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be reclaimed by
+      Snapshot Deleting Service per run.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.filtering.service.interval</name>
+    <value>1m</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sst.filtering.service.timeout</name>
+    <value>300000ms</value>
+    <tag>OZONE, PERFORMANCE,OM</tag>
+    <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDeletingService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.interval</name>
+    <value>30s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDeletingService
+      thread run.
+    </description>
+  </property>
 
   <property>
     <name>ozone.scm.event.ContainerReport.thread.pool.size</name>
@@ -3245,7 +3298,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.server.leaderelection.pre-vote</name>
-    <value>false</value>
+    <value>true</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Enable/disable SCM HA leader election pre-vote phase.</description>
   </property>
@@ -3396,7 +3449,7 @@
   <property>
     <name>ozone.audit.log.debug.cmd.list.dnaudit</name>
     <value></value>
-    <tag>DN</tag>
+    <tag>DATANODE</tag>
     <description>
       A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
       log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".
@@ -3446,6 +3499,15 @@
       will create intermediate directories.
     </description>
   </property>
+  <property>
+    <name>ozone.om.snapshot.cache.max.size</name>
+    <value>10</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Size of the OM Snapshot LRU cache.  This is the maximum number of open OM Snapshot RocksDb instances
+      that will be held in memory at any time.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.container.location.cache.size</name>
@@ -3463,6 +3525,16 @@
     <tag>OZONE, OM</tag>
     <description>
       The time to live for container location cache in Ozone.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable shared ofs tmp directory ofs://tmp.  Allows a root tmp
+      directory with sticky-bit behaviour.
     </description>
   </property>
 
@@ -3515,12 +3587,57 @@
       Initial delay in MINUTES by Recon to request SCM DB Snapshot.
     </description>
   </property>
+
   <property>
     <name>ozone.recon.scm.snapshot.task.interval.delay</name>
     <value>24h</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
       Interval in MINUTES by Recon to request SCM DB Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.compaction.dag.max.time.allowed</name>
+    <value>30d</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum time a snapshot is allowed to be in compaction DAG before it gets pruned out by pruning daemon.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.compaction.dag.prune.daemon.run.interval</name>
+    <value>3600s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which compaction DAG pruning daemon thread is running to remove older snapshots with compaction
+      history from compaction DAG. Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.db.dir</name>
+    <value/>
+    <tag>OZONE, OM</tag>
+    <description>
+      Directory where the OzoneManager stores the snapshot diff related data.
+      This should be specified as a single directory. If the directory does not
+      exist then the OM will attempt to create it.
+
+      If undefined, then the OM will log a warning and fallback to
+      ozone.metadata.dirs. This fallback approach is not recommended for
+      production environments.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.force.full.diff</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      If true, snapshot diff will always perform full diff (can be slow)
+      without using the optimised DAG based pruning approach
     </description>
   </property>
 </configuration>

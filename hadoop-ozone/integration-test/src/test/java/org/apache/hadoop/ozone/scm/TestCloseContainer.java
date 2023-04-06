@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +63,7 @@ public class TestCloseContainer {
   private static String volName = "vol1";
   private OzoneBucket bucket;
   private MiniOzoneCluster cluster;
+  private OzoneClient client;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -86,12 +89,14 @@ public class TestCloseContainer {
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
+    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
   }
 
   @AfterEach
   public void cleanup() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

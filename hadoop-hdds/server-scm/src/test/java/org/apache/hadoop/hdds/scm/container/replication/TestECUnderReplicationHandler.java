@@ -36,11 +36,13 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
@@ -51,8 +53,8 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,10 +68,12 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 
 /**
@@ -86,9 +90,11 @@ public class TestECUnderReplicationHandler {
   private static final int PARITY = 2;
   private PlacementPolicy ecPlacementPolicy;
   private int remainingMaintenanceRedundancy = 1;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws NodeNotFoundException,
+      CommandTargetOverloadedException, NotLeaderException {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
       public NodeStatus getNodeStatus(DatanodeDetails dd) {
@@ -97,6 +103,26 @@ public class TestECUnderReplicationHandler {
       }
     };
     replicationManager = Mockito.mock(ReplicationManager.class);
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(rmConf);
+
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.HEALTHY, 0);
+        });
+
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendDatanodeCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockSendThrottledReconstructionCommand(
+        replicationManager, commandsSent);
+
     conf = SCMTestUtils.getConf();
     repConfig = new ECReplicationConfig(DATA, PARITY);
     container = ReplicationTestUtil
@@ -146,20 +172,95 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
+  public void testThrowsWhenTargetsOverloaded() throws IOException {
+    Set<ContainerReplica> availableReplicas =  ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
+        .when(replicationManager).sendThrottledReconstructionCommand(
+            any(), any());
+
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
+        testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 0, 0, policy));
+  }
+
+  @Test
   public void testUnderReplicationWithDecomIndex1() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-    Map<DatanodeDetails, SCMCommand<?>> cmds =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(
             Lists.emptyList(), availableReplicas, 1, 0, policy);
     Assertions.assertEquals(1, cmds.size());
     // Check the replicate command has index 1 set
-    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.values()
-        .iterator().next();
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds
+        .iterator().next().getValue();
     Assertions.assertEquals(1, cmd.getReplicaIndex());
+  }
 
+
+  // Test used to reproduce the issue reported in HDDS-8171 and then adjusted
+  // to ensure only a single command is sent for HDDS-8172.
+  @Test
+  public void testUnderReplicationWithDecomIndexAndMaintOnSameIndex()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = new LinkedHashSet<>();
+    ContainerReplica deadMaintenance =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, IN_MAINTENANCE, CLOSED);
+    availableReplicas.add(deadMaintenance);
+
+    nodeManager = new MockNodeManager(true, 10) {
+      @Override
+      public NodeStatus getNodeStatus(DatanodeDetails dd) {
+        if (dd.equals(deadMaintenance.getDatanodeDetails())) {
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.DEAD);
+        }
+        return new NodeStatus(
+            dd.getPersistedOpState(), HddsProtos.NodeState.HEALTHY, 0);
+      }
+    };
+
+    availableReplicas.addAll(ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(IN_MAINTENANCE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5)));
+
+    // Note that maintenanceIndexes is set to zero as we do not expect any
+    // maintenance commands to be created, as they are solved by the earlier
+    // decommission command.
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
+        testUnderReplicationWithMissingIndexes(
+            Lists.emptyList(), availableReplicas, 1, 0, policy);
+    Assertions.assertEquals(1, cmds.size());
+    // Check the replicate command has index 1 set
+    for (Pair<DatanodeDetails, SCMCommand<?>> c : cmds) {
+      // Ensure neither of the commands are for the dead maintenance node
+      Assertions.assertNotEquals(deadMaintenance.getDatanodeDetails(),
+          c.getKey());
+    }
+  }
+
+  @Test
+  public void testUnderReplicationWithDecomNodesOverloaded()
+      throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+    doThrow(new CommandTargetOverloadedException("Overloaded"))
+        .when(replicationManager).sendThrottledReplicationCommand(
+            any(), anyList(), any(), anyInt());
+
+    Assertions.assertThrows(CommandTargetOverloadedException.class, () ->
+        testUnderReplicationWithMissingIndexes(
+            Lists.emptyList(), availableReplicas, 1, 0, policy));
   }
 
   @Test
@@ -280,7 +381,7 @@ public class TestECUnderReplicationHandler {
 
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(
-            noNodesPolicy, conf, nodeManager, replicationManager);
+            noNodesPolicy, conf, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
         new ContainerHealthResult.UnderReplicatedHealthResult(container,
             1, false, false, false);
@@ -305,7 +406,7 @@ public class TestECUnderReplicationHandler {
       }
 
       Assert.assertThrows(SCMException.class,
-          () -> ecURH.processAndCreateCommands(availableReplicas,
+          () -> ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2));
 
       // Now adjust replicas so it is also over replicated. This time rather
@@ -313,18 +414,22 @@ public class TestECUnderReplicationHandler {
       // returns, which in this case is a delete command for replica index 4.
       availableReplicas.add(overRepReplica);
 
-      Map<DatanodeDetails, SCMCommand<?>> expectedDelete = new HashMap<>();
-      expectedDelete.put(overRepReplica.getDatanodeDetails(),
-          createDeleteContainerCommand(container, overRepReplica));
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> expectedDelete =
+          new HashSet<>();
+      expectedDelete.add(Pair.of(overRepReplica.getDatanodeDetails(),
+          createDeleteContainerCommand(container, overRepReplica)));
 
       Mockito.when(replicationManager.processOverReplicatedContainer(
-          underRep)).thenReturn(expectedDelete);
-      Map<DatanodeDetails, SCMCommand<?>> commands =
-          ecURH.processAndCreateCommands(availableReplicas,
+          underRep)).thenAnswer(invocationOnMock -> {
+            commandsSent.addAll(expectedDelete);
+            return expectedDelete.size();
+          });
+      commandsSent.clear();
+      ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2);
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(true, expectedDelete.equals(commands));
+      Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
     }
   }
 
@@ -348,7 +453,7 @@ public class TestECUnderReplicationHandler {
 
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(
-            sameNodePolicy, conf, nodeManager, replicationManager);
+            sameNodePolicy, conf, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
         new ContainerHealthResult.UnderReplicatedHealthResult(container,
             1, false, false, false);
@@ -370,16 +475,19 @@ public class TestECUnderReplicationHandler {
         availableReplicas.add(toAdd);
       }
 
-      Map<DatanodeDetails, SCMCommand<?>> commands =
-          ecURH.processAndCreateCommands(availableReplicas,
-              Collections.emptyList(), underRep, 2);
+      ecURH.processAndSendCommands(availableReplicas, Collections.emptyList(),
+          underRep, 2);
 
       Mockito.verify(replicationManager, times(0))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(1, commands.size());
+      Assertions.assertEquals(1, commandsSent.size());
+      Pair<DatanodeDetails, SCMCommand<?>> pair =
+          commandsSent.iterator().next();
+      Assertions.assertEquals(newNode, pair.getKey());
       Assertions.assertEquals(StorageContainerDatanodeProtocolProtos
               .SCMCommandProto.Type.reconstructECContainersCommand,
-          commands.get(newNode).getType());
+          pair.getValue().getType());
+      commandsSent.clear();
     }
   }
 
@@ -398,14 +506,14 @@ public class TestECUnderReplicationHandler {
 
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(
-            sameNodePolicy, conf, nodeManager, replicationManager);
+            sameNodePolicy, conf, replicationManager);
 
     ContainerHealthResult.UnderReplicatedHealthResult underRep =
         new ContainerHealthResult.UnderReplicatedHealthResult(container,
             1, true, false, false);
 
     Assert.assertThrows(SCMException.class,
-        () -> ecURH.processAndCreateCommands(availableReplicas,
+        () -> ecURH.processAndSendCommands(availableReplicas,
             Collections.emptyList(), underRep, 1));
 
     // Now adjust replicas so it is also over replicated. This time rather than
@@ -416,18 +524,20 @@ public class TestECUnderReplicationHandler {
             4, IN_SERVICE, CLOSED);
     availableReplicas.add(overRepReplica);
 
-    Map<DatanodeDetails, SCMCommand<?>> expectedDelete = new HashMap<>();
-    expectedDelete.put(overRepReplica.getDatanodeDetails(),
-        createDeleteContainerCommand(container, overRepReplica));
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> expectedDelete = new HashSet<>();
+    expectedDelete.add(Pair.of(overRepReplica.getDatanodeDetails(),
+        createDeleteContainerCommand(container, overRepReplica)));
 
     Mockito.when(replicationManager.processOverReplicatedContainer(
-        underRep)).thenReturn(expectedDelete);
-    Map<DatanodeDetails, SCMCommand<?>> commands =
-        ecURH.processAndCreateCommands(availableReplicas,
+        underRep)).thenAnswer(invocationOnMock -> {
+          commandsSent.addAll(expectedDelete);
+          return expectedDelete.size();
+        });
+    ecURH.processAndSendCommands(availableReplicas,
             Collections.emptyList(), underRep, 1);
     Mockito.verify(replicationManager, times(1))
         .processOverReplicatedContainer(underRep);
-    Assertions.assertEquals(true, expectedDelete.equals(commands));
+    Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
   }
 
   @Test
@@ -445,6 +555,7 @@ public class TestECUnderReplicationHandler {
     // get created due to the placement policy returning an already used node
     testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
         availableReplicas, 0, 0, sameNodePolicy);
+    commandsSent.clear();
 
     // Now add a decommissioning index - we will not get a replicate command
     // for it, as the placement policy will throw an exception as we catch
@@ -465,12 +576,12 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 1),
             Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 1),
             Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
-    Map<DatanodeDetails, SCMCommand<?>> cmds =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(ImmutableList.of(2, 3),
             availableReplicas, 0, 0, policy);
     Assertions.assertEquals(1, cmds.size());
     ReconstructECContainersCommand cmd =
-        (ReconstructECContainersCommand) cmds.values().iterator().next();
+        (ReconstructECContainersCommand) cmds.iterator().next().getValue();
     // Ensure that all source nodes are IN_SERVICE, we should not have picked
     // the non in-service nodes for index 1.
     for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex s
@@ -507,12 +618,11 @@ public class TestECUnderReplicationHandler {
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
     ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
-        ecPlacementPolicy, conf, nodeManager, replicationManager);
+        ecPlacementPolicy, conf, replicationManager);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands =
-        handler.processAndCreateCommands(availableReplicas,
-            Collections.emptyList(), result, 1);
-    Assertions.assertEquals(1, commands.size());
+    handler.processAndSendCommands(availableReplicas,
+        Collections.emptyList(), result, 1);
+    Assertions.assertEquals(1, commandsSent.size());
     Mockito.verify(ecPlacementPolicy, times(0))
         .chooseDatanodes(anyList(), Mockito.isNull(), eq(0), anyLong(),
             anyLong());
@@ -556,13 +666,11 @@ public class TestECUnderReplicationHandler {
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
     ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
-        ecPlacementPolicy, conf, nodeManager, replicationManager);
+        ecPlacementPolicy, conf, replicationManager);
 
-    Map<DatanodeDetails, SCMCommand<?>> commands =
-        handler.processAndCreateCommands(availableReplicas, pendingOps, result,
-            1);
-    Assertions.assertEquals(1, commands.size());
-    Assertions.assertFalse(commands.containsKey(dn));
+    handler.processAndSendCommands(availableReplicas, pendingOps, result, 1);
+    Assertions.assertEquals(1, commandsSent.size());
+    Assertions.assertNotEquals(dn, commandsSent.iterator().next().getKey());
   }
 
   @Test
@@ -573,17 +681,14 @@ public class TestECUnderReplicationHandler {
     ContainerReplica decomReplica = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 2, DECOMMISSIONING, CLOSED);
     availableReplicas.add(decomReplica);
-    Map<DatanodeDetails, SCMCommand<?>> cmds =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(Collections.emptyList(),
             availableReplicas, 1, 0, policy);
     Assertions.assertEquals(1, cmds.size());
-    ReplicateContainerCommand cmd =
-        (ReplicateContainerCommand) cmds.values().iterator().next();
-
-    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
-    Assertions.assertEquals(1, sources.size());
-    Assertions.assertEquals(decomReplica.getDatanodeDetails(),
-        cmd.getSourceDatanodes().get(0));
+    // With push replication the command should always be sent to the
+    // decommissioning source.
+    DatanodeDetails target = cmds.iterator().next().getKey();
+    Assertions.assertEquals(decomReplica.getDatanodeDetails(), target);
   }
 
   @Test
@@ -595,7 +700,7 @@ public class TestECUnderReplicationHandler {
         container.containerID(), 2, ENTERING_MAINTENANCE, CLOSED);
     availableReplicas.add(maintReplica);
 
-    Map<DatanodeDetails, SCMCommand<?>> cmds =
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> cmds =
         testUnderReplicationWithMissingIndexes(Collections.emptyList(),
             availableReplicas, 0, 1, policy);
     Assertions.assertEquals(0, cmds.size());
@@ -606,33 +711,27 @@ public class TestECUnderReplicationHandler {
         availableReplicas, 0, 1, policy);
 
     Assertions.assertEquals(1, cmds.size());
-    ReplicateContainerCommand cmd =
-        (ReplicateContainerCommand) cmds.values().iterator().next();
-
-    List<DatanodeDetails> sources = cmd.getSourceDatanodes();
-    Assertions.assertEquals(1, sources.size());
-    Assertions.assertEquals(maintReplica.getDatanodeDetails(),
-        cmd.getSourceDatanodes().get(0));
+    // With push replication the command should always be sent to the
+    // entering_maintenance source.
+    DatanodeDetails target = cmds.iterator().next().getKey();
+    Assertions.assertEquals(maintReplica.getDatanodeDetails(), target);
   }
 
-  public Map<DatanodeDetails, SCMCommand<?>>
+  public Set<Pair<DatanodeDetails, SCMCommand<?>>>
       testUnderReplicationWithMissingIndexes(
       List<Integer> missingIndexes, Set<ContainerReplica> availableReplicas,
       int decomIndexes, int maintenanceIndexes,
       PlacementPolicy placementPolicy) throws IOException {
     ECUnderReplicationHandler ecURH =
         new ECUnderReplicationHandler(
-            placementPolicy, conf, nodeManager, replicationManager);
+            placementPolicy, conf, replicationManager);
     ContainerHealthResult.UnderReplicatedHealthResult result =
         Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
     Mockito.when(result.isUnrecoverable()).thenReturn(false);
     Mockito.when(result.getContainerInfo()).thenReturn(container);
 
-    Map<DatanodeDetails, SCMCommand<?>> datanodeDetailsSCMCommandMap = ecURH
-        .processAndCreateCommands(availableReplicas, ImmutableList.of(),
-            result, remainingMaintenanceRedundancy);
-    Set<Map.Entry<DatanodeDetails, SCMCommand<?>>> entries =
-        datanodeDetailsSCMCommandMap.entrySet();
+    ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+        result, remainingMaintenanceRedundancy);
     int replicateCommand = 0;
     int reconstructCommand = 0;
     byte[] missingIndexesByteArr = new byte[missingIndexes.size()];
@@ -642,7 +741,7 @@ public class TestECUnderReplicationHandler {
     boolean shouldReconstructCommandExist =
         missingIndexes.size() > 0 && missingIndexes.size() <= repConfig
             .getParity();
-    for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : entries) {
+    for (Map.Entry<DatanodeDetails, SCMCommand<?>> dnCommand : commandsSent) {
       if (dnCommand.getValue() instanceof ReplicateContainerCommand) {
         replicateCommand++;
       } else if (dnCommand
@@ -662,7 +761,7 @@ public class TestECUnderReplicationHandler {
         replicateCommand);
     Assertions.assertEquals(shouldReconstructCommandExist ? 1 : 0,
         reconstructCommand);
-    return datanodeDetailsSCMCommandMap;
+    return commandsSent;
   }
 
   private DeleteContainerCommand createDeleteContainerCommand(

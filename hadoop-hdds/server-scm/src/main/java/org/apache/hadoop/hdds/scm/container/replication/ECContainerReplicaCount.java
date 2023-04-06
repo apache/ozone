@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,26 +77,36 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
-  private final Set<ContainerReplica> replicas;
+  private final Set<DatanodeDetails> unhealthyReplicaDNs;
+  private final List<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> replicaPendingOps,
       int remainingMaintenanceRedundancy) {
     this.containerInfo = containerInfo;
-    this.replicas = replicas;
+    // Iterate replicas in deterministic order to avoid potential data loss
+    // on delete.
+    // See https://issues.apache.org/jira/browse/HDDS-4589.
+    // N.B., sort replicas by (containerID, datanodeDetails).
+    this.replicas = replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .collect(Collectors.toList());
     this.repConfig = (ECReplicationConfig)containerInfo.getReplicationConfig();
     this.pendingAdd = new ArrayList<>();
     this.pendingDelete = new ArrayList<>();
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
 
-    for (ContainerReplicaOp op : replicaPendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd.add(op.getReplicaIndex());
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete.add(op.getReplicaIndex());
+    unhealthyReplicaDNs = new HashSet<>();
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        unhealthyReplicaDNs.add(r.getDatanodeDetails());
       }
+    }
+
+    for (ContainerReplicaOp op : replicaPendingOps) {
+      processPendingOp(op);
     }
 
     for (ContainerReplica replica : replicas) {
@@ -137,20 +148,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
     for (Integer i : pendingDelete) {
-      ensureIndexWithinBounds(i, "pendingDelete");
-      Integer count = healthyIndexes.get(i);
-      if (count != null) {
-        count = count - 1;
-        if (count < 1) {
-          healthyIndexes.remove(i);
-        } else {
-          healthyIndexes.put(i, count);
-        }
-      }
-    }
-    // Ensure any pending adds are within bounds
-    for (Integer i : pendingAdd) {
-      ensureIndexWithinBounds(i, "pendingAdd");
+      adjustHealthyCountWithPendingDelete(i);
     }
   }
 
@@ -160,7 +158,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   @Override
-  public Set<ContainerReplica> getReplicas() {
+  public List<ContainerReplica> getReplicas() {
     return replicas;
   }
 
@@ -172,6 +170,58 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public int getMaintenanceCount() {
     return maintenanceIndexes.size();
+  }
+
+  /**
+   * Given a ContainerReplicaOp, check its index is within the expected
+   * bounds and then add it to the relevant list.
+   * @param op
+   */
+  private void processPendingOp(ContainerReplicaOp op) {
+    ensureIndexWithinBounds(op.getReplicaIndex(), "pending" + op.getOpType());
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      pendingAdd.add(op.getReplicaIndex());
+    } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+      if (!unhealthyReplicaDNs.contains(op.getTarget())) {
+        // We ignore unhealthy replicas later in this method, so we also
+        // need to ignore pending deletes on those unhealthy replicas,
+        // otherwise the pending delete will decrement the healthy count and
+        // make the container appear under-replicated when it is not.
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
+  }
+
+  /**
+   * Remove the pending delete replicas from the healthy set as we assume they
+   * will eventually be removed and reduce the count for this replica. If the
+   * count goes to zero, remove it from the map.
+   * @param index The replica Index which is pending delete.
+   */
+  private void adjustHealthyCountWithPendingDelete(int index) {
+    Integer count = healthyIndexes.get(index);
+    if (count != null) {
+      count = count - 1;
+      if (count < 1) {
+        healthyIndexes.remove(index);
+      } else {
+        healthyIndexes.put(index, count);
+      }
+    }
+  }
+
+  /**
+   * Add a pending op to the object. This allows the same
+   * ECContainerReplicaCount object to be used for multiple processing stages
+   * where commands are created at each state. The addition of a new pending
+   * op could influence what further replicas are needed in subsequent stages.
+   * @param op The ContainerReplicaOp to add.
+   */
+  public void addPendingOp(ContainerReplicaOp op) {
+    processPendingOp(op);
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+      adjustHealthyCountWithPendingDelete(op.getReplicaIndex());
+    }
   }
 
   /**
@@ -304,7 +354,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     for (Integer i : decommissionIndexes.keySet()) {
       missing.remove(i);
     }
-    return missing.stream().collect(Collectors.toList());
+    return new ArrayList<>(missing);
   }
 
   /**
@@ -469,6 +519,36 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public boolean isSufficientlyReplicated() {
     return isSufficientlyReplicated(false);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Container State: ").append(containerInfo.getState())
+        .append(", Replicas: (Count: ").append(replicas.size());
+    if (healthyIndexes.size() > 0) {
+      sb.append(", Healthy: ").append(healthyIndexes.size());
+    }
+    if (unhealthyReplicaDNs.size() > 0) {
+      sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
+    }
+    if (decommissionIndexes.size() > 0) {
+      sb.append(", Decommission: ").append(decommissionIndexes.size());
+    }
+    if (maintenanceIndexes.size() > 0) {
+      sb.append(", Maintenance: ").append(maintenanceIndexes.size());
+    }
+    if (pendingAdd.size() > 0) {
+      sb.append(", PendingAdd: ").append(pendingAdd.size());
+    }
+    if (pendingDelete.size() > 0) {
+      sb.append(", PendingDelete: ").append(pendingDelete.size());
+    }
+    sb.append(")")
+        .append(", ReplicationConfig: ").append(repConfig)
+        .append(", RemainingMaintenanceRedundancy: ")
+        .append(remainingMaintenanceRedundancy);
+    return sb.toString();
   }
 
   /**

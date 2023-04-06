@@ -20,12 +20,13 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,6 +79,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     int failed = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
+    List<HealthResult> failedOnes = new LinkedList<>();
     while (true) {
       if (!replicationManager.shouldRun()) {
         break;
@@ -97,29 +99,32 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
                    "container {}", healthResult.getClass(),
                 healthResult.getContainerInfo(), e);
         failed++;
-        requeueHealthResultFromQueue(replicationManager, healthResult);
+        failedOnes.add(healthResult);
       }
     }
-    LOG.info("Processed {} containers with health state counts {}," +
-             "failed processing {}", processed, healthStateCntMap, failed);
+
+    failedOnes.forEach(result ->
+        requeueHealthResultFromQueue(replicationManager, result));
+
+    if (processed > 0 || failed > 0) {
+      LOG.info("Processed {} containers with health state counts {}, " +
+          "failed processing {}", processed, healthStateCntMap, failed);
+    }
   }
 
   /**
    * Gets the commands to be run datanode to process the
    * container health result.
-   * @param rm
-   * @param healthResult
    * @return Commands to be run on Datanodes
    */
-  protected abstract Map<DatanodeDetails, SCMCommand<?>> getDatanodeCommands(
-          ReplicationManager rm, HealthResult healthResult)
+  protected abstract int
+      sendDatanodeCommands(ReplicationManager rm, HealthResult healthResult)
           throws IOException;
+
   private void processContainer(HealthResult healthResult) throws IOException {
-    Map<DatanodeDetails, SCMCommand<?>> cmds = getDatanodeCommands(
-            replicationManager, healthResult);
-    for (Map.Entry<DatanodeDetails, SCMCommand<?>> cmd : cmds.entrySet()) {
-      replicationManager.sendDatanodeCommand(cmd.getValue(),
-              healthResult.getContainerInfo(), cmd.getKey());
+    ContainerInfo containerInfo = healthResult.getContainerInfo();
+    synchronized (containerInfo) {
+      sendDatanodeCommands(replicationManager, healthResult);
     }
   }
 

@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -139,7 +141,8 @@ public final class ContainerUtils {
    * @throws IOException when read/write error occurs
    */
   public static synchronized void writeDatanodeDetailsTo(
-      DatanodeDetails datanodeDetails, File path) throws IOException {
+      DatanodeDetails datanodeDetails, File path, ConfigurationSource conf)
+      throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
         throw new IOException("Unable to overwrite the datanode ID file.");
@@ -150,7 +153,7 @@ public final class ContainerUtils {
         throw new IOException("Unable to create datanode ID directories.");
       }
     }
-    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path);
+    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
   }
 
   /**
@@ -278,4 +281,22 @@ public final class ContainerUtils {
     return Long.parseLong(containerBaseDir.getName());
   }
 
+  public static String getContainerTarName(long containerId) {
+    return "container-" + containerId + ".tar";
+  }
+
+  public static long retrieveContainerIdFromTarName(String tarName)
+      throws IOException {
+    assert tarName != null;
+    Pattern pattern = Pattern.compile("container-(\\d+).tar");
+    // Now create matcher object.
+    Matcher m = pattern.matcher(tarName);
+
+    if (m.find()) {
+      return Long.parseLong(m.group(1));
+    } else {
+      throw new IOException("Illegal container tar gz file " +
+          tarName);
+    }
+  }
 }

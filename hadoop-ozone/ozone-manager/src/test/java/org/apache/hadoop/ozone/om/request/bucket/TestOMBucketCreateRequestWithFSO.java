@@ -24,14 +24,17 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,7 +53,7 @@ public class TestOMBucketCreateRequestWithFSO
   @Test
   public void testValidateAndUpdateCacheWithFSO() throws Exception {
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -91,7 +94,7 @@ public class TestOMBucketCreateRequestWithFSO
 
     // OzoneManager is mocked, the bucket layout will return null
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED.name());
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMBucketCreateRequest omBucketCreateRequest =
         doPreExecute(volumeName, bucketName, false);
@@ -109,18 +112,16 @@ public class TestOMBucketCreateRequestWithFSO
       throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
 
-    OMRequest originalRequest;
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName);
 
     if (layoutFSOFromCli) {
-      originalRequest =
-          OMRequestTestUtils.createBucketReqFSO(bucketName, volumeName,
-              false, StorageTypeProto.SSD);
-    } else {
-      originalRequest = OMRequestTestUtils
-          .createBucketRequest(bucketName, volumeName,
-              false, StorageTypeProto.SSD);
+      bucketInfo
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+          .addMetadata(OMRequestTestUtils.fsoMetadata());
     }
 
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);
 

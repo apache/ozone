@@ -143,7 +143,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
         ArgumentCaptor.forClass(Integer.class);
     Mockito.verify(replicationManager, Mockito.times(2))
         .sendDeleteCommand(Mockito.eq(container), Mockito.anyInt(), Mockito.any(
-            DatanodeDetails.class));
+            DatanodeDetails.class), Mockito.eq(true));
     // replica index that delete was sent for should either be 2 or 5
     replicaIndexCaptor.getAllValues()
         .forEach(index -> Assert.assertTrue(index == 2 || index == 5));

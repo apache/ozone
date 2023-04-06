@@ -117,7 +117,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
         continue;
       }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.get(0).hasStripeChecksum()) {
+      if (chunks != null && chunks.size() > 0 && chunks.get(0)
+          .hasStripeChecksum()) {
         checksumBlockData = bd;
         break;
       }
@@ -128,7 +129,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
       List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
 
       Preconditions.checkArgument(
-          currentChunks.size() == checksumBlockDataChunks.size());
+          currentChunks.size() == checksumBlockDataChunks.size(),
+          "The chunk list has " + currentChunks.size()
+              + " entries, but the checksum chunks has "
+              + checksumBlockDataChunks.size()
+              + " entries. They should be equal in size.");
       List<ChunkInfo> newChunkList = new ArrayList<>();
 
       for (int i = 0; i < currentChunks.size(); i++) {
@@ -255,12 +260,6 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
     this.putBlkRspFuture = flushFuture;
     return flushFuture;
-  }
-
-  @Override
-  public void close() throws IOException {
-    super.close();
-    cleanup(false);
   }
 
   /**

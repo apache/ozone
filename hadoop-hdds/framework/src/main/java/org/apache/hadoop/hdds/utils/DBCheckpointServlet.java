@@ -21,31 +21,20 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -53,7 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
 public class DBCheckpointServlet extends HttpServlet {
 
@@ -168,13 +157,13 @@ public class DBCheckpointServlet extends HttpServlet {
       if (file == null) {
         return;
       }
-      response.setContentType("application/x-tgz");
+      response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
+               file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
+      writeDbDataToStream(checkpoint, request,
           response.getOutputStream());
       Instant end = Instant.now();
 
@@ -201,52 +190,18 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
+   * Write checkpoint to the stream.
    *
-   * @param checkpoint  checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
+   * @param checkpoint The checkpoint to be written.
+   * @param ignoredRequest The httpRequest which generated this checkpoint.
+   *        (Parameter is ignored in this class but used in child classes).
+   * @param destination The stream to write to.
    */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
-      throws IOException {
-
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
-          }
-        }
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
-    }
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
+                                  HttpServletRequest ignoredRequest,
+                                  OutputStream destination)
+      throws IOException, InterruptedException {
+    writeDBCheckpointToStream(checkpoint, destination);
   }
 
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
-    }
-    archiveOutputStream.closeArchiveEntry();
-  }
 }

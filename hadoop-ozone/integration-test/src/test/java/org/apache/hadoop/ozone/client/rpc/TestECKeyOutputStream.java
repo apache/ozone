@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -87,7 +87,7 @@ public class TestECKeyOutputStream {
    */
   @BeforeClass
   public static void init() throws Exception {
-    chunkSize = 1024;
+    chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
@@ -136,6 +136,7 @@ public class TestECKeyOutputStream {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -169,7 +170,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 
@@ -366,7 +367,7 @@ public class TestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     final BucketArgs.Builder bucketArgs = BucketArgs.newBuilder();
     bucketArgs.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
+        new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
                 chunkSize)));
 

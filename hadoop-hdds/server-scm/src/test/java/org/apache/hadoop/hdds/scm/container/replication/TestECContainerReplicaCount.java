@@ -43,6 +43,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 
 /**
@@ -85,6 +86,15 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(1, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(5,
         rcnt.unavailableIndexes(true).get(0).intValue());
+
+    // Add a pending add op for the missing replica and ensure it no longer
+    // appears missing
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, Long.MAX_VALUE);
+    rcnt.addPendingOp(op);
+    Assertions.assertTrue(rcnt.isSufficientlyReplicated(true));
+    Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
 
   @Test
@@ -200,6 +210,13 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(1, rcnt.overReplicatedIndexes(true).size());
     Assertions.assertTrue(rcnt.isOverReplicated(false));
     Assertions.assertEquals(2, rcnt.overReplicatedIndexes(false).size());
+
+    // Add a pending delete op for the excess replica and ensure it now reports
+    // as not over replicated.
+    rcnt.addPendingOp(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(), 2, Long.MAX_VALUE));
+    Assertions.assertFalse(rcnt.isOverReplicated(true));
   }
 
   @Test
@@ -611,5 +628,39 @@ public class TestECContainerReplicaCount {
     // replica is on a healthy node
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
         inServiceReplica.getDatanodeDetails()));
+  }
+
+  @Test
+  public void testSufficientlyReplicatedWithUnhealthyAndPendingDelete() {
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ContainerReplica unhealthyReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            1, IN_SERVICE, UNHEALTHY);
+    replica.add(unhealthyReplica);
+
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(),
+        unhealthyReplica.getReplicaIndex()));
+
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, replica, pendingOps, 1);
+    Assertions.assertTrue(rcnt.isSufficientlyReplicated(false));
+
+    // Add another pending delete to an index that is not an unhealthy index
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(), 2));
+
+    rcnt = new ECContainerReplicaCount(container, replica, pendingOps, 1);
+    Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
+    Assertions.assertEquals(2, rcnt.unavailableIndexes(false).get(0));
   }
 }

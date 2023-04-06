@@ -85,6 +85,18 @@ public final class ClusterStateResponse {
   private long keys;
 
   /**
+   * Total count of keys marked for deletion in the cluster.
+   */
+  @JsonProperty("deletedKeys")
+  private long deletedKeys;
+
+  /**
+   * Total count of directories marked for deletion in the cluster.
+   */
+  @JsonProperty
+  private long deletedDirs;
+
+  /**
    * Returns new builder class that builds a ClusterStateResponse.
    *
    * @return Builder
@@ -104,6 +116,8 @@ public final class ClusterStateResponse {
     this.containers = b.containers;
     this.missingContainers = b.missingContainers;
     this.openContainers = b.openContainers;
+    this.deletedKeys = b.deletedKeys;
+    this.deletedDirs = b.deletedDirs;
   }
 
   /**
@@ -121,6 +135,8 @@ public final class ClusterStateResponse {
     private long volumes;
     private long buckets;
     private long keys;
+    private long deletedKeys;
+    private long deletedDirs;
 
     public Builder() {
       // Default values
@@ -133,6 +149,8 @@ public final class ClusterStateResponse {
       this.pipelines = 0;
       this.totalDatanodes = 0;
       this.healthyDatanodes = 0;
+      this.deletedKeys = 0;
+      this.deletedDirs = 0;
     }
 
     public Builder setPipelines(int pipelines) {
@@ -178,6 +196,14 @@ public final class ClusterStateResponse {
     public Builder setBuckets(long buckets) {
       this.buckets = buckets;
       return this;
+    }
+
+    public void setDeletedKeys(long deletedKeys) {
+      this.deletedKeys = deletedKeys;
+    }
+
+    public void setDeletedDirs(long deletedDirs) {
+      this.deletedDirs = deletedDirs;
     }
 
     public Builder setKeys(long keys) {
@@ -230,5 +256,13 @@ public final class ClusterStateResponse {
 
   public long getKeys() {
     return keys;
+  }
+
+  public long getDeletedKeys() {
+    return deletedKeys;
+  }
+
+  public long getDeletedDirs() {
+    return deletedDirs;
   }
 }

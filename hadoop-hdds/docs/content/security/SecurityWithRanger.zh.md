@@ -1,7 +1,7 @@
 ---
 title: "Apache Ranger"
 date: "2019-April-03"
-weight: 5
+weight: 7
 menu:
    main:
       parent: 安全

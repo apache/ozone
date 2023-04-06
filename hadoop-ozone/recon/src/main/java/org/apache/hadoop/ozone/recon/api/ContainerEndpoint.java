@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,20 +50,23 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -88,22 +92,34 @@ public class ContainerEndpoint {
 
   private final ReconContainerManager containerManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final OzoneStorageContainerManager reconSCM;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerEndpoint.class);
+  private BucketLayout layout = BucketLayout.DEFAULT;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-      ContainerHealthSchemaManager containerHealthSchemaManager) {
+               ContainerHealthSchemaManager containerHealthSchemaManager,
+               ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconSCM = reconSCM;
   }
 
   /**
-   * Return @{@link org.apache.hadoop.ozone.recon.api.types.ContainerMetadata}
+   * Return @{@link org.apache.hadoop.hdds.scm.container}
    * for the containers starting from the given "prev-key" query param for the
    * given "limit". The given "prev-key" is skipped from the results returned.
-   *
-   * @param limit max no. of containers to get.
    * @param prevKey the containerID after which results are returned.
+   *                start containerID, >=0,
+   *                start searching at the head if 0.
+   * @param limit max no. of containers to get.
+   *              count must be >= 0
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big.
    * @return {@link Response}
    */
   @GET
@@ -112,20 +128,28 @@ public class ContainerEndpoint {
           int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
-    Map<Long, ContainerMetadata> containersMap;
-    long containersCount;
-    try {
-      containersMap =
-              reconContainerMetadataManager.getContainers(limit, prevKey);
-      containersCount = reconContainerMetadataManager.getCountForContainers();
-    } catch (IOException ioEx) {
-      throw new WebApplicationException(ioEx,
-          Response.Status.INTERNAL_SERVER_ERROR);
+    if (limit < 0 || prevKey < 0) {
+      // Send back an empty response
+      return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
+    long containersCount;
+    Collection<ContainerMetadata> containerMetaDataList =
+        containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
+            .stream()
+            .map(container -> {
+              ContainerMetadata containerMetadata =
+                  new ContainerMetadata(container.getContainerID());
+              containerMetadata.setNumberOfKeys(container.getNumberOfKeys());
+              return containerMetadata;
+            })
+            .collect(Collectors.toList());
+
+    containersCount = containerMetaDataList.size();
     ContainersResponse containersResponse =
-        new ContainersResponse(containersCount, containersMap.values());
+        new ContainersResponse(containersCount, containerMetaDataList);
     return Response.ok(containersResponse).build();
   }
+
 
   /**
    * Return @{@link org.apache.hadoop.ozone.recon.api.types.KeyMetadata} for
@@ -152,16 +176,22 @@ public class ContainerEndpoint {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
           reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
-
       // Get set of Container-Key mappings for given containerId.
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
 
-        // Directly calling get() on the Key table instead of iterating since
-        // only full keys are supported now. When we change to using a prefix
-        // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        // Directly calling getSkipCache() on the Key/FileTable table
+        // instead of iterating since only full keys are supported now. We will
+        // try to get the OmKeyInfo object by searching the KEY_TABLE table with
+        // the key prefix. If it's not found, we will then search the FILE_TABLE
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
             .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        if (omKeyInfo == null) {
+          omKeyInfo =
+              omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                  .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        }
+
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo

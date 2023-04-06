@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -112,11 +113,20 @@ public class TestOMDBUpdatesHandler {
     reconOmMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_two", secondKey);
 
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setOmCertSerialId("certID");
+    identifier.setOmServiceId("");
+
+    omMetadataManager.getDelegationTokenTable().put(identifier, 12345L);
+
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(3, events.size());
+    assertEquals(4, events.size());
 
     OMDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());

@@ -26,10 +26,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -59,21 +62,22 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final IntraDatanodeProtocolServiceStub client;
 
-  private final Path workingDirectory;
+  private final CopyContainerCompression compression;
 
-  private final ContainerProtos.CopyContainerCompressProto compression;
+  private final AtomicBoolean closed = new AtomicBoolean();
+  private final String debugString;
 
   public GrpcReplicationClient(
-      String host, int port, Path workingDir,
+      String host, int port,
       SecurityConfig secConfig, CertificateClient certClient,
-      String compression)
+      CopyContainerCompression compression)
       throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    if (secConfig.isSecurityEnabled()) {
+    if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
@@ -91,24 +95,26 @@ public class GrpcReplicationClient implements AutoCloseable {
     }
     channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    workingDirectory = workingDir;
-    this.compression =
-        ContainerProtos.CopyContainerCompressProto.valueOf(compression);
+    this.compression = compression;
+    debugString = getClass().getSimpleName()
+        + "{" + host + ":" + port + "}"
+        + "@" + Integer.toHexString(hashCode());
+    LOG.debug("{}: created", this);
   }
 
-  public CompletableFuture<Path> download(long containerId) {
+  public CompletableFuture<Path> download(long containerId, Path dir) {
     CopyContainerRequestProto request =
         CopyContainerRequestProto.newBuilder()
             .setContainerID(containerId)
             .setLen(-1)
             .setReadOffset(0)
-            .setCompression(compression)
+            .setCompression(compression.toProto())
             .build();
 
     CompletableFuture<Path> response = new CompletableFuture<>();
 
-    Path destinationPath =
-        getWorkingDirectory().resolve("container-" + containerId + ".tar.gz");
+    Path destinationPath = dir
+        .resolve(ContainerUtils.getContainerTarName(containerId));
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));
@@ -116,23 +122,32 @@ public class GrpcReplicationClient implements AutoCloseable {
     return response;
   }
 
-  private Path getWorkingDirectory() {
-    return workingDirectory;
+  public StreamObserver<SendContainerRequest> upload(
+      StreamObserver<SendContainerResponse> responseObserver) {
+    return client.upload(responseObserver);
   }
 
-  public void shutdown() {
-    channel.shutdown();
-    try {
-      channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.error("failed to shutdown replication channel", e);
-      Thread.currentThread().interrupt();
+  private void shutdown() {
+    if (!closed.getAndSet(true)) {
+      LOG.debug("{}: shutdown", this);
+      channel.shutdown();
+      try {
+        channel.awaitTermination(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        LOG.error("failed to shutdown replication channel", e);
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
   @Override
   public void close() throws Exception {
     shutdown();
+  }
+
+  @Override
+  public String toString() {
+    return debugString;
   }
 
   /**

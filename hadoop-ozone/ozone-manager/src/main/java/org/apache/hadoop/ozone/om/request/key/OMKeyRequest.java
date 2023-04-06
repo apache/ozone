@@ -86,6 +86,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
@@ -384,7 +385,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Native authorizer requires client id as part of key name to check
     // write ACL on key. Add client id to key name if ozone native
     // authorizer is configured.
-    if (ozoneManager.isNativeAuthorizerEnabled()) {
+    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
       keyNameForAclCheck = key + "/" + clientId;
     }
 
@@ -520,11 +521,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   /**
    * Check bucket quota in bytes.
+   * @paran metadataManager
    * @param omBucketInfo
    * @param allocateSize
    * @throws IOException
    */
-  protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
+  protected void checkBucketQuotaInBytes(
+      OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
       long usedBytes = omBucketInfo.getUsedBytes();
@@ -835,6 +838,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // This is a special marker to indicate that SnapshotDeletingService
+    // can reclaim this key's blocks unconditionally.
+    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

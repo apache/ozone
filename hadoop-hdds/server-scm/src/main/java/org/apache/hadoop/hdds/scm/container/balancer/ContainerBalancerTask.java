@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -26,8 +27,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -41,10 +42,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -69,6 +72,7 @@ public class ContainerBalancerTask implements Runnable {
   private NodeManager nodeManager;
   private ContainerManager containerManager;
   private ReplicationManager replicationManager;
+  private MoveManager moveManager;
   private OzoneConfiguration ozoneConfiguration;
   private ContainerBalancer containerBalancer;
   private final SCMContext scmContext;
@@ -110,11 +114,11 @@ public class ContainerBalancerTask implements Runnable {
   private Set<DatanodeDetails> selectedSources;
   private FindTargetStrategy findTargetStrategy;
   private FindSourceStrategy findSourceStrategy;
-  private Map<ContainerMoveSelection,
-      CompletableFuture<LegacyReplicationManager.MoveResult>>
+  private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
       moveSelectionToFutureMap;
   private IterationResult iterationResult;
   private int nextIterationIndex;
+  private boolean delayStart;
 
   /**
    * Constructs ContainerBalancerTask with the specified arguments.
@@ -129,10 +133,16 @@ public class ContainerBalancerTask implements Runnable {
                                int nextIterationIndex,
                                ContainerBalancer containerBalancer,
                                ContainerBalancerMetrics metrics,
-                               ContainerBalancerConfiguration config) {
+                               ContainerBalancerConfiguration config,
+                               boolean delayStart) {
     this.nodeManager = scm.getScmNodeManager();
     this.containerManager = scm.getContainerManager();
     this.replicationManager = scm.getReplicationManager();
+    this.moveManager = scm.getMoveManager();
+    this.moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
+    this.moveManager.setReplicationTimeout(
+        config.getMoveReplicationTimeout().toMillis());
+    this.delayStart = delayStart;
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
     this.config = config;
@@ -157,6 +167,15 @@ public class ContainerBalancerTask implements Runnable {
    */
   public void run() {
     try {
+      if (delayStart) {
+        long delayDuration = ozoneConfiguration.getTimeDuration(
+            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+            HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+            TimeUnit.SECONDS);
+        LOG.info("ContainerBalancer will sleep for {} seconds before starting" +
+            " balancing.", delayDuration);
+        Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
+      }
       balance();
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
@@ -206,7 +225,10 @@ public class ContainerBalancerTask implements Runnable {
           // one for sending command , one for running du, and one for
           // reporting back make it like this for now, a more suitable
           // value. can be set in the future if needed
-          Thread.sleep(3 * nodeReportInterval);
+          long sleepTime = 3 * nodeReportInterval;
+          LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
+              "for updated usage information from Datanodes.", sleepTime);
+          Thread.sleep(nodeReportInterval);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");
@@ -594,7 +616,7 @@ public class ContainerBalancerTask implements Runnable {
       LOG.warn("Container balancer is interrupted");
       Thread.currentThread().interrupt();
     } catch (TimeoutException e) {
-      long timeoutCounts = cancelAndCountPendingMoves();
+      long timeoutCounts = cancelMovesThatExceedTimeoutDuration();
       LOG.warn("{} Container moves are canceled.", timeoutCounts);
       metrics.incrementNumContainerMovesTimeoutInLatestIteration(timeoutCounts);
     } catch (ExecutionException e) {
@@ -623,18 +645,42 @@ public class ContainerBalancerTask implements Runnable {
         metrics.getNumContainerMovesCompletedInLatestIteration());
   }
 
-  private long cancelAndCountPendingMoves() {
-    return moveSelectionToFutureMap.entrySet().stream()
-        .filter(entry -> !entry.getValue().isDone())
-        .peek(entry -> {
-          LOG.warn("Container move timeout for container {} from source {}" +
-                  " to target {}.",
-              entry.getKey().getContainerID(),
-              containerToSourceMap.get(entry.getKey().getContainerID())
-                  .getUuidString(),
-              entry.getKey().getTargetNode().getUuidString());
-          entry.getValue().cancel(true);
-        }).count();
+  /**
+   * Cancels container moves that are not yet done. Note that if a move
+   * command has already been sent out to a Datanode, we don't yet have the
+   * capability to cancel it. However, those commands in the DN should time out
+   * if they haven't been processed yet.
+   *
+   * @return number of moves that did not complete (timed out) and were
+   * cancelled.
+   */
+  private long cancelMovesThatExceedTimeoutDuration() {
+    Set<Map.Entry<ContainerMoveSelection,
+        CompletableFuture<MoveManager.MoveResult>>>
+        entries = moveSelectionToFutureMap.entrySet();
+    Iterator<Map.Entry<ContainerMoveSelection,
+        CompletableFuture<MoveManager.MoveResult>>>
+        iterator = entries.iterator();
+
+    int numCancelled = 0;
+    // iterate through all moves and cancel ones that aren't done yet
+    while (iterator.hasNext()) {
+      Map.Entry<ContainerMoveSelection,
+          CompletableFuture<MoveManager.MoveResult>>
+          entry = iterator.next();
+      if (!entry.getValue().isDone()) {
+        LOG.warn("Container move timed out for container {} from source {}" +
+                " to target {}.", entry.getKey().getContainerID(),
+            containerToSourceMap.get(entry.getKey().getContainerID())
+                                .getUuidString(),
+            entry.getKey().getTargetNode().getUuidString());
+
+        entry.getValue().cancel(true);
+        numCancelled += 1;
+      }
+    }
+
+    return numCancelled;
   }
 
   /**
@@ -744,70 +790,84 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   /**
-   * Asks {@link ReplicationManager} to move the specified container from
-   * source to target.
+   * Asks {@link ReplicationManager} or {@link MoveManager} to move the
+   * specified container from source to target.
    *
    * @param source the source datanode
    * @param moveSelection the selected container to move and target datanode
    * @return false if an exception occurred or the move completed with a
-   * result other than ReplicationManager.MoveResult.COMPLETED. Returns true
+   * result other than MoveManager.MoveResult.COMPLETED. Returns true
    * if the move completed with MoveResult.COMPLETED or move is not yet done
    */
   private boolean moveContainer(DatanodeDetails source,
                                 ContainerMoveSelection moveSelection) {
     ContainerID containerID = moveSelection.getContainerID();
-    CompletableFuture<LegacyReplicationManager.MoveResult> future;
+    CompletableFuture<MoveManager.MoveResult> future;
     try {
       ContainerInfo containerInfo = containerManager.getContainer(containerID);
-      future = replicationManager
-          .move(containerID, source, moveSelection.getTargetNode())
-          .whenComplete((result, ex) -> {
 
-            metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
-            if (ex != null) {
-              LOG.info("Container move for container {} from source {} to " +
-                      "target {} failed with exceptions {}",
-                  containerID.toString(),
-                  source.getUuidString(),
-                  moveSelection.getTargetNode().getUuidString(), ex);
-              metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-            } else {
-              if (result == LegacyReplicationManager.MoveResult.COMPLETED) {
-                sizeActuallyMovedInLatestIteration +=
-                    containerInfo.getUsedBytes();
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Container move completed for container {} from " +
-                          "source {} to target {}", containerID,
-                      source.getUuidString(),
-                      moveSelection.getTargetNode().getUuidString());
-                }
-              } else {
-                LOG.warn(
-                    "Container move for container {} from source {} to target" +
-                        " {} failed: {}",
-                    moveSelection.getContainerID(), source.getUuidString(),
-                    moveSelection.getTargetNode().getUuidString(), result);
-              }
-            }
-          });
+      /*
+      If LegacyReplicationManager is enabled, ReplicationManager will
+      redirect to it. Otherwise, use MoveManager.
+       */
+      if (ozoneConfiguration.getBoolean("hdds.scm.replication.enable.legacy",
+          true)) {
+        future = replicationManager
+            .move(containerID, source, moveSelection.getTargetNode());
+      } else {
+        future = moveManager.move(containerID, source,
+            moveSelection.getTargetNode());
+      }
+
+      future = future.whenComplete((result, ex) -> {
+        metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
+        if (ex != null) {
+          LOG.info("Container move for container {} from source {} to " +
+                  "target {} failed with exceptions.",
+              containerID.toString(),
+              source.getUuidString(),
+              moveSelection.getTargetNode().getUuidString(), ex);
+          metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+        } else {
+          if (result == MoveManager.MoveResult.COMPLETED) {
+            sizeActuallyMovedInLatestIteration +=
+                containerInfo.getUsedBytes();
+            LOG.debug("Container move completed for container {} from " +
+                    "source {} to target {}", containerID,
+                source.getUuidString(),
+                moveSelection.getTargetNode().getUuidString());
+          } else {
+            LOG.warn(
+                "Container move for container {} from source {} to target" +
+                    " {} failed: {}",
+                moveSelection.getContainerID(), source.getUuidString(),
+                moveSelection.getTargetNode().getUuidString(), result);
+          }
+        }
+      });
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} for container move",
           containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
-    } catch (NodeNotFoundException | TimeoutException e) {
+    } catch (NodeNotFoundException | TimeoutException |
+             ContainerReplicaNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
       metrics.incrementNumContainerMovesFailedInLatestIteration(1);
       return false;
     }
 
+    /*
+    If the future hasn't failed yet, put it in moveSelectionToFutureMap for
+    processing later
+     */
     if (future.isDone()) {
       if (future.isCompletedExceptionally()) {
         return false;
       } else {
-        LegacyReplicationManager.MoveResult result = future.join();
+        MoveManager.MoveResult result = future.join();
         moveSelectionToFutureMap.put(moveSelection, future);
-        return result == LegacyReplicationManager.MoveResult.COMPLETED;
+        return result == MoveManager.MoveResult.COMPLETED;
       }
     } else {
       moveSelectionToFutureMap.put(moveSelection, future);
@@ -957,6 +1017,7 @@ public class ContainerBalancerTask implements Runnable {
    * Resets some variables and metrics for this iteration.
    */
   private void resetState() {
+    moveManager.resetState();
     this.clusterCapacity = 0L;
     this.clusterRemaining = 0L;
     this.overUtilizedNodes.clear();
@@ -1045,6 +1106,11 @@ public class ContainerBalancerTask implements Runnable {
   @VisibleForTesting
   void setConfig(ContainerBalancerConfiguration config) {
     this.config = config;
+  }
+
+  @VisibleForTesting
+  void setTaskStatus(Status taskStatus) {
+    this.taskStatus = taskStatus;
   }
 
   public Status getBalancerStatus() {

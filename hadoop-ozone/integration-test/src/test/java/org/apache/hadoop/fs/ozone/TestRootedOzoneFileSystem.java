@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -39,11 +38,12 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -87,6 +88,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -103,15 +105,24 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -128,6 +139,7 @@ public class TestRootedOzoneFileSystem {
       LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+  private static OzoneClient client;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -159,6 +171,7 @@ public class TestRootedOzoneFileSystem {
 
   @Parameterized.AfterParam
   public static void teardownParam() {
+    IOUtils.closeQuietly(client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
@@ -170,7 +183,7 @@ public class TestRootedOzoneFileSystem {
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -250,7 +263,8 @@ public class TestRootedOzoneFileSystem {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    objectStore = client.getObjectStore();
 
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
@@ -296,7 +310,7 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, child);
 
     OzoneKeyDetails key = getKey(child, false);
-    OFSPath childOFSPath = new OFSPath(child);
+    OFSPath childOFSPath = new OFSPath(child, conf);
     Assert.assertEquals(key.getName(), childOFSPath.getKeyName());
 
     // Creating a child should not add parent keys to the bucket
@@ -326,7 +340,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
@@ -382,7 +396,7 @@ public class TestRootedOzoneFileSystem {
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
-    OFSPath parentOFSPath = new OFSPath(parent);
+    OFSPath parentOFSPath = new OFSPath(parent, conf);
     String parentKey = parentOFSPath.getKeyName() + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     Assert.assertEquals(parentKey, parentKeyInfo.getName());
@@ -695,7 +709,7 @@ public class TestRootedOzoneFileSystem {
     // Check volume and bucket existence, they should both be created.
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeNameLocal);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketNameLocal);
-    OFSPath ofsPathDir1 = new OFSPath(dir12);
+    OFSPath ofsPathDir1 = new OFSPath(dir12, conf);
     String key = ofsPathDir1.getKeyName() + "/";
     OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(key);
     Assert.assertEquals(key, ozoneKeyDetails.getName());
@@ -965,9 +979,9 @@ public class TestRootedOzoneFileSystem {
     if (isDirectory) {
       key = key + OZONE_URI_DELIMITER;
     }
-    OFSPath ofsPath = new OFSPath(key);
+    OFSPath ofsPath = new OFSPath(key, conf);
     String keyInBucket = ofsPath.getKeyName();
-    return cluster.getClient().getObjectStore().getVolume(volumeName)
+    return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(keyInBucket);
   }
 
@@ -1006,7 +1020,7 @@ public class TestRootedOzoneFileSystem {
       throws IOException {
     fs.delete(new Path(bucketPath1, "dir1"), true);
     fs.delete(new Path(bucketPath1, "dir2"), true);
-    OFSPath ofsPath = new OFSPath(bucketPath1);
+    OFSPath ofsPath = new OFSPath(bucketPath1, conf);
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     volume.deleteBucket(ofsPath.getBucketName());
     objectStore.deleteVolume(ofsPath.getVolumeName());
@@ -1029,7 +1043,7 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(2, fileStatusBucket.length);
     // listStatus("/volume")
     Path volume = new Path(
-        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1, conf).getVolumeName());
     FileStatus[] fileStatusVolume = ofs.listStatus(volume);
     Assert.assertEquals(1, fileStatusVolume.length);
     Assert.assertEquals(ownerShort, fileStatusVolume[0].getOwner());
@@ -1130,7 +1144,7 @@ public class TestRootedOzoneFileSystem {
     listStatusCheckHelper(bucketPath1);
     // listStatus("/volume")
     Path volume = new Path(
-        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1, conf).getVolumeName());
     listStatusCheckHelper(volume);
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
@@ -1216,7 +1230,123 @@ public class TestRootedOzoneFileSystem {
     }
   }
 
-   /*
+  @Test
+  public void testSharedTmpDir() throws IOException {
+    // Prep
+    conf.setBoolean(OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR, true);
+    // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
+    ClientProtocol proxy = objectStore.getClientProxy();
+    // Get default acl rights for user
+    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+    ACLType userRights = aclConfig.getUserDefaultRights();
+    // Construct ACL for world access
+    // ACL admin owner, world read+write
+    BitSet aclRights = new BitSet();
+    aclRights.set(READ.ordinal());
+    aclRights.set(WRITE.ordinal());
+    List<OzoneAcl> objectAcls = new ArrayList<>();
+    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
+        aclRights, ACCESS));
+    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
+        ACCESS));
+    // volume acls have all access to admin and read+write access to world
+
+    // Construct VolumeArgs
+    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+        .setAdmin("admin")
+        .setOwner("admin")
+        .setAcls(Collections.unmodifiableList(objectAcls))
+        .setQuotaInNamespace(1000)
+        .setQuotaInBytes(Long.MAX_VALUE).build();
+    // Sanity check
+    Assert.assertEquals("admin", volumeArgs.getOwner());
+    Assert.assertEquals("admin", volumeArgs.getAdmin());
+    Assert.assertEquals(Long.MAX_VALUE, volumeArgs.getQuotaInBytes());
+    Assert.assertEquals(1000, volumeArgs.getQuotaInNamespace());
+    Assert.assertEquals(0, volumeArgs.getMetadata().size());
+    Assert.assertEquals(2, volumeArgs.getAcls().size());
+    // Create volume "tmp" with world access read+write to access tmp mount
+    // admin has all access to tmp mount
+    proxy.createVolume(OFSPath.OFS_MOUNT_TMP_VOLUMENAME, volumeArgs);
+
+    OzoneVolume vol = objectStore.getVolume(OFSPath.OFS_MOUNT_TMP_VOLUMENAME);
+    Assert.assertNotNull(vol);
+
+    // Begin test
+    String hashedUsername = OFSPath.getTempMountBucketNameOfCurrentUser();
+
+    // Expect failure since temp bucket for current user is not created yet
+    try {
+      vol.getBucket(hashedUsername);
+    } catch (OMException ex) {
+      // Expect BUCKET_NOT_FOUND
+      if (!ex.getResult().equals(BUCKET_NOT_FOUND)) {
+        Assert.fail("Temp bucket for current user shouldn't have been created");
+      }
+    }
+
+    // set acls for shared tmp mount under the tmp volume
+    objectAcls.clear();
+    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
+        ACCESS));
+    aclRights.clear(DELETE.ordinal());
+    aclRights.set(LIST.ordinal());
+    objectAcls.add(new OzoneAcl(ACLIdentityType.WORLD, "",
+        aclRights, ACCESS));
+    objectAcls.add(new OzoneAcl(ACLIdentityType.USER, "admin", userRights,
+        ACCESS));
+    // bucket acls have all access to admin and read+write+list access to world
+
+    BucketArgs bucketArgs = new BucketArgs.Builder()
+        .setOwner("admin")
+        .setAcls(Collections.unmodifiableList(objectAcls))
+        .setQuotaInNamespace(1000)
+        .setQuotaInBytes(Long.MAX_VALUE).build();
+
+    // Create bucket "tmp" with world access read+write+list to tmp directory
+    // admin has all access to tmp mount
+    proxy.createBucket(OFSPath.OFS_MOUNT_TMP_VOLUMENAME,
+        OFSPath.OFS_MOUNT_TMP_VOLUMENAME, bucketArgs);
+
+    // Write under /tmp/
+    Path dir1 = new Path("/tmp/dir1");
+    userOfs.mkdirs(dir1);
+
+    try (FSDataOutputStream stream = userOfs.create(new Path(
+        "/tmp/dir1/file1"))) {
+      stream.write(1);
+    }
+
+    // Verify temp bucket creation
+    OzoneBucket bucket = vol.getBucket("tmp");
+    Assert.assertNotNull(bucket);
+    // Verify dir1 creation
+    FileStatus[] fileStatuses = fs.listStatus(new Path("/tmp/"));
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(
+        "/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
+    // Verify file1 creation
+    FileStatus[] fileStatusesInDir1 = fs.listStatus(dir1);
+    Assert.assertEquals(1, fileStatusesInDir1.length);
+    Assert.assertEquals("/tmp/dir1/file1",
+        fileStatusesInDir1[0].getPath().toUri().getPath());
+
+    // Cleanup
+    userOfs.delete(dir1, true);
+    try {
+      userOfs.delete(new Path("/tmp"), true);
+    } catch (OMException ex) {
+      // Expect PERMISSION_DENIED, User regularuser1 doesn't have DELETE
+      // permission for /tmp
+      if (!ex.getResult().equals(PERMISSION_DENIED)) {
+        Assert.fail("Temp bucket cannot be deleted by current user");
+      }
+    }
+    fs.delete(new Path("/tmp"), true);
+    proxy.deleteVolume(OFSPath.OFS_MOUNT_TMP_VOLUMENAME);
+  }
+
+  /*
    * OFS: Test /tmp mount behavior.
    */
   @Test
@@ -1233,12 +1363,11 @@ public class TestRootedOzoneFileSystem {
     // Construct VolumeArgs
     VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAcls(Collections.singletonList(aclWorldAccess))
-        .setQuotaInNamespace(1000)
-        .setQuotaInBytes(Long.MAX_VALUE).build();
+        .setQuotaInNamespace(1000).build();
     // Sanity check
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
-    Assert.assertEquals(Long.MAX_VALUE, volumeArgs.getQuotaInBytes());
+    Assert.assertEquals(-1, volumeArgs.getQuotaInBytes());
     Assert.assertEquals(1000, volumeArgs.getQuotaInNamespace());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());
@@ -1523,7 +1652,7 @@ public class TestRootedOzoneFileSystem {
 
     // Create a new volume and a new bucket
     OzoneBucket bucket3 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
     // Need to setOwner to current test user so it has permission to list vols
     volume3.setOwner(username);
@@ -1618,7 +1747,7 @@ public class TestRootedOzoneFileSystem {
     }
     // create second bucket and write a key in it.
     OzoneBucket bucket2 =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     String volumeName2 = bucket2.getVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER, volumeName2);
     String bucketName2 = bucket2.getName();
@@ -1900,13 +2029,13 @@ public class TestRootedOzoneFileSystem {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE));
+        new DefaultReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE)));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
     final OzoneBucket bucket100 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+        .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     Assert.assertEquals(ReplicationType.STAND_ALONE.name(),
         bucket100.getReplicationConfig().getReplicationType().name());
@@ -1917,7 +2046,7 @@ public class TestRootedOzoneFileSystem {
         .createFile(vol + "/" + buck + "/test", (short) 3, true, false)) {
       file.write(new byte[1024]);
     }
-    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
+    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
     Assert.assertEquals(key.getReplicationConfig().getReplicationType().name(),
@@ -1931,13 +2060,13 @@ public class TestRootedOzoneFileSystem {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     builder.setDefaultReplicationConfig(
-        new DefaultReplicationConfig(ReplicationType.EC,
-            new ECReplicationConfig("RS-3-2-1024")));
+        new DefaultReplicationConfig(
+            new ECReplicationConfig("RS-3-2-1024k")));
     BucketArgs omBucketArgs = builder.build();
     String vol = UUID.randomUUID().toString();
     String buck = UUID.randomUUID().toString();
     final OzoneBucket bucket101 = TestDataUtil
-        .createVolumeAndBucket(cluster, vol, buck, BucketLayout.LEGACY,
+        .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
     Assert.assertEquals(ReplicationType.EC.name(),
         bucket101.getReplicationConfig().getReplicationType().name());
@@ -1947,7 +2076,7 @@ public class TestRootedOzoneFileSystem {
         .createFile(vol + "/" + buck + "/test", (short) 3, true, false)) {
       file.write(new byte[1024]);
     }
-    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test");
+    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
     Assert.assertEquals(ReplicationType.EC.name(),
@@ -1991,7 +2120,7 @@ public class TestRootedOzoneFileSystem {
     // write some test data into bucket
     try (OzoneOutputStream outputStream = objectStore.getVolume(volumeName).
             getBucket(bucketName).createKey(key, 1,
-                    new ECReplicationConfig("RS-3-2-1024"),
+                    new ECReplicationConfig("RS-3-2-1024k"),
                     new HashMap<>())) {
       outputStream.write(RandomUtils.nextBytes(1));
     }
@@ -2001,7 +2130,7 @@ public class TestRootedOzoneFileSystem {
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
     long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
-            new ECReplicationConfig(3, 2, RS, 1024));
+        new ECReplicationConfig(3, 2, RS, (int) OzoneConsts.MB));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
     //clean up
     ofs.delete(filePath, true);
@@ -2086,5 +2215,50 @@ public class TestRootedOzoneFileSystem {
         .setSourceBucket(sourceBucket);
     OzoneVolume ozoneVolume = objectStore.getVolume(linkVolume);
     ozoneVolume.createBucket(linkBucket, builder.build());
+  }
+
+  @Test
+  public void testSnapshotRead() throws Exception {
+    // Init data
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volume1Path = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucket1Path = new Path(volume1Path, bucket1.getName());
+    Path file1 = new Path(bucket1Path, "key1");
+    Path file2 = new Path(bucket1Path, "key2");
+
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+
+    OzoneBucket bucket2 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volume2Path = new Path(OZONE_URI_DELIMITER, bucket2.getVolumeName());
+    Path bucket2Path = new Path(volume2Path, bucket2.getName());
+
+    fs.mkdirs(bucket2Path);
+    Path snapPath1 = fs.createSnapshot(bucket1Path, "snap1");
+    Path snapPath2 = fs.createSnapshot(bucket2Path, "snap1");
+
+    Path file3 = new Path(bucket1Path, "key3");
+    ContractTestUtils.touch(fs, file3);
+
+    Path snapPath3 = fs.createSnapshot(bucket1Path, "snap2");
+
+    try {
+      FileStatus[] f1 = fs.listStatus(snapPath1);
+      FileStatus[] f2 = fs.listStatus(snapPath2);
+      FileStatus[] f3 = fs.listStatus(snapPath3);
+      Assert.assertEquals(2, f1.length);
+      Assert.assertEquals(0, f2.length);
+      Assert.assertEquals(3, f3.length);
+    } catch (Exception e) {
+      Assert.fail("Failed to read/list on snapshotPath, exception: " + e);
+    }
+  }
+
+  @Test
+  public void testFileSystemDeclaresCapability() throws Throwable {
+    assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
+    assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
   }
 }

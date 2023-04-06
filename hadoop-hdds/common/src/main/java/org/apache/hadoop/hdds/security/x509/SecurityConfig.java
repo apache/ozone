@@ -75,10 +75,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
@@ -117,8 +113,6 @@ public class SecurityConfig {
   private final boolean isSecurityEnabled;
   private final String crlName;
   private boolean grpcTlsUseTestCert;
-  private final long keystoreReloadInterval;
-  private final long truststoreReloadInterval;
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
@@ -186,12 +180,7 @@ public class SecurityConfig {
         HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
     renewalGracePeriod = Duration.parse(renewalGraceDurationString);
 
-    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
-      LOG.error("Certificate duration {} should not be greater than Maximum " +
-          "Certificate duration {}", maxCertDuration, defaultCertDuration);
-      throw new IllegalArgumentException("Certificate duration should not be " +
-          "greater than maximum Certificate duration");
-    }
+    validateCertificateValidityConfig();
 
     this.externalRootCaCert = this.configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
@@ -217,15 +206,44 @@ public class SecurityConfig {
         }
       }
     }
+  }
 
-    this.keystoreReloadInterval = this.configuration.getTimeDuration(
-        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    this.truststoreReloadInterval = this.configuration.getTimeDuration(
-        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
+  /**
+   * Check for certificate validity configuration.
+   */
+  private void validateCertificateValidityConfig() {
+    if (maxCertDuration.isNegative() || maxCertDuration.isZero()) {
+      String msg = "Property " + HDDS_X509_MAX_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (defaultCertDuration.isNegative() || defaultCertDuration.isZero()) {
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (renewalGracePeriod.isNegative() || renewalGracePeriod.isZero()) {
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+
+    if (maxCertDuration.compareTo(defaultCertDuration) < 0) {
+      String msg = "Property " + HDDS_X509_DEFAULT_DURATION +
+              " should not be greater than Property " + HDDS_X509_MAX_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+    if (defaultCertDuration.compareTo(renewalGracePeriod) < 0) {
+      String msg = "Property " + HDDS_X509_RENEW_GRACE_DURATION +
+              " should not be greater than Property "
+              + HDDS_X509_DEFAULT_DURATION;
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
   }
 
   /**
@@ -468,13 +486,5 @@ public class SecurityConfig {
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
-  }
-
-  public long getSslKeystoreReloadInterval() {
-    return keystoreReloadInterval;
-  }
-
-  public long getSslTruststoreReloadInterval() {
-    return truststoreReloadInterval;
   }
 }

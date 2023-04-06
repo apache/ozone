@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.ReconCertificateClient;
+import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -175,7 +175,7 @@ public class StorageContainerServiceProviderImpl
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();
     File targetFile = new File(scmSnapshotDBParentDir, snapshotFileName +
-            ".tar.gz");
+            ".tar");
 
     try {
       if (!SCMHAUtils.isSCMHAEnabled(configuration)) {
@@ -198,11 +198,12 @@ public class StorageContainerServiceProviderImpl
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
-            try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                hostAddress, grpcPort, configuration,
-                new ReconCertificateClient(new SecurityConfig(configuration),
-                    reconStorage.getReconCertSerialId(),
-                    reconStorage.getClusterID(), reconStorage.getReconId()))) {
+            SecurityConfig secConf = new SecurityConfig(configuration);
+            try (ReconCertificateClient certClient =
+                     new ReconCertificateClient(
+                         secConf, reconStorage, null, null);
+                 SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+                     hostAddress, grpcPort, configuration, certClient)) {
               downloadClient.download(targetFile.toPath()).get();
             } catch (ExecutionException | InterruptedException e) {
               LOG.error("Rocks DB checkpoint downloading failed", e);

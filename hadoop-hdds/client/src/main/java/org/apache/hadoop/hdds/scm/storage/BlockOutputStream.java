@@ -372,6 +372,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleFullBuffer() throws IOException {
+    waitForFlushAndCommit(true);
+  }
+
+  void waitForFlushAndCommit(boolean bufferFull) throws IOException {
     try {
       checkOpen();
       waitOnFlushFutures();
@@ -381,7 +385,7 @@ public class BlockOutputStream extends OutputStream {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, true);
     }
-    watchForCommit(true);
+    watchForCommit(bufferFull);
   }
 
   void releaseBuffersOnException() {
@@ -515,20 +519,7 @@ public class BlockOutputStream extends OutputStream {
         && (!config.isStreamBufferFlushDelay() ||
             writtenDataLength - totalDataFlushedLength
                 >= config.getStreamBufferSize())) {
-      try {
-        handleFlush(false);
-      } catch (ExecutionException e) {
-        // just set the exception here as well in order to maintain sanctity of
-        // ioException field
-        handleExecutionException(e);
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        handleInterruptedException(ex, true);
-      } catch (Throwable e) {
-        String msg = "Failed to flush. error: " + e.getMessage();
-        LOG.error(msg, e);
-        throw e;
-      }
+      handleFlush(false);
     }
   }
 
@@ -549,7 +540,26 @@ public class BlockOutputStream extends OutputStream {
   /**
    * @param close whether the flush is happening as part of closing the stream
    */
-  private void handleFlush(boolean close)
+  protected void handleFlush(boolean close) throws IOException {
+    try {
+      handleFlushInternal(close);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(ex, true);
+    } catch (Throwable e) {
+      String msg = "Failed to flush. error: " + e.getMessage();
+      LOG.error(msg, e);
+      throw e;
+    } finally {
+      if (close) {
+        cleanup(false);
+      }
+    }
+  }
+
+  private void handleFlushInternal(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
@@ -581,27 +591,16 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void close() throws IOException {
-    if (xceiverClientFactory != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0) {
-      try {
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      if (bufferPool != null && bufferPool.getSize() > 0) {
         handleFlush(true);
-      } catch (ExecutionException e) {
-        handleExecutionException(e);
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        handleInterruptedException(ex, true);
-      } catch (Throwable e) {
-        String msg = "Failed to flush. error: " + e.getMessage();
-        LOG.error(msg, e);
-        throw e;
-      } finally {
+        // TODO: Turn the below buffer empty check on when Standalone pipeline
+        // is removed in the write path in tests
+        // Preconditions.checkArgument(buffer.position() == 0);
+        // bufferPool.checkBufferPoolEmpty();
+      } else {
         cleanup(false);
       }
-      // TODO: Turn the below buffer empty check on when Standalone pipeline
-      // is removed in the write path in tests
-      // Preconditions.checkArgument(buffer.position() == 0);
-      // bufferPool.checkBufferPoolEmpty();
-
     }
   }
 

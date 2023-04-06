@@ -30,9 +30,9 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -59,6 +59,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.security.cert.CertificateExpiredException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,12 +73,12 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_LEN;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -98,7 +100,7 @@ public class TestOzoneContainerWithTLS {
   private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
   private boolean containerTokenEnabled;
-  private int certLifetime = 10 * 1000; // 10s
+  private int certLifetime = 15 * 1000; // 15s
 
   public TestOzoneContainerWithTLS(boolean enableToken) {
     this.containerTokenEnabled = enableToken;
@@ -131,30 +133,31 @@ public class TestOzoneContainerWithTLS {
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
     conf.setInt(HDDS_KEY_LEN, 1024);
+
     // certificate lives for 10s
     conf.set(HDDS_X509_DEFAULT_DURATION,
         Duration.ofMillis(certLifetime).toString());
-    conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
-    conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
+    conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT2S");
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
-    caClient = new CertificateClientTestImpl(conf, false);
+    caClient = new CertificateClientTestImpl(conf);
     secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime, caClient.getCertificate().getSerialNumber().toString());
+        expiryTime);
   }
 
   @Test(expected = CertificateExpiredException.class)
   public void testCertificateLifetime() throws Exception {
     // Sleep to wait for certificate expire
-    Thread.sleep(certLifetime);
-    caClient.getCertificate().checkValidity();
+    LocalDateTime now = LocalDateTime.now();
+    now = now.plusSeconds(certLifetime / 1000);
+    caClient.getCertificate().checkValidity(Date.from(
+        now.atZone(ZoneId.systemDefault()).toInstant()));
   }
 
   @Test
-  @org.junit.Ignore("HDDS-7628")
   public void testCreateOzoneContainer() throws Exception {
     LOG.info("testCreateOzoneContainer with TLS and containerToken enabled: {}",
         containerTokenEnabled);
@@ -200,7 +203,6 @@ public class TestOzoneContainerWithTLS {
   }
 
   @Test
-  @org.junit.Ignore("HDDS-7628")
   public void testContainerDownload() throws Exception {
     DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
         UUID.randomUUID().toString(), "localhost", "0.0.0.0",
@@ -225,29 +227,26 @@ public class TestOzoneContainerWithTLS {
 
       // Create containers
       long containerId = ContainerTestHelper.getTestContainerID();
-      int count = 5;
       List<Long> containerIdList = new ArrayList<>();
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
           Collections.singletonList(caClient.getCACertificate()));
       client.connect();
-      for (int i = 0; i < count; i++, containerId++) {
-        if (containerTokenEnabled) {
-          Token<ContainerTokenIdentifier> token = secretManager.generateToken(
-              UserGroupInformation.getCurrentUser().getUserName(),
-              ContainerID.valueOf(containerId));
-          createSecureContainer(client, containerId, token);
-          closeSecureContainer(client, containerId, token);
-        } else {
-          createContainer(client, containerId);
-          closeContainer(client, containerId);
-        }
-        containerIdList.add(containerId);
+      if (containerTokenEnabled) {
+        Token<ContainerTokenIdentifier> token = secretManager.generateToken(
+            UserGroupInformation.getCurrentUser().getUserName(),
+            ContainerID.valueOf(containerId));
+        createSecureContainer(client, containerId, token);
+        closeSecureContainer(client, containerId, token);
+      } else {
+        createContainer(client, containerId);
+        closeContainer(client, containerId);
       }
+      containerIdList.add(containerId++);
 
       // Wait certificate to expire
       GenericTestUtils.waitFor(() ->
               caClient.getCertificate().getNotAfter().before(new Date()),
-          500, certLifetime);
+          100, certLifetime);
 
       List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
       sourceDatanodes.add(dn);
@@ -269,7 +268,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(
-          containerId, sourceDatanodes);
+          containerId, sourceDatanodes, null, NO_COMPRESSION);
       downloader.close();
       Assert.assertNull(file);
       Assert.assertTrue(logCapture.getOutput().contains(
@@ -306,7 +305,8 @@ public class TestOzoneContainerWithTLS {
       for (Long cId : containerIdList) {
         downloader = new SimpleContainerDownloader(conf, caClient);
         try {
-          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes);
+          file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
+                  null, NO_COMPRESSION);
           downloader.close();
           Assert.assertNotNull(file);
         } finally {

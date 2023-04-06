@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.io.IOException;
 import java.util.List;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -36,6 +35,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,9 +124,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     try {
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
-            volumeName, bucketName, null);
+        checkAclPermission(ozoneManager, volumeName, bucketName);
       }
 
       // acquire lock.
@@ -232,7 +230,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().build());
@@ -269,6 +267,26 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
   }
 
+  private void checkAclPermission(
+      OzoneManager ozoneManager, String volumeName, String bucketName)
+      throws IOException {
+    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
+      UserGroupInformation ugi = createUGI();
+      String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
+          IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Bucket properties are allowed to changed by Admin and Owner",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    } else { // ranger acl
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
+          volumeName, bucketName, null);
+    }
+  }
+
   public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
                      OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs,
                      OmBucketInfo dbBucketInfo)
@@ -302,12 +320,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.QUOTA_ERROR);
       }
     }
+    
+    // avoid iteration of other bucket if quota set is less than previous set
+    if (quotaInBytes < dbBucketInfo.getQuotaInBytes()) {
+      return true;
+    }
+    
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
-          !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
       }
     }

@@ -202,6 +202,13 @@ public class TestContainerPlacementFactory {
             Map<ContainerReplica, Boolean> replicas) {
       return Collections.emptySet();
     }
+
+    @Override
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+      return null;
+    }
+
   }
 
   @Test
