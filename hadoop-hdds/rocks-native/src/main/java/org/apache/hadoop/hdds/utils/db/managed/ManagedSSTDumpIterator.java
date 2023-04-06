@@ -45,6 +45,11 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ManagedSSTDumpIterator.class);
+  // Since we don't have any restriction on the key, we are prepending
+  // the length of the pattern in the sst dump tool output.
+  // The first token in the pattern is the key.
+  // The second tells the sequence number of the key.
+  // The third token gives the type of key in the sst file.
   private static final String PATTERN_REGEX =
           "'([\\s\\S]+)' seq:([0-9]+), type:([0-9]+)";
   public static final int PATTERN_KEY_GROUP_NUMBER = 1;
