@@ -168,7 +168,7 @@ public class S3GetSecretRequest extends OMClientRequest {
                 assignS3SecretValue = null;
               }
             } else {
-              // Found in S3SecretTable.
+              // Found in S3SecretTable. No secret returned.
               throw new OMException("secret value already with user", OMException.ResultCodes.ACCESS_DENIED);
             }
 
