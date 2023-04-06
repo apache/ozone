@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 
 /**
  * This class tests OMSnapshotDeleteResponse.
- * TODO: WIP
  */
 public class TestOMSnapshotDeleteResponse {
 
