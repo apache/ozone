@@ -56,7 +56,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -294,11 +293,7 @@ public class TestContainerBalancerTask {
       throws IllegalContainerBalancerStateException, IOException,
       InvalidContainerBalancerConfigurationException, TimeoutException,
       NodeNotFoundException {
-    ReplicationManagerConfiguration rmConf =
-        conf.getObject(ReplicationManagerConfiguration.class);
     rmConf.setEnableLegacy(false);
-    conf.setFromObject(rmConf);
-
     startBalancer(balancerConfiguration);
     Mockito.verify(moveManager, atLeastOnce())
         .move(Mockito.any(ContainerID.class),
