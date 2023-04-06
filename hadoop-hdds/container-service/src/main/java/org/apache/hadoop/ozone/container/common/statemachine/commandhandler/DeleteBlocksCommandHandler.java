@@ -489,7 +489,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
 
     if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      blockDeleteMetrics.incrFailureCount();
+      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
       LOG.info(String.format("Delete blocks for containerId: %d"
               + " is either received out of order or retried,"
               + " %d <= %d", containerId, delTX.getTxID(),
