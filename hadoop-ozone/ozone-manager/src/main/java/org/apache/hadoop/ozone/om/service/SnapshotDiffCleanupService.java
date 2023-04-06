@@ -183,9 +183,9 @@ public class SnapshotDiffCleanupService extends BackgroundService {
           //  2. delete endKey.
           writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
           writeBatch.delete(snapDiffReportCfh, endKey);
-          // Finally, remove the entry from the purged job table.
-          writeBatch.delete(snapDiffPurgedJobCfh, key);
         }
+        // Finally, remove the entry from the purged job table.
+        writeBatch.delete(snapDiffPurgedJobCfh, key);
       }
       db.get().write(writeOptions, writeBatch);
     } catch (IOException | RocksDBException e) {

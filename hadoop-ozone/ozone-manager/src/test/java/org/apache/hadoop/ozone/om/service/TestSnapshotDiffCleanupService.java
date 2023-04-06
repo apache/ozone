@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
@@ -218,9 +219,29 @@ public class TestSnapshotDiffCleanupService {
     SnapshotDiffJob staleRejectedJob = addJobAndReport(REJECTED,
         currentTime - Duration.ofDays(10).toMillis(), 0);
 
-    // Run the cleanup.
+    // Run 1.
     diffCleanupService.run();
+    // Assert nothing is remove from report table and only entries were moved
+    // from active job table to purge job table.
+    assertJobInActiveTable(getJobKey(validRequest), validRequest);
+    assertJobInActiveTable(getJobKey(queueJob), queueJob);
+    assertJobInActiveTable(getJobKey(inProgressJob1), inProgressJob1);
+    assertJobInActiveTable(getJobKey(inProgressJob2), inProgressJob2);
+    assertJobInPurgedTable(staleRequest.getJobId(),
+        staleRequest.getTotalDiffEntries());
+    assertJobInPurgedTable(failedJob.getJobId(),
+        failedJob.getTotalDiffEntries());
+    assertJobInPurgedTable(staleRejectedJob.getJobId(),
+        staleRejectedJob.getTotalDiffEntries());
+    assertJobInPurgedTable(recentRejectedJob.getJobId(),
+        recentRejectedJob.getTotalDiffEntries());
+    assertNumberOfEntriesInTable(jobTableCfh, 4);
+    assertNumberOfEntriesInTable(purgedJobTableCfh, 4);
+    assertNumberOfEntriesInTable(reportTableCfh, 31);
 
+    // Run 2.
+    diffCleanupService.run();
+    // Asset report table was cleaned.
     assertJobAndReport(validRequest, true);
     assertJobAndReport(staleRequest, false);
     assertJobAndReport(queueJob, true);
@@ -229,6 +250,10 @@ public class TestSnapshotDiffCleanupService {
     assertJobAndReport(failedJob, false);
     assertJobAndReport(recentRejectedJob, false);
     assertJobAndReport(staleRejectedJob, false);
+
+    assertNumberOfEntriesInTable(jobTableCfh, 4);
+    assertNumberOfEntriesInTable(purgedJobTableCfh, 0);
+    assertNumberOfEntriesInTable(reportTableCfh, 19);
   }
 
   private SnapshotDiffJob addJobAndReport(JobStatus jobStatus,
@@ -268,20 +293,20 @@ public class TestSnapshotDiffCleanupService {
     String jobKey =
         expectedJob.getFromSnapshot() + DELIMITER + expectedJob.getToSnapshot();
     if (isExpected) {
-      assertJob(jobKey, expectedJob);
+      assertJobInActiveTable(jobKey, expectedJob);
       assertReport(expectedJob.getJobId(),
           expectedJob.getTotalDiffEntries(),
           emptyReportEntry);
     } else {
-      assertJob(jobKey, null);
+      assertJobInActiveTable(jobKey, null);
       assertReport(expectedJob.getJobId(),
           expectedJob.getTotalDiffEntries(),
           null);
     }
   }
 
-  private void assertJob(String jobKey,
-                         SnapshotDiffJob expectedJob)
+  private void assertJobInActiveTable(String jobKey,
+                                      SnapshotDiffJob expectedJob)
       throws IOException, RocksDBException {
     byte[] bytes = db.get().get(jobTableCfh, codecRegistry.asRawData(jobKey));
     SnapshotDiffJob actualJob =
@@ -300,5 +325,34 @@ public class TestSnapshotDiffCleanupService {
           codecRegistry.asRawData(jobId + DELIMITER + index));
       assertArrayEquals(expectedEntry, bytes);
     }
+  }
+
+  private void assertJobInPurgedTable(String jobKey,
+                                      long expectedEntriesCount)
+      throws IOException, RocksDBException {
+    byte[] bytes = db.get().get(purgedJobTableCfh,
+        codecRegistry.asRawData(jobKey));
+    long actualEntriesCount = codecRegistry.asObject(bytes, Long.class);
+    assertEquals(expectedEntriesCount, actualEntriesCount);
+  }
+
+
+  private void assertNumberOfEntriesInTable(ColumnFamilyHandle table,
+                                            long expectedCount) {
+    int count = 0;
+    try (ManagedRocksIterator iterator =
+             new ManagedRocksIterator(db.get().newIterator(table))) {
+      iterator.get().seekToFirst();
+      while (iterator.get().isValid()) {
+        iterator.get().next();
+        count++;
+      }
+    }
+
+    assertEquals(expectedCount, count);
+  }
+
+  private String getJobKey(SnapshotDiffJob diffJob) {
+    return diffJob.getFromSnapshot() + DELIMITER + diffJob.getToSnapshot();
   }
 }
