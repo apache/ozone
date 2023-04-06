@@ -23,8 +23,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -48,8 +48,8 @@ public class TestContainerTokenVerifier
 
   @Override
   protected TokenVerifier newTestSubject(SecurityConfig secConf,
-      CertificateClient caClient) {
-    return new ContainerTokenVerifier(secConf, caClient);
+      SecretKeyVerifierClient secretKeyClient) {
+    return new ContainerTokenVerifier(secConf, secretKeyClient);
   }
 
   @Override
@@ -69,8 +69,10 @@ public class TestContainerTokenVerifier
 
   @Override
   protected ContainerTokenIdentifier newTokenId() {
-    return new ContainerTokenIdentifier("any user",
-        ContainerID.valueOf(CONTAINER_ID.incrementAndGet()), "123",
+    ContainerTokenIdentifier tokenId = new ContainerTokenIdentifier("any user",
+        ContainerID.valueOf(CONTAINER_ID.incrementAndGet()),
         Instant.now().plusSeconds(3600));
+    tokenId.setSecretKeyId(SECRET_KEY_ID);
+    return tokenId;
   }
 }

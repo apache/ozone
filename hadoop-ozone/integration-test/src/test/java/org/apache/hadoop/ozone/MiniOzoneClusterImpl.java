@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -126,6 +127,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
+  private SecretKeyClient secretKeyClient;
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -483,7 +485,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public void startHddsDatanodes() {
     hddsDatanodes.forEach((datanode) -> {
-      datanode.setCertificateClient(getCAClient());
+      datanode.setCertificateClient(caClient);
+      datanode.setSecretKeyClient(secretKeyClient);
       datanode.start();
     });
   }
@@ -510,12 +513,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopRecon(reconServer);
   }
 
-  private CertificateClient getCAClient() {
-    return this.caClient;
-  }
-
   private void setCAClient(CertificateClient client) {
     this.caClient = client;
+  }
+
+  private void setSecretKeyClient(SecretKeyClient client) {
+    this.secretKeyClient = client;
   }
 
   private static void stopDatanodes(
@@ -591,6 +594,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (certClient != null) {
           om.setCertClient(certClient);
         }
+        if (secretKeyClient != null) {
+          om.setSecretKeyClient(secretKeyClient);
+        }
         om.start();
 
         if (includeRecon) {
@@ -607,6 +613,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             hddsDatanodes, reconServer);
 
         cluster.setCAClient(certClient);
+        cluster.setSecretKeyClient(secretKeyClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }

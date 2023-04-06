@@ -26,13 +26,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
@@ -203,13 +200,7 @@ public class SecretKeyManagerTest {
 
   private static ManagedSecretKey generateKey(Instant creationTime)
       throws Exception {
-    KeyGenerator keyGen = KeyGenerator.getInstance(ALGORITHM);
-    SecretKey secretKey = keyGen.generateKey();
-    return new ManagedSecretKey(
-        UUID.randomUUID(),
-        creationTime,
-        creationTime.plus(VALIDITY_DURATION),
-        secretKey
-    );
+    return SecretKeyTestUtil.generateKey(ALGORITHM, creationTime,
+        VALIDITY_DURATION);
   }
 }

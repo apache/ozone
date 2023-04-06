@@ -107,7 +107,7 @@ public final class ContainerTestUtils {
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return new OzoneContainer(datanodeDetails, conf, context, null);
+    return new OzoneContainer(datanodeDetails, conf, context);
   }
 
   public static DatanodeDetails createDatanodeDetails() {
