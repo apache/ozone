@@ -23,6 +23,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -66,6 +67,8 @@ import javax.annotation.Nonnull;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
@@ -119,9 +122,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
-
-  // TODO: [SNAPSHOT] create config for max allowed page size.
-  private final int maxPageSize = 1000;
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
     this.options = new ManagedDBOptions();
@@ -482,6 +482,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     verifySnapshotInfoForSnapDiff(fsInfo, tsInfo);
 
     int index = getIndexFromToken(token);
+    int maxPageSize = ozoneManager.getConfiguration()
+        .getInt(OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE,
+            OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }

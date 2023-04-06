@@ -116,6 +116,7 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
@@ -276,6 +277,7 @@ public class TestRootedOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setInt(OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE, 4);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
@@ -2293,9 +2295,28 @@ public class TestRootedOzoneFileSystem {
         diff.getDiffList().get(0).getSourcePath());
     Assert.assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(1).getSourcePath());
+
+    // test whether snapdiff returns aggregated response as
+    // page size is 4.
+    for (int fileCount = 0; fileCount < 10; fileCount++) {
+      Path file =
+          new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+      ContractTestUtils.touch(fs, file);
+    }
+    Path snap3 = fs.createSnapshot(bucketPath1);
+    fromSnapPath = toSnapPath;
+    toSnapPath = Paths.get(snap3.toString()).getFileName();
+    fromSnap = fromSnapPath != null ? fromSnapPath.toString() : null;
+    toSnap = toSnapPath != null ? toSnapPath.toString() : null;
+    diff = ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
+    Assert.assertEquals(10, diff.getDiffList().size());
+
     // try snapDiff between non-bucket paths
     String errorMsg = "Path is not a bucket";
+    String finalFromSnap = fromSnap;
+    String finalToSnap = toSnap;
     LambdaTestUtils.intercept(IllegalArgumentException.class, errorMsg,
-        () -> ofs.getSnapshotDiffReport(volumePath1, fromSnap, toSnap));
+        () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
+            finalToSnap));
   }
 }

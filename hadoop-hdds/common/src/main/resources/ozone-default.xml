@@ -3640,4 +3640,12 @@
       without using the optimised DAG based pruning approach
     </description>
   </property>
+  <property>
+    <name>ozone.om.snapdiff.max.page.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of entries that a single snapDiff RPC would return.
+    </description>
+  </property>
 </configuration>

@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
@@ -654,13 +655,33 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
+    SnapshotDiffReportOzone aggregated;
+    SnapshotDiffReportOzone report =
+        getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, "");
+    aggregated = report;
+    while (!report.getToken().isEmpty()) {
+      LOG.info("Total Snapshot Diff length between snapshot {} and {} exceeds"
+              + " max page size, Performing another snapdiff with index at {}",
+          fromSnapshot, toSnapshot, report.getToken());
+      report = getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot,
+          report.getToken());
+      aggregated.aggregate(report);
+    }
+    return aggregated;
+  }
+
+  private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
+      String fromSnapshot, String toSnapshot, String token)
+      throws IOException, InterruptedException {
     SnapshotDiffResponse snapshotDiffResponse = null;
     do {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume.getName(), bucket.getName(),
-              fromSnapshot, toSnapshot, "", -1, false);
+              fromSnapshot, toSnapshot, token, -1, false);
       Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
     } while (snapshotDiffResponse.getJobStatus() != DONE);
-    return snapshotDiffResponse.getSnapshotDiffReport();
+    SnapshotDiffReportOzone report =
+        snapshotDiffResponse.getSnapshotDiffReport();
+    return report;
   }
 }

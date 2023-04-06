@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -51,10 +50,6 @@ public class SnapshotDiffReportOzone
    */
   private final String bucketName;
 
-  /**
-   * list of diff.
-   */
-  private final List<DiffReportEntry> diffList;
 
   /**
    * subsequent token for the diff report.
@@ -71,12 +66,15 @@ public class SnapshotDiffReportOzone
     super(snapshotRoot, fromSnapshot, toSnapshot, entryList);
     this.volumeName = volumeName;
     this.bucketName = bucketName;
-    this.diffList = entryList != null ? entryList : Collections.emptyList();
     this.token = token;
   }
 
   public List<DiffReportEntry> getDiffList() {
-    return diffList;
+    return super.getDiffList();
+  }
+
+  public String getToken() {
+    return token;
   }
 
   @Override
@@ -87,7 +85,7 @@ public class SnapshotDiffReportOzone
         .append(" and snapshot: ")
         .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
-    for (DiffReportEntry entry : diffList) {
+    for (DiffReportEntry entry : getDiffList()) {
       str.append(entry.toString()).append(LINE_SEPARATOR);
     }
     if (StringUtils.isNotEmpty(token)) {
@@ -105,7 +103,7 @@ public class SnapshotDiffReportOzone
         .setBucketName(bucketName)
         .setFromSnapshot(getFromSnapshot())
         .setToSnapshot(getLaterSnapshotName());
-    builder.addAllDiffList(diffList.stream().map(
+    builder.addAllDiffList(getDiffList().stream().map(
             SnapshotDiffReportOzone::toProtobufDiffReportEntry)
         .collect(Collectors.toList()));
     if (StringUtils.isNotEmpty(token)) {
@@ -159,8 +157,8 @@ public class SnapshotDiffReportOzone
       .DiffReportEntryProto toProtobufDiffReportEntry(DiffReportEntry entry) {
     final OzoneManagerProtocolProtos.DiffReportEntryProto.Builder builder =
         OzoneManagerProtocolProtos.DiffReportEntryProto.newBuilder();
-    builder.setDiffType(toProtobufDiffType(entry.getType()))
-        .setSourcePath(new String(entry.getSourcePath()));
+    builder.setDiffType(toProtobufDiffType(entry.getType())).setSourcePath(
+        new String(entry.getSourcePath(), StandardCharsets.UTF_8));
     if (entry.getTargetPath() != null) {
       String targetPath =
           new String(entry.getTargetPath(), StandardCharsets.UTF_8);
@@ -181,6 +179,15 @@ public class SnapshotDiffReportOzone
         sourcePath.getBytes(StandardCharsets.UTF_8),
         targetPath != null ? targetPath.getBytes(StandardCharsets.UTF_8) :
             null);
+  }
+
+  /**
+   * @param diffReport
+   * Add the diffReportEntries from given diffReport to the report.
+   * Used while aggregating paged response of snapdiff.
+   */
+  public void aggregate(SnapshotDiffReportOzone diffReport) {
+    this.getDiffList().addAll(diffReport.getDiffList());
   }
 
 

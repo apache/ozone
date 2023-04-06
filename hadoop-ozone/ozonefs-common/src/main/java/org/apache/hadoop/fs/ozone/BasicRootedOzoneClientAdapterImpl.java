@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1291,13 +1292,37 @@ public class BasicRootedOzoneClientAdapterImpl
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
     OFSPath ofsPath = new OFSPath(snapshotDir, config);
-    SnapshotDiffResponse snapshotDiffResponse = null;
-    do {
-      snapshotDiffResponse = objectStore.snapshotDiff(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), fromSnapshot, toSnapshot, "", -1, false);
-      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
-    } while (snapshotDiffResponse.getJobStatus() != DONE);
-    return snapshotDiffResponse.getSnapshotDiffReport();
+    String volume = ofsPath.getVolumeName();
+    String bucket = ofsPath.getBucketName();
+    SnapshotDiffReportOzone aggregated;
+    SnapshotDiffReportOzone report =
+        getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+            bucket, "");
+    aggregated = report;
+    while (!report.getToken().isEmpty()) {
+      LOG.info("Total Snapshot Diff length between snapshot {} and {} exceeds"
+              + " max page size, Performing another snapdiff with index at {}",
+          fromSnapshot, toSnapshot, report.getToken());
+      report =
+          getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+              bucket, report.getToken());
+      aggregated.aggregate(report);
+    }
+    return aggregated;
   }
 
+  private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
+      String fromSnapshot, String toSnapshot, String volume, String bucket,
+      String token) throws IOException, InterruptedException {
+    SnapshotDiffResponse snapshotDiffResponse = null;
+    do {
+      snapshotDiffResponse =
+          objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
+              token, -1, false);
+      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
+    } while (snapshotDiffResponse.getJobStatus() != DONE);
+    SnapshotDiffReportOzone report =
+        snapshotDiffResponse.getSnapshotDiffReport();
+    return report;
+  }
 }
