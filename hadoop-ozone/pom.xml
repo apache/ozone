@@ -26,7 +26,7 @@
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
-    <spring.version>5.3.23</spring.version>
+    <spring.version>5.3.26</spring.version>
     <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
