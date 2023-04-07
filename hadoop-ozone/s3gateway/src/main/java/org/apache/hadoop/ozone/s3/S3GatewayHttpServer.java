@@ -28,19 +28,27 @@ import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.server.http.ServletElementsFactory;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3secret.OzoneS3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3secret.OzoneS3SecretConfigKeys.OZONE_S3G_SECRET_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.s3secret.OzoneS3SecretConfigKeys.OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
 
 /**
- * S3 Gateway specific configuration keys.
+ * Http server to provide S3-compatible API.
  */
 public class S3GatewayHttpServer extends BaseHttpServer {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(S3GatewayHttpServer.class);
 
   /**
    * Default offset between two filters.
@@ -56,29 +64,42 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   private void addSecretAuthentication(MutableConfigurationSource conf)
       throws IOException {
-    ServletHandler handler = getWebAppContext().getServletHandler();
 
-    Map<String, String> params = new HashMap<>();
-    String principalInConf =
-        conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
-    if (principalInConf != null && !principalInConf.isEmpty()) {
-      params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-          principalInConf, conf.get(OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY)));
+    if (conf.getBoolean(OZONE_S3G_SECRET_HTTP_ENABLED_KEY, false)) {
+      String authType = conf.get(OZONE_S3G_SECRET_HTTP_AUTH_TYPE, "simple");
+
+      if (UserGroupInformation.isSecurityEnabled()
+          && authType.equals("kerberos")) {
+        ServletHandler handler = getWebAppContext().getServletHandler();
+        Map<String, String> params = new HashMap<>();
+
+        String principalInConf =
+            conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
+        if (principalInConf != null && !principalInConf.isEmpty()) {
+          params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
+              principalInConf, conf.get(OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY)));
+        }
+        String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
+        if (httpKeytab != null && !httpKeytab.isEmpty()) {
+          params.put("kerberos.keytab", httpKeytab);
+        }
+        params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
+
+        FilterHolder holder = ServletElementsFactory.createFilterHolder(
+            "secretAuthentication", AuthenticationFilter.class.getName(),
+            params);
+        FilterMapping filterMapping =
+            ServletElementsFactory.createFilterMapping(
+                "secretAuthentication",
+                new String[]{"/secret/*"});
+
+        handler.addFilter(holder, filterMapping);
+      } else {
+        LOG.error("Secret Endpoint should be secured with Kerberos");
+        throw new IllegalStateException("Secret Endpoint should be secured"
+                                            + " with Kerberos");
+      }
     }
-    String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
-    if (httpKeytab != null && !httpKeytab.isEmpty()) {
-      params.put("kerberos.keytab", httpKeytab);
-    }
-    params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
-
-    FilterHolder holder = ServletElementsFactory.createFilterHolder(
-        "secretAuthentication", AuthenticationFilter.class.getName(),
-        params);
-    FilterMapping filterMapping = ServletElementsFactory.createFilterMapping(
-        "secretAuthentication",
-        new String[]{"/secret/*"});
-
-    handler.addFilter(holder, filterMapping);
   }
 
   @Override
