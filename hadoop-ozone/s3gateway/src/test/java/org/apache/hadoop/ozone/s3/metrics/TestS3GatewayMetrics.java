@@ -377,7 +377,7 @@ public class TestS3GatewayMetrics {
         .length(), 1, null, body);
     // GET the key from the bucket
     keyEndpoint.get(bucketName, keyName, null, 0,
-        null, body);
+        null);
     long curMetric = metrics.getGetKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -388,7 +388,7 @@ public class TestS3GatewayMetrics {
     // Fetching a non-existent key
     try {
       keyEndpoint.get(bucketName, "unknownKey", null, 0,
-          null, null);
+          null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
@@ -520,7 +520,7 @@ public class TestS3GatewayMetrics {
 
     // Listing out the parts by providing the uploadID
     keyEndpoint.get(bucketName, keyName,
-        uploadID, 3, null, null);
+        uploadID, 3, null);
     long curMetric = metrics.getListPartsSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -532,7 +532,7 @@ public class TestS3GatewayMetrics {
     try {
       // Listing out the parts by providing the uploadID after aborting
       keyEndpoint.get(bucketName, keyName,
-          "wrong_id", 3, null, null);
+          "wrong_id", 3, null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
