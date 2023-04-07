@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.impl.MetricsSystemImpl;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -34,8 +34,11 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 @InterfaceAudience.Private
 @Metrics(about = "Storage Container Client Metrics", context = "dfs")
 public class XceiverClientMetrics {
+  @VisibleForTesting
   public static final String SOURCE_NAME = XceiverClientMetrics.class
       .getSimpleName();
+  @VisibleForTesting
+  public static final MetricsSystem METRICS_SYSTEM = new MetricsSystemImpl();
 
   private @Metric MutableCounterLong pendingOps;
   private @Metric MutableCounterLong totalOps;
@@ -75,10 +78,9 @@ public class XceiverClientMetrics {
   }
 
   public static XceiverClientMetrics create() {
-    DefaultMetricsSystem.initialize(SOURCE_NAME);
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Storage Container Client Metrics",
-        new XceiverClientMetrics());
+    METRICS_SYSTEM.init(SOURCE_NAME);
+    return METRICS_SYSTEM.register(SOURCE_NAME,
+        "Storage Container Client Metrics", new XceiverClientMetrics());
   }
 
   public void incrPendingContainerOpsMetrics(ContainerProtos.Type type) {
@@ -126,7 +128,6 @@ public class XceiverClientMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    METRICS_SYSTEM.unregisterSource(SOURCE_NAME);
   }
 }

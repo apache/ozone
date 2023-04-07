@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.scm;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -36,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.test.MetricsAsserts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -65,6 +66,12 @@ public class TestXceiverClientMetrics {
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
+
+  private MetricsRecordBuilder getMetrics() {
+    MetricsSystem metricsSystem = XceiverClientMetrics.METRICS_SYSTEM;
+    return MetricsAsserts.getMetrics(
+        metricsSystem.getSource(XceiverClientMetrics.SOURCE_NAME));
+  }
 
   @BeforeAll
   public static void init() throws Exception {
@@ -103,8 +110,7 @@ public class TestXceiverClientMetrics {
               container.getPipeline());
       client.sendCommand(request);
 
-      MetricsRecordBuilder containerMetrics = getMetrics(
-          XceiverClientMetrics.SOURCE_NAME);
+      MetricsRecordBuilder containerMetrics = getMetrics();
       // Above request command is in a synchronous way, so there will be no
       // pending requests.
       assertCounter("PendingOps", 0L, containerMetrics);
@@ -147,8 +153,7 @@ public class TestXceiverClientMetrics {
 
       GenericTestUtils.waitFor(() -> {
         // check if pending metric count is increased
-        MetricsRecordBuilder metric =
-            getMetrics(XceiverClientMetrics.SOURCE_NAME);
+        MetricsRecordBuilder metric = getMetrics();
         long pendingOps = getLongCounter("PendingOps", metric);
         long pendingPutSmallFileOps =
             getLongCounter("numPendingPutSmallFile", metric);
@@ -176,7 +181,7 @@ public class TestXceiverClientMetrics {
       }, 100, 60000);
 
       // the counter value of pending metrics should be decreased to 0
-      containerMetrics = getMetrics(XceiverClientMetrics.SOURCE_NAME);
+      containerMetrics = getMetrics();
       assertCounter("PendingOps", 0L, containerMetrics);
       assertCounter("numPendingPutSmallFile", 0L, containerMetrics);
 
