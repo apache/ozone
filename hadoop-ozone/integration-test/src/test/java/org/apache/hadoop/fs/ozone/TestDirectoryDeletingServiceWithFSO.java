@@ -426,7 +426,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 8);
     assertTableRowCount(dirTable, 5);
-    long prevDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
 
     // Create snapshot
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
