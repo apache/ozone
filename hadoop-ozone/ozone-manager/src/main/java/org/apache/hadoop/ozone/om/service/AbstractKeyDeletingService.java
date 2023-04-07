@@ -57,7 +57,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
- * which is used by SnapshotDeletingService.
+ * which is now used by SnapshotDeletingService as well.
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService {
 
