@@ -26,8 +26,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.Time;
 
@@ -43,6 +45,10 @@ public class ObjectStoreStub extends ObjectStore {
 
   public ObjectStoreStub() {
     super();
+  }
+
+  public ObjectStoreStub(ConfigurationSource conf, ClientProtocol proxy) {
+    super(conf, proxy);
   }
 
   private Map<String, OzoneVolumeStub> volumes = new HashMap<>();

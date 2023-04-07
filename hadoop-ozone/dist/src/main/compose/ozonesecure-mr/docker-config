@@ -36,8 +36,12 @@ OZONE-SITE.XML_hdds.scm.kerberos.keytab.file=/etc/security/keytabs/scm.keytab
 OZONE-SITE.XML_ozone.om.kerberos.principal=om/om@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.kerberos.keytab.file=/etc/security/keytabs/om.keytab
 OZONE-SITE.XML_ozone.administrators=*
+OZONE-SITE.XML_ozone.s3.administrators="s3g"
 
 OZONE-SITE.XML_ozone.security.enabled=true
+OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
+OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
+
 OZONE-SITE.XML_hdds.scm.http.auth.kerberos.principal=HTTP/scm@EXAMPLE.COM
 OZONE-SITE.XML_hdds.scm.http.auth.kerberos.keytab=/etc/security/keytabs/scm.keytab
 OZONE-SITE.XML_ozone.om.http.auth.kerberos.principal=HTTP/om@EXAMPLE.COM
@@ -46,6 +50,8 @@ OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.principal=HTTP/dn@EXAMPLE.COM
 OZONE-SITE.XML_hdds.datanode.http.auth.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.keytab
 OZONE-SITE.XML_ozone.s3g.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
+OZONE-SITE.XML_ozone.s3g.secret.http.auth.kerberos.keytab=/etc/security/keytabs/s3g.keytab
+OZONE-SITE.XML_ozone.s3g.secret.http.auth.kerberos.principal=HTTP/s3g@EXAMPLE.COM
 OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 
 OZONE-SITE.XML_ozone.s3g.kerberos.keytab.file=/etc/security/keytabs/s3g.keytab

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -76,5 +77,15 @@ public class S3SecretEndpointBase implements Auditor {
 
   public OzoneClient getClient() {
     return client;
+  }
+
+  @VisibleForTesting
+  public void setClient(OzoneClient ozoneClient) {
+    this.client = ozoneClient;
+  }
+
+  @VisibleForTesting
+  public void setContext(ContainerRequestContext context) {
+    this.context = context;
   }
 }
