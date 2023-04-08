@@ -242,7 +242,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
-    containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
+    containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
@@ -250,7 +250,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
         fileCountBySizeDao,
-        reconScm.getContainerCountBySizeDao(),
+        containerCountBySizeDao,
         utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
