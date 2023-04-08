@@ -108,8 +108,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
         endTime = System.nanoTime();
         duration = endTime - startTime;
         durationMilliseconds = duration / 1_000_000;
-        LOG.info("Elapsed Time in milli seconds for Process() execution: ",
-            (durationMilliseconds));
+        LOG.info("Elapsed Time in milliseconds for Process() execution: {}",
+            durationMilliseconds);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Container Size Distribution task Thread.", t);
@@ -127,18 +127,16 @@ public class ContainerSizeCountTask extends ReconScmTask {
    * the list of containers and does the following for each container:
    *
    * 1) If the container is not present in processedContainers,
-   *    it is a new container, so it is added to the processedContainers map
-   *    and the count for its size in the containerSizeCountMap is incremented
-   *    by 1 using the handlePutKeyEvent() function.
+   * it is a new container, so it is added to the processedContainers map
+   * and the count for its size in the containerSizeCountMap is incremented
+   * by 1 using the handlePutKeyEvent() function.
    * 2) If the container is present in processedContainers but its size has
-   *    the processedContainers map is updated to the new size and the count for
-   *    the old size in the containerSizeCountMap is decremented by 1 using the
-   *    handleDeleteKeyEvent() function. The count for the new size is then
-   *    incremented by 1 using the handlePutKeyEvent() function.
-   * 3) If the container is present in both processedContainers and containers,
-   *    it means the container has not been deleted. Therefore, it is removed
-   *    from the deletedContainers map.
-   *
+   * been updated to the new size then the count for the old size in the
+   * containerSizeCountMap is decremented by 1 using the
+   * handleDeleteKeyEvent() function. The count for the new size is then
+   * incremented by 1 using the handlePutKeyEvent() function.
+   * 3) If the container is not present in containers list, it means the
+   * container has been deleted.
    * The remaining containers inside the deletedContainers map are the ones
    * that are not in the cluster and need to be deleted. Finally, the counts in
    * the containerSizeCountMap are written to the database using the
@@ -331,8 +329,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
     return new ContainerSizeCountKey(
-        // Using the FileSize UpperBound Calculator for now, we can replace it
-        // with a new UpperBound Calculator for containers only
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }
 

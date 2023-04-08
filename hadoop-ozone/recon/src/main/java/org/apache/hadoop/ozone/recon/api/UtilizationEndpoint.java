@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import javax.inject.Inject;
 
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -28,6 +29,8 @@ import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.Record3;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -56,7 +59,7 @@ public class UtilizationEndpoint {
   private FileCountBySizeDao fileCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerCountBySizeDao containerCountBySizeDao;
-
+  Logger LOG = LoggerFactory.getLogger(UtilizationEndpoint.class);
   @Inject
   public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
                              ContainerCountBySizeDao containerCountBySizeDao,
@@ -117,27 +120,32 @@ public class UtilizationEndpoint {
   @Path("/containerCount")
   public Response getContainerCounts(
       @QueryParam(RECON_QUERY_CONTAINER_SIZE)
-          long containerSize
-  ) {
+          long containerSize) {
     DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
     List<ContainerCountBySize> resultSet;
-    if (containerSize > 0) {
-      // Get the current count from database and update
-      Record1<Long> recordToFind =
-          dslContext.newRecord(
-                  CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
-              .value1(containerSize);
-      ContainerCountBySize record =
-          containerCountBySizeDao.findById(recordToFind.value1());
-      resultSet = record != null ?
-          Collections.singletonList(record) : Collections.emptyList();
-    } else {
-      // fetch all records having values greater than zero
-      resultSet = containerCountBySizeDao.findAll().stream()
-          .filter(record -> record.getCount() > 0)
-          .collect(Collectors.toList());
+    try {
+      if (containerSize > 0) {
+        // Get the current count from database and update
+        Record1<Long> recordToFind =
+            dslContext.newRecord(
+                    CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
+                .value1(containerSize);
+        ContainerCountBySize record =
+            containerCountBySizeDao.findById(recordToFind.value1());
+        resultSet = record != null ?
+            Collections.singletonList(record) : Collections.emptyList();
+      } else {
+        // fetch all records having values greater than zero
+        resultSet = containerCountBySizeDao.findAll().stream()
+            .filter(record -> record.getCount() > 0)
+            .collect(Collectors.toList());
+      }
+      return Response.ok(resultSet).build();
+    } catch (Exception e) {
+      // Log the exception and return a server error response
+      LOG.error("Error retrieving container counts", e);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
-    return Response.ok(resultSet).build();
   }
 
 }
