@@ -19,7 +19,14 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.cache.LoadingCache;
+
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +44,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+
+import org.apache.commons.io.file.PathUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
@@ -124,6 +133,13 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
   private final ExecutorService executorService;
 
+  /**
+   * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
+   * It is to make sure that SST files don't get deleted for the in_progress
+   * job/s as part of compaction DAG and SST file pruning
+   * {@link RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory}.
+   */
+  private final String sstBackupDirForSnapDiffJobs;
 
   public SnapshotDiffManager(ManagedRocksDB db,
                              RocksDBCheckpointDiffer differ,
@@ -167,9 +183,62 @@ public class SnapshotDiffManager implements AutoCloseable {
         new ThreadPoolExecutor.CallerRunsPolicy()
     );
 
+    Path path = Paths.get(differ.getMetadataDir(), "snapDiff");
+    createEmptySnapDiffDir(path);
+    this.sstBackupDirForSnapDiffJobs = path.toString();
+
     // TODO: [SNAPSHOT] Load jobs only if it is leader node.
     //  It could a event-triggered form OM when node is leader and up.
     this.loadJobsOnStartUp();
+  }
+
+  /**
+   * Creates an empty dir. If directory exists, it deletes that and then
+   * creates new one otherwise just create a new dir.
+   * Throws IllegalStateException if, couldn't delete the existing
+   * directory or fails to create it.
+   * <p>
+   * We delete existing dir is to remove all hardlinks and free up the space
+   * if there were any created by previous snapDiff job and were not removed
+   * because of any failure.
+   */
+  private void createEmptySnapDiffDir(Path path) {
+    try {
+      if (Files.exists(path)) {
+        PathUtils.deleteDirectory(path);
+      }
+      Files.createDirectories(path);
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't delete existing or create new" +
+          " directory for:" + path, e);
+    }
+
+    // Create readme file.
+    Path readmePath = Paths.get(path.toString(), "_README.txt");
+    File readmeFile = new File(readmePath.toString());
+    if (!readmeFile.exists()) {
+      try (BufferedWriter bw = Files.newBufferedWriter(
+          readmePath, StandardOpenOption.CREATE)) {
+        bw.write("This directory is used to store SST files needed to" +
+            " generate snap diff report for a particular job.\n" +
+            " DO NOT add, change or delete any files in this directory" +
+            " unless you know what you are doing.\n");
+      } catch (IOException ignored) {
+      }
+    }
+  }
+
+  private void deleteDir(Path path) {
+    if (path == null || Files.notExists(path)) {
+      return;
+    }
+
+    try {
+      PathUtils.deleteDirectory(path);
+    } catch (IOException e) {
+      // TODO: [SNAPSHOT] Fail gracefully
+      throw new IllegalStateException(e);
+    }
   }
 
   private Map<String, String> getTablePrefixes(
@@ -409,7 +478,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     ColumnFamilyHandle toSnapshotColumnFamily = null;
     ColumnFamilyHandle objectIDsColumnFamily = null;
 
+    // Creates temporary unique dir for the snapDiff job to keep SST files
+    // hardlinks. JobId is used as dir name for uniqueness.
+    // It is required to prevent that SST files get deleted for in_progress
+    // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
+    Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
+
     try {
+      Files.createDirectories(path);
       // JobId is prepended to column families name to make them unique
       // for request.
       fromSnapshotColumnFamily =
@@ -467,10 +543,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       Map<String, String> tablePrefixes =
           getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
 
-      final Set<String> deltaFilesForKeyOrFileTable =
-          getDeltaFiles(fromSnapshot, toSnapshot,
-              Collections.singletonList(fsKeyTable.getName()), fsInfo, tsInfo,
-              useFullDiff, tablePrefixes);
+      Set<String> deltaFilesForKeyOrFileTable = getDeltaFiles(fromSnapshot,
+          toSnapshot, Collections.singletonList(fsKeyTable.getName()), fsInfo,
+          tsInfo, useFullDiff, tablePrefixes, path.toString());
 
       addToObjectIdMap(fsKeyTable,
           tsKeyTable,
@@ -488,7 +563,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         final Set<String> deltaFilesForDirTable =
             getDeltaFiles(fromSnapshot, toSnapshot,
                 Collections.singletonList(fsDirTable.getName()), fsInfo, tsInfo,
-                useFullDiff, tablePrefixes);
+                useFullDiff, tablePrefixes, path.toString());
         addToObjectIdMap(fsDirTable,
             tsDirTable,
             deltaFilesForDirTable,
@@ -512,6 +587,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       dropAndCloseColumnFamilyHandle(fromSnapshotColumnFamily);
       dropAndCloseColumnFamilyHandle(toSnapshotColumnFamily);
       dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
+      // Delete SST files backup directory.
+      deleteDir(path);
     }
   }
 
@@ -580,9 +657,12 @@ public class SnapshotDiffManager implements AutoCloseable {
   @NotNull
   @SuppressWarnings("parameternumber")
   private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
-      OmSnapshot toSnapshot, List<String> tablesToLookUp,
-      SnapshotInfo fsInfo, SnapshotInfo tsInfo,
-      boolean useFullDiff, Map<String, String> tablePrefixes)
+                                    OmSnapshot toSnapshot,
+                                    List<String> tablesToLookUp,
+                                    SnapshotInfo fsInfo, SnapshotInfo tsInfo,
+                                    boolean useFullDiff,
+                                    Map<String, String> tablePrefixes,
+                                    String diffDir)
       throws RocksDBException, IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
 
@@ -600,7 +680,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       List<String> sstDiffList =
-          differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
+          differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
       deltaFiles.addAll(sstDiffList);
 
       // TODO: [SNAPSHOT] Remove the workaround below when the SnapDiff logic
