@@ -126,6 +126,16 @@ wait_for_om_leader() {
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+
+      local grep_command="grep -e FOLLOWER -e LEADER | sort -r -k3 | awk '{ print \$1 }' | xargs echo | sed 's/ /,/g'"
+      local new_order
+      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+        new_order=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command | ${grep_command}")
+      else
+        new_order=$(docker-compose exec -T ${SCM} bash -c "$command | ${grep_command}")
+      fi
+
+      reorder_om_nodes "${new_order}"
       return
     else
       echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
@@ -212,6 +222,19 @@ execute_robot_test(){
   fi
 
   return ${rc}
+}
+
+## @description Replace OM node order in config
+reorder_om_nodes() {
+  local c pid procname new_order
+  local new_order="$1"
+
+  if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
+      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
+      echo "Replaced OM order with ${new_order} in ${c}"
+    done
+  fi
 }
 
 ## @description Create stack dump of each java process in each container

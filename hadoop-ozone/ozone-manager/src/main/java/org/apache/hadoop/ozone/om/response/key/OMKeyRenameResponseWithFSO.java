@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -33,11 +34,13 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
 
 /**
  * Response for RenameKey request - prefix layout.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE})
+@CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
+    SNAPSHOT_RENAMED_KEY_TABLE})
 public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   private boolean isRenameDirectory;
@@ -88,7 +91,22 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
           .deleteWithBatch(batchOperation, getFromKeyName());
       omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
+
+      boolean isSnapshotBucket = OMClientRequestUtils.
+          isSnapshotBucket(omMetadataManager, getRenameKeyInfo());
+      String renameDbKey = omMetadataManager.getRenameKey(
+          getRenameKeyInfo().getVolumeName(),
+          getRenameKeyInfo().getBucketName(),
+          getRenameKeyInfo().getObjectID());
+
+      String renamedKey = omMetadataManager.getSnapshotRenamedKeyTable()
+          .get(renameDbKey);
+      if (isSnapshotBucket && renamedKey == null) {
+        omMetadataManager.getSnapshotRenamedKeyTable().putWithBatch(
+            batchOperation, renameDbKey, getFromKeyName());
+      }
     }
+
     if (fromKeyParent != null) {
       addDirToDBBatch(omMetadataManager, fromKeyParent,
           volumeId, bucketId, batchOperation);

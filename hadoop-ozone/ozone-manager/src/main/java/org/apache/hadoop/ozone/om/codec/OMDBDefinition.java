@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
@@ -229,6 +230,25 @@ public class OMDBDefinition implements DBDefinition {
           SnapshotInfo.class,
           new OmDBSnapshotInfoCodec());
 
+  /**
+   * SnapshotRenamedKeyTable that complements the keyTable (or fileTable)
+   * entries of the immediately previous snapshot in the same snapshot
+   * scope (bucket or volume).
+   * <p>
+   * Key renames between the two subsequent snapshots are captured, this
+   * information is used in {@link SnapshotDeletingService} to check if the
+   * renamedKey is present in the previous snapshot's keyTable
+   * (or fileTable).
+   */
+  public static final DBColumnFamilyDefinition<String, String>
+      SNAPSHOT_RENAMED_KEY_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE,
+          String.class,  // /volumeName/bucketName/objectID
+          new StringCodec(),
+          String.class, // path to the key in previous snapshot's key(file)Table
+          new StringCodec());
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -248,7 +268,7 @@ public class OMDBDefinition implements DBDefinition {
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        SNAPSHOT_INFO_TABLE};
+        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_KEY_TABLE};
   }
 }
 

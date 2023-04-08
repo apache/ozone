@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -258,29 +258,24 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
-   * with #deleting# prefix in OM DB.
-   *
-   * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} represent keys and blocks.
-   * @throws IOException
-   */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
-
-  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
-   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -374,6 +369,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmDBTenantState> getTenantStateTable();
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
+
+  Table<String, String> getSnapshotRenamedKeyTable();
 
   /**
    * Gets the OM Meta table.
@@ -483,6 +480,18 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOpenFileName(long volumeId, long bucketId,
                          long parentObjectId, String fileName, long id);
 
+
+  /**
+   * Given a volume, bucket and a objectID, return the DB key name in
+   * snapshotRenamedKeyTable.
+   *
+   * @param volume   - volume name
+   * @param bucket   - bucket name
+   * @param objectID - objectID of the key
+   * @return DB rename key as String.
+   */
+  String getRenameKey(String volume, String bucket, long objectID);
+
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.
    *
@@ -523,4 +532,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   long getBucketId(String volume, String bucket) throws IOException;
 
+  /**
+   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * @param deletedKey - key to be purged from the deletedTable
+   * @return {@link BlockGroup}
+   */
+  List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
 }

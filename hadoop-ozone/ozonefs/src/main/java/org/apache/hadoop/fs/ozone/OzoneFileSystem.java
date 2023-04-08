@@ -26,6 +26,7 @@ import java.net.URI;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -106,5 +107,18 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   protected OutputStream createFSOutputStream(
           OzoneFSOutputStream outputStream) {
     return new CapableOzoneFSOutputStream(outputStream);
+  }
+
+  @Override
+  public boolean hasPathCapability(final Path path, final String capability)
+      throws IOException {
+    // qualify the path to make sure that it refers to the current FS.
+    final Path p = makeQualified(path);
+    boolean cap =
+        OzonePathCapabilities.hasPathCapability(p, capability);
+    if (cap) {
+      return cap;
+    }
+    return super.hasPathCapability(p, capability);
   }
 }

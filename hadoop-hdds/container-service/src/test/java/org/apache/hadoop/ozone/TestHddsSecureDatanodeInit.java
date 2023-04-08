@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -55,13 +56,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -128,7 +128,7 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @BeforeEach
-  public void setUpDNCertClient() {
+  public void setUpDNCertClient() throws IOException {
 
     FileUtils.deleteQuietly(Paths.get(
         securityConfig.getKeyLocation(DN_COMPONENT).toString(),
@@ -143,6 +143,11 @@ public class TestHddsSecureDatanodeInit {
     client = new DNCertificateClient(securityConfig, datanodeDetails,
         certHolder.getSerialNumber().toString(), null, null);
     service.setCertificateClient(client);
+  }
+
+  @AfterEach
+  public void tearDownClient() throws IOException {
+    client.close();
   }
 
   @Test
@@ -275,26 +280,6 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @Test
-  public void testGetCSR() throws Exception {
-    keyCodec.writePublicKey(publicKey);
-    keyCodec.writePrivateKey(privateKey);
-    service.setCertificateClient(client);
-    PKCS10CertificationRequest csr =
-        client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-
-    csr = client.getCSRBuilder().build();
-    Assertions.assertNotNull(csr);
-  }
-
-  @Test
-  @Disabled("HDDS-7874")
   public void testCertificateRotation() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);

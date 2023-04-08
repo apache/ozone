@@ -173,9 +173,16 @@ public class TestBlockDeletingService {
    * creates some fake chunk files for testing.
    */
   private void createToDeleteBlocks(ContainerSet containerSet,
-      int numOfContainers,
-      int numOfBlocksPerContainer,
+      int numOfContainers, int numOfBlocksPerContainer,
       int numOfChunksPerBlock) throws IOException {
+    for (int i = 0; i < numOfContainers; i++) {
+      createToDeleteBlocks(containerSet, numOfBlocksPerContainer,
+          numOfChunksPerBlock);
+    }
+  }
+
+  private KeyValueContainerData createToDeleteBlocks(ContainerSet containerSet,
+      int numOfBlocksPerContainer, int numOfChunksPerBlock) throws IOException {
     ChunkManager chunkManager;
     if (layout == FILE_PER_BLOCK) {
       chunkManager = new FilePerBlockStrategy(true, null, null);
@@ -185,34 +192,34 @@ public class TestBlockDeletingService {
     byte[] arr = randomAlphanumeric(1048576).getBytes(UTF_8);
     ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.wrap(arr));
     int txnID = 0;
-    for (int x = 0; x < numOfContainers; x++) {
-      long containerID = ContainerTestHelper.getTestContainerID();
-      KeyValueContainerData data =
-          new KeyValueContainerData(containerID, layout,
-              ContainerTestHelper.CONTAINER_MAX_SIZE,
-              UUID.randomUUID().toString(), datanodeUuid);
-      data.closeContainer();
-      data.setSchemaVersion(schemaVersion);
-      KeyValueContainer container = new KeyValueContainer(data, conf);
-      container.create(volumeSet,
-          new RoundRobinVolumeChoosingPolicy(), scmId);
-      containerSet.addContainer(container);
-      data = (KeyValueContainerData) containerSet.getContainer(
-          containerID).getContainerData();
-      data.setSchemaVersion(schemaVersion);
-      if (schemaVersion.equals(SCHEMA_V1)) {
-        createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
-            containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-      } else if (schemaVersion.equals(SCHEMA_V2)
-          || schemaVersion.equals(SCHEMA_V3)) {
-        createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
-            containerID, numOfChunksPerBlock, buffer, chunkManager,
-            container, data);
-      } else {
-        throw new UnsupportedOperationException(
-            "Only schema version 1,2,3 are supported.");
-      }
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainerData data =
+        new KeyValueContainerData(containerID, layout,
+            ContainerTestHelper.CONTAINER_MAX_SIZE,
+            UUID.randomUUID().toString(), datanodeUuid);
+    data.closeContainer();
+    data.setSchemaVersion(schemaVersion);
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    container.create(volumeSet,
+        new RoundRobinVolumeChoosingPolicy(), scmId);
+    containerSet.addContainer(container);
+    data = (KeyValueContainerData) containerSet.getContainer(
+        containerID).getContainerData();
+    data.setSchemaVersion(schemaVersion);
+    if (schemaVersion.equals(SCHEMA_V1)) {
+      createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
+          containerID, numOfChunksPerBlock, buffer, chunkManager, container);
+    } else if (schemaVersion.equals(SCHEMA_V2)
+        || schemaVersion.equals(SCHEMA_V3)) {
+      createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
+          containerID, numOfChunksPerBlock, buffer, chunkManager,
+          container, data);
+    } else {
+      throw new UnsupportedOperationException(
+          "Only schema version 1,2,3 are supported.");
     }
+
+    return data;
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -415,6 +422,125 @@ public class TestBlockDeletingService {
     } else {
       throw new UnsupportedOperationException(
           "Only schema version 1,2,3 are supported.");
+    }
+  }
+
+
+  /**
+   * In some cases, the pending delete blocks metadata will become larger
+   * than the actual number of pending delete blocks in the database. If
+   * there are no delete transactions in the DB, this metadata counter should
+   * be reset to zero.
+   */
+  @Test
+  public void testPendingDeleteBlockReset() throws Exception {
+    // This test is not relevant for schema V1.
+    if (schemaVersion.equals(SCHEMA_V1)) {
+      return;
+    }
+
+    final int blockDeleteLimit = 2;
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(blockDeleteLimit);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = new ContainerSet(1000);
+
+    // Create one container with no actual pending delete blocks, but an
+    // incorrect metadata value indicating it has enough pending deletes to
+    // use up the whole block deleting limit.
+    KeyValueContainerData incorrectData =
+        createToDeleteBlocks(containerSet,
+        0, 1);
+    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+      // Check pre-create state.
+      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+          incorrectData));
+      Assert.assertEquals(0, db.getStore().getMetadataTable()
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
+      Assert.assertEquals(0,
+          incorrectData.getNumPendingDeletionBlocks());
+
+      // Alter the pending delete value in memory and the DB.
+      incorrectData.incrPendingDeletionBlocks(blockDeleteLimit);
+      db.getStore().getMetadataTable().put(
+          incorrectData.getPendingDeleteBlockCountKey(),
+          (long)blockDeleteLimit);
+    }
+
+    // Create one container with fewer pending delete blocks than the first.
+    int correctNumBlocksToDelete = blockDeleteLimit - 1;
+    KeyValueContainerData correctData = createToDeleteBlocks(containerSet,
+        correctNumBlocksToDelete, 1);
+    // Check its metadata was set up correctly.
+    Assert.assertEquals(correctNumBlocksToDelete,
+        correctData.getNumPendingDeletionBlocks());
+    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+      Assert.assertEquals(correctNumBlocksToDelete,
+          getUnderDeletionBlocksCount(db, correctData));
+      Assert.assertEquals(correctNumBlocksToDelete,
+          db.getStore().getMetadataTable()
+              .get(correctData.getPendingDeleteBlockCountKey()).longValue());
+    }
+
+    // Create the deleting service instance with very large interval between
+    // runs so we can trigger it manually.
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    OzoneContainer ozoneContainer =
+        mockDependencies(containerSet, keyValueHandler);
+    BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
+        1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf);
+
+    // On the first run, the container with incorrect metadata should consume
+    // the block deletion limit, and the correct container with fewer pending
+    // delete blocks will not be processed.
+    svc.runPeriodicalTaskNow();
+
+    // Pending delete block count in the incorrect container should be fixed
+    // and reset to 0.
+    Assert.assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
+    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+          incorrectData));
+      Assert.assertEquals(0, db.getStore().getMetadataTable()
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
+    }
+    // Correct container should not have been processed.
+    Assert.assertEquals(correctNumBlocksToDelete,
+        correctData.getNumPendingDeletionBlocks());
+    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+      Assert.assertEquals(correctNumBlocksToDelete,
+          getUnderDeletionBlocksCount(db, correctData));
+      Assert.assertEquals(correctNumBlocksToDelete,
+          db.getStore().getMetadataTable()
+              .get(correctData.getPendingDeleteBlockCountKey()).longValue());
+    }
+
+    // On the second run, the correct container should be picked up, because
+    // it now has the most pending delete blocks.
+    svc.runPeriodicalTaskNow();
+
+    // The incorrect container should remain in the same state after being
+    // fixed.
+    Assert.assertEquals(0, incorrectData.getNumPendingDeletionBlocks());
+    try (DBHandle db = BlockUtils.getDB(incorrectData, conf)) {
+      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+          incorrectData));
+      Assert.assertEquals(0, db.getStore().getMetadataTable()
+          .get(incorrectData.getPendingDeleteBlockCountKey()).longValue());
+    }
+    // The correct container should have been processed this run and had its
+    // blocks deleted.
+    Assert.assertEquals(0, correctData.getNumPendingDeletionBlocks());
+    try (DBHandle db = BlockUtils.getDB(correctData, conf)) {
+      Assert.assertEquals(0, getUnderDeletionBlocksCount(db,
+          correctData));
+      Assert.assertEquals(0, db.getStore().getMetadataTable()
+          .get(correctData.getPendingDeleteBlockCountKey()).longValue());
     }
   }
 

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -246,7 +245,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getVolumeTable().put(volumeKey, volumeArgs);
     om.getMetadataManager().getVolumeTable().addCacheEntry(
         new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(volumeArgs), 2)
+        CacheValue.get(2, volumeArgs)
     );
   }
 
@@ -264,7 +263,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getBucketTable().put(bucketKey, bucketInfo);
     om.getMetadataManager().getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(bucketInfo), 1)
+        CacheValue.get(1, bucketInfo)
     );
   }
 

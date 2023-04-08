@@ -25,11 +25,12 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -62,6 +63,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
+  private OzoneClient client;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -76,10 +78,11 @@ public class TestSCMPipelineBytesWrittenMetrics {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   private void writeNumBytes(int numBytes) throws Exception {
-    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    ObjectStore store = client.getObjectStore();
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -137,6 +140,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
   @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
 }

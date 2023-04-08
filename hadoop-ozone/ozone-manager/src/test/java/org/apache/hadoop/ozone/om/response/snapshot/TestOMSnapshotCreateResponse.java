@@ -20,9 +20,15 @@
 package org.apache.hadoop.ozone.om.response.snapshot;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.junit.After;
 import org.junit.Assert;
@@ -41,10 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
-
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
  * This class tests OMSnapshotCreateResponse.
@@ -56,11 +59,11 @@ public class TestOMSnapshotCreateResponse {
   
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
-  private String fsPath;
+  private OzoneConfiguration ozoneConfiguration;
   @Before
   public void setup() throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    fsPath = folder.newFolder().getAbsolutePath();
+    ozoneConfiguration = new OzoneConfiguration();
+    String fsPath = folder.newFolder().getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
@@ -90,6 +93,10 @@ public class TestOMSnapshotCreateResponse {
         omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
+    // Prepare for deletedTable clean up logic verification
+    Set<String> dtSentinelKeys = addTestKeysToDeletedTable(
+        volumeName, bucketName);
+
     // commit to table
     OMSnapshotCreateResponse omSnapshotCreateResponse =
         new OMSnapshotCreateResponse(OMResponse.newBuilder()
@@ -98,14 +105,12 @@ public class TestOMSnapshotCreateResponse {
             .setCreateSnapshotResponse(
                 CreateSnapshotResponse.newBuilder()
                 .setSnapshotInfo(snapshotInfo.getProtobuf())
-                .build()).build(), volumeName, bucketName, snapshotName);
+                .build()).build(), snapshotInfo);
     omSnapshotCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Confirm snapshot directory was created
-    String snapshotDir = fsPath + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName();
+    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
     Assert.assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
@@ -118,5 +123,71 @@ public class TestOMSnapshotCreateResponse {
     SnapshotInfo storedInfo = keyValue.getValue();
     Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
     Assert.assertEquals(snapshotInfo, storedInfo);
+
+    // Check deletedTable clean up works as expected
+    verifyEntriesLeftInDeletedTable(dtSentinelKeys);
+  }
+
+  private Set<String> addTestKeysToDeletedTable(
+      String volumeName, String bucketName) throws IOException {
+
+    RepeatedOmKeyInfo dummyRepeatedKeyInfo = new RepeatedOmKeyInfo.Builder()
+        .setOmKeyInfos(new ArrayList<>()).build();
+
+    // Add deletedTable key entries that surround the snapshot scope
+    Set<String> dtSentinelKeys = new HashSet<>();
+    // Get a bucket name right before and after the bucketName
+    // e.g. When bucketName is buck2, bucketNameBefore is buck1,
+    // bucketNameAfter is buck3
+    // This will not guarantee the bucket name is valid for Ozone but
+    // this would be good enough for this unit test.
+    char bucketNameLastChar = bucketName.charAt(bucketName.length() - 1);
+    String bucketNameBefore = bucketName.substring(0, bucketName.length() - 1) +
+        Character.toString((char)(bucketNameLastChar - 1));
+    for (int i = 0; i < 3; i++) {
+      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameBefore,
+          "dtkey" + i);
+      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
+      dtSentinelKeys.add(dtKey);
+    }
+    String bucketNameAfter = bucketName.substring(0, bucketName.length() - 1) +
+        Character.toString((char)(bucketNameLastChar + 1));
+    for (int i = 0; i < 3; i++) {
+      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameAfter,
+          "dtkey" + i);
+      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
+      dtSentinelKeys.add(dtKey);
+    }
+    // Add deletedTable key entries in the snapshot (bucket) scope
+    for (int i = 0; i < 10; i++) {
+      String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          "dtkey" + i);
+      omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
+    }
+
+    return dtSentinelKeys;
+  }
+
+  private void verifyEntriesLeftInDeletedTable(Set<String> dtSentinelKeys)
+      throws IOException {
+
+    // Verify that only keys inside the snapshot scope are gone from
+    // deletedTable.
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        keyIter = omMetadataManager.getDeletedTable().iterator()) {
+      keyIter.seekToFirst();
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
+        String dtKey = entry.getKey();
+        // deletedTable should not have bucketName keys
+        Assert.assertTrue("deletedTable should contain key",
+            dtSentinelKeys.contains(dtKey));
+        dtSentinelKeys.remove(dtKey);
+      }
+    }
+
+    Assert.assertTrue("deletedTable is missing keys that should be there",
+        dtSentinelKeys.isEmpty());
   }
 }

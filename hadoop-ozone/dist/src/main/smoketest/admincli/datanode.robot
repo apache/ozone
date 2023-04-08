@@ -62,3 +62,9 @@ Incomplete command
 #List datanodes on unknown host
 #    ${output} =         Execute And Ignore Error     ozone admin --verbose datanode list --scm unknown-host
 #                        Should contain   ${output}   Invalid host name
+
+List datanodes as JSON
+    ${output} =         Execute          ozone admin datanode list --json | jq -r '.'
+                        Should contain   ${output}    datanodeDetails
+                        Should contain   ${output}    healthState
+                        Should contain   ${output}    opState

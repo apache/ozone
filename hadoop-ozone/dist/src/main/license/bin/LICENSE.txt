@@ -292,10 +292,10 @@ Apache License 2.0
    com.google.guava:guava
    com.google.guava:listenablefuture
    com.google.inject.extensions:guice-assistedinject
-   com.google.inject.extensions:guice-multibindings
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
    com.google.j2objc:j2objc-annotations
+   com.googlecode.json-simple:json-simple
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
@@ -366,6 +366,8 @@ Apache License 2.0
    org.apache.commons:commons-lang3
    org.apache.commons:commons-pool2
    org.apache.commons:commons-text
+   org.apache.curator:curator-client
+   org.apache.curator:curator-framework
    org.apache.derby:derby
    org.apache.hadoop:hadoop-annotations
    org.apache.hadoop:hadoop-auth
@@ -411,6 +413,8 @@ Apache License 2.0
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift
+   org.apache.zookeeper:zookeeper
+   org.apache.zookeeper:zookeeper-jute
    org.codehaus.jackson:jackson-core-asl
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
@@ -509,7 +513,7 @@ WTFPL
 
 
 --------------------------------------------------------------------------------
-hdds-server-scm, ozone-manager, ozone-s3gateway and hdds-server-framework
+hdds-server-scm, ozone-manager, ozone-s3gateway, hdds-rocks-native and hdds-server-framework
 contains the source of the following javascript/css components (See licenses/ for text of these licenses):
 
 Apache Software Foundation License 2.0

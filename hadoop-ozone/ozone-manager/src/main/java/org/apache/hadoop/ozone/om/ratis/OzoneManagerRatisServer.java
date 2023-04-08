@@ -30,7 +30,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,7 +48,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -97,6 +95,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -602,7 +601,21 @@ public final class OzoneManagerRatisServer {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
-    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties, true);
+
+    // Set to enable RAFT to purge logs up to Snapshot Index
+    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties,
+        conf.getBoolean(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX_DEFAULT
+        )
+    );
+    // Set number of last RAFT logs to not be purged
+    RaftServerConfigKeys.Log.setPurgePreservationLogNum(properties,
+        conf.getLong(
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM,
+          OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT
+        )
+    );
 
     // Set RAFT segment pre-allocated size
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
@@ -736,13 +749,15 @@ public final class OzoneManagerRatisServer {
   public RaftPeer getLeader() {
     try {
       RaftServer.Division division = server.getDivision(raftGroupId);
-      if (division.getInfo().isLeader()) {
-        return division.getPeer();
-      } else {
-        ByteString leaderId = division.getInfo().getRoleInfoProto()
-            .getFollowerInfo().getLeaderInfo().getId().getId();
-        return leaderId.isEmpty() ? null :
-            division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+      if (division != null) {
+        if (division.getInfo().isLeader()) {
+          return division.getPeer();
+        } else {
+          ByteString leaderId = division.getInfo().getRoleInfoProto()
+                  .getFollowerInfo().getLeaderInfo().getId().getId();
+          return leaderId.isEmpty() ? null :
+                  division.getRaftConf().getPeer(RaftPeerId.valueOf(leaderId));
+        }
       }
     } catch (IOException e) {
       // In this case we return not a leader.
@@ -862,16 +877,7 @@ public final class OzoneManagerRatisServer {
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
-          conf.getConfiguration());
-      GrpcTlsConfig config = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, true);
-      return RatisHelper.setServerTlsConf(config);
-    }
-
-    return null;
+    GrpcTlsConfig config = createServerTlsConfig(conf, caClient, true);
+    return config == null ? null : RatisHelper.setServerTlsConf(config);
   }
-
 }

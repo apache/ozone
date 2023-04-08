@@ -59,11 +59,11 @@ public class TestReplicationConfig {
   public static Stream<Arguments> ecType() {
     return Stream.of(
         arguments("RS", 3, 2, MB),
-        arguments("RS", 3, 2, KB),
+        arguments("RS", 3, 2, 2 * MB),
         arguments("RS", 6, 3, MB),
-        arguments("RS", 6, 3, KB),
+        arguments("RS", 6, 3, 2 * MB),
         arguments("RS", 10, 4, MB),
-        arguments("RS", 10, 4, KB)
+        arguments("RS", 10, 4, 2 * MB)
     );
   }
 
@@ -155,7 +155,7 @@ public class TestReplicationConfig {
         codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
-            + chunkSize, config.getReplication());
+            + chunkSize / 1024 + "k", config.getReplication());
   }
 
   @ParameterizedTest
@@ -391,7 +391,7 @@ public class TestReplicationConfig {
   private String ecDescriptor(String codec, int data, int parity,
       int chunkSize) {
     return codec.toUpperCase() + "-" + data + "-" + parity + "-" +
-        (chunkSize == MB ? "1024K" : "1024");
+        (chunkSize / 1024) + "k";
   }
 
 }

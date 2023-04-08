@@ -40,7 +40,7 @@ execute_robot_test scm gdpr
 execute_robot_test scm security/ozone-secure-token.robot
 
 exclude=""
-for bucket in erasure link generated; do
+for bucket in erasure; do
   execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
   exclude="--exclude no-bucket-type"
@@ -55,12 +55,17 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_robot_test scm -v USERNAME:httpfs httpfs
 execute_debug_tests
 
-execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
 
-execute_robot_test scm ec/basic.robot
+prefix=${RANDOM}
+execute_robot_test scm -v PREFIX:${prefix} ec/basic.robot
+docker-compose up -d --no-recreate --scale datanode=4
+execute_robot_test scm -v PREFIX:${prefix} ec/read.robot
+docker-compose up -d --no-recreate --scale datanode=3
+execute_robot_test scm -v PREFIX:${prefix} ec/read.robot
 
 execute_robot_test scm snapshot
 
