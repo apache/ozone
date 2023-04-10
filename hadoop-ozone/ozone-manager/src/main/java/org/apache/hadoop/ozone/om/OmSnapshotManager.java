@@ -156,7 +156,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private final int maxPageSize;
 
-  OmSnapshotManager(OzoneManager ozoneManager) {
+  public OmSnapshotManager(OzoneManager ozoneManager) {
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();

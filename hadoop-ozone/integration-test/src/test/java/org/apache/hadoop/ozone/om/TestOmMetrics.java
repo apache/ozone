@@ -323,14 +323,14 @@ public class TestOmMetrics {
     writeClient.deleteKey(keyArgs);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
-        new ECReplicationConfig("rs-6-4-1024K"));
+        new ECReplicationConfig("rs-6-3-1024K"));
     try {
       keySession = writeClient.openKey(keyArgs);
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
       Assertions.assertTrue(e.getMessage()
-          .contains("No enough datanodes to choose"));
+          .contains("No enough datanodes to choose"), e::getMessage);
     }
 
     omMetrics = getMetrics("OMMetrics");

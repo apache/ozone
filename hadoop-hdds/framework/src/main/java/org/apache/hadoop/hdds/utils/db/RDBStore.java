@@ -19,9 +19,10 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,14 +33,13 @@ import java.util.Set;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
+import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -67,7 +67,7 @@ public class RDBStore implements DBStore {
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;
-  private ObjectName statMBeanName;
+  private RocksDBStoreMetrics metrics;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
   private final String snapshotsParentDir;
@@ -86,7 +86,7 @@ public class RDBStore implements DBStore {
       throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, null);
+        maxDbUpdatesSizeThreshold, true, null);
   }
 
   @SuppressWarnings("parameternumber")
@@ -95,7 +95,9 @@ public class RDBStore implements DBStore {
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanNameName, boolean enableCompactionLog,
                   long maxDbUpdatesSizeThreshold,
+                  boolean createCheckpointDirs,
                   ConfigurationSource configuration)
+
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -120,46 +122,35 @@ public class RDBStore implements DBStore {
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
-      if (dbOptions.statistics() != null) {
-        Map<String, String> jmxProperties = new HashMap<>();
-        jmxProperties.put("dbName", dbJmxBeanName);
-        statMBeanName = HddsUtils.registerWithJmxProperties(
-            "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), db,
-                dbJmxBeanName));
-        if (statMBeanName == null) {
-          LOG.warn("jmx registration failed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        } else {
-          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        }
+      // dbOptions.statistics() only contribute to part of RocksDB metrics in
+      // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
+      metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
+          dbJmxBeanName);
+      if (metrics == null) {
+        LOG.warn("Metrics registration failed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
+      } else {
+        LOG.debug("Metrics registration succeed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
       }
 
       //create checkpoints directory if not exists.
-      checkpointsParentDir =
-          dbLocation.getParent() + OM_KEY_PREFIX + OM_CHECKPOINT_DIR;
-      File checkpointsDir = new File(checkpointsParentDir);
-      if (!checkpointsDir.exists()) {
-        boolean success = checkpointsDir.mkdir();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB checkpoint directory: " +
-              checkpointsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        checkpointsParentDir = null;
+      } else {
+        Path checkpointsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
+        checkpointsParentDir = checkpointsParentDirPath.toString();
+        Files.createDirectories(checkpointsParentDirPath);
       }
-
       //create snapshot checkpoint directory if does not exist.
-      snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_CHECKPOINT_DIR).toString();
-      File snapshotsDir = new File(snapshotsParentDir);
-      if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdirs();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB snapshot checkpoint directory: " +
-              snapshotsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        snapshotsParentDir = null;
+      } else {
+        Path snapshotsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
+        snapshotsParentDir = snapshotsParentDirPath.toString();
+        Files.createDirectories(snapshotsParentDirPath);
       }
 
       if (enableCompactionLog) {
@@ -217,9 +208,9 @@ public class RDBStore implements DBStore {
 
   @Override
   public void close() throws IOException {
-    if (statMBeanName != null) {
-      MBeans.unregister(statMBeanName);
-      statMBeanName = null;
+    if (metrics != null) {
+      metrics.unregister();
+      metrics = null;
     }
 
     RDBMetrics.unRegister();
@@ -271,12 +262,6 @@ public class RDBStore implements DBStore {
   public void commitBatchOperation(BatchOperation operation)
       throws IOException {
     ((RDBBatchOperation) operation).commit(db);
-  }
-
-
-  @VisibleForTesting
-  protected ObjectName getStatMBeanName() {
-    return statMBeanName;
   }
 
   @Override

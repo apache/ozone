@@ -300,8 +300,8 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("path") String keyPath,
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
-      @QueryParam("part-number-marker") String partNumberMarker,
-      InputStream body) throws IOException, OS3Exception {
+      @QueryParam("part-number-marker") String partNumberMarker)
+      throws IOException, OS3Exception {
 
     S3GAction s3GAction = S3GAction.GET_KEY;
     boolean auditSuccess = true;

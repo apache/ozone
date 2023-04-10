@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -401,6 +402,37 @@ public class TestReplicationManager {
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * {@link
+   * ReplicationManager#getContainerReplicationHealth(ContainerInfo, Set)}
+   * should return under replicated result for an under replicated container.
+   */
+  @Test
+  public void testGetContainerReplicationHealthForUnderReplicatedContainer() {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+
+    ContainerHealthResult result =
+        replicationManager.getContainerReplicationHealth(container, replicas);
+    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
+        result.getHealthState());
+
+    // Test the same for a RATIS container
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    container = createContainerInfo(ratisRepConfig, 1L,
+        HddsProtos.LifeCycleState.CLOSED);
+    replicas = addReplicas(container, ContainerReplicaProto.State.CLOSED, 0,
+        0);
+
+    result =
+        replicationManager.getContainerReplicationHealth(container, replicas);
+    Assert.assertEquals(ContainerHealthResult.HealthState.UNDER_REPLICATED,
+        result.getHealthState());
   }
 
   @Test
@@ -826,6 +858,49 @@ public class TestReplicationManager {
         .getNumReplicationCmdsSent());
   }
 
+  /**
+   * Tests that a ReplicateContainerCommand that is sent from source to
+   * target has the correct deadline and that ContainerReplicaOp for
+   * replica ADD is created correctly.
+   */
+  @Test
+  public void testReplicateContainerCommandToTarget()
+      throws NotLeaderException {
+    // create a closed EC container
+    ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+    ContainerInfo containerInfo =
+        ReplicationTestUtil.createContainerInfo(ecRepConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20);
+
+    // command will be pushed from source to target
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        containerInfo.getContainerID(), target);
+    command.setReplicaIndex(1);
+    replicationManager.sendDatanodeCommand(command, containerInfo, source);
+
+    // check the command's deadline
+    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
+        rmConf.getDatanodeTimeoutOffset();
+    Assert.assertEquals(expectedDeadline, command.getDeadline());
+
+    List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
+        containerInfo.containerID());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(target, ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcReplicationCmdsSentTotal());
+    Assertions.assertEquals(0, replicationManager.getMetrics()
+        .getNumReplicationCmdsSent());
+  }
+
   @Test
   public void testSendLowPriorityReplicateContainerCommand()
       throws NotLeaderException {
@@ -957,7 +1032,7 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
 
     ReconstructECContainersCommand command = createReconstructionCommand(
-        container, new ArrayList<>(targetNodes.keySet()));
+        container, targetNodes.keySet().toArray(new DatanodeDetails[0]));
 
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
@@ -980,10 +1055,6 @@ public class TestReplicationManager {
     int reconstructionCount = 2;
     int replicationCount = limit - reconstructionCount * reconstructionWeight;
 
-    List<DatanodeDetails> targets = new ArrayList<>();
-    targets.add(MockDatanodeDetails.randomDatanodeDetails());
-    targets.add(MockDatanodeDetails.randomDatanodeDetails());
-
     Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
             eq(SCMCommandProto.Type.replicateContainerCommand),
             eq(SCMCommandProto.Type.reconstructECContainersCommand)))
@@ -999,12 +1070,13 @@ public class TestReplicationManager {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     ReconstructECContainersCommand command = createReconstructionCommand(
-        container, targets);
+        container, MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
     replicationManager.sendThrottledReconstructionCommand(container, command);
   }
 
   private ReconstructECContainersCommand createReconstructionCommand(
-      ContainerInfo containerInfo, List<DatanodeDetails> targets) {
+      ContainerInfo containerInfo, DatanodeDetails... targets) {
     List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex> sources
         = new ArrayList<>();
     for (int i = 1; i <= 3; i++) {
@@ -1013,10 +1085,10 @@ public class TestReplicationManager {
               MockDatanodeDetails.randomDatanodeDetails(), i));
     }
     byte[] missingIndexes = new byte[]{4, 5};
-
     return new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sources,
-        targets, missingIndexes, (ECReplicationConfig) repConfig);
+        new ArrayList<>(Arrays.asList(targets)), missingIndexes,
+        (ECReplicationConfig) repConfig);
   }
 
   @Test
@@ -1048,6 +1120,76 @@ public class TestReplicationManager {
     ContainerInfo container = ReplicationTestUtil.createContainerInfo(
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
+  }
+
+  @Test
+  public void testExcludedNodes() throws NodeNotFoundException,
+      NotLeaderException, CommandTargetOverloadedException {
+    int repLimit = replicationManager.getConfig().getDatanodeReplicationLimit();
+    int reconstructionWeight = replicationManager.getConfig()
+        .getReconstructionCommandWeight();
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    Map<DatanodeDetails, Integer> commandCounts = new HashMap<>();
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+
+    commandCounts.put(dn1, repLimit - 1);
+    commandCounts.put(dn2, repLimit - reconstructionWeight);
+    commandCounts.put(dn3, repLimit);
+
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(),
+        eq(SCMCommandProto.Type.replicateContainerCommand),
+        eq(SCMCommandProto.Type.reconstructECContainersCommand)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+          counts.put(SCMCommandProto.Type.replicateContainerCommand,
+              commandCounts.get(dn));
+          counts.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return counts;
+        });
+
+    replicationManager.sendThrottledReplicationCommand(container,
+        new ArrayList<>(commandCounts.keySet()),
+        MockDatanodeDetails.randomDatanodeDetails(), 1);
+
+    Set<DatanodeDetails> excluded = replicationManager.getExcludedNodes();
+    Assert.assertEquals(excluded.size(), 1);
+    // dn 3 was at the limit already, so should be added when filtering the
+    // nodes
+    Assert.assertTrue(excluded.contains(dn3));
+
+    // Trigger an update for dn3, but it should stay in the excluded list as its
+    // count is still at the limit.
+    replicationManager.datanodeCommandCountUpdated(dn3);
+    Assert.assertEquals(replicationManager.getExcludedNodes().size(), 1);
+
+    // now sent a reconstruction command. It should be sent to dn2, which is
+    // at the lowest count, but this command should push it to the limit and
+    // cause it to be excluded.
+    ReconstructECContainersCommand command = createReconstructionCommand(
+        container, dn1, dn2);
+    replicationManager.sendThrottledReconstructionCommand(container, command);
+    excluded = replicationManager.getExcludedNodes();
+    Assert.assertEquals(excluded.size(), 2);
+    // dn 3 was already in the excluded list
+    Assert.assertTrue(excluded.contains(dn3));
+    // dn 2 reached the limit from the reconstruction command
+    Assert.assertTrue(excluded.contains(dn2));
+
+    // Update received for DN2, it should be cleared from the excluded list.
+    replicationManager.datanodeCommandCountUpdated(dn2);
+    excluded = replicationManager.getExcludedNodes();
+    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertFalse(excluded.contains(dn2));
+
+    // Finally, update received for DN1 - it is not excluded and should not
+    // be added or cause any problems by not being there
+    replicationManager.datanodeCommandCountUpdated(dn1);
+    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertFalse(excluded.contains(dn1));
   }
 
   @SafeVarargs

@@ -100,6 +100,7 @@ public final class DBStoreBuilder {
   private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
   private boolean enableCompactionLog;
+  private boolean createCheckpointDirs = true;
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
@@ -210,7 +211,8 @@ public final class DBStoreBuilder {
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
           registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionLog, maxDbUpdatesSizeThreshold, configuration);
+          enableCompactionLog, maxDbUpdatesSizeThreshold, createCheckpointDirs,
+          configuration);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -272,6 +274,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
+  public DBStoreBuilder setCreateCheckpointDirs(boolean createCheckpointDirs) {
+    this.createCheckpointDirs = createCheckpointDirs;
+    return this;
+  }
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
