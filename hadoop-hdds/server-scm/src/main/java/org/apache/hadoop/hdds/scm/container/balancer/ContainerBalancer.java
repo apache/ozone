@@ -411,7 +411,7 @@ public class ContainerBalancer extends StatefulService {
     if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
       LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
               "should be greater than hdds.datanode.du.refresh.period {}",
-          conf.getBalancingInterval(), refreshPeriod);
+          conf.getBalancingInterval().toMillis(), refreshPeriod);
     }
 
     // "move.replication.timeout" should be lesser than "move.timeout"
