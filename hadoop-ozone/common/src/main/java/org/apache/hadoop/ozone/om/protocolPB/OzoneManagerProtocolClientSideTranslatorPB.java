@@ -677,7 +677,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getMetadata() != null && args.getMetadata().size() > 0) {
       keyArgs.addAllMetadata(KeyValueUtil.toProtobuf(args.getMetadata()));
     }
-    req.setKeyArgs(keyArgs.build());
 
     if (args.getMultipartUploadID() != null) {
       keyArgs.setMultipartUploadID(args.getMultipartUploadID());
