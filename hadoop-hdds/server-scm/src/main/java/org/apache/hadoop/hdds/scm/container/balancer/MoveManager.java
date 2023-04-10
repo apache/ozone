@@ -158,6 +158,8 @@ public final class MoveManager implements
         // for example , after becoming a new leader, we might need
         // to complete some moves and we know these futures does not
         // exist.
+        LOG.debug("Completing container move for container {} with result {}.",
+            cid, mr);
         future.complete(mr);
       }
     }
@@ -369,6 +371,9 @@ public final class MoveManager implements
     }
     MoveDataNodePair movePair = pair.getRight();
     final DatanodeDetails src = movePair.getSrc();
+    final DatanodeDetails tgt = movePair.getTgt();
+    LOG.debug("Handling successful addition of Container {} from" +
+        " source {} to target {}.", cid, src, tgt);
 
     ContainerInfo containerInfo = containerManager.getContainer(cid);
     synchronized (containerInfo) {

@@ -158,10 +158,12 @@ public class ContainerBalancerSelectionCriteria {
    * Checks whether a Container has the ReplicationType
    * {@link HddsProtos.ReplicationType#EC}.
    * @param container container to check
-   * @return true if the ReplicationType is EC, else false
+   * @return true if the ReplicationType is EC and "hdds.scm.replication
+   * .enable.legacy" is true, else false
    */
   private boolean isECContainer(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
+        && replicationManager.getConfig().isLegacyEnabled();
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
