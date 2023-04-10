@@ -34,12 +34,10 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,13 +69,15 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify that symmetric secret keys in correctly
  * synchronized from leader to follower during snapshot installation.
  */
+@Timeout(500)
 public final class TestSecretKeySnapshot {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeySnapshot.class);
@@ -86,9 +86,6 @@ public final class TestSecretKeySnapshot {
   public static final int ROTATE_CHECK_DURATION_MS = 1_000;
   public static final int ROTATE_DURATION_MS = 30_000;
   public static final int EXPIRY_DURATION_MS = 61_000;
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(1800);
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -100,7 +97,7 @@ public final class TestSecretKeySnapshot {
   private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -138,7 +135,7 @@ public final class TestSecretKeySnapshot {
     cluster.waitForClusterToBeReady();
   }
 
-  @After
+  @AfterEach
   public void stop() {
     miniKdc.stop();
     if (cluster != null) {
@@ -205,7 +202,7 @@ public final class TestSecretKeySnapshot {
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = cluster.getScmLeader();
-    Assert.assertNotNull(leaderSCM);
+    assertNotNull(leaderSCM);
     // Find the inactive SCM
     String followerId = cluster.getInactiveSCM().next().getSCMNodeId();
 
@@ -264,7 +261,7 @@ public final class TestSecretKeySnapshot {
       containers.add(scm.getContainerManager()
           .allocateContainer(
               RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-              TestSCMInstallSnapshotWithHA.class.getName()));
+              this.getClass().getName()));
       Thread.sleep(100);
       logIndex = stateMachine.getLastAppliedTermIndex().getIndex();
     }
