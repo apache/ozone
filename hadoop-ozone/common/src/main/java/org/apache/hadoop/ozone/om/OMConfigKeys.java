@@ -475,7 +475,7 @@ public final class OMConfigKeys {
       = 1000;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME
-      = "ozone.om.snapshot.diff.job.default.wait.time";
+      = "ozone.om.snapshot.diff.job.report.persistent.time";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT
       = TimeUnit.DAYS.toMillis(7);
@@ -484,7 +484,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.DAYS.toMillis(7);
+      = TimeUnit.HOURS.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
