@@ -795,7 +795,28 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
   @Override
   public Object clone() throws CloneNotSupportedException {
     OmKeyInfo omKeyInfo = (OmKeyInfo) super.clone();
-    return omKeyInfo.copyObject();
+
+    omKeyInfo.metadata = new HashMap<>();
+    omKeyInfo.keyLocationVersions = new ArrayList<>();
+    omKeyInfo.acls = new ArrayList<>();
+
+    keyLocationVersions.stream().filter(keyLocationVersion ->
+            keyLocationVersion != null).forEach(keyLocationVersion ->
+            omKeyInfo.keyLocationVersions.add(
+                    new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
+                            keyLocationVersion.getLocationList(),
+                            keyLocationVersion.isMultipartKey())));
+
+    acls.stream().filter(acl -> acl != null).forEach(acl ->
+            omKeyInfo.acls.add(new OzoneAcl(acl.getType(),
+                    acl.getName(), (BitSet) acl.getAclBitSet().clone(),
+                    acl.getAclScope())));
+
+    if (metadata != null) {
+      metadata.forEach((k, v) -> omKeyInfo.metadata.put(k, v));
+    }
+
+    return omKeyInfo;
   }
 
   /**
