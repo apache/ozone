@@ -220,7 +220,7 @@ public class TestLegacyReplicationManager {
         Mockito.any(),
         Mockito.anyInt()
         )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(2, 2, 3));
+        new ContainerPlacementStatusDefault(2, 2));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
     createReplicationManager(new ReplicationManagerConfiguration());
@@ -2217,7 +2217,7 @@ public class TestLegacyReplicationManager {
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(invocation -> {
-        return new ContainerPlacementStatusDefault(1, 2, 3);
+        return new ContainerPlacementStatusDefault(1, 2);
       });
 
       int currentReplicateCommandCount = datanodeCommandHandler
@@ -2253,7 +2253,7 @@ public class TestLegacyReplicationManager {
               Mockito.anyList(),
               Mockito.anyInt()
       )).thenAnswer(invocation -> {
-        return new ContainerPlacementStatusDefault(1, 2, 3);
+        return new ContainerPlacementStatusDefault(1, 2);
       });
 
       currentReplicateCommandCount = datanodeCommandHandler.getInvocationCount(
@@ -2306,7 +2306,7 @@ public class TestLegacyReplicationManager {
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(
-              invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+              invocation -> new ContainerPlacementStatusDefault(1, 2));
 
       int currentDeleteCommandCount = datanodeCommandHandler
               .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -2362,7 +2362,7 @@ public class TestLegacyReplicationManager {
               Mockito.argThat(list -> list.size() == 3),
               Mockito.anyInt()
       )).thenAnswer(
-              invocation -> new ContainerPlacementStatusDefault(2, 2, 3));
+              invocation -> new ContainerPlacementStatusDefault(2, 2));
 
       final int currentDeleteCommandCount = datanodeCommandHandler
               .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
@@ -2410,7 +2410,7 @@ public class TestLegacyReplicationManager {
               Mockito.argThat(list -> list != null && list.size() <= 4),
               Mockito.anyInt()
       )).thenAnswer(
-              invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+              invocation -> new ContainerPlacementStatusDefault(1, 2));
 
       int currentDeleteCommandCount = datanodeCommandHandler
               .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);

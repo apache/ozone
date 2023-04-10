@@ -135,7 +135,7 @@ public class TestECUnderReplicationHandler {
     ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2));
   }
 
   @Test

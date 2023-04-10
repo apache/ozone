@@ -78,7 +78,7 @@ public class TestRatisReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(2, 2, 3));
+        new ContainerPlacementStatusDefault(2, 2));
     healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
@@ -559,7 +559,7 @@ public class TestRatisReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(1, 2, 3));
+        new ContainerPlacementStatusDefault(1, 2));
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
@@ -591,9 +591,9 @@ public class TestRatisReplicationCheckHandler {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated
       if (dns.size() <= 3) {
-        return new ContainerPlacementStatusDefault(1, 2, 3);
+        return new ContainerPlacementStatusDefault(1, 2);
       } else {
-        return new ContainerPlacementStatusDefault(2, 2, 3);
+        return new ContainerPlacementStatusDefault(2, 2);
       }
     });
 
@@ -632,7 +632,7 @@ public class TestRatisReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(1, 2, 3));
+        new ContainerPlacementStatusDefault(1, 2));
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
@@ -662,9 +662,9 @@ public class TestRatisReplicationCheckHandler {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated
       if (dns.size() <= 3) {
-        return new ContainerPlacementStatusDefault(1, 2, 3);
+        return new ContainerPlacementStatusDefault(1, 2);
       } else {
-        return new ContainerPlacementStatusDefault(2, 2, 3);
+        return new ContainerPlacementStatusDefault(2, 2);
       }
     });
 

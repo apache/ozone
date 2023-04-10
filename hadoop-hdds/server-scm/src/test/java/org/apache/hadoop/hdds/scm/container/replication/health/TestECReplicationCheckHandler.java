@@ -79,7 +79,7 @@ public class TestECReplicationCheckHandler {
     placementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(placementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2));
     healthCheck = new ECReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
@@ -551,7 +551,7 @@ public class TestECReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(4, 5, 9));
+        new ContainerPlacementStatusDefault(4, 5));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -587,9 +587,9 @@ public class TestECReplicationCheckHandler {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 5 or less make it be mis-replicated
       if (dns.size() <= 5) {
-        return new ContainerPlacementStatusDefault(4, 5, 9);
+        return new ContainerPlacementStatusDefault(4, 5);
       } else {
-        return new ContainerPlacementStatusDefault(5, 5, 9);
+        return new ContainerPlacementStatusDefault(5, 5);
       }
     });
 
@@ -632,7 +632,7 @@ public class TestECReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(4, 5, 9));
+        new ContainerPlacementStatusDefault(4, 5));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -667,7 +667,7 @@ public class TestECReplicationCheckHandler {
         Mockito.any(),
         Mockito.anyInt()
     )).thenAnswer(invocation ->
-        new ContainerPlacementStatusDefault(4, 5, 9));
+        new ContainerPlacementStatusDefault(4, 5));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),

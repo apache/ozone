@@ -30,31 +30,28 @@ public class ContainerPlacementStatusDefault
 
   private final int requiredRacks;
   private final int currentRacks;
-  private final int totalRacks;
 
   private final int maxReplicasPerRack;
   private final List<Integer> rackReplicaCnts;
 
 
   public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
-      int totalRacks, int maxReplicasPerRack, List<Integer> rackReplicaCnts) {
+      int maxReplicasPerRack, List<Integer> rackReplicaCnts) {
     this.requiredRacks = requiredRacks;
     this.currentRacks = currentRacks;
-    this.totalRacks = totalRacks;
     this.maxReplicasPerRack = maxReplicasPerRack;
     this.rackReplicaCnts = rackReplicaCnts;
   }
 
-  public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
-      int totalRacks) {
-    this(currentRacks, requiredRacks, totalRacks, 1,
+  public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks) {
+    this(currentRacks, requiredRacks, 1,
          currentRacks == 0 ? Collections.emptyList()
                  : Collections.nCopies(currentRacks, 1));
   }
 
   @Override
   public boolean isPolicySatisfied() {
-    if (currentRacks < Math.min(totalRacks, requiredRacks)) {
+    if (currentRacks < requiredRacks) {
       return false;
     }
     return rackReplicaCnts.stream().allMatch(cnt -> cnt <= maxReplicasPerRack);
@@ -86,7 +83,7 @@ public class ContainerPlacementStatusDefault
 
   @Override
   public int expectedPlacementCount() {
-    return Math.min(requiredRacks, totalRacks);
+    return requiredRacks;
   }
 
   @Override

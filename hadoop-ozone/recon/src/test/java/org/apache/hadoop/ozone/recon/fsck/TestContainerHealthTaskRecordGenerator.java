@@ -66,7 +66,7 @@ public class TestContainerHealthTaskRecordGenerator {
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 1));
   }
 
   @Test
@@ -170,7 +170,7 @@ public class TestContainerHealthTaskRecordGenerator {
         generateReplicas(container, CLOSED, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(2, 3, 5));
+        .thenReturn(new ContainerPlacementStatusDefault(2, 3));
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy);
 
@@ -196,7 +196,7 @@ public class TestContainerHealthTaskRecordGenerator {
     // Container is now placed OK - should be removed.
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(3, 3, 5));
+        .thenReturn(new ContainerPlacementStatusDefault(3, 3));
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(ContainerHealthTask.ContainerHealthRecords
         .retainOrUpdateRecord(status, rec));
@@ -235,7 +235,7 @@ public class TestContainerHealthTaskRecordGenerator {
         generateReplicas(container, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
     status =
         new ContainerHealthStatus(container, replicas, placementPolicy);
     records = ContainerHealthTask.ContainerHealthRecords
@@ -263,7 +263,7 @@ public class TestContainerHealthTaskRecordGenerator {
     replicas.clear();
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
     status =
         new ContainerHealthStatus(container, replicas, placementPolicy);
     records = ContainerHealthTask.ContainerHealthRecords
@@ -305,7 +305,7 @@ public class TestContainerHealthTaskRecordGenerator {
     replicas = generateReplicas(container, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
     status = new ContainerHealthStatus(container, replicas, placementPolicy);
     records = ContainerHealthTask.ContainerHealthRecords
         .generateUnhealthyRecords(status, existingRec, (long)1234567);

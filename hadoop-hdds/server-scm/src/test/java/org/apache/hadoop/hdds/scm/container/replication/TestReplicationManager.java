@@ -114,11 +114,11 @@ public class TestReplicationManager {
     containerManager = Mockito.mock(ContainerManager.class);
     ratisPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
-        anyInt())).thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+        anyInt())).thenReturn(new ContainerPlacementStatusDefault(2, 2));
     ecPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2));
 
     scmContext = Mockito.mock(SCMContext.class);
 
@@ -626,7 +626,7 @@ public class TestReplicationManager {
     // replicated take precedence.
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
             anyList(), anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
 
     ContainerInfo decomContainer = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);

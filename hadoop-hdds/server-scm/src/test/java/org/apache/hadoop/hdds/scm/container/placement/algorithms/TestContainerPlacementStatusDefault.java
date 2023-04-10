@@ -35,24 +35,24 @@ public class TestContainerPlacementStatusDefault {
   @Test
   public void testPlacementSatisfiedCorrectly() {
     ContainerPlacementStatusDefault stat =
-        new ContainerPlacementStatusDefault(1, 1, 1);
+        new ContainerPlacementStatusDefault(1, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
     // Requires 2 racks, but cluster only has 1
-    stat = new ContainerPlacementStatusDefault(1, 2, 1);
+    stat = new ContainerPlacementStatusDefault(1, 2);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(2, 2, 3);
+    stat = new ContainerPlacementStatusDefault(2, 2);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(3, 2, 3);
+    stat = new ContainerPlacementStatusDefault(3, 2);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(3, 2, 3);
+    stat = new ContainerPlacementStatusDefault(3, 2);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
   }
@@ -60,28 +60,28 @@ public class TestContainerPlacementStatusDefault {
   @Test
   public void testPlacementNotSatisfied() {
     ContainerPlacementStatusDefault stat =
-        new ContainerPlacementStatusDefault(1, 2, 2);
+        new ContainerPlacementStatusDefault(1, 2);
     assertFalse(stat.isPolicySatisfied());
     assertEquals(1, stat.misReplicationCount());
 
     // Zero rack, but need 2 - shouldn't really happen in practice
-    stat = new ContainerPlacementStatusDefault(0, 2, 1);
+    stat = new ContainerPlacementStatusDefault(0, 2);
     assertFalse(stat.isPolicySatisfied());
     assertEquals(1, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(2, 3, 3);
+    stat = new ContainerPlacementStatusDefault(2, 3);
     assertFalse(stat.isPolicySatisfied());
     assertEquals(1, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(2, 4, 3, 1, Arrays.asList(1, 3));
+    stat = new ContainerPlacementStatusDefault(2, 4, 1, Arrays.asList(1, 3));
     assertFalse(stat.isPolicySatisfied());
     assertEquals(2, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(1, 4, 3, 1, Arrays.asList(1, 2));
+    stat = new ContainerPlacementStatusDefault(1, 4, 1, Arrays.asList(1, 2));
     assertFalse(stat.isPolicySatisfied());
     assertEquals(2, stat.misReplicationCount());
 
-    stat = new ContainerPlacementStatusDefault(2, 2, 3, 2, Arrays.asList(3, 1));
+    stat = new ContainerPlacementStatusDefault(2, 2, 2, Arrays.asList(3, 1));
     assertFalse(stat.isPolicySatisfied());
     assertEquals(1, stat.misReplicationCount());
 
