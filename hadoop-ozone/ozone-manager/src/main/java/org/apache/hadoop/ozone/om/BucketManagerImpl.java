@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -49,9 +50,13 @@ public class BucketManagerImpl implements BucketManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketManagerImpl.class);
 
+  private final OzoneManager ozoneManager;
+
   private final OMMetadataManager metadataManager;
 
-  public BucketManagerImpl(OMMetadataManager metadataManager) {
+  public BucketManagerImpl(OzoneManager ozoneManager,
+      OMMetadataManager metadataManager) {
+    this.ozoneManager = ozoneManager;
     this.metadataManager = metadataManager;
   }
 
@@ -114,8 +119,10 @@ public class BucketManagerImpl implements BucketManager {
       throw new IllegalArgumentException("Unexpected argument passed to " +
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);

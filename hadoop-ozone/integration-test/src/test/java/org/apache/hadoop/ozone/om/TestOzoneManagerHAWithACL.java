@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.BitSet;
 import java.util.Collections;
@@ -53,6 +54,18 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     testAddPrefixAcl();
     testRemovePrefixAcl();
     testSetPrefixAcl();
+
+    testLinkBucketAddBucketAcl();
+    testLinkBucketRemoveBucketAcl();
+    testLinkBucketSetBucketAcl();
+
+    testLinkBucketAddKeyAcl();
+    testLinkBucketRemoveKeyAcl();
+    testLinkBucketSetKeyAcl();
+
+    testLinkBucketAddPrefixAcl();
+    testLinkBucketRemovePrefixAcl();
+    testLinkBucketSetPrefixAcl();
   }
 
   public void testAddBucketAcl() throws Exception {
@@ -61,11 +74,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName()).build();
+    OzoneObj ozoneObj = buildBucketObj(ozoneBucket);
 
     testAddAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
@@ -76,11 +85,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName()).build();
+    OzoneObj ozoneObj = buildBucketObj(ozoneBucket);
 
     testRemoveAcl(remoteUserName, ozoneObj, defaultUserAcl);
 
@@ -92,11 +97,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName()).build();
+    OzoneObj ozoneObj = buildBucketObj(ozoneBucket);
 
     testSetAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
@@ -133,12 +134,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
     String key = createKey(ozoneBucket);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setKeyName(key).build();
+    OzoneObj ozoneObj = buildKeyObj(ozoneBucket, key);
 
     testAddAcl(remoteUserName, ozoneObj, userAcl);
   }
@@ -151,12 +147,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
     String key = createKey(ozoneBucket);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setKeyName(key).build();
+    OzoneObj ozoneObj = buildKeyObj(ozoneBucket, key);
 
     testRemoveAcl(remoteUserName, ozoneObj, userAcl);
 
@@ -170,12 +161,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
     String key = createKey(ozoneBucket);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setKeyName(key).build();
+    OzoneObj ozoneObj = buildKeyObj(ozoneBucket, key);
 
     testSetAcl(remoteUserName, ozoneObj, userAcl);
 
@@ -188,12 +174,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.PREFIX)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setPrefixName(prefixName).build();
+    OzoneObj ozoneObj = buildPrefixObj(ozoneBucket, prefixName);
 
     testAddAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
@@ -207,12 +188,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl userAcl1 = new OzoneAcl(USER, "remote",
         READ, ACCESS);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.PREFIX)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setPrefixName(prefixName).build();
+    OzoneObj ozoneObj = buildPrefixObj(ozoneBucket, prefixName);
 
     ObjectStore objectStore = getObjectStore();
 
@@ -241,16 +217,289 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneAcl defaultUserAcl = new OzoneAcl(USER, remoteUserName,
         READ, DEFAULT);
 
-    OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(OzoneObj.ResourceType.PREFIX)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setVolumeName(ozoneBucket.getVolumeName())
-        .setBucketName(ozoneBucket.getName())
-        .setPrefixName(prefixName).build();
+    OzoneObj ozoneObj = buildPrefixObj(ozoneBucket, prefixName);
 
     testSetAcl(remoteUserName, ozoneObj, defaultUserAcl);
   }
 
+  public void testLinkBucketAddBucketAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    OzoneObj linkObj = buildBucketObj(linkedBucket);
+    OzoneObj srcObj = buildBucketObj(srcBucket);
+
+    // add link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testAddAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // add src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketRemoveBucketAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    OzoneObj linkObj = buildBucketObj(linkedBucket);
+    OzoneObj srcObj = buildBucketObj(srcBucket);
+
+    // remove link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    // remove src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
+    testRemoveAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketSetBucketAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    OzoneObj linkObj = buildBucketObj(linkedBucket);
+    OzoneObj srcObj = buildBucketObj(srcBucket);
+
+    // set link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testSetAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // set src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testSetAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketAddKeyAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+
+    // CASE 1: create key from link bucket
+    String key = createKey(linkedBucket);
+    OzoneObj linkObj = buildKeyObj(linkedBucket, key);
+    OzoneObj srcObj = buildKeyObj(srcBucket, key);
+
+    // add link acl and compare acls of src and link
+    testAddAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // add src acl and compare acls of src and link
+    testAddAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // CASE 2: create key from src bucket
+    key = createKey(srcBucket);
+    linkObj = buildKeyObj(linkedBucket, key);
+    srcObj = buildKeyObj(srcBucket, key);
+
+    // add acl to link and compare acls of src and link
+    testAddAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // add acl to src and compare acls of src and link
+    testAddAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketRemoveKeyAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+
+    // CASE 1: create key from link bucket
+    String key = createKey(linkedBucket);
+    OzoneObj linkObj = buildKeyObj(linkedBucket, key);
+    OzoneObj srcObj = buildKeyObj(srcBucket, key);
+
+    // remove link acl and compare acls of src and link
+    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    // remove src acl and compare acls of src and link
+    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
+    testRemoveAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // CASE 2: create key from src bucket
+    key = createKey(srcBucket);
+    linkObj = buildKeyObj(linkedBucket, key);
+    srcObj = buildKeyObj(srcBucket, key);
+
+    // remove link acl and compare acls of src and link
+    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    // remove src acl and compare acls of src and link
+    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
+    testRemoveAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketSetKeyAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+
+    // CASE 1: create key from link bucket
+    String key = createKey(linkedBucket);
+    OzoneObj linkObj = buildKeyObj(linkedBucket, key);
+    OzoneObj srcObj = buildKeyObj(srcBucket, key);
+
+    // set acl to link and compare acls of src and link
+    testSetAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // set acl to src and compare acls of src and link
+    testSetAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // CASE 2: create key from src bucket
+    key = createKey(srcBucket);
+    linkObj = buildKeyObj(linkedBucket, key);
+    srcObj = buildKeyObj(srcBucket, key);
+
+    // set acl to link and compare acls of src and link
+    testSetAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // set acl to src and compare acls of src and link
+    testSetAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketAddPrefixAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
+
+    // add link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testAddAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // add src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketRemovePrefixAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
+
+    // remove link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    assertEqualsAcls(srcObj, linkObj);
+
+    // remove src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
+    testRemoveAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  public void testLinkBucketSetPrefixAcl() throws Exception {
+    OzoneBucket srcBucket = setupBucket();
+    OzoneBucket linkedBucket = linkBucket(srcBucket);
+
+    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+
+    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
+    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
+
+    // set link acl and compare acls of src and link
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testSetAcl(user1, linkObj, acl1);
+    assertEqualsAcls(srcObj, linkObj);
+
+    // set src acl and compare acls of src and link
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testSetAcl(user2, srcObj, acl2);
+    assertEqualsAcls(srcObj, linkObj);
+
+  }
+
+  private OzoneObj buildBucketObj(OzoneBucket bucket) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName()).build();
+  }
+
+  private OzoneObj buildKeyObj(OzoneBucket bucket, String key) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(key).build();
+  }
+
+  private OzoneObj buildPrefixObj(OzoneBucket bucket, String prefix) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setPrefixName(prefix).build();
+  }
+
+  private void assertEqualsAcls(OzoneObj srcObj, OzoneObj linkObj)
+      throws IOException {
+    Assert.assertEquals(
+        getObjectStore().getAcl(srcObj), getObjectStore().getAcl(linkObj));
+  }
 
   private void testSetAcl(String remoteUserName, OzoneObj ozoneObj,
       OzoneAcl userAcl) throws Exception {
