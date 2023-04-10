@@ -96,7 +96,7 @@ public class TestSCMContainerPlacementRackAware {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
             1, StorageUnit.BYTES);
     NodeSchema[] schemas = new NodeSchema[]
-            {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
+        {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
 
