@@ -42,6 +42,12 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.ratis.util.function.CheckedRunnable;
+import org.apache.hadoop.util.Preconditions;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -522,5 +528,15 @@ public class MutableVolumeSet implements VolumeSet {
     } finally {
       this.readUnlock();
     }
+  }
+
+  public double getIdealUsage() {
+    long totalCapacity = 0L, totalUsed = 0L;
+    for (StorageVolume volume: volumeMap.values()) {
+      totalCapacity += volume.getCapacity();
+      totalUsed += volume.getUsedSpace();
+    }
+    Preconditions.checkArgument(totalCapacity != 0);
+    return (double) totalUsed / totalCapacity;
   }
 }
