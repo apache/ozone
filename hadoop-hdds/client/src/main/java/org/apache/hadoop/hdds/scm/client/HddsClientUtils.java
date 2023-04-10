@@ -137,7 +137,8 @@ public final class HddsClientUtils {
         (c == '_' && !isStrictS3);
   }
 
-  private static void doCharacterChecks(char currChar, char prev, boolean isStrictS3) {
+  private static void doCharacterChecks(char currChar, char prev,
+      boolean isStrictS3) {
     if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
