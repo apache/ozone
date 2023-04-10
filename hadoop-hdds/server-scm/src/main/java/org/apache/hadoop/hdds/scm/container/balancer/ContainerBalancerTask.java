@@ -463,8 +463,7 @@ public class ContainerBalancerTask implements Runnable {
     }
 
     selectionCriteria = new ContainerBalancerSelectionCriteria(config,
-        nodeManager, replicationManager, containerManager, findSourceStrategy,
-        ozoneConfiguration);
+        nodeManager, replicationManager, containerManager, findSourceStrategy);
     return true;
   }
 
