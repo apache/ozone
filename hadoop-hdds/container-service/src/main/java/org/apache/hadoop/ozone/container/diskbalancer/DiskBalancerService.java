@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.FileUtils;
@@ -89,6 +91,8 @@ public class DiskBalancerService extends BackgroundService {
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
+  private VolumeChoosingPolicy volumeChoosingPolicy;
+  private ContainerChoosingPolicy containerChoosingPolicy;
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
@@ -109,6 +113,18 @@ public class DiskBalancerService extends BackgroundService {
     inProgressContainers = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
+
+    try {
+      volumeChoosingPolicy = (VolumeChoosingPolicy)
+          conf.getObject(DiskBalancerConfiguration.class)
+          .getVolumeChoosingPolicyClass().newInstance();
+      containerChoosingPolicy = (ContainerChoosingPolicy)
+          conf.getObject(DiskBalancerConfiguration.class)
+              .getContainerChoosingPolicyClass().newInstance();
+    } catch (Exception e) {
+      LOG.error("Got exception when initializing DiskBalancerService", e);
+      throw new RuntimeException(e);
+    }
 
     metrics = DiskBalancerServiceMetrics.create();
 
@@ -385,6 +401,14 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public void setBalancedBytesInLastWindow(long bytes) {
     this.balancedBytesInLastWindow.set(bytes);
+  }
+
+  public ContainerChoosingPolicy getContainerChoosingPolicy() {
+    return containerChoosingPolicy;
+  }
+
+  public VolumeChoosingPolicy getVolumeChoosingPolicy() {
+    return volumeChoosingPolicy;
   }
 
   @Override

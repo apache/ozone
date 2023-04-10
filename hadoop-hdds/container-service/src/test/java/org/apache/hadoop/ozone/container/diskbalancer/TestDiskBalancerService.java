@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -143,6 +145,23 @@ public class TestDiskBalancerService {
     Assert.assertEquals(10, svc.getDiskBalancerInfo().getParallelThread());
 
     svc.shutdown();
+  }
+
+  @Test
+  public void testPolicyClassInitialization() throws IOException {
+    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    Assert.assertTrue(svc.getContainerChoosingPolicy()
+        instanceof DefaultContainerChoosingPolicy);
+    Assert.assertTrue(svc.getVolumeChoosingPolicy()
+        instanceof DefaultVolumeChoosingPolicy);
   }
 
   private String generateVolumeLocation(String base, int volumeCount) {

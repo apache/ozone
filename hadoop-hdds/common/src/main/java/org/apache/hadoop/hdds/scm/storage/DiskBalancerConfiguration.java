@@ -126,6 +126,29 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerTimeout = duration.toMillis();
   }
 
+  @Config(key = "volume.choosing.policy", type = ConfigType.CLASS,
+      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
+          ".DefaultVolumeChoosingPolicy",
+      tags = {ConfigTag.DISKBALANCER},
+      description = "The volume choosing policy of the disk balancer service.")
+  private Class<?> volumeChoosingPolicyClass;
+
+  public Class<?> getVolumeChoosingPolicyClass() {
+    return volumeChoosingPolicyClass;
+  }
+
+  @Config(key = "container.choosing.policy", type = ConfigType.CLASS,
+      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
+          ".DefaultContainerChoosingPolicy",
+      tags = {ConfigTag.DISKBALANCER},
+      description = "The container choosing policy of the disk balancer " +
+          "service.")
+  private Class<?> containerChoosingPolicyClass;
+
+  public Class<?> getContainerChoosingPolicyClass() {
+    return containerChoosingPolicyClass;
+  }
+
   public DiskBalancerConfiguration() {
   }
 
