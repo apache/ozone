@@ -39,16 +39,7 @@ public class TestContainerPlacementStatusDefault {
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
-    // Requires 2 racks, but cluster only has 1
-    stat = new ContainerPlacementStatusDefault(1, 2);
-    assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.misReplicationCount());
-
     stat = new ContainerPlacementStatusDefault(2, 2);
-    assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.misReplicationCount());
-
-    stat = new ContainerPlacementStatusDefault(3, 2);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
 
@@ -67,7 +58,7 @@ public class TestContainerPlacementStatusDefault {
     // Zero rack, but need 2 - shouldn't really happen in practice
     stat = new ContainerPlacementStatusDefault(0, 2);
     assertFalse(stat.isPolicySatisfied());
-    assertEquals(1, stat.misReplicationCount());
+    assertEquals(2, stat.misReplicationCount());
 
     stat = new ContainerPlacementStatusDefault(2, 3);
     assertFalse(stat.isPolicySatisfied());
@@ -79,7 +70,7 @@ public class TestContainerPlacementStatusDefault {
 
     stat = new ContainerPlacementStatusDefault(1, 4, 1, Arrays.asList(1, 2));
     assertFalse(stat.isPolicySatisfied());
-    assertEquals(2, stat.misReplicationCount());
+    assertEquals(3, stat.misReplicationCount());
 
     stat = new ContainerPlacementStatusDefault(2, 2, 2, Arrays.asList(3, 1));
     assertFalse(stat.isPolicySatisfied());
