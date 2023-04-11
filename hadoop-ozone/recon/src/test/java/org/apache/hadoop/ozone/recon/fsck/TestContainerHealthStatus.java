@@ -58,7 +58,7 @@ public class TestContainerHealthStatus {
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 1));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
   }
 
   @Test
@@ -156,7 +156,7 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED);
     when(placementPolicy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy);
     assertFalse(status.isHealthy());

@@ -366,9 +366,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     public ContainerPlacementStatus validateContainerPlacement(
         List<DatanodeDetails> dns, int replicas) {
       if (misRepWhenDnPresent != null && isDnPresent(dns)) {
-        return new ContainerPlacementStatusDefault(1, 2);
+        return new ContainerPlacementStatusDefault(1, 2, 3);
       } else {
-        return new ContainerPlacementStatusDefault(1, 1);
+        return new ContainerPlacementStatusDefault(1, 1, 1);
       }
     }
 

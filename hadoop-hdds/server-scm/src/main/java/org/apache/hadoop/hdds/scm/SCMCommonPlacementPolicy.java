@@ -74,9 +74,9 @@ public abstract class SCMCommonPlacementPolicy implements
    * or the replication factor is 1 or the required racks is 1.
    */
   private ContainerPlacementStatus validPlacement
-      = new ContainerPlacementStatusDefault(1, 1);
+      = new ContainerPlacementStatusDefault(1, 1, 1);
   private ContainerPlacementStatus invalidPlacement
-      = new ContainerPlacementStatusDefault(0, 1);
+      = new ContainerPlacementStatusDefault(0, 1, 1);
 
   /**
    * Constructor.
@@ -391,7 +391,8 @@ public abstract class SCMCommonPlacementPolicy implements
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas);
-    if (topology == null || replicas == 1 || requiredRacks == 1) {
+    int numRacks = topology != null ? topology.getRackCount() : 1;
+    if (numRacks == 1 || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
@@ -405,9 +406,10 @@ public abstract class SCMCommonPlacementPolicy implements
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
-    int maxReplicasPerRack = getMaxReplicasPerRack(replicas, requiredRacks);
+    int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
+            Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
-        currentRackCount.size(), requiredRacks, maxReplicasPerRack,
+        currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
             currentRackCount.values().stream().map(Long::intValue)
                     .collect(Collectors.toList()));
   }

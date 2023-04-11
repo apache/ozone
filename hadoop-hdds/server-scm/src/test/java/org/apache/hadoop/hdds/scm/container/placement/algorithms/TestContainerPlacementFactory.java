@@ -194,7 +194,7 @@ public class TestContainerPlacementFactory {
     @Override
     public ContainerPlacementStatus
         validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
-      return new ContainerPlacementStatusDefault(1, 1);
+      return new ContainerPlacementStatusDefault(1, 1, 1);
     }
 
     @Override

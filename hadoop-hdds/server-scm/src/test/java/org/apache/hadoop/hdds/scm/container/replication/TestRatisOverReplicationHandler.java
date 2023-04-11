@@ -82,7 +82,7 @@ public class TestRatisOverReplicationHandler {
     policy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(policy.validateContainerPlacement(
         Mockito.anyList(), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(2, 2));
+        .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
 
     replicationManager = Mockito.mock(ReplicationManager.class);
     Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
@@ -195,7 +195,7 @@ public class TestRatisOverReplicationHandler {
     // checked.
     Mockito.when(policy.validateContainerPlacement(
         Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
@@ -225,7 +225,7 @@ public class TestRatisOverReplicationHandler {
     // checked.
     Mockito.when(policy.validateContainerPlacement(
             Mockito.argThat(list -> list.size() <= 4), Mockito.anyInt()))
-        .thenReturn(new ContainerPlacementStatusDefault(1, 2));
+        .thenReturn(new ContainerPlacementStatusDefault(1, 2, 3));
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
