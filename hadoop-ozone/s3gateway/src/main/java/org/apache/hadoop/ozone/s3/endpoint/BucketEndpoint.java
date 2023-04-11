@@ -113,7 +113,7 @@ public class BucketEndpoint extends EndpointBase {
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result =
-            captureLatencyNs(getLatencyMetrics().getGetAclLatencyNs(), () -> {
+            captureLatencyNs(getMetrics().getGetAclLatencyNs(), () -> {
               try {
                 return getAcl(bucketName);
               } catch (OS3Exception ex) {
@@ -141,7 +141,7 @@ public class BucketEndpoint extends EndpointBase {
       }
 
       OzoneBucket bucket =
-          captureLatencyNs(getLatencyMetrics().getGetBucketLatencyNs(), () -> {
+          captureLatencyNs(getMetrics().getGetBucketLatencyNs(), () -> {
             try {
               return getBucket(bucketName);
             } catch (OS3Exception ex) {
@@ -290,7 +290,7 @@ public class BucketEndpoint extends EndpointBase {
         return response;
       }
       String location =
-          captureLatencyNs(getLatencyMetrics().getCreateBucketLatencyNs(),
+          captureLatencyNs(getMetrics().getCreateBucketLatencyNs(),
               () -> {
                 try {
                   return createS3Bucket(bucketName);
@@ -363,7 +363,7 @@ public class BucketEndpoint extends EndpointBase {
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
     } finally {
-      getLatencyMetrics().addListMultipartUploadsLatencyNs(
+      getMetrics().addListMultipartUploadsLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }
@@ -379,7 +379,7 @@ public class BucketEndpoint extends EndpointBase {
       throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      captureLatencyNs(getLatencyMetrics().getHeadBucketLatencyNs(), () -> {
+      captureLatencyNs(getMetrics().getHeadBucketLatencyNs(), () -> {
         try {
           getBucket(bucketName);
         } catch (OS3Exception ex) {
@@ -414,7 +414,7 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
-      captureLatencyNs(getLatencyMetrics().getDeleteBucketLatencyNs(), () -> {
+      captureLatencyNs(getMetrics().getDeleteBucketLatencyNs(), () -> {
         try {
           deleteS3Bucket(bucketName);
         } catch (OS3Exception ex) {
@@ -653,7 +653,7 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().incPutAclFailure();
       throw ex;
     } finally {
-      getLatencyMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
+      getMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
     }
     getMetrics().incPutAclSuccess();
     return Response.status(HttpStatus.SC_OK).build();

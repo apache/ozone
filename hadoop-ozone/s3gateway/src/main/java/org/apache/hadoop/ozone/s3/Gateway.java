@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.s3.metrics.S3GatewayLatencyMetrics;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -56,7 +55,6 @@ public class Gateway extends GenericCli {
 
   private S3GatewayHttpServer httpServer;
   private S3GatewayMetrics metrics;
-  private S3GatewayLatencyMetrics latencyMetrics;
   private OzoneConfiguration ozoneConfiguration;
 
   public static void main(String[] args) throws Exception {
@@ -74,7 +72,6 @@ public class Gateway extends GenericCli {
     loginS3GUser(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     metrics = S3GatewayMetrics.create();
-    latencyMetrics = S3GatewayLatencyMetrics.create();
     start();
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -102,7 +99,6 @@ public class Gateway extends GenericCli {
     LOG.info("Stopping Ozone S3 gateway");
     httpServer.stop();
     S3GatewayMetrics.unRegister();
-    S3GatewayLatencyMetrics.unRegister();
   }
 
   private static void loginS3GUser(OzoneConfiguration conf)

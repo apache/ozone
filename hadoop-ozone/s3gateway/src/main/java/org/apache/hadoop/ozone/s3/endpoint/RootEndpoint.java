@@ -88,7 +88,7 @@ public class RootEndpoint extends EndpointBase {
                 Collections.emptyMap())
         );
       }
-      getLatencyMetrics().addListS3BucketsLatencyNs(
+      getMetrics().addListS3BucketsLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }

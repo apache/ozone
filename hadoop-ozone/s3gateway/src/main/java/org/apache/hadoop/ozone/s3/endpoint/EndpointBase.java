@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.hadoop.ozone.s3.metrics.S3GatewayLatencyMetrics;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
@@ -359,11 +358,6 @@ public abstract class EndpointBase implements Auditor {
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
     return S3GatewayMetrics.create();
-  }
-
-  @VisibleForTesting
-  public S3GatewayLatencyMetrics getLatencyMetrics() {
-    return S3GatewayLatencyMetrics.create();
   }
 
   protected Map<String, String> getAuditParameters() {

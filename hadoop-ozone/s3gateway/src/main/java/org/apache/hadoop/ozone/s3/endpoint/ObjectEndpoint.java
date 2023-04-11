@@ -235,7 +235,7 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
 
-      output = captureLatencyNs(getLatencyMetrics().getCreateKeyLatencyNs(),
+      output = captureLatencyNs(getMetrics().getCreateKeyLatencyNs(),
           () -> getClientProtocol().createKey(volume.getName(), bucketName,
           keyPath, length, replicationConfig, customMetadata));
       IOUtils.copy(body, output);
@@ -434,7 +434,7 @@ public class ObjectEndpoint extends EndpointBase {
             buildAuditMessageForSuccess(s3GAction, getAuditParameters())
         );
       }
-      getLatencyMetrics().addGetKeyLatencyNs(Time.monotonicNowNanos() - start);
+      getMetrics().addGetKeyLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -464,7 +464,7 @@ public class ObjectEndpoint extends EndpointBase {
 
     OzoneKey key;
     try {
-      key = captureLatencyNs(getLatencyMetrics().getHeadKeyLatencyNs(),
+      key = captureLatencyNs(getMetrics().getHeadKeyLatencyNs(),
           () -> getClientProtocol().headS3Object(bucketName, keyPath));
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
@@ -512,7 +512,7 @@ public class ObjectEndpoint extends EndpointBase {
                                         String key, String uploadId)
       throws IOException, OS3Exception {
     try {
-      captureLatencyNs(getLatencyMetrics().getAbortMultipartUploadLatencyNs(),
+      captureLatencyNs(getMetrics().getAbortMultipartUploadLatencyNs(),
           () -> getClientProtocol().abortMultipartUpload(volume.getName(),
               bucket, key, uploadId));
     } catch (OMException ex) {
@@ -554,7 +554,7 @@ public class ObjectEndpoint extends EndpointBase {
         s3GAction = S3GAction.ABORT_MULTIPART_UPLOAD;
         return abortMultipartUpload(volume, bucketName, keyPath, uploadId);
       }
-      captureLatencyNs(getLatencyMetrics().getDeleteKeyLatencyNs(),
+      captureLatencyNs(getMetrics().getDeleteKeyLatencyNs(),
           () -> getClientProtocol().deleteKey(volume.getName(), bucketName,
               keyPath, false));
     } catch (OMException ex) {
@@ -649,7 +649,7 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().incInitMultiPartUploadFailure();
       throw ex;
     } finally {
-      getLatencyMetrics().addInitMultipartUploadLatencyNs(
+      getMetrics().addInitMultipartUploadLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }
@@ -748,7 +748,7 @@ public class ObjectEndpoint extends EndpointBase {
       auditWriteFailure(s3GAction, ex);
       throw ex;
     } finally {
-      getLatencyMetrics().addCompleteMultipartUploadLatencyNs(
+      getMetrics().addCompleteMultipartUploadLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }
@@ -842,7 +842,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
-      getLatencyMetrics().addCreateMultipartKeyLatencyNs(
+      getMetrics().addCreateMultipartKeyLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }
@@ -903,7 +903,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
-      getLatencyMetrics().addListPartsLatencyNs(
+      getMetrics().addListPartsLatencyNs(
           Time.monotonicNowNanos() - start);
     }
     getMetrics().incListPartsSuccess();
@@ -1001,7 +1001,7 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
-      getLatencyMetrics().addCopyObjectLatencyNs(
+      getMetrics().addCopyObjectLatencyNs(
           Time.monotonicNowNanos() - start);
     }
   }
