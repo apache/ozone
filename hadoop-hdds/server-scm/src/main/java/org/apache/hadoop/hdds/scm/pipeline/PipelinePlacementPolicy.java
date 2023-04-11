@@ -480,9 +480,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   @Override
   protected int getRequiredRackCount(int numReplicas) {
-    NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
-    int racks = topology != null ? topology.getRackCount() : 1;
-    return Math.min(REQUIRED_RACKS, racks);
+    return REQUIRED_RACKS;
   }
 
   /**
