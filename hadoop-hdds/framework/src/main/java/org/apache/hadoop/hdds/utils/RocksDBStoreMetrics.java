@@ -281,7 +281,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
   private void exportSstFileStat(MetricsRecordBuilder rb,
       Map<Integer, Map<String, Long>> numStatPerCF, String metricName) {
     Map<String, Long> numStat;
-    for (Map.Entry<Integer, Map<String, Long>> entry : numStatPerCF.entrySet()) {
+    for (Map.Entry<Integer, Map<String, Long>> entry: numStatPerCF.entrySet()) {
       numStat = entry.getValue();
       numStat.forEach((cf, v) -> rb.addCounter(Interns.info(
           cf + "_" + metricName + entry.getKey(), "RocksDBProperty"), v));
