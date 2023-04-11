@@ -31,7 +31,6 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
@@ -162,15 +161,6 @@ public class OFSPath {
   // Shouldn't have a delimiter at beginning e.g. dir1/dir12
   public String getKeyName() {
     return keyName;
-  }
-
-  /**
-   * Returns the last element of the KeyName, which can either be a file name
-   * or the leaf directory.
-   */
-  public String getFileName() {
-    java.nio.file.Path file = Paths.get(keyName).getFileName();
-    return file != null ? file.toString() : "";
   }
 
   private boolean isEmpty() {

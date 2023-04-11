@@ -133,10 +133,11 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   }
 
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
-    OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(originalOmRequest, getBucketLayout());
+    OMKeyRenameRequestWithFSO omKeyRenameRequestWithFSO =
+        new OMKeyRenameRequestWithFSO(originalOmRequest, getBucketLayout());
 
-    OMRequest modifiedOmRequest = omKeyRenameRequest.preExecute(ozoneManager);
+    OMRequest modifiedOmRequest
+        = omKeyRenameRequestWithFSO.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set and modification time is
     // set in KeyArgs.

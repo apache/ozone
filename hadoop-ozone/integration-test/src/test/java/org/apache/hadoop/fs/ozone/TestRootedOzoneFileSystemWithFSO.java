@@ -142,10 +142,12 @@ public class TestRootedOzoneFileSystemWithFSO
     final String dir = "dir1";
     final String key = dir + "/key1";
     final Path source = new Path(getBucketPath(), key);
+    getFs().mkdirs(source);
     final Path dest = new Path(String.valueOf(getBucketPath()));
     LOG.info("Will move {} to {}", source, dest);
-    getFs().rename(source, dest);
-    assertTrue("Key rename failed", getFs().exists(dest));
+    getFs().rename(source, getBucketPath());
+    assertTrue("Key rename failed",
+        getFs().exists(new Path(getBucketPath(), "key1")));
     // cleanup
     getFs().delete(dest, true);
   }
