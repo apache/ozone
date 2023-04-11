@@ -47,4 +47,14 @@ Transfer Leader to SCM4
                             LOG                     ${result}
                             Should Contain          ${result}                Transfer leadership successfully
 
+Verify SCM4 Certificate
+    ${root_ca_output} =     Execute                 ozone admin cert list -c 1
+    ${root_ca_cert} =       Get Lines Containing String                      ${root_ca_output}           scm1.org
+    ${root_ca_cert_split} =     Split String                                 ${root_ca_cert}
+    ${root_ca_cert_subject} =   Strip String                                 ${root_ca_cert_split[3]}
 
+    ${output} =             Execute                 ozone admin cert list
+    ${scm4_cert} =          Get Lines Containing String                      ${output}           scm4.org
+    ${scm4_cert_split} =    Split String                                     ${scm4_cert}
+    ${scm4_cert_issuer} =   Strip String                                     ${scm4_cert_split[4]}
+    Should not Be Equal As Strings                  ${scm4_cert_issuer}       ${root_ca_cert_subject}
