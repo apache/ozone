@@ -438,7 +438,8 @@ public final class SCMContainerPlacementRackScatter
     if (networkTopology == null) {
       return 1;
     }
-    int numRacks = networkTopology.getRackCount();
+    int maxLevel = networkTopology.getMaxLevel();
+    int numRacks = networkTopology.getNumOfNodes(maxLevel - 1);
     // Return the num of Rack if numRack less than numReplicas
     return Math.min(numRacks, numReplicas);
   }

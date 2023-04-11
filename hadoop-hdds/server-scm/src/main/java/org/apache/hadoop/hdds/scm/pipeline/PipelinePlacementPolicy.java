@@ -475,7 +475,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @return true when all nodes are equal
    */
   private boolean checkAllNodesAreEqual(NetworkTopology topology) {
-    return topology == null || topology.getRackCount() == 1;
+    if (topology == null) {
+      return true;
+    }
+    return (topology.getNumOfNodes(topology.getMaxLevel() - 1) == 1);
   }
 
   @Override
