@@ -25,8 +25,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.metrics2.lib.MutableRollingAverages;
-import org.apache.hadoop.metrics2.lib.MutableStat;
 
 /**
  * Class to hold RocksDB metrics.
