@@ -258,7 +258,7 @@ public class TestHSync {
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(
-                3, 2, ECReplicationConfig.EcCodec.RS, 1024)));
+                3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
     TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,

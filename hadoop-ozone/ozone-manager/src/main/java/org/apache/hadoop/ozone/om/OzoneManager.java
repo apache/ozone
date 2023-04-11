@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -396,6 +397,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
   private OMLayoutVersionManager versionManager;
 
+  private final ReplicationConfigValidator replicationConfigValidator;
+
   private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
   // execution, we can get from ozoneManager.
@@ -482,6 +485,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
+    replicationConfigValidator =
+        conf.getObject(ReplicationConfigValidator.class);
 
     exitManager = new ExitManager();
 
@@ -1904,17 +1909,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    RaftPeer leader = omRatisServer.getLeader();
-    if (Objects.nonNull(leader)) {
-      // If we have any leader information, its id cannot be null.
-      String leaderId = leader.getId().toString();
-      omHAMetricsInit(leaderId);
-    } else {
-      LOG.error("OzoneManagerRatisServer leader is null, " +
-          "unregistering OMHAMetrics.");
-      // Unregister, to get rid of stale metrics
-      OMHAMetrics.unRegister();
-    }
   }
 
   /**
@@ -2212,6 +2206,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       scmClient.close();
       if (certClient != null) {
         certClient.close();
+      }
+
+      if (omhaMetrics != null) {
+        OMHAMetrics.unRegister();
       }
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -2936,9 +2934,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Create OMHAMetrics instance.
    */
-  private void omHAMetricsInit(String leaderId) {
+  public void omHAMetricsInit(String leaderId) {
     // unregister, in case metrics already exist
-    // so that the metric tags will get updated.
+    // so that the metrics will get updated.
     OMHAMetrics.unRegister();
     omhaMetrics = OMHAMetrics
         .create(getOMNodeId(), leaderId);
@@ -4579,5 +4577,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
+  }
+
+  public void validateReplicationConfig(ReplicationConfig replicationConfig)
+      throws OMException {
+    try {
+      getReplicationConfigValidator().validate(replicationConfig);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid replication config: " + replicationConfig,
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+  }
+
+  @VisibleForTesting
+  public ReplicationConfigValidator getReplicationConfigValidator() {
+    return replicationConfigValidator;
   }
 }

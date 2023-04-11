@@ -120,7 +120,8 @@ public class ContainerBalancerSelectionCriteria {
    * @param second second container to compare
    * @return An integer greater than 0 if first is more used, 0 if they're
    * the same containers or a container is not found, and a value less than 0
-   * if first is not more used than second.
+   * if first is less used than second. If both containers have equal used
+   * space, they're compared using {@link ContainerID#compareTo(ContainerID)}.
    */
   private int isContainerMoreUsed(ContainerID first,
                                   ContainerID second) {
@@ -132,8 +133,10 @@ public class ContainerBalancerSelectionCriteria {
       ContainerInfo secondInfo = containerManager.getContainer(second);
       if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
         return 1;
-      } else {
+      } else if (firstInfo.getUsedBytes() < secondInfo.getUsedBytes()) {
         return -1;
+      } else {
+        return first.compareTo(second);
       }
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not retrieve ContainerInfo from container manager for " +
@@ -155,10 +158,12 @@ public class ContainerBalancerSelectionCriteria {
    * Checks whether a Container has the ReplicationType
    * {@link HddsProtos.ReplicationType#EC}.
    * @param container container to check
-   * @return true if the ReplicationType is EC, else false
+   * @return true if the ReplicationType is EC and "hdds.scm.replication
+   * .enable.legacy" is true, else false
    */
   private boolean isECContainer(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
+        && replicationManager.getConfig().isLegacyEnabled();
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
