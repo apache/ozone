@@ -16,16 +16,21 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
+export interface IAcl {
+    type: string;
+    name: string;
+    scope: string;
+    aclList: string[];
 }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage'
-};
+export interface IVolume {
+    volume: string;
+    owner: string;
+    admin: string;
+    creationTime: string;
+    modificationTime: string;
+    quotaInBytes: number;
+    quotaInNamespace: number;
+    usedNamespace: number;
+    acls?: IAcl[];
+}

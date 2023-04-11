@@ -717,7 +717,7 @@
               "name": "STANDALONE",
               "value": 9859
             }
-          
+
           ],
           "certSerialId": null,
           "version": null,
@@ -1276,7 +1276,7 @@
   "objectInfo": {
     "versioningEnabled": false,
     "metadata": {
-      
+
     },
     "name": "fso-bucket",
     "fileName": "file1",
@@ -1920,6 +1920,75 @@
             "lastSeenTime": 1665590272289,
             "lastBcsId": 0
           }
+        ]
+      }
+    ]
+  },
+  "volumes": {
+    "status": "OK",
+    "totalCount": 3,
+    "volumes": [
+      {
+        "volume": "vol1",
+        "owner": "testuser",
+        "admin": "ozone",
+        "creationTime": "2019-11-26T21:18:43.688Z",
+        "modificationTime": "2019-11-26T21:18:46.062Z",
+        "quotaInNamespace": 2048,
+        "quotaInBytes": 1073741824,
+        "usedNamespace": 10,
+        "acls": [
+          {
+            "type": "USER",
+            "name": "testuser",
+            "scope": "ACCESS",
+            "aclList": [
+              "WRITE",
+              "READ",
+              "DELETE"
+            ]
+          }
+        ]
+      },
+      {
+        "volume": "vol2",
+        "owner": "testuser2",
+        "admin": "ozone",
+        "creationTime": "2019-11-26T21:19:20.855Z",
+        "modificationTime": "2019-11-26T21:19:20.991Z",
+        "quotaInBytes": -1,
+        "quotaInNamespace": -1,
+        "usedNamespace": 0,
+        "acls": [
+          {
+            "type": "GROUP",
+            "name": "testgroup",
+            "scope": "ACCESS",
+            "aclList": [
+              "ALL"
+            ]
+          },
+          {
+            "type": "USER",
+            "name": "testuser2",
+            "scope": "ACCESS",
+            "aclList": [
+              "WRITE_ACL",
+              "READ"
+            ]
+          }
+        ]
+      },
+      {
+        "volume": "vol3",
+        "owner": "testuser2",
+        "admin": "ozone",
+        "creationTime": "2019-11-26T21:19:20.855Z",
+        "modificationTime": "2019-11-26T21:19:20.991Z",
+        "quotaInBytes": -1,
+        "quotaInNamespace": -1,
+        "usedNamespace": 0,
+        "acls": [
         ]
       }
     ]
