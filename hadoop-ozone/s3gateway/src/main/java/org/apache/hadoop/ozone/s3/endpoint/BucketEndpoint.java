@@ -172,7 +172,12 @@ public class BucketEndpoint extends EndpointBase {
       getMetrics().incGetBucketFailure();
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
-      throw ex;
+      if (ex instanceof RuntimeException &&
+          ex.getCause() instanceof OS3Exception) {
+        throw (OS3Exception) ex.getCause();
+      } else {
+        throw ex;
+      }
     }
 
     // The valid encodingType Values is "url"
@@ -308,7 +313,12 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
-      throw ex;
+      if (ex instanceof RuntimeException &&
+          ex.getCause() instanceof OS3Exception) {
+        throw (OS3Exception) ex.getCause();
+      } else {
+        throw ex;
+      }
     }
   }
 
@@ -383,7 +393,12 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception e) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), e));
-      throw e;
+      if (e instanceof RuntimeException &&
+          e.getCause() instanceof OS3Exception) {
+        throw (OS3Exception) e.getCause();
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -422,7 +437,12 @@ public class BucketEndpoint extends EndpointBase {
     } catch (Exception ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
-      throw ex;
+      if (ex instanceof RuntimeException &&
+          ex.getCause() instanceof OS3Exception) {
+        throw (OS3Exception) ex.getCause();
+      } else {
+        throw ex;
+      }
     }
 
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
