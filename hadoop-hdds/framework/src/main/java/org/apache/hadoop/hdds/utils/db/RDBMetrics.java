@@ -25,6 +25,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.metrics2.lib.MutableRollingAverages;
+import org.apache.hadoop.metrics2.lib.MutableStat;
 
 /**
  * Class to hold RocksDB metrics.
@@ -56,6 +58,9 @@ public class RDBMetrics {
   private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
   private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
   private @Metric MutableCounterLong numDBKeyGetIfExistGets;
+  // WAL Update data size and sequence count
+  private @Metric MutableCounterLong walUpdateDataSize;
+  private @Metric MutableCounterLong walUpdateSequenceCount;
 
 
   public long getNumDBKeyGetIfExistGets() {
@@ -99,6 +104,22 @@ public class RDBMetrics {
   @VisibleForTesting
   public long getNumDBKeyMayExistMisses() {
     return numDBKeyMayExistMisses.value();
+  }
+
+  public void incWalUpdateDataSize(long size) {
+    walUpdateDataSize.incr(size);
+  }
+
+  public long getWalUpdateDataSize() {
+    return walUpdateDataSize.value();
+  }
+
+  public void incWalUpdateSequenceCount(long count) {
+    walUpdateSequenceCount.incr(count);
+  }
+
+  public long getWalUpdateSequenceCount() {
+    return walUpdateSequenceCount.value();
   }
 
   public static synchronized void unRegister() {
