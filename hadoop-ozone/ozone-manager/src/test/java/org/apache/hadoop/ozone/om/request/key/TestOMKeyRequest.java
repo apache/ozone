@@ -212,6 +212,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    when(ozoneManager.isLeaderReady()).thenReturn(false);
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager())
         .thenReturn(omSnapshotManager);
