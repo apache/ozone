@@ -48,6 +48,7 @@ import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.singleton;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
@@ -136,6 +138,40 @@ public class TestECUnderReplicationHandler {
     Mockito.when(ecPlacementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
+  }
+
+  @Test
+  void excludesOverloadedNodes() throws IOException {
+    ECUnderReplicationHandler subject = new ECUnderReplicationHandler(
+        ecPlacementPolicy, conf, replicationManager);
+    Set<ContainerReplica> replicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3));
+    ContainerHealthResult.UnderReplicatedHealthResult result =
+        Mockito.mock(ContainerHealthResult.UnderReplicatedHealthResult.class);
+    Mockito.when(result.getContainerInfo()).thenReturn(container);
+
+    DatanodeDetails excludedByRM = MockDatanodeDetails.randomDatanodeDetails();
+    Mockito.when(replicationManager.getExcludedNodes())
+        .thenReturn(singleton(excludedByRM));
+
+    ArgumentCaptor<List<DatanodeDetails>> captor =
+        ArgumentCaptor.forClass(List.class);
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(captor.capture(),
+            any(), anyInt(), anyLong(), anyLong())
+        ).thenAnswer(invocationOnMock -> {
+          int numNodes = invocationOnMock.getArgument(2);
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < numNodes; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    subject.processAndSendCommands(
+        replicas, Collections.emptyList(), result, 2);
+
+    Assertions.assertTrue(captor.getValue().contains(excludedByRM));
   }
 
   @Test

@@ -45,6 +45,8 @@ e. If the cluster is upgraded from old version less than 1.1.0, use of quota on 
 
 f. If volume's quota is enabled then bucket's quota cannot be cleared. 
 
+g. Volume having linked bucket do not consume space quota for keys within linked bucket. Linked bucket keys will consume space quota of source volume and source bucket.
+
 2. Namespace quota
 
 Administrators should be able to define how many namespace a Volume or Bucket can use. The following settings for namespace quota are supported: 
@@ -55,9 +57,14 @@ b. When volume namespace quota is enabled, the total number of buckets under the
 
 c. When bucket namespace quota is enabled, the total number of keys under the bucket, cannot exceed the bucket namespace quota.
 
-d. Linked buckets do not consume namespace quota.
+d. Linked buckets do not define separate namespace quota, it is referred by namespace quota of source bucket for keys inside linked bucket.
 
-e. If the cluster is upgraded from old version less than 1.1.0, use of quota on older volumes and buckets(We can confirm by looking at the info for the volume or bucket, and if the quota value is -2 then volume or bucket is old) is not recommended. Since the old key is not counted to the bucket's namespace quota, the quota setting is inaccurate at this point.
+e. Linked bucket will consume namespace quota of volume.
+
+f. If the cluster is upgraded from old version less than 1.1.0, use of quota on older volumes and buckets(We can confirm by looking at the info for the volume or bucket, and if the quota value is -2 then volume or bucket is old) is not recommended. Since the old key is not counted to the bucket's namespace quota, the quota setting is inaccurate at this point.
+
+### Note:
+- For FSO bucket with recursive deletion of directory, release of quota happens asynchronously after sub directories and files are removed (when directory is removed, recursive deletion can be in-progress in background).
 
 ## Client usage
 ### Storage Space level quota

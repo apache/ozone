@@ -1909,17 +1909,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         }
       }
     }
-    RaftPeer leader = omRatisServer.getLeader();
-    if (Objects.nonNull(leader)) {
-      // If we have any leader information, its id cannot be null.
-      String leaderId = leader.getId().toString();
-      omHAMetricsInit(leaderId);
-    } else {
-      LOG.error("OzoneManagerRatisServer leader is null, " +
-          "unregistering OMHAMetrics.");
-      // Unregister, to get rid of stale metrics
-      OMHAMetrics.unRegister();
-    }
   }
 
   /**
@@ -2217,6 +2206,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       scmClient.close();
       if (certClient != null) {
         certClient.close();
+      }
+
+      if (omhaMetrics != null) {
+        OMHAMetrics.unRegister();
       }
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -2941,9 +2934,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Create OMHAMetrics instance.
    */
-  private void omHAMetricsInit(String leaderId) {
+  public void omHAMetricsInit(String leaderId) {
     // unregister, in case metrics already exist
-    // so that the metric tags will get updated.
+    // so that the metrics will get updated.
     OMHAMetrics.unRegister();
     omhaMetrics = OMHAMetrics
         .create(getOMNodeId(), leaderId);
