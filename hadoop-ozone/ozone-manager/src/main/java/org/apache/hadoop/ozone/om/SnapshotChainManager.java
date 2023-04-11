@@ -93,7 +93,7 @@ public class SnapshotChainManager {
 
     // set state variable latestGlobal snapshot entry to this snapshotID
     latestGlobalSnapshotID = snapshotID;
-  };
+  }
 
   /**
    * Add snapshot to bucket snapshot chain(path based).
@@ -140,7 +140,7 @@ public class SnapshotChainManager {
 
     // set state variable latestPath snapshot entry to this snapshotID
     latestPathSnapshotID.put(snapshotPath, snapshotID);
-  };
+  }
 
   private boolean deleteSnapshotGlobal(String snapshotID) throws IOException {
     boolean status = true;
