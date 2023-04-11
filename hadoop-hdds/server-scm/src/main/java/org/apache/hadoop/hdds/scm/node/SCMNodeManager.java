@@ -1067,9 +1067,10 @@ public class SCMNodeManager implements NodeManager {
       String hostName = dni.getHostName();
       DatanodeDetails.Port httpPort = dni.getPort(HTTP);
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
-      NodeStatus nodestatus = null;
-      NodeState health = null;
-      NodeOperationalState operationalState = null;
+      //default initialization of nodeStatus,health & operationalState
+      NodeStatus nodestatus = NodeStatus.inServiceStale();
+      NodeState health = nodestatus.getHealth();
+      NodeOperationalState operationalState = nodestatus.getOperationalState();
       if (nonNull(dni.getNodeStatus())) {
         nodestatus = dni.getNodeStatus();
       }
