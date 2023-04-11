@@ -242,10 +242,4 @@ public interface NetworkTopology {
    */
   List<? extends Node> sortByDistanceCost(Node reader,
       List<? extends Node> nodes, int activeLen);
-
-  default int getRackCount() {
-    // The leaf nodes are all at max level, so the number of nodes at
-    // leafLevel - 1 is the rack count
-    return getNumOfNodes(getMaxLevel() - 1);
-  }
 }
