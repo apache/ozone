@@ -1273,6 +1273,7 @@ public class LegacyReplicationManager {
         // maintenance nodes, as the replicas will remain present in the
         // container manager, even when they go dead.
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
+            && !r.getDatanodeDetails().isDecomissioned()
             && !deletionInFlight.contains(r.getDatanodeDetails())
             && (validReplicaStateSet.isEmpty() ||
               validReplicaStateSet.contains(r.getState())))
