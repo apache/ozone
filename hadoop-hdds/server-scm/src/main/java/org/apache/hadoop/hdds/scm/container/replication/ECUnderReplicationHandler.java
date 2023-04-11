@@ -141,6 +141,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             ContainerReplicaOp.PendingOpType.ADD)
         .map(ContainerReplicaOp::getTarget)
         .collect(Collectors.toList()));
+    excludedNodes.addAll(replicationManager.getExcludedNodes());
 
     final ContainerID id = container.containerID();
     int commandsSent = 0;
