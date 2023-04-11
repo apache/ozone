@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -46,7 +45,6 @@ import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -61,7 +59,6 @@ import static org.mockito.Mockito.mock;
 public class TestContainerStateCounts extends AbstractReconSqlDBTest {
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
-  private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ClusterStateEndpoint clusterStateEndpoint;
   private ReconContainerManager reconContainerManager;
