@@ -51,7 +51,7 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
-    long start = Time.monotonicNowNanos();
+    long startNanos = Time.monotonicNowNanos();
     boolean auditSuccess = true;
     try {
       ListBucketResponse response = new ListBucketResponse();
@@ -60,9 +60,7 @@ public class RootEndpoint extends EndpointBase {
       try {
         bucketIterator = listS3Buckets(null);
       } catch (Exception e) {
-        getMetrics().incListS3BucketsFailure();
-        getMetrics().addListS3BucketsLatencyNs(Time.monotonicNowNanos() - start,
-            false);
+        getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
 
@@ -74,9 +72,7 @@ public class RootEndpoint extends EndpointBase {
         response.addBucket(bucketMetadata);
       }
 
-      getMetrics().incListS3BucketsSuccess();
-      getMetrics().addListS3BucketsLatencyNs(Time.monotonicNowNanos() - start,
-          true);
+      getMetrics().updateListS3BucketsSuccessStats(startNanos);
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
