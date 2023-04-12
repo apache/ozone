@@ -2311,6 +2311,13 @@ public class TestRootedOzoneFileSystem {
     diff = ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
     Assert.assertEquals(10, diff.getDiffList().size());
 
+    Path file =
+        new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+    ContractTestUtils.touch(fs, file);
+    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, ".");
+    Assert.assertEquals(1, diff.getDiffList().size());
+
+
     // try snapDiff between non-bucket paths
     String errorMsg = "Path is not a bucket";
     String finalFromSnap = fromSnap;
