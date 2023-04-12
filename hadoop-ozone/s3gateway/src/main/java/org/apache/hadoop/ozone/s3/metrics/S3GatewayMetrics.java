@@ -86,36 +86,108 @@ public final class S3GatewayMetrics implements MetricsSource {
 
   // S3 Gateway Latency Metrics
   // ObjectEndpoint
+
+  @Metric(about = "Latency for successfully initiating a multipart upload " +
+      "for an S3 object in nanoseconds")
   private MutableRate initMultipartUploadSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to initiate a multipart upload for an " +
+      "S3 object in nanoseconds")
   private MutableRate initMultipartUploadFailureLatencyNs;
+
+  @Metric(about = "Latency for successfully creating a multipart key for an " +
+      "S3 object in nanoseconds")
   private MutableRate createMultipartKeySuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to create a multipart key for an S3 " +
+      "object in nanoseconds")
   private MutableRate createMultipartKeyFailureLatencyNs;
+
+  @Metric(about = "Latency for successfully completing a multipart upload " +
+      "for an S3 object in nanoseconds")
   private MutableRate completeMultipartUploadSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to complete a multipart upload for an " +
+      "S3 object in nanoseconds")
   private MutableRate completeMultipartUploadFailureLatencyNs;
+
+  @Metric(about = "Latency for aborting a multipart upload for an S3 object " +
+      "in nanoseconds")
   private MutableRate abortMultipartUploadLatencyNs;
+
+  @Metric(about = "Latency for successfully copying an S3 object in " +
+      "nanoseconds")
   private MutableRate copyObjectSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to copy an S3 object in nanoseconds")
   private MutableRate copyObjectFailureLatencyNs;
+
+  @Metric(about = "Latency for successfully listing parts for a multipart " +
+      "upload of an S3 object in nanoseconds")
   private MutableRate listPartsSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to list parts for a multipart upload " +
+      "of an S3 object in nanoseconds")
   private MutableRate listPartsFailureLatencyNs;
+
+  @Metric(about = "Latency for creating an S3 key in nanoseconds")
   private MutableRate createKeyLatencyNs;
+
+  @Metric(about = "Latency for successfully retrieving an S3 key in " +
+      "nanoseconds")
   private MutableRate getKeySuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to retrieve an S3 key in nanoseconds")
   private MutableRate getKeyFailureLatencyNs;
+
+  @Metric(about = "Latency for retrieving the metadata for an S3 key in " +
+      "nanoseconds")
   private MutableRate headKeyLatencyNs;
+
+  @Metric(about = "Latency for deleting an S3 key in nanoseconds")
   private MutableRate deleteKeyLatencyNs;
 
   // BucketEndpoint
+
+  @Metric(about = "Latency for retrieving the access control list (ACL) of " +
+      "an S3 bucket in nanoseconds")
   private MutableRate getAclLatencyNs;
+
+  @Metric(about = "Latency for successfully setting the access control list " +
+      "(ACL) of an S3 bucket in nanoseconds")
   private MutableRate putAclSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to set the access control list (ACL) " +
+      "of an S3 bucket in nanoseconds")
   private MutableRate putAclFailureLatencyNs;
+
+  @Metric(about = "Latency for creating an S3 bucket in nanoseconds")
   private MutableRate createBucketLatencyNs;
+
+  @Metric(about = "Latency for retrieving an S3 bucket in nanoseconds")
   private MutableRate getBucketLatencyNs;
+
+  @Metric(about = "Latency for retrieving the metadata of an S3 bucket in " +
+      "nanoseconds")
   private MutableRate headBucketLatencyNs;
+
+  @Metric(about = "Latency for deleting an S3 bucket in nanoseconds")
   private MutableRate deleteBucketLatencyNs;
+
+  @Metric(about = "Latency for successfully listing multipart uploads for an " +
+      "S3 bucket in nanoseconds")
   private MutableRate listMultipartUploadsSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to list multipart uploads for an S3 " +
+      "bucket in nanoseconds")
   private MutableRate listMultipartUploadsFailureLatencyNs;
 
   // RootEndpoint
+
+  @Metric(about = "Latency for successfully listing S3 buckets in nanoseconds")
   private MutableRate listS3BucketsSuccessLatencyNs;
+
+  @Metric(about = "Latency for failing to list S3 buckets in nanoseconds")
   private MutableRate listS3BucketsFailureLatencyNs;
 
   /**
