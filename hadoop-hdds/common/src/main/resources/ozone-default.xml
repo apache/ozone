@@ -3580,6 +3580,15 @@
   </property>
 
   <property>
+    <name>ozone.fs.hsync.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.recon.scm.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
