@@ -233,6 +233,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
   /**
    * Removes the snapshot from the SnapshotChainManager.
+   * In case of any failure, it logs the exception as an error and swallow it.
+   * Ideally, there should not be any failure in deletion.
+   * If it happens, and we throw the exception, we lose the track why snapshot
+   * creation failed itself.
+   * Hence, to not lose that information it is better just log and swallow the
+   * exception.
    */
   private void removeSnapshotInfoFromSnapshotChainManager(
       SnapshotChainManager snapshotChainManager,
@@ -241,10 +247,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     try {
       snapshotChainManager.deleteSnapshot(info);
     } catch (IOException exception) {
-      LOG.warn("Failed to remove snapshot: {} from SnapshotChainManager.",
+      LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
-      throw new IllegalStateException("Snapshot chain manager is corrupted.",
-          exception);
     }
   }
 }
