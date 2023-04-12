@@ -61,6 +61,8 @@ public class RootEndpoint extends EndpointBase {
         bucketIterator = listS3Buckets(null);
       } catch (Exception e) {
         getMetrics().incListS3BucketsFailure();
+        getMetrics().addListS3BucketsLatencyNs(Time.monotonicNowNanos() - start,
+            false);
         throw e;
       }
 
@@ -73,6 +75,8 @@ public class RootEndpoint extends EndpointBase {
       }
 
       getMetrics().incListS3BucketsSuccess();
+      getMetrics().addListS3BucketsLatencyNs(Time.monotonicNowNanos() - start,
+          true);
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -88,8 +92,6 @@ public class RootEndpoint extends EndpointBase {
                 Collections.emptyMap())
         );
       }
-      getMetrics().addListS3BucketsLatencyNs(
-          Time.monotonicNowNanos() - start);
     }
   }
 

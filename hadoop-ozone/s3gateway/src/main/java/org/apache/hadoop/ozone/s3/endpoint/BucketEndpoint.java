@@ -348,12 +348,16 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
           getAuditParameters()));
       getMetrics().incListMultipartUploadsSuccess();
+      getMetrics().addListMultipartUploadsLatencyNs(
+          Time.monotonicNowNanos() - start, true);
       return Response.ok(result).build();
     } catch (OMException exception) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(),
               exception));
       getMetrics().incListMultipartUploadsFailure();
+      getMetrics().addListMultipartUploadsLatencyNs(
+          Time.monotonicNowNanos() - start, false);
       if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
@@ -362,9 +366,6 @@ public class BucketEndpoint extends EndpointBase {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
       throw ex;
-    } finally {
-      getMetrics().addListMultipartUploadsLatencyNs(
-          Time.monotonicNowNanos() - start);
     }
   }
 
@@ -642,6 +643,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (OMException exception) {
       getMetrics().incPutAclFailure();
+      getMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start, false);
       auditWriteFailure(S3GAction.PUT_ACL, exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
@@ -651,11 +653,11 @@ public class BucketEndpoint extends EndpointBase {
       throw exception;
     } catch (OS3Exception ex) {
       getMetrics().incPutAclFailure();
+      getMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start, false);
       throw ex;
-    } finally {
-      getMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start);
     }
     getMetrics().incPutAclSuccess();
+    getMetrics().addPutAclLatencyNs(Time.monotonicNowNanos() - start, true);
     return Response.status(HttpStatus.SC_OK).build();
   }
 
