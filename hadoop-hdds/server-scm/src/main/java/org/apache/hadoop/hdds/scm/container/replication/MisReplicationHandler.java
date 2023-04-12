@@ -90,10 +90,9 @@ public abstract class MisReplicationHandler implements
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-                    + " any number of nodes. Number of required "
-                    + "Nodes %d, Datasize Required: %d",
-            containerPlacement.getClass(), requiredNodes, dataSizeRequired),
-            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+        + " any nodes. Number of required Nodes %d, Datasize Required: %d",
+        containerPlacement.getClass(), requiredNodes, dataSizeRequired),
+        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
   private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
