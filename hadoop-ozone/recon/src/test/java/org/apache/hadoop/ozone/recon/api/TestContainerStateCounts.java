@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.Response;
@@ -55,7 +54,6 @@ import static org.mockito.Mockito.mock;
 /**
  * Unit test for ClusterStateEndpoint ContainerStateCounts.
  */
-@Disabled("HDDS-8374")
 public class TestContainerStateCounts extends AbstractReconSqlDBTest {
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
