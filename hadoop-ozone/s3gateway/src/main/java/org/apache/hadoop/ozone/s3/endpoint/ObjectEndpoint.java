@@ -234,9 +234,8 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
 
-      output =
-          getClientProtocol().createKey(volume.getName(), bucketName, keyPath,
-              length, replicationConfig, customMetadata);
+      output = getClientProtocol().createKey(volume.getName(), bucketName,
+          keyPath, length, replicationConfig, customMetadata);
       IOUtils.copy(body, output);
 
       getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -510,8 +509,8 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     try {
-      getClientProtocol().abortMultipartUpload(volume.getName(), bucket, key,
-          uploadId);
+      getClientProtocol().abortMultipartUpload(volume.getName(), bucket,
+          key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
@@ -551,8 +550,8 @@ public class ObjectEndpoint extends EndpointBase {
         s3GAction = S3GAction.ABORT_MULTIPART_UPLOAD;
         return abortMultipartUpload(volume, bucketName, keyPath, uploadId);
       }
-      getClientProtocol().deleteKey(volume.getName(), bucketName, keyPath,
-          false);
+      getClientProtocol().deleteKey(volume.getName(), bucketName,
+          keyPath, false);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
