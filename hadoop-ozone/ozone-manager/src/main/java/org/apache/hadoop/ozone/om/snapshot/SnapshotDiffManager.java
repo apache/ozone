@@ -844,6 +844,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           IN_PROGRESS + "' is expected.");
     }
     snapshotDiffJob.setStatus(DONE);
+    snapshotDiffJob.setTotalDiffEntries(totalNumberOfEntries);
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
