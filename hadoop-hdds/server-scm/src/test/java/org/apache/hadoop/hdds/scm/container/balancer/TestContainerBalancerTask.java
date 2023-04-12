@@ -392,6 +392,47 @@ public class TestContainerBalancerTask {
     }
   }
 
+  /**
+   * Container Balancer should not select a non-CLOSED replica for moving.
+   */
+  @Test
+  public void balancerShouldNotSelectNonClosedContainerReplicas()
+      throws IOException, IllegalContainerBalancerStateException,
+      InvalidContainerBalancerConfigurationException, TimeoutException {
+
+    // let's mock such that all replicas have CLOSING state
+    when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
+        .thenAnswer(invocationOnMock -> {
+          ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
+          Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
+          Set<ContainerReplica> replicasToReturn =
+              new HashSet<>(replicas.size());
+          for (ContainerReplica replica : replicas) {
+            ContainerReplica newReplica =
+                replica.toBuilder().setContainerState(
+                    ContainerReplicaProto.State.CLOSING).build();
+            replicasToReturn.add(newReplica);
+          }
+
+          return replicasToReturn;
+        });
+
+    balancerConfiguration.setThreshold(10);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
+
+    startBalancer(balancerConfiguration);
+    stopBalancer();
+
+    // balancer should have identified unbalanced nodes
+    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+        .isEmpty());
+    // no container should have moved because all replicas are CLOSING
+    Assertions.assertTrue(
+        containerBalancerTask.getContainerToSourceMap().isEmpty());
+  }
+
   @Test
   public void containerBalancerShouldObeyMaxSizeToMoveLimit()
       throws IllegalContainerBalancerStateException, IOException,
