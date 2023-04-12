@@ -870,7 +870,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.impl</name>
-    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -2753,7 +2753,7 @@
   </property>
   <property>
     <name>ozone.network.topology.aware.read</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       Whether to enable topology aware read to improve the read performance.
