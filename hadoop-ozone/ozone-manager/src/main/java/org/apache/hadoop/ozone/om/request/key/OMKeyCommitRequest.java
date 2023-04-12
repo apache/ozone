@@ -81,7 +81,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
+    OMRequest request = super.preExecute(ozoneManager);
+    CommitKeyRequest commitKeyRequest = request.getCommitKeyRequest();
     Preconditions.checkNotNull(commitKeyRequest);
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
@@ -103,9 +104,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath);
 
-    return getOmRequest().toBuilder()
+    return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).setUserInfo(getUserInfo()).build();
+            .setKeyArgs(newKeyArgs)).build();
   }
 
   @Override
