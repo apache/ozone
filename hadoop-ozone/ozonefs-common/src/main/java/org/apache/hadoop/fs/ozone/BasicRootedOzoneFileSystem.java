@@ -1427,4 +1427,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         spaceConsumed(summary[1]).build();
   }
 
+  /**
+   * Start the lease recovery of a file.
+   *
+   * @param f a file
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  public boolean recoverLease(final Path f) throws IOException {
+    return adapterImpl.recoverLease(f);
+  }
+
 }
