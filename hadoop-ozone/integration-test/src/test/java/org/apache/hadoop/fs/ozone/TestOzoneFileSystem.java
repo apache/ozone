@@ -65,6 +65,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -81,6 +82,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -639,10 +641,16 @@ public class TestOzoneFileSystem {
       }, 1000, 120000);
     }
 
-    FileStatus[] fileStatuses = fs.listStatus(parent);
+    List<FileStatus> fileStatuses = new ArrayList<>(Arrays.asList(
+        fs.listStatus(parent)));
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    fileStatuses.removeIf(f -> trashRoot.equals(f.getPath()));
 
     // the number of immediate children of root is 1
-    Assert.assertEquals(1, fileStatuses.length);
+    Assertions.assertEquals(1, fileStatuses.size(),
+        () -> "Found " + fileStatuses + " with "
+            + "layout:" + bucketLayout
+            + ", fsPaths:" + enabledFileSystemPaths);
     writeClient.deleteKey(keyArgs);
   }
 
