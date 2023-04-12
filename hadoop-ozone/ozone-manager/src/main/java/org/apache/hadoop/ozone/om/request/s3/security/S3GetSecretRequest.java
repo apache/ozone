@@ -172,7 +172,8 @@ public class S3GetSecretRequest extends OMClientRequest {
               awsSecret.set(s3SecretValue.getAwsSecret());
               return new S3GetSecretResponse(null,
                       ozoneManager.getS3SecretManager(),
-                      createErrorOMResponse(omResponse, new OMException(OMException.ResultCodes.INVALID_REQUEST)));
+                      createErrorOMResponse(omResponse, new
+                              OMException(OMException.ResultCodes.INVALID_REQUEST)));
             }
 
             // Throw ACCESS_ID_NOT_FOUND to the client if accessId doesn't exist

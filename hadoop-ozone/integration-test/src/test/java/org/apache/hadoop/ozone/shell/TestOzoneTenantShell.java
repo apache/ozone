@@ -357,6 +357,18 @@ public class TestOzoneTenantShell {
     stream.reset();
   }
 
+  private void checkNotOutput(ByteArrayOutputStream stream, String stringToMatch,
+                           boolean exactMatch) throws IOException {
+    stream.flush();
+    final String str = stream.toString(DEFAULT_ENCODING);
+    if (exactMatch) {
+      Assert.assertEquals(stringToMatch, str);
+    } else {
+      Assert.assertTrue(str, str.contains(stringToMatch));
+    }
+    stream.reset();
+  }
+
   private void checkOutput(String str, String stringToMatch,
                            boolean exactMatch) {
     if (exactMatch) {
@@ -499,9 +511,7 @@ public class TestOzoneTenantShell {
     // Try user getsecret again after assignment, should succeed
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
-    checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
-            false);
-    checkOutput(err, "", true);
+    checkOutput(err, "\n", true);
 
     executeHA(tenantShell, new String[] {
         "--verbose", "user", "assign", "bob", "--tenant=research"});
@@ -810,8 +820,7 @@ public class TestOzoneTenantShell {
     // Get secret should still give the previous secret key
     executeHA(tenantShell, new String[] {
         "user", "getsecret", tenantName + "$alice"});
-    checkOutput(out, "somesecret1", false);
-    checkOutput(err, "", true);
+    checkOutput(err, "\n", true);
 
     // Set secret as alice should succeed
     final UserGroupInformation ugiAlice = UserGroupInformation

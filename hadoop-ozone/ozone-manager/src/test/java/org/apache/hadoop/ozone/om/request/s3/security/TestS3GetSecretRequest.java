@@ -217,16 +217,16 @@ public class TestS3GetSecretRequest {
     // This effectively makes alice a regular user.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
-    final S3Secret s3Secret1 = processSuccessSecretRequest(
+    S3Secret s3Secret1 = processSuccessSecretRequest(
         USER_ALICE, 1, true);
 
 
     // 2. Get secret of "alice" (as herself) again.
-    final S3Secret s3Secret2 = processSuccessSecretRequest(
+    s3Secret1 = processSuccessSecretRequest(
         USER_ALICE, 2, false);
 
-    //no secret is returned as secret already exists in the DB
-    Assert.assertNull(s3Secret2);
+    // no secret is returned as secret already exists in the DB
+    Assert.assertNull(s3Secret1);
   }
 
   @Test
@@ -264,7 +264,7 @@ public class TestS3GetSecretRequest {
 
     // This effectively makes alice an S3 Admin.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
-    String userPrincipalId=USER_ALICE;
+    String userPrincipalId = USER_ALICE;
 
     S3GetSecretRequest s3GetSecretRequest =
             new S3GetSecretRequest(
@@ -280,7 +280,7 @@ public class TestS3GetSecretRequest {
     Assert.assertTrue(omClientResponse1 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse1 =
             (S3GetSecretResponse) omClientResponse1;
-    //Secret is returned the first time
+    // Secret is returned the first time
     final S3SecretValue s3SecretValue1 =
             s3GetSecretResponse1.getS3SecretValue();
     Assert.assertEquals(userPrincipalId, s3SecretValue1.getKerberosID());
@@ -293,7 +293,7 @@ public class TestS3GetSecretRequest {
     final S3Secret s3Secret2 = getS3SecretResponse1.getS3Secret();
     Assert.assertEquals(userPrincipalId, s3Secret2.getKerberosID());
 
-    //Run validateAndUpdateCache for the second time
+    // Run validateAndUpdateCache for the second time
     OMClientResponse omClientResponse2 =
             s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
                     2, ozoneManagerDoubleBufferHelper);
@@ -301,7 +301,7 @@ public class TestS3GetSecretRequest {
     Assert.assertTrue(omClientResponse2 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse2 =
             (S3GetSecretResponse) omClientResponse2;
-    //no secret is returned as it is the second time
+    // no secret is returned as it is the second time
     Assert.assertNull(s3GetSecretResponse2.getS3SecretValue());
   }
   @Test

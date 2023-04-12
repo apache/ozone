@@ -704,17 +704,8 @@ public final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugi, null),
           RandomStringUtils.randomAscii(5));
 
-      //Creates a secret since it does not exist
+      // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
-
-      //Fetches the secret from db since it was created in previous step
-      S3SecretValue attempt2 = omClient.getS3Secret(username);
-
-      //secret fetched on both attempts must be same
-      assertEquals(attempt1.getAwsSecret(), attempt2.getAwsSecret());
-
-      //access key fetched on both attempts must be same
-      assertEquals(attempt1.getAwsAccessKey(), attempt2.getAwsAccessKey());
 
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
@@ -732,14 +723,14 @@ public final class TestSecureOzoneCluster {
       S3SecretValue attempt3 = omClient.getS3Secret(username);
 
       // secret should differ because it has been revoked previously
-      assertNotEquals(attempt3.getAwsSecret(), attempt2.getAwsSecret());
+      assertNotEquals(attempt3.getAwsSecret(), attempt1.getAwsSecret());
 
       // accessKey is still the same because it is derived from username
-      assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
+      assertEquals(attempt3.getAwsAccessKey(), attempt1.getAwsAccessKey());
 
       // Admin can set secret for any user
-      omClient.setS3Secret(username, secretKeySet);
-      assertEquals(secretKeySet, omClient.getS3Secret(username).getAwsSecret());
+      S3SecretValue attempt4 = omClient.setS3Secret(username, secretKeySet);
+      assertEquals(secretKeySet, attempt4.getAwsSecret());
       // Clean up
       omClient.revokeS3Secret(username);
 
