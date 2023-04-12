@@ -148,7 +148,7 @@ public class ClusterStateEndpoint {
     }
 
     Long totalKeys = 0L;
-    Long deletedKeys = 0L;
+    Long keysAwaitingDeletion = 0L;
     Long deletedDirs = 0L;
 
     if (keyRecord != null) {
@@ -158,14 +158,14 @@ public class ClusterStateEndpoint {
       totalKeys += fileRecord.getValue();
     }
     if (deletedKeyRecord != null) {
-      deletedKeys += deletedKeyRecord.getValue();
+      keysAwaitingDeletion += deletedKeyRecord.getValue();
     }
     if (deletedDirRecord != null) {
       deletedDirs += deletedDirRecord.getValue();
     }
 
     builder.setKeys(totalKeys);
-    builder.setDeletedKeys(deletedKeys);
+    builder.setKeysAwaitingDeletion(keysAwaitingDeletion);
     builder.setDeletedDirs(deletedDirs);
 
     // Subtract deleted containers from total containers.
