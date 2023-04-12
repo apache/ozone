@@ -103,7 +103,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     Result result;
     try {
       if (fromKeyName.length() == 0) {
-        throw new OMException("Key name is empty",
+        throw new OMException("Source key name is empty",
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }
 

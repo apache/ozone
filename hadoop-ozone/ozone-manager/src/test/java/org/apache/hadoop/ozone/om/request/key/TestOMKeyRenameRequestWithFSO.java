@@ -77,10 +77,18 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Override
   @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
-    String invalidToKeyName = "";
+    String invalidToKeyName = "invalid:";
     Assert.assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, fromKeyName, invalidToKeyName)));  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithEmptyToKey() throws Exception {
+    String emptyToKeyName = "";
+    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName,
+        bucketName, fromKeyName, emptyToKeyName));
+    Assert.assertEquals(omRequest.getRenameKeyRequest().getToKeyName(), "");
+  }
 
   @Override
   @Test
