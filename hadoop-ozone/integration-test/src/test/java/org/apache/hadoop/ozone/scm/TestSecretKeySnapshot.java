@@ -126,7 +126,8 @@ public final class TestSecretKeySnapshot {
         .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKeySnapshot")
         .setScmId(scmId)
-        .setNumDatanodes(3)
+        .setSCMServiceId("SCMServiceId")
+        .setNumDatanodes(1)
         .setNumOfStorageContainerManagers(3)
         .setNumOfActiveSCMs(2)
         .setNumOfOzoneManagers(1);
