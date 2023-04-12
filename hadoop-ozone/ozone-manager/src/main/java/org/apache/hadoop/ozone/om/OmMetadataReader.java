@@ -486,8 +486,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                            boolean throwIfPermissionDenied)
       throws OMException {
 
-    if (!captureLatencyNs(perfMetrics.getCheckAccessLatencyNs(),
-        () -> accessAuthorizer.checkAccess(obj, context))) {
+    boolean hasAccessPermission;
+    long start = Time.monotonicNowNanos();
+    try {
+      hasAccessPermission = accessAuthorizer.checkAccess(obj, context);
+    } finally {
+      perfMetrics.setCheckAccessLatencyNs(Time.monotonicNowNanos() - start);
+    }
+
+    if (!hasAccessPermission) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";

@@ -143,7 +143,7 @@ public class OMPerformanceMetrics {
     forceContainerCacheRefresh.add(value ? 1L : 0L);
   }
 
-  public MutableRate getCheckAccessLatencyNs() {
-    return checkAccessLatencyNs;
+  public void setCheckAccessLatencyNs(long latencyInNs) {
+    checkAccessLatencyNs.add(latencyInNs);
   }
 }
