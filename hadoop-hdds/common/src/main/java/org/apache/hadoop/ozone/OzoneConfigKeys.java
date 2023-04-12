@@ -104,6 +104,15 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * Flag to enable hsync/hflush.
+   */
+  public static final String OZONE_FS_HSYNC_ENABLED
+      = "ozone.fs.hsync.enabled";
+  public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
+      = false;
+
+
+  /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
