@@ -417,4 +417,27 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
     return req;
   }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitKey
+  )
+  public static OMRequest disallowHsync(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.HSYNC)) {
+      CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
+      boolean isHSync = commitKeyRequest.hasHsync() &&
+          commitKeyRequest.getHsync();
+      if (isHSync) {
+        throw new OMException("Cluster does not have the hsync support "
+            + "feature finalized yet, but the request contains"
+            + " an hsync field. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }
