@@ -90,7 +90,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-import static java.util.Objects.nonNull;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -1067,28 +1066,21 @@ public class SCMNodeManager implements NodeManager {
       String hostName = dni.getHostName();
       DatanodeDetails.Port httpPort = dni.getPort(HTTP);
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
-      //default initialization of nodeStatus,health & operationalState
-      NodeStatus nodestatus = NodeStatus.inServiceStale();
-      NodeState health = nodestatus.getHealth();
-      NodeOperationalState operationalState = nodestatus.getOperationalState();
-      if (nonNull(dni.getNodeStatus())) {
-        nodestatus = dni.getNodeStatus();
-      }
-      if (nonNull(nodestatus.getHealth())) {
-        health = nodestatus.getHealth();
-      }
-      if (nonNull(nodestatus.getOperationalState())) {
-        operationalState = nodestatus.getOperationalState();
+      String opstate = "";
+      String healthState = "";
+      if (dni.getNodeStatus() != null) {
+        opstate = dni.getNodeStatus().getOperationalState().toString();
+        healthState = dni.getNodeStatus().getHealth().toString();
       }
       Map<String, String> map = new HashMap<>();
-      map.put(opeState, operationalState.toString());
-      map.put(comState, health.toString());
+      map.put(opeState, opstate);
+      map.put(comState, healthState);
       if (httpPort != null) {
         map.put(httpPort.getName().toString(), httpPort.getValue().toString());
       }
       if (httpsPort != null) {
         map.put(httpsPort.getName().toString(),
-                httpsPort.getValue().toString());
+                  httpsPort.getValue().toString());
       }
       nodes.put(hostName, map);
     }
