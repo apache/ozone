@@ -18,10 +18,12 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -176,20 +178,47 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container) || isECContainer(container) ||
+    return !isContainerClosed(container, node) || isECContainer(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container, sizeMovedAlready);
   }
 
   /**
-   * Checks whether specified container is closed.
+   * Checks whether specified container is closed. Also checks if the replica
+   * on the specified datanode is CLOSED. Assumes that there will only be one
+   * replica of a container on a particular Datanode.
    * @param container container to check
+   * @param datanodeDetails datanode on which a replica of the container is
+   * present
    * @return true if container LifeCycleState is
-   * {@link HddsProtos.LifeCycleState#CLOSED}, else false
+   * {@link HddsProtos.LifeCycleState#CLOSED} and its replica on the
+   * specified datanode is CLOSED, else false
    */
-  private boolean isContainerClosed(ContainerInfo container) {
-    return container.getState().equals(HddsProtos.LifeCycleState.CLOSED);
+  private boolean isContainerClosed(ContainerInfo container,
+                                    DatanodeDetails datanodeDetails) {
+    if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
+      return false;
+    }
+
+    // also check that the replica on the specified DN is closed
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(container.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
+          "this container.", container.getContainerID(), e);
+      return false;
+    }
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().equals(datanodeDetails)) {
+        // don't consider replica if it's not closed
+        // assumption: there's only one replica of this container on this DN
+        return replica.getState().equals(ContainerReplicaProto.State.CLOSED);
+      }
+    }
+
+    return false;
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerInfo container,
