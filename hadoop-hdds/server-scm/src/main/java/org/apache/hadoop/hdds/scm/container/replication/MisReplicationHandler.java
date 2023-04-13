@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -75,25 +74,6 @@ public abstract class MisReplicationHandler implements
       ContainerInfo containerInfo, Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> pendingOps, int remainingMaintenanceRedundancy)
       throws IOException;
-
-  private List<DatanodeDetails> getTargetDatanodes(
-          List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
-          ContainerInfo container, int requiredNodes) throws IOException {
-    final long dataSizeRequired =
-            Math.max(container.getUsedBytes(), currentContainerSize);
-    while (requiredNodes > 0) {
-      try {
-        return containerPlacement.chooseDatanodes(usedNodes, excludedNodes,
-                null, requiredNodes, 0, dataSizeRequired);
-      } catch (IOException e) {
-        requiredNodes -= 1;
-      }
-    }
-    throw new SCMException(String.format("Placement Policy: %s did not return"
-        + " any nodes. Number of required Nodes %d, Datasize Required: %d",
-        containerPlacement.getClass(), requiredNodes, dataSizeRequired),
-        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-  }
 
   private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
     return replicas.stream()
@@ -196,8 +176,10 @@ public abstract class MisReplicationHandler implements
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
     int requiredNodes = replicasToBeReplicated.size();
-    List<DatanodeDetails> targetDatanodes = getTargetDatanodes(usedDns,
-           excludedDns, container, requiredNodes);
+
+    List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
+        .getTargetDatanodes(containerPlacement, requiredNodes, usedDns,
+            excludedDns, currentContainerSize, container);
 
     int count = sendReplicateCommands(container, replicasToBeReplicated,
         targetDatanodes);
