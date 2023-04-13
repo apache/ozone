@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.After;
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -88,6 +91,10 @@ public class TestBucketRequest {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    when(ozoneManager.resolveBucketLink(any(Pair.class), anyBoolean()))
+        .thenAnswer(invocation -> new ResolvedBucket(
+            invocation.getArgument(0), invocation.getArgument(0)));
   }
 
   @After

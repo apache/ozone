@@ -323,7 +323,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
           throw e;
         }
-
+        
         try {
           // create the other manager instances based on snapshot
           // metadataManager

@@ -63,9 +63,6 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     testLinkBucketRemoveKeyAcl();
     testLinkBucketSetKeyAcl();
 
-    testLinkBucketAddPrefixAcl();
-    testLinkBucketRemovePrefixAcl();
-    testLinkBucketSetPrefixAcl();
   }
 
   public void testAddBucketAcl() throws Exception {
@@ -244,24 +241,25 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   }
 
   public void testLinkBucketRemoveBucketAcl() throws Exception {
+    // case1 : test remove link acl
     OzoneBucket srcBucket = setupBucket();
     OzoneBucket linkedBucket = linkBucket(srcBucket);
-
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
-
-    // remove link acl and compare acls of src and link
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    String user = "remoteUser1";
+    OzoneAcl acl = new OzoneAcl(USER, user, READ, DEFAULT);
+    testRemoveAcl(user, linkObj, acl);
     assertEqualsAcls(srcObj, linkObj);
 
-    // remove src acl and compare acls of src and link
+    // case2 : test remove src acl
+    OzoneBucket srcBucket2 = setupBucket();
+    OzoneBucket linkedBucket2 = linkBucket(srcBucket2);
+    OzoneObj linkObj2 = buildBucketObj(linkedBucket2);
+    OzoneObj srcObj2 = buildBucketObj(srcBucket2);
     String user2 = "remoteUser2";
     OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
-    testRemoveAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
+    testRemoveAcl(user2, srcObj2, acl2);
+    assertEqualsAcls(srcObj2, linkObj2);
 
   }
 
@@ -272,16 +270,14 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
 
-    // set link acl and compare acls of src and link
     String user1 = "remoteUser1";
     OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testSetAcl(user1, linkObj, acl1);
+    testSetAcl(user1, linkObj, acl1);  // case1: set link acl
     assertEqualsAcls(srcObj, linkObj);
 
-    // set src acl and compare acls of src and link
     String user2 = "remoteUser2";
     OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testSetAcl(user2, srcObj, acl2);
+    testSetAcl(user2, srcObj, acl2);   // case2: set src acl
     assertEqualsAcls(srcObj, linkObj);
 
   }
@@ -289,182 +285,63 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   public void testLinkBucketAddKeyAcl() throws Exception {
     OzoneBucket srcBucket = setupBucket();
     OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-
-    // CASE 1: create key from link bucket
     String key = createKey(linkedBucket);
     OzoneObj linkObj = buildKeyObj(linkedBucket, key);
     OzoneObj srcObj = buildKeyObj(srcBucket, key);
 
-    // add link acl and compare acls of src and link
-    testAddAcl(user1, linkObj, acl1);
+    String user1 = "remoteUser1";
+    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
+    testAddAcl(user1, linkObj, acl1);  // case1: set link acl
     assertEqualsAcls(srcObj, linkObj);
 
-    // add src acl and compare acls of src and link
-    testAddAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // CASE 2: create key from src bucket
-    key = createKey(srcBucket);
-    linkObj = buildKeyObj(linkedBucket, key);
-    srcObj = buildKeyObj(srcBucket, key);
-
-    // add acl to link and compare acls of src and link
-    testAddAcl(user1, linkObj, acl1);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // add acl to src and compare acls of src and link
-    testAddAcl(user2, srcObj, acl2);
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testAddAcl(user2, srcObj, acl2);  // case2: set src acl
     assertEqualsAcls(srcObj, linkObj);
 
   }
 
   public void testLinkBucketRemoveKeyAcl() throws Exception {
+
+    // CASE 1: from link bucket
     OzoneBucket srcBucket = setupBucket();
     OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-
-    // CASE 1: create key from link bucket
     String key = createKey(linkedBucket);
     OzoneObj linkObj = buildKeyObj(linkedBucket, key);
     OzoneObj srcObj = buildKeyObj(srcBucket, key);
-
-    // remove link acl and compare acls of src and link
-    testRemoveAcl(user1, linkObj, acl1); // remove default acl
+    String user = "remoteUser1";
+    OzoneAcl acl = new OzoneAcl(USER, user, READ, DEFAULT);
+    testRemoveAcl(user, linkObj, acl);
     assertEqualsAcls(srcObj, linkObj);
 
-    // remove src acl and compare acls of src and link
-    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
-    testRemoveAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // CASE 2: create key from src bucket
-    key = createKey(srcBucket);
-    linkObj = buildKeyObj(linkedBucket, key);
-    srcObj = buildKeyObj(srcBucket, key);
-
-    // remove link acl and compare acls of src and link
-    testRemoveAcl(user1, linkObj, acl1); // remove default acl
-    assertEqualsAcls(srcObj, linkObj);
-
-    // remove src acl and compare acls of src and link
-    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
-    testRemoveAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
+    // CASE 2: from src bucket
+    OzoneBucket srcBucket2 = setupBucket();
+    OzoneBucket linkedBucket2 = linkBucket(srcBucket2);
+    String key2 = createKey(srcBucket2);
+    OzoneObj linkObj2 = buildKeyObj(linkedBucket2, key2);
+    OzoneObj srcObj2 = buildKeyObj(srcBucket2, key2);
+    String user2 = "remoteUser2";
+    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
+    testRemoveAcl(user2, srcObj2, acl2);
+    assertEqualsAcls(srcObj2, linkObj2);
 
   }
 
   public void testLinkBucketSetKeyAcl() throws Exception {
     OzoneBucket srcBucket = setupBucket();
     OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-
-    // CASE 1: create key from link bucket
     String key = createKey(linkedBucket);
     OzoneObj linkObj = buildKeyObj(linkedBucket, key);
     OzoneObj srcObj = buildKeyObj(srcBucket, key);
 
-    // set acl to link and compare acls of src and link
-    testSetAcl(user1, linkObj, acl1);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // set acl to src and compare acls of src and link
-    testSetAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // CASE 2: create key from src bucket
-    key = createKey(srcBucket);
-    linkObj = buildKeyObj(linkedBucket, key);
-    srcObj = buildKeyObj(srcBucket, key);
-
-    // set acl to link and compare acls of src and link
-    testSetAcl(user1, linkObj, acl1);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // set acl to src and compare acls of src and link
-    testSetAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-  }
-
-  public void testLinkBucketAddPrefixAcl() throws Exception {
-    OzoneBucket srcBucket = setupBucket();
-    OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
-
-    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
-    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
-
-    // add link acl and compare acls of src and link
     String user1 = "remoteUser1";
     OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testAddAcl(user1, linkObj, acl1);
+    testSetAcl(user1, linkObj, acl1);  // case1: set link acl
     assertEqualsAcls(srcObj, linkObj);
 
-    // add src acl and compare acls of src and link
     String user2 = "remoteUser2";
     OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testAddAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-  }
-
-  public void testLinkBucketRemovePrefixAcl() throws Exception {
-    OzoneBucket srcBucket = setupBucket();
-    OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
-
-    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
-    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
-
-    // remove link acl and compare acls of src and link
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testRemoveAcl(user1, linkObj, acl1); // remove default acl
-    assertEqualsAcls(srcObj, linkObj);
-
-    // remove src acl and compare acls of src and link
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testAddAcl(user2, srcObj, acl2);    // make sure acl exist
-    testRemoveAcl(user2, srcObj, acl2);
-    assertEqualsAcls(srcObj, linkObj);
-
-  }
-
-  public void testLinkBucketSetPrefixAcl() throws Exception {
-    OzoneBucket srcBucket = setupBucket();
-    OzoneBucket linkedBucket = linkBucket(srcBucket);
-
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
-
-    OzoneObj linkObj = buildPrefixObj(linkedBucket, prefixName);
-    OzoneObj srcObj = buildPrefixObj(srcBucket, prefixName);
-
-    // set link acl and compare acls of src and link
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testSetAcl(user1, linkObj, acl1);
-    assertEqualsAcls(srcObj, linkObj);
-
-    // set src acl and compare acls of src and link
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testSetAcl(user2, srcObj, acl2);
+    testSetAcl(user2, srcObj, acl2);  // case2: set src acl
     assertEqualsAcls(srcObj, linkObj);
 
   }
@@ -570,7 +447,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertFalse(removeAcl);
 
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    Assert.assertTrue(addAcl);
+    Assert.assertTrue(addAcl); // 加进来了
 
     // Just changed acl type here to write, rest all is same as defaultUserAcl.
     OzoneAcl modifiedUserAcl = new OzoneAcl(USER, remoteUserName,

@@ -373,14 +373,21 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws IOException if there is error.
    */
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-            Pair.of(obj.getVolumeName(), obj.getBucketName()));
+
+    String volumeName = obj.getVolumeName();
+    String bucketName = obj.getBucketName();
+    if (volumeName != null && bucketName != null) {
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(volumeName, bucketName), false);
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
+    }
     boolean auditSuccess = true;
 
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            bucket.realVolume(), bucket.realBucket(), obj.getKeyName());
+            volumeName, bucketName, obj.getKeyName());
       }
       metrics.incNumGetAcl();
       switch (obj.getResourceType()) {

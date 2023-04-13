@@ -120,9 +120,10 @@ public class BucketManagerImpl implements BucketManager {
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
     ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+        Pair.of(obj.getVolumeName(), obj.getBucketName()), false);
     String volume = resolvedBucket.realVolume();
     String bucket = resolvedBucket.realBucket();
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
@@ -151,8 +152,16 @@ public class BucketManagerImpl implements BucketManager {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
 
-    String volume = ozObject.getVolumeName();
-    String bucket = ozObject.getBucketName();
+    ResolvedBucket resolvedBucket;
+    try {
+      resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()), false);
+    } catch (IOException e) {
+      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    }
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);

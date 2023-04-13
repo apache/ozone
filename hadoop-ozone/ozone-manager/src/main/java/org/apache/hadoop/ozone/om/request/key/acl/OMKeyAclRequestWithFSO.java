@@ -76,7 +76,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       ObjectParser objectParser = new ObjectParser(getPath(),
           OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()), false);
       volume = resolvedBucket.realVolume();
       bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();

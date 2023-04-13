@@ -870,7 +870,7 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
     ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+        Pair.of(obj.getVolumeName(), obj.getBucketName()), false);
     String volume = resolvedBucket.realVolume();
     String bucket = resolvedBucket.realBucket();
     String keyName = obj.getKeyName();
@@ -914,8 +914,15 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(context);
     Objects.requireNonNull(context.getClientUgi());
 
-    String volume = ozObject.getVolumeName();
-    String bucket = ozObject.getBucketName();
+    ResolvedBucket resolvedBucket;
+    try {
+      resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()), false);
+    } catch (IOException e) {
+      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    }
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = ozObject.getKeyName();
     String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
     OmKeyArgs args = new OmKeyArgs.Builder()

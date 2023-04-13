@@ -83,7 +83,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.KEY);
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()), false);
       volume = resolvedBucket.realVolume();
       bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();

@@ -91,7 +91,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.BUCKET);
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()), false);
       volume = resolvedBucket.realVolume();
       bucket = resolvedBucket.realBucket();
 

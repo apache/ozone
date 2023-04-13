@@ -21,14 +21,12 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 import java.io.IOException;
 import java.util.Map;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -76,16 +74,12 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
     PrefixManagerImpl prefixManager =
         (PrefixManagerImpl) ozoneManager.getPrefixManager();
     try {
-      String originPrefixPath = getOzoneObj().getPath();
-      ObjectParser objectParser = new ObjectParser(originPrefixPath,
+      String prefixPath = getOzoneObj().getPath();
+      ObjectParser objectParser = new ObjectParser(prefixPath,
           OzoneManagerProtocolProtos.OzoneObj.ObjectType.PREFIX);
-      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
-      volume = resolvedBucket.realVolume();
-      bucket = resolvedBucket.realBucket();
+      volume = objectParser.getVolume();
+      bucket = objectParser.getBucket();
       key = objectParser.getKey();
-      String prefixPath = OMPrefixAclRequestUtils.resolvedPrefixPath(
-          originPrefixPath, resolvedBucket);
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {

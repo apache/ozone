@@ -72,6 +72,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -212,6 +213,8 @@ public class TestOMKeyRequest {
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    when(ozoneManager.resolveBucketLink(any(Pair.class), anyBoolean()))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager())
