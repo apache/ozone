@@ -97,15 +97,22 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return true;
     }
 
+    boolean isSuperRead = isSuperRead(context.getClientUgi());
+
     boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
     if (isListAllVolume) {
-      return getAllowListAllVolumes();
+      return getAllowListAllVolumes() || isSuperRead;
     }
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
+
+    // bypass only read checks for super read
+    if (isSuperRead && parentAclRight == ACLType.READ) {
+      return true;
+    }
     
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
@@ -225,5 +232,15 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     }
 
     return ozAdmins.isAdmin(callerUgi);
+  }
+
+  private boolean isSuperRead(UserGroupInformation callerUgi) {
+    Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
+
+    if (ozAdmins == null) {
+      return false;
+    }
+
+    return ozAdmins.isSuperRead(callerUgi);
   }
 }

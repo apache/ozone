@@ -625,7 +625,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Collection<String> omAdminGroups =
         OzoneConfigUtil.getOzoneAdminsGroupsFromConfig(configuration);
     LOG.info("OM start with adminUsers: {}", omAdminUsernames);
-    omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
+    // Get super read list
+    Collection<String> omSuperReadUsernames =
+            OzoneConfigUtil.getOzoneSuperReadUserNamesFromConfig(configuration);
+    Collection<String> omSuperReadGroups =
+            OzoneConfigUtil.getOzoneSuperReadGroupsFromConfig(configuration);
+    omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups, omSuperReadUsernames, omSuperReadGroups);
 
     Collection<String> s3AdminUsernames =
             OzoneConfigUtil.getS3AdminsFromConfig(configuration);

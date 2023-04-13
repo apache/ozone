@@ -97,6 +97,21 @@ public class TestOzoneAdministrators {
         asList(new String[]{"testuser2", "testuser3"})));
     Assert.assertFalse("mismatching admins are not allowed perform " +
         "admin operations", nativeAuthorizer.checkAccess(obj, context));
+
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+            null, null, Collections.singletonList("testuser"), null));
+    if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
+      Assert.assertTrue("matching super read user are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
+      Assert.assertFalse("mismatching super read user are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
+    }
+
+    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
+      null, null, Collections.singletonList("testuser1"), null));
+    Assert.assertFalse("mismatching super read user are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
   }
 
   private void testGroupAdminOperations(OzoneObj obj, RequestContext context)
@@ -112,6 +127,21 @@ public class TestOzoneAdministrators {
     Assert.assertFalse("Users from mismatching admin groups " +
         "are allowed to perform admin operations",
             nativeAuthorizer.checkAccess(obj, context));
+
+    nativeAuthorizer.setOzoneAdmins(
+            new OzoneAdmins(null, null, null, Collections.singletonList("testgroup")));
+    if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
+      Assert.assertTrue("matching super read groups are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
+      Assert.assertFalse("mismatching super read groups are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    }
+
+    nativeAuthorizer.setOzoneAdmins(
+            new OzoneAdmins(null, null, null, Collections.singletonList("testgroup1")));
+    Assert.assertFalse("mismatching super read groups are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
   }
 
   private RequestContext getUserRequestContext(String username,
