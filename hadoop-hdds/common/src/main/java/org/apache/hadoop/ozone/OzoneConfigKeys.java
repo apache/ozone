@@ -104,6 +104,15 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * Flag to enable hsync/hflush.
+   */
+  public static final String OZONE_FS_HSYNC_ENABLED
+      = "ozone.fs.hsync.enabled";
+  public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
+      = false;
+
+
+  /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
@@ -484,7 +493,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";
-  public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = false;
+  public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = true;
 
   public static final String OZONE_MANAGER_FAIR_LOCK = "ozone.om.lock.fair";
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;

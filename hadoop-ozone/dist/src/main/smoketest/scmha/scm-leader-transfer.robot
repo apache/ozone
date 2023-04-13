@@ -30,7 +30,7 @@ Get SCM Leader Node
                             Should Contain          ${result}               FOLLOWER            2
     ${scmLine} =            Get Lines Containing String                     ${result}           LEADER
     ${splits} =             Split String            ${scmLine}          :
-    ${leaderSCM} =          Strip String            ${splits[4]}
+    ${leaderSCM} =          Strip String            ${splits[3]}
                             LOG                     Leader SCM: ${leaderSCM}
     [return]                ${leaderSCM}
 

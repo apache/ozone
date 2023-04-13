@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
+import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
@@ -104,6 +105,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -232,6 +234,17 @@ public final class OzoneManagerRatisUtils {
             omRequest.getDeleteOpenKeysRequest().getBucketLayout());
       }
       return new OMOpenKeysDeleteRequest(omRequest, bktLayout);
+    case RecoverLease:
+      volumeName = omRequest.getRecoverLeaseRequest().getVolumeName();
+      bucketName = omRequest.getRecoverLeaseRequest().getBucketName();
+      bucketLayout =
+        getBucketLayout(ozoneManager.getMetadataManager(), volumeName,
+          bucketName);
+      if (bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        throw new IOException("Bucket " + bucketName + " is not FSO layout. " +
+                "It does not support lease recovery");
+      }
+      return new OMRecoverLeaseRequest(omRequest);
     /*
      * Key requests that can have multiple variants based on the bucket layout
      * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.

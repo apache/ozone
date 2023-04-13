@@ -185,8 +185,8 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
     assertThrows(CommandTargetOverloadedException.class,
-        () -> testMisReplication(availableReplicas, Collections.emptyList(),
-            0, 1, 1));
+        () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
+            Collections.emptyList(), 0, 1, 1, 0));
   }
 
   @Override

@@ -131,9 +131,9 @@ enum Type {
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
   SnapshotMoveDeletedKeys = 116;
-
   TransferLeadership = 117;
   SnapshotPurge = 118;
+  RecoverLease = 119;
 }
 
 message OMRequest {
@@ -251,6 +251,7 @@ message OMRequest {
   optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
+  optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
 }
 
 message OMResponse {
@@ -360,6 +361,7 @@ message OMResponse {
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
 }
 
 enum Status {
@@ -1859,6 +1861,16 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+}
+
+message RecoverLeaseRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string keyName = 3;
+}
+
+message RecoverLeaseResponse {
+  optional bool response = 1;
 }
 
 /**
