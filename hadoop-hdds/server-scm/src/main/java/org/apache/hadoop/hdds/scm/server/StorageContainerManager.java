@@ -623,11 +623,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager = new SCMHAManagerImpl(conf, this);
     }
 
-    long timeDuration = conf.getTimeDuration(
-        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
-        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
-            .getDuration(), TimeUnit.MILLISECONDS);
-    leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
+    if (configurator.getLeaseManager() != null) {
+      leaseManager = configurator.getLeaseManager();
+    } else {
+      long timeDuration = conf.getTimeDuration(
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+              .getDuration(), TimeUnit.MILLISECONDS);
+      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
+    }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getLayoutVersion());
@@ -1764,13 +1768,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public ContainerManager getContainerManager() {
     return containerManager;
-  }
-
-  /**
-   * Returns SCM lease manager.
-   */
-  public LeaseManager getLeaseManager() {
-    return leaseManager;
   }
 
   /**

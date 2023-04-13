@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -48,6 +49,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
@@ -117,6 +119,38 @@ public class TestCloseContainerEventHandler {
     eventHandler.onMessage(container.containerID(), eventPublisher);
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+  }
+
+  @Test
+  public void testCloseContainerWithDelayByLeaseManager()
+      throws Exception {
+    final Pipeline pipeline = createPipeline(RATIS_REP_CONFIG, 3);
+    final ContainerInfo container =
+        createContainer(RATIS_REP_CONFIG, pipeline.getId());
+    container.setState(HddsProtos.LifeCycleState.CLOSING);
+    Mockito.when(containerManager.getContainer(container.containerID()))
+        .thenReturn(container);
+
+    SCMContext scmContext = Mockito.mock(SCMContext.class);
+    Mockito.when(scmContext.isLeader()).thenReturn(true);
+    long timeoutInMs = 2000;
+    Mockito.when(pipelineManager.getPipeline(pipeline.getId()))
+        .thenReturn(pipeline);
+    LeaseManager<Object> leaseManager = new LeaseManager<>("test", timeoutInMs);
+    leaseManager.start();
+    CloseContainerEventHandler closeHandler = new CloseContainerEventHandler(
+        pipelineManager, containerManager, scmContext,
+        leaseManager, timeoutInMs);
+    closeHandler.onMessage(container.containerID(), eventPublisher);
+    // immediate check if event is published, it should not publish in 500ms
+    Thread.sleep(500);
+    Mockito.verify(eventPublisher, never())
+        .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    Thread.sleep(timeoutInMs * 2);
+    // event publish already after waiting 4+ seconds
+    Mockito.verify(eventPublisher, atLeastOnce())
+        .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    leaseManager.shutdown();
   }
 
   @Test

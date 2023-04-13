@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -63,11 +64,12 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
   private final LeaseManager<Object> leaseManager;
   private final long timeout;
 
-  public CloseContainerEventHandler(final PipelineManager pipelineManager,
-                                    final ContainerManager containerManager,
-                                    final SCMContext scmContext,
-                                    LeaseManager leaseManager,
-                                    final long timeout) {
+  public CloseContainerEventHandler(
+      final PipelineManager pipelineManager,
+      final ContainerManager containerManager,
+      final SCMContext scmContext,
+      @Nullable LeaseManager<Object> leaseManager,
+      final long timeout) {
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.scmContext = scmContext;
@@ -113,14 +115,19 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
         command.setTerm(scmContext.getTermOfLeader());
         command.setEncodedToken(getContainerToken(containerID));
 
-        try {
-          leaseManager.acquire(command, timeout, () -> triggerCloseCallback(
-              publisher, container, command));
-        } catch (LeaseAlreadyExistException ex) {
-          LOG.debug("Close container {} in {} state already in queue.",
-              containerID, container.getState());
-        } catch (Exception ex) {
-          LOG.error("Error while scheduling close", ex);
+        if (null != leaseManager) {
+          try {
+            leaseManager.acquire(command, timeout, () -> triggerCloseCallback(
+                publisher, container, command));
+          } catch (LeaseAlreadyExistException ex) {
+            LOG.debug("Close container {} in {} state already in queue.",
+                containerID, container.getState());
+          } catch (Exception ex) {
+            LOG.error("Error while scheduling close", ex);
+          }
+        } else {
+          // case of recon, lease manager will be null, trigger event directly
+          triggerCloseCallback(publisher, container, command);
         }
       } else {
         LOG.debug("Cannot close container {}, which is in {} state.",
@@ -135,6 +142,19 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
     }
   }
 
+  /**
+   * Callback method triggered when timeout occurs at lease manager.
+   * This will then send close command to DN (adding to command queue)
+   * after this delay. This delay is provided to ensure the allocated blocks
+   * are written successfully by the client with in the delay, and 
+   * SCM in closing state will not allocate new blocks during this time.
+   * 
+   * @param publisher the publisher
+   * @param container the container info
+   * @param command the scm delete command
+   * @return Void
+   * @throws ContainerNotFoundException
+   */
   private Void triggerCloseCallback(
       EventPublisher publisher, ContainerInfo container, SCMCommand<?> command)
       throws ContainerNotFoundException {
