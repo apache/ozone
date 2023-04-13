@@ -33,6 +33,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SUPER_READ_USERNAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SUPER_READ_GROUPS;
 
 /**
  * Utility class for ozone configurations.
@@ -77,6 +79,14 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
+  /**
+   * Return list of Ozone Super Read Usernames from config.
+   */
+  static Collection<String> getOzoneSuperReadUserNamesFromConfig(
+          OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_SUPER_READ_USERNAMES);
+  }
+
   static Collection<String> getOzoneAdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
@@ -92,6 +102,11 @@ public final class OzoneConfigUtil {
               .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
     }
     return s3AdminsGroup;
+  }
+
+  static Collection<String> getOzoneSuperReadGroupsFromConfig(
+          OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_SUPER_READ_GROUPS);
   }
 
   public static ReplicationConfig resolveReplicationConfigPreference(

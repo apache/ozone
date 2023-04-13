@@ -4035,6 +4035,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Return OzoneAdmins.
+   */
+  public OzoneAdmins getOmAdmins() {
+    return omAdmins;
+  }
+
+  /**
    * Return true if a UserGroupInformation is OM admin, false otherwise.
    * @param callerUgi Caller UserGroupInformation
    */

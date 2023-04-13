@@ -34,8 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -52,6 +50,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private KeyManager keyManager;
   private PrefixManager prefixManager;
   private OzoneAdmins ozAdmins;
+  private OzoneAdmins ozSuperReadAdmins;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -92,21 +91,30 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     }
 
     // bypass all checks for admin
-    boolean isAdmin = isAdmin(context.getClientUgi());
+    boolean isAdmin = isAdmin(ozAdmins, context.getClientUgi());
     if (isAdmin) {
       return true;
     }
 
     boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
+
+    boolean isSuperReadAdmin = isAdmin(ozSuperReadAdmins, context.getClientUgi());
+
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
     if (isListAllVolume) {
-      return getAllowListAllVolumes();
+      return getAllowListAllVolumes()
+          || isSuperReadAdmin;
+    }
+
+    if (context.getAclRights() == ACLType.READ
+        || context.getAclRights() == ACLType.READ_ACL
+        || context.getAclRights() == ACLType.LIST) {
+      return isSuperReadAdmin;
     }
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
-    
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
@@ -195,6 +203,10 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.ozAdmins = ozoneAdmins;
   }
 
+  public void setOzoneSuperReadAdmins(OzoneAdmins ozoneSuperReadAdmins) {
+    this.ozSuperReadAdmins = ozoneSuperReadAdmins;
+  }
+
   public OzoneAdmins getOzoneAdmins() {
     return ozAdmins;
   }
@@ -217,13 +229,14 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     return false;
   }
 
-  private boolean isAdmin(UserGroupInformation callerUgi) {
+  private boolean isAdmin(OzoneAdmins pOzAdmins,
+      UserGroupInformation callerUgi) {
     Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
 
-    if (ozAdmins == null) {
+    if (pOzAdmins == null) {
       return false;
     }
 
-    return ozAdmins.isAdmin(callerUgi);
+    return pOzAdmins.isAdmin(callerUgi);
   }
 }

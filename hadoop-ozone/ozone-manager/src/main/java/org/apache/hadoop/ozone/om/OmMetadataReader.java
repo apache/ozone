@@ -44,6 +44,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -114,8 +115,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(
-            new OzoneAdmins(ozoneManager.getOmAdminUsernames()));
+        authorizer.setOzoneAdmins(ozoneManager.getOmAdmins());
+        authorizer.setOzoneSuperReadAdmins(getOmSuperReadAdmins(configuration));
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;
@@ -579,5 +580,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ResourceType.KEY;
   }
 
-  
+  private OzoneAdmins getOmSuperReadAdmins(OzoneConfiguration configuration) {
+    // Get super read list
+    Collection<String> omSuperReadUsernames =
+            OzoneConfigUtil.getOzoneSuperReadUserNamesFromConfig(configuration);
+    Collection<String> omSuperReadGroups =
+            OzoneConfigUtil.getOzoneSuperReadGroupsFromConfig(configuration);
+    return new OzoneAdmins(omSuperReadUsernames, omSuperReadGroups);
+  }
 }

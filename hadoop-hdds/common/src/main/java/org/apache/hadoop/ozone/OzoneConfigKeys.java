@@ -173,6 +173,12 @@ public final class OzoneConfigKeys {
           "ozone.s3.administrators";
   public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
           "ozone.s3.administrators.groups";
+
+  public static final String OZONE_SUPER_READ_USERNAMES =
+          "ozone.readonly.administrators";
+  public static final String OZONE_SUPER_READ_GROUPS =
+          "ozone.readonly.administrators.groups";
+
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
