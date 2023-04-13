@@ -810,8 +810,7 @@ public class ContainerBalancerTask implements Runnable {
       If LegacyReplicationManager is enabled, ReplicationManager will
       redirect to it. Otherwise, use MoveManager.
        */
-      if (ozoneConfiguration.getBoolean("hdds.scm.replication.enable.legacy",
-          true)) {
+      if (replicationManager.getConfig().isLegacyEnabled()) {
         future = replicationManager
             .move(containerID, source, moveSelection.getTargetNode());
       } else {

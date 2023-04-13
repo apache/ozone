@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
@@ -89,12 +90,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
+  private final BlockDeletingServiceMetrics blockDeleteMetrics;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
+    this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
     this.executor = Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
@@ -486,6 +489,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
 
     if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
+      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
       LOG.info(String.format("Delete blocks for containerId: %d"
               + " is either received out of order or retried,"
               + " %d <= %d", containerId, delTX.getTxID(),

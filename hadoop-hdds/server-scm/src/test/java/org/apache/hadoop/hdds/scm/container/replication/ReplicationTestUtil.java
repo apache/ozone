@@ -42,6 +42,7 @@ import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -286,9 +287,7 @@ public final class ReplicationTestUtil {
           throw new SCMException("Insufficient Nodes available to choose",
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
         }
-        List<DatanodeDetails> dns = new ArrayList<>();
-        dns.add(nodeToReturn);
-        return dns;
+        return Collections.singletonList(nodeToReturn);
       }
 
       @Override
@@ -310,6 +309,37 @@ public final class ReplicationTestUtil {
               throws SCMException {
         throw new SCMException("No nodes available",
                 FAILED_TO_FIND_SUITABLE_NODE);
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
+  }
+
+  /**
+   * Placement policy that throws an exception when the number of requested
+   * nodes is greater or equal to throwWhenThisOrMoreNodesRequested, otherwise
+   * returns a random node.
+   */
+  public static PlacementPolicy getInsufficientNodesTestPlacementPolicy(
+      final NodeManager nodeManager, final OzoneConfiguration conf,
+      int throwWhenThisOrMoreNodesRequested) {
+    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
+          throw new SCMException("No nodes available",
+              FAILED_TO_FIND_SUITABLE_NODE);
+        }
+        return Collections
+            .singletonList(MockDatanodeDetails.randomDatanodeDetails());
       }
 
       @Override

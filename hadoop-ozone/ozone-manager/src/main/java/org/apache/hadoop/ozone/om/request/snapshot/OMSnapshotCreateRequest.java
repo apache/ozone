@@ -48,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -100,7 +101,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-    return omRequest;
+
+    return omRequest.toBuilder().setCreateSnapshotRequest(
+        omRequest.getCreateSnapshotRequest().toBuilder()
+            .setSnapshotId(UUID.randomUUID().toString())
+            .build()).build();
   }
   
   @Override

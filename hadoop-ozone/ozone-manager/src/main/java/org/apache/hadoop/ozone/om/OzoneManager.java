@@ -4420,6 +4420,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return null;
   }
 
+  @Override
+  public boolean recoverLease(String volumeName, String bucketName,
+                              String keyName) throws IOException {
+    return false;
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
