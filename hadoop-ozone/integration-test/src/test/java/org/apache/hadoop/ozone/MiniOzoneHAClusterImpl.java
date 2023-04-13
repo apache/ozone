@@ -616,6 +616,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               LOG.info("Intialized SCM at {}. This SCM is currently "
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
+
+            if (i == 1) {
+              GenericTestUtils.waitFor(scm::checkLeader, 1000, 10_000);
+            }
           }
           break;
         } catch (BindException e) {
@@ -629,6 +633,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
               retryCount, e);
+        } catch (InterruptedException | TimeoutException e) {
+          throw new RuntimeException(e);
         }
       }
 
