@@ -21,9 +21,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -349,6 +351,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException;
+
   /**
    * Force SCM out of Safe mode.
    *
@@ -441,6 +444,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
+
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
    * commands operating on {@code containerID}.
@@ -455,4 +459,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException;
+
+  DecommissionScmResponseProto decommissionScm(
+      RemoveSCMRequest removeScmRequest) throws IOException;
 }

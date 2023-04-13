@@ -27,8 +27,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -509,4 +511,12 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.queryUpgradeFinalizationProgress(
         upgradeClientID, force, readonly);
   }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      RemoveSCMRequest removeScmRequest)
+      throws IOException {
+    return storageContainerLocationClient.decommissionScm(removeScmRequest);
+  }
+
 }

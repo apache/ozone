@@ -38,12 +38,16 @@ import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -1323,5 +1327,40 @@ public class SCMClientProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      RemoveSCMRequest removeScm) {
+    String removeScmError = "";
+    Builder removeScmResponseBuilder =
+        RemoveScmResponseProto.newBuilder()
+            .setScmId(removeScm.getScmId());
+
+    RemoveSCMRequest removeScmRequest = removeScm;
+
+    // set ratis address in server if not supplied by scm client
+    if (removeScm.getRatisAddr().equals("")) {
+      removeScmRequest = new RemoveSCMRequest(
+          removeScm.getClusterId(),
+          removeScm.getScmId(),
+          "localhost:" + scm.getScmHAManager().getRatisServer()
+              .getDivision().getRaftServer().getServerRpc()
+              .getInetSocketAddress().getPort());
+    }
+
+    try {
+      removeScmResponseBuilder
+          .setSuccess(scm.removePeerFromHARing(removeScmRequest));
+    } catch (IOException ex) {
+      removeScmResponseBuilder
+          .setSuccess(false);
+      removeScmError = ex.getMessage();
+    }
+
+    return DecommissionScmResponseProto.newBuilder()
+        .setRemoveScmResponse(removeScmResponseBuilder.build())
+        .setRemoveScmError(removeScmError)
+        .build();
   }
 }
