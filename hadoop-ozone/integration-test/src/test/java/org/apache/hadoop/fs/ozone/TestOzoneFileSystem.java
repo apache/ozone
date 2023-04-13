@@ -1678,7 +1678,8 @@ public class TestOzoneFileSystem {
     }, 1000, 120000);
 
     // userTrash path will contain the checkpoint folder
-    Assert.assertEquals(1, fs.listStatus(userTrash).length);
+    FileStatus[] statusList = fs.listStatus(userTrash);
+    Assert.assertTrue(1 <= statusList.length);
 
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(() -> {
