@@ -23,13 +23,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.validator.routines.DomainValidator;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -48,21 +49,27 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getCertificationRequest;
-import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -116,7 +123,7 @@ public class DefaultCAServer implements CertificateServer {
   private final String subject;
   private final String clusterID;
   private final String scmID;
-  private String componentName = Paths.get("scm", "ca").toString();
+  private String componentName;
   private Path caKeysPath;
   private Path caRootX509Path;
   private SecurityConfig config;
@@ -127,6 +134,8 @@ public class DefaultCAServer implements CertificateServer {
   private CertificateApprover approver;
   private CRLApprover crlApprover;
   private CertificateStore store;
+  private Lock lock;
+  private static boolean testSecureFlag;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -136,11 +145,15 @@ public class DefaultCAServer implements CertificateServer {
    * @param certificateStore - A store used to persist Certificates.
    */
   public DefaultCAServer(String subject, String clusterID, String scmID,
-                         CertificateStore certificateStore) {
+                         CertificateStore certificateStore,
+      PKIProfile pkiProfile, String componentName) {
     this.subject = subject;
     this.clusterID = clusterID;
     this.scmID = scmID;
     this.store = certificateStore;
+    this.profile = pkiProfile;
+    this.componentName = componentName;
+    lock = new ReentrantLock();
   }
 
   @Override
@@ -149,28 +162,18 @@ public class DefaultCAServer implements CertificateServer {
     caKeysPath = securityConfig.getKeyLocation(componentName);
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
-
-    // TODO: Make these configurable and load different profiles based on
-    // config.
-    profile = new DefaultProfile();
     this.approver = new DefaultApprover(profile, this.config);
 
     /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
      */
 
-    if (type == CAType.SELF_SIGNED_CA) {
-      VerificationStatus status = verifySelfSignedCA(securityConfig);
-      Consumer<SecurityConfig> caInitializer =
-          processVerificationStatus(status);
-      caInitializer.accept(securityConfig);
-      crlApprover = new DefaultCRLApprover(securityConfig,
-          getCAKeys().getPrivate());
-      return;
-    }
-
-    LOG.error("We support only Self-Signed CAs for now.");
-    throw new IllegalStateException("Not implemented functionality requested.");
+    VerificationStatus status = verifySelfSignedCA(securityConfig);
+    Consumer<SecurityConfig> caInitializer =
+        processVerificationStatus(status, type);
+    caInitializer.accept(securityConfig);
+    crlApprover = new DefaultCRLApprover(securityConfig,
+        getCAKeys().getPrivate());
   }
 
   @Override
@@ -178,10 +181,17 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certificateCodec =
         new CertificateCodec(config, componentName);
     try {
-      return certificateCodec.readCertificate();
+      return certificateCodec.getTargetCertHolder();
     } catch (CertificateException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public CertPath getCaCertPath()
+      throws CertificateException, IOException {
+    CertificateCodec codec = new CertificateCodec(config, componentName);
+    return codec.getCertPath();
   }
 
   /**
@@ -211,79 +221,105 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(
+  public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType approverType) {
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(config.getDefaultCertDuration()).toLocalDate();
+      CertificateApprover.ApprovalType approverType, NodeType role) {
+    LocalDateTime beginDate = LocalDateTime.now();
+    LocalDateTime endDate;
+    // When issuing certificates for sub-ca use the max certificate duration
+    // similar to self signed root certificate.
+    if (role == NodeType.SCM) {
+      endDate = beginDate.plus(config.getMaxCertificateDuration());
+    } else {
+      endDate = beginDate.plus(config.getDefaultCertDuration());
+    }
 
     CompletableFuture<X509CertificateHolder> xcertHolder =
         approver.inspectCSR(csr);
 
-    if(xcertHolder.isCompletedExceptionally()) {
+    CompletableFuture<CertPath> xCertHolders
+        = new CompletableFuture<>();
+
+    if (xcertHolder.isCompletedExceptionally()) {
       // This means that approver told us there are things which it disagrees
       // with in this Certificate Request. Since the first set of sanity
       // checks failed, we just return the future object right here.
-      return xcertHolder;
+      xCertHolders.completeExceptionally(new SCMSecurityException("Failed to " +
+          "verify the CSR."));
     }
     try {
       switch (approverType) {
       case MANUAL:
-        xcertHolder.completeExceptionally(new SCMSecurityException("Manual " +
+        xCertHolders.completeExceptionally(new SCMSecurityException("Manual " +
             "approval is not yet implemented."));
         break;
       case KERBEROS_TRUSTED:
       case TESTING_AUTOMATIC:
         X509CertificateHolder xcert;
         try {
-          xcert = signAndStoreCertificate(beginDate, endDate, csr);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         } catch (SCMSecurityException e) {
           // Certificate with conflicting serial id, retry again may resolve
           // this issue.
           LOG.error("Certificate storage failed, retrying one more time.", e);
-          xcert = signAndStoreCertificate(beginDate, endDate, csr);
+          xcert = signAndStoreCertificate(beginDate, endDate, csr, role);
         }
-
-        xcertHolder.complete(xcert);
+        CertificateCodec codec = new CertificateCodec(config, componentName);
+        CertPath certPath = codec.getCertPath();
+        CertPath updatedCertPath = codec.prependCertToCertPath(xcert, certPath);
+        xCertHolders.complete(updatedCertPath);
         break;
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
-    } catch (CertificateException | IOException | OperatorCreationException e) {
+    } catch (CertificateException | IOException | OperatorCreationException |
+             TimeoutException e) {
       LOG.error("Unable to issue a certificate.", e);
-      xcertHolder.completeExceptionally(new SCMSecurityException(e));
+      xCertHolders.completeExceptionally(
+          new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
     }
-    return xcertHolder;
+    return xCertHolders;
   }
 
-  private X509CertificateHolder signAndStoreCertificate(LocalDate beginDate,
-      LocalDate endDate, PKCS10CertificationRequest csr) throws IOException,
-      OperatorCreationException, CertificateException {
-    X509CertificateHolder xcert = approver.sign(config,
-        getCAKeys().getPrivate(),
-        getCACertificate(), java.sql.Date.valueOf(beginDate),
-        java.sql.Date.valueOf(endDate), csr, scmID, clusterID);
-    store.storeValidCertificate(xcert.getSerialNumber(),
-        CertificateCodec.getX509Certificate(xcert));
+  private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
+      LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
+      throws IOException,
+      OperatorCreationException, CertificateException, TimeoutException {
+
+    lock.lock();
+    X509CertificateHolder xcert;
+    try {
+      xcert = approver.sign(config,
+          getCAKeys().getPrivate(),
+          getCACertificate(),
+          Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
+          Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant()),
+          csr, scmID, clusterID);
+      if (store != null) {
+        store.checkValidCertID(xcert.getSerialNumber());
+        store.storeValidCertificate(xcert.getSerialNumber(),
+            CertificateCodec.getX509Certificate(xcert), role);
+      }
+    } finally {
+      lock.unlock();
+    }
     return xcert;
   }
 
   @Override
-  public Future<X509CertificateHolder> requestCertificate(String csr,
-      CertificateApprover.ApprovalType type) throws IOException {
+  public Future<CertPath> requestCertificate(String csr,
+      CertificateApprover.ApprovalType type, NodeType nodeType)
+      throws IOException {
     PKCS10CertificationRequest request =
         getCertificationRequest(csr);
-    return requestCertificate(request, type);
+    return requestCertificate(request, type, nodeType);
   }
 
   @Override
   public Future<Optional<Long>> revokeCertificates(
       List<BigInteger> certificates,
       CRLReason reason,
-      Date revocationTime,
-      SecurityConfig securityConfig) {
+      Date revocationTime) {
     CompletableFuture<Optional<Long>> revoked = new CompletableFuture<>();
     if (CollectionUtils.isEmpty(certificates)) {
       revoked.completeExceptionally(new SCMSecurityException(
@@ -295,28 +331,40 @@ public class DefaultCAServer implements CertificateServer {
           store.revokeCertificates(certificates,
               getCACertificate(), reason, revocationTime, crlApprover)
       );
-    } catch (IOException ex) {
+    } catch (IOException | TimeoutException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));
     }
     return revoked;
   }
 
+  @Override
+  public List<X509Certificate> listCertificate(NodeType role,
+      long startSerialId, int count, boolean isRevoked) throws IOException {
+    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
+        isRevoked ? CertificateStore.CertType.REVOKED_CERTS :
+            CertificateStore.CertType.VALID_CERTS);
+  }
+
+  @Override
+  public void reinitialize(SCMMetadataStore scmMetadataStore) {
+    store.reinitialize(scmMetadataStore);
+  }
+
   /**
-   *
-   * @param role            - node type: OM/SCM/DN.
-   * @param startSerialId   - start cert serial id.
-   * @param count           - max number of certificates returned in a batch.
-   * @param isRevoked       - whether return revoked cert only.
-   * @return
+   * Get the CRLInfo based on the CRL Ids.
+   * @param crlIds - list of crl ids
+   * @return CRLInfo
    * @throws IOException
    */
   @Override
-  public List<X509Certificate> listCertificate(HddsProtos.NodeType role,
-      long startSerialId, int count, boolean isRevoked) throws IOException {
-    return store.listCertificate(role, BigInteger.valueOf(startSerialId), count,
-        isRevoked? CertificateStore.CertType.REVOKED_CERTS :
-            CertificateStore.CertType.VALID_CERTS);
+  public List<CRLInfo> getCrls(List<Long> crlIds) throws IOException {
+    return store.getCrls(crlIds);
+  }
+
+  @Override
+  public long getLatestCrlId() {
+    return store.getLatestCrlId();
   }
 
   /**
@@ -413,7 +461,7 @@ public class DefaultCAServer implements CertificateServer {
    */
   @VisibleForTesting
   Consumer<SecurityConfig> processVerificationStatus(
-      VerificationStatus status) {
+      VerificationStatus status,  CAType type) {
     Consumer<SecurityConfig> consumer = null;
     switch (status) {
     case SUCCESS:
@@ -441,25 +489,48 @@ public class DefaultCAServer implements CertificateServer {
       };
       break;
     case INITIALIZE:
-      consumer = (arg) -> {
-        try {
-          generateSelfSignedCA(arg);
-        } catch (NoSuchProviderException | NoSuchAlgorithmException
-            | IOException e) {
-          LOG.error("Unable to initialize CertificateServer.", e);
-        }
-        VerificationStatus newStatus = verifySelfSignedCA(arg);
-        if (newStatus != VerificationStatus.SUCCESS) {
-          LOG.error("Unable to initialize CertificateServer, failed in " +
-              "verification.");
-        }
-      };
+      if (type == CAType.ROOT) {
+        consumer = this::initRootCa;
+      } else if (type == CAType.SUBORDINATE) {
+        // For sub CA certificates are generated during bootstrap/init. If
+        // both keys/certs are missing, init/bootstrap is missed to be
+        // performed.
+        consumer = (arg) -> {
+          LOG.error("Sub SCM CA Server is missing keys/certs. SCM is started " +
+              "with out init/bootstrap");
+          throw new IllegalStateException("INTERMEDIARY_CA Should not be" +
+              " in Initialize State during startup.");
+        };
+      }
       break;
     default:
       /* Make CheckStyle happy */
       break;
     }
     return consumer;
+  }
+
+  private void initRootCa(SecurityConfig securityConfig) {
+    if (isExternalCaSpecified(securityConfig)) {
+      initWithExternalRootCa(securityConfig);
+    } else {
+      try {
+        generateSelfSignedCA(securityConfig);
+      } catch (NoSuchProviderException | NoSuchAlgorithmException
+               | IOException e) {
+        LOG.error("Unable to initialize CertificateServer.", e);
+      }
+    }
+    VerificationStatus newStatus = verifySelfSignedCA(securityConfig);
+    if (newStatus != VerificationStatus.SUCCESS) {
+      LOG.error("Unable to initialize CertificateServer, failed in " +
+          "verification.");
+    }
+  }
+
+  private boolean isExternalCaSpecified(SecurityConfig conf) {
+    return !conf.getExternalRootCaCert().isEmpty() &&
+        !conf.getExternalRootCaPrivateKeyPath().isEmpty();
   }
 
   /**
@@ -485,17 +556,17 @@ public class DefaultCAServer implements CertificateServer {
    * Generates a self-signed Root Certificate for CA.
    *
    * @param securityConfig - SecurityConfig
-   * @param key - KeyPair.
+   * @param key            - KeyPair.
    * @throws IOException          - on Error.
    * @throws SCMSecurityException - on Error.
    */
-  private void generateRootCertificate(SecurityConfig securityConfig,
-      KeyPair key) throws IOException, SCMSecurityException {
+  private void generateRootCertificate(
+      SecurityConfig securityConfig, KeyPair key)
+      throws IOException, SCMSecurityException {
     Preconditions.checkNotNull(this.config);
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
-    LocalDate endDate =
-        temp.plus(securityConfig.getMaxCertificateDuration()).toLocalDate();
+    LocalDateTime beginDate = LocalDateTime.now();
+    LocalDateTime endDate =
+        beginDate.plus(securityConfig.getMaxCertificateDuration());
     SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
         .setSubject(this.subject)
         .setScmID(this.scmID)
@@ -512,14 +583,14 @@ public class DefaultCAServer implements CertificateServer {
       OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
           ip -> {
             builder.addIpAddress(ip.getHostAddress());
-            if(validator.isValid(ip.getCanonicalHostName())) {
+            if (validator.isValid(ip.getCanonicalHostName())) {
               builder.addDnsName(ip.getCanonicalHostName());
             }
           });
     } catch (IOException e) {
       throw new org.apache.hadoop.hdds.security.x509
-          .exceptions.CertificateException(
-              "Error while adding ip to CA self signed certificate", e,
+          .exception.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
           CSR_ERROR);
     }
     X509CertificateHolder selfSignedCertificate = builder.build();
@@ -527,6 +598,65 @@ public class DefaultCAServer implements CertificateServer {
     CertificateCodec certCodec =
         new CertificateCodec(config, componentName);
     certCodec.writeCertificate(selfSignedCertificate);
+  }
+
+  private void initWithExternalRootCa(SecurityConfig conf) {
+    String externalRootCaLocation = conf.getExternalRootCaCert();
+    Path extCertPath = Paths.get(externalRootCaLocation);
+    Path extPrivateKeyPath = Paths.get(conf.getExternalRootCaPrivateKeyPath());
+    String externalPublicKeyLocation = conf.getExternalRootCaPublicKeyPath();
+
+    KeyCodec keyCodec = new KeyCodec(config, componentName);
+    CertificateCodec certificateCodec =
+        new CertificateCodec(config, componentName);
+    try {
+      Path extCertParent = extCertPath.getParent();
+      Path extCertName = extCertPath.getFileName();
+      if (extCertParent == null || extCertName == null) {
+        throw new IOException("External cert path is not correct: " +
+            extCertPath);
+      }
+      X509CertificateHolder certHolder = certificateCodec.getTargetCertHolder(
+          extCertParent, extCertName.toString());
+      Path extPrivateKeyParent = extPrivateKeyPath.getParent();
+      Path extPrivateKeyFileName = extPrivateKeyPath.getFileName();
+      if (extPrivateKeyParent == null || extPrivateKeyFileName == null) {
+        throw new IOException("External private key path is not correct: " +
+            extPrivateKeyPath);
+      }
+      PrivateKey privateKey = keyCodec.readPrivateKey(extPrivateKeyParent,
+          extPrivateKeyFileName.toString());
+      PublicKey publicKey;
+      publicKey = readPublicKeyWithExternalData(
+          externalPublicKeyLocation, keyCodec, certHolder);
+      keyCodec.writeKey(new KeyPair(publicKey, privateKey));
+      certificateCodec.writeCertificate(certHolder);
+    } catch (IOException | CertificateException | NoSuchAlgorithmException |
+             InvalidKeySpecException e) {
+      LOG.error("External root CA certificate initialization failed", e);
+    }
+  }
+
+  private PublicKey readPublicKeyWithExternalData(
+      String externalPublicKeyLocation, KeyCodec keyCodec,
+      X509CertificateHolder certHolder)
+      throws CertificateException, NoSuchAlgorithmException,
+      InvalidKeySpecException, IOException {
+    PublicKey publicKey;
+    if (externalPublicKeyLocation.isEmpty()) {
+      publicKey = CertificateCodec.getX509Certificate(certHolder)
+          .getPublicKey();
+    } else {
+      Path publicKeyPath = Paths.get(externalPublicKeyLocation);
+      Path publicKeyPathFileName = publicKeyPath.getFileName();
+      Path publicKeyParent = publicKeyPath.getParent();
+      if (publicKeyPathFileName == null || publicKeyParent == null) {
+        throw new IOException("Public key path incorrect: " + publicKeyParent);
+      }
+      publicKey = keyCodec.readPublicKey(
+          publicKeyParent, publicKeyPathFileName.toString());
+    }
+    return publicKey;
   }
 
   /**
@@ -539,5 +669,10 @@ public class DefaultCAServer implements CertificateServer {
     MISSING_KEYS, /* Private key is missing, certificate Exists.*/
     MISSING_CERTIFICATE, /* Keys exist, but root certificate missing.*/
     INITIALIZE /* All artifacts are missing, we should init the system. */
+  }
+
+  @VisibleForTesting
+  public static void setTestSecureFlag(boolean flag) {
+    testSecureFlag = flag;
   }
 }

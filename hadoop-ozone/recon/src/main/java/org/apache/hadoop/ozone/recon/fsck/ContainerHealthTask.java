@@ -18,18 +18,27 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
@@ -40,6 +49,7 @@ import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Class that scans the list of containers and keeps track of containers with
  * no replicas in a SQL table.
@@ -49,19 +59,25 @@ public class ContainerHealthTask extends ReconScmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
 
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+
+  private StorageContainerServiceProvider scmClient;
   private ContainerManager containerManager;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private PlacementPolicy placementPolicy;
   private final long interval;
+
   private Set<ContainerInfo> processedContainers = new HashSet<>();
 
   public ContainerHealthTask(
       ContainerManager containerManager,
+      StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
+    this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
@@ -69,36 +85,48 @@ public class ContainerHealthTask extends ReconScmTask {
   }
 
   @Override
-  public synchronized void run() {
+  public void run() {
     try {
       while (canRun()) {
-        long start = Time.monotonicNow();
-        long currentTime = System.currentTimeMillis();
-        long existingCount = processExistingDBRecords(currentTime);
-        LOG.info("Container Health task thread took {} milliseconds to" +
-                " process {} existing database records.",
-            Time.monotonicNow() - start, existingCount);
-        start = Time.monotonicNow();
-        final List<ContainerInfo> containers = containerManager.getContainers();
-        containers.stream()
-            .filter(c -> !processedContainers.contains(c))
-            .forEach(c -> processContainer(c, currentTime));
-        recordSingleRunCompletion();
-        LOG.info("Container Health task thread took {} milliseconds for" +
-                " processing {} containers.", Time.monotonicNow() - start,
-            containers.size());
-        processedContainers.clear();
-        wait(interval);
+        triggerContainerHealthCheck();
+        Thread.sleep(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  public void triggerContainerHealthCheck() {
+    lock.writeLock().lock();
+    try {
+      long start = Time.monotonicNow();
+      long currentTime = System.currentTimeMillis();
+      long existingCount = processExistingDBRecords(currentTime);
+      LOG.info("Container Health task thread took {} milliseconds to" +
+              " process {} existing database records.",
+          Time.monotonicNow() - start, existingCount);
+      start = Time.monotonicNow();
+      final List<ContainerInfo> containers = containerManager.getContainers();
+      containers.stream()
+          .filter(c -> !processedContainers.contains(c))
+          .forEach(c -> processContainer(c, currentTime));
+      recordSingleRunCompletion();
+      LOG.info("Container Health task thread took {} milliseconds for" +
+              " processing {} containers.", Time.monotonicNow() - start,
+          containers.size());
+      processedContainers.clear();
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 
   private ContainerHealthStatus setCurrentContainer(long recordId)
       throws ContainerNotFoundException {
     ContainerInfo container =
-        containerManager.getContainer(new ContainerID(recordId));
+        containerManager.getContainer(ContainerID.valueOf(recordId));
     Set<ContainerReplica> replicas =
         containerManager.getContainerReplicas(container.containerID());
     return new ContainerHealthStatus(container, replicas, placementPolicy);
@@ -132,7 +160,7 @@ public class ContainerHealthTask extends ReconScmTask {
              containerHealthSchemaManager.getAllUnhealthyRecordsCursor()) {
       ContainerHealthStatus currentContainer = null;
       Set<String> existingRecords = new HashSet<>();
-      while(cursor.hasNext()) {
+      while (cursor.hasNext()) {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
@@ -146,7 +174,13 @@ public class ContainerHealthTask extends ReconScmTask {
             currentContainer = setCurrentContainer(rec.getContainerId());
           }
           if (ContainerHealthRecords
-              .retainOrUpdateRecord(currentContainer, rec)) {
+              .retainOrUpdateRecord(currentContainer, rec
+              )) {
+            // Check if the missing container is deleted in SCM
+            if (currentContainer.isMissing() &&
+                containerDeletedInSCM(currentContainer.getContainer())) {
+              rec.delete();
+            }
             existingRecords.add(rec.getContainerState());
             if (rec.changed()) {
               rec.update();
@@ -174,7 +208,11 @@ public class ContainerHealthTask extends ReconScmTask {
           containerManager.getContainerReplicas(container.containerID());
       ContainerHealthStatus h = new ContainerHealthStatus(
           container, containerReplicas, placementPolicy);
-      if (h.isHealthy()) {
+      if (h.isHealthy() || h.isDeleted()) {
+        return;
+      }
+      // For containers deleted in SCM, we sync the container state here.
+      if (h.isMissing() && containerDeletedInSCM(container)) {
         return;
       }
       containerHealthSchemaManager.insertUnhealthyContainerRecords(
@@ -183,6 +221,35 @@ public class ContainerHealthTask extends ReconScmTask {
       LOG.error("Container not found while processing container in Container " +
           "Health task", e);
     }
+  }
+
+  private boolean containerDeletedInSCM(ContainerInfo containerInfo) {
+    try {
+      ContainerWithPipeline containerWithPipeline =
+          scmClient.getContainerWithPipeline(containerInfo.getContainerID());
+      if (containerWithPipeline.getContainerInfo().getState() ==
+          HddsProtos.LifeCycleState.DELETED) {
+        if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
+          containerManager.updateContainerState(containerInfo.containerID(),
+              HddsProtos.LifeCycleEvent.DELETE);
+        }
+        if (containerInfo.getState() == HddsProtos.LifeCycleState.DELETING &&
+            containerManager.getContainerReplicas(containerInfo.containerID())
+                .size() == 0
+        ) {
+          containerManager.updateContainerState(containerInfo.containerID(),
+              HddsProtos.LifeCycleEvent.CLEANUP);
+        }
+        return true;
+      }
+    } catch (InvalidStateTransitionException e) {
+      LOG.error("Failed to transition Container state while processing " +
+          "container in Container Health task", e);
+    } catch (IOException | TimeoutException e) {
+      LOG.error("Got exception while processing container in" +
+          " Container Health task", e);
+    }
+    return false;
   }
 
   /**
@@ -201,15 +268,18 @@ public class ContainerHealthTask extends ReconScmTask {
      * If the record is to be retained, the fields in the record for actual
      * replica count, delta and reason will be updated if their counts have
      * changed.
-     * @param container ContainerHealthStatus representing the health state of
-     *                  the container.
-     * @param rec Existing database record from the UnhealthyContainers table.
-     * @return
+     *
+     * @param container ContainerHealthStatus representing the
+     *                  health state of the container.
+     * @param rec       Existing database record from the
+     *                  UnhealthyContainers table.
+     * @return returns true or false if need to retain or update the unhealthy
+     * container record
      */
     public static boolean retainOrUpdateRecord(
         ContainerHealthStatus container, UnhealthyContainersRecord rec) {
       boolean returnValue = false;
-      switch(UnHealthyContainerStates.valueOf(rec.getContainerState())) {
+      switch (UnHealthyContainerStates.valueOf(rec.getContainerState())) {
       case MISSING:
         returnValue = container.isMissing();
         break;
@@ -245,7 +315,7 @@ public class ContainerHealthTask extends ReconScmTask {
         ContainerHealthStatus container, Set<String> recordForStateExists,
         long time) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isHealthy()) {
+      if (container.isHealthy() || container.isDeleted()) {
         return records;
       }
 
@@ -278,6 +348,7 @@ public class ContainerHealthTask extends ReconScmTask {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
       }
+
       return records;
     }
 
@@ -370,5 +441,4 @@ public class ContainerHealthTask extends ReconScmTask {
       }
     }
   }
-
 }

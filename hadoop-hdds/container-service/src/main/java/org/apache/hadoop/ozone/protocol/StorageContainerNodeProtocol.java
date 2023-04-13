@@ -19,8 +19,11 @@ package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -54,18 +57,36 @@ public interface StorageContainerNodeProtocol {
    * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
    * @param pipelineReport PipelineReportsProto
+   * @param layoutVersionInfo LayoutVersionProto
    * @return  SCMRegisteredResponseProto
    */
   RegisteredCommand register(DatanodeDetails datanodeDetails,
                              NodeReportProto nodeReport,
-                             PipelineReportsProto pipelineReport);
+                             PipelineReportsProto pipelineReport,
+                             LayoutVersionProto layoutVersionInfo);
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.
    * @param datanodeDetails - Datanode ID.
-   * @return SCMheartbeat response list
+   * @param layoutVersionInfo - Layout Version Proto.
+   * @return Commands to be sent to the datanode.
    */
-  List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails);
+  default List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                    LayoutVersionProto layoutVersionInfo) {
+    return processHeartbeat(datanodeDetails, layoutVersionInfo, null);
+  };
+
+  /**
+   * Send heartbeat to indicate the datanode is alive and doing well.
+   * @param datanodeDetails - Datanode ID.
+   * @param layoutVersionInfo - Layout Version Proto.
+   * @param queueReport - The CommandQueueReportProto report from the
+   *                    heartbeating datanode.
+   * @return Commands to be sent to the datanode.
+   */
+  List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutVersionInfo,
+      CommandQueueReportProto queueReport);
 
   /**
    * Check if node is registered or not.

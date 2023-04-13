@@ -23,25 +23,36 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Set;
+import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Interface which exposes the api for pipeline management.
  */
-public interface PipelineManager extends Closeable, PipelineManagerMXBean,
-    EventHandler<SafeModeStatus> {
+public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
-      throws IOException;
+  Pipeline createPipeline(ReplicationConfig replicationConfig)
+      throws IOException, TimeoutException;
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-      List<DatanodeDetails> nodes);
+  Pipeline createPipeline(ReplicationConfig replicationConfig,
+                          List<DatanodeDetails> excludedNodes,
+                          List<DatanodeDetails> favoredNodes)
+      throws IOException, TimeoutException;
+
+
+  Pipeline createPipeline(
+      ReplicationConfig replicationConfig,
+      List<DatanodeDetails> nodes
+  );
+
+  Pipeline createPipelineForRead(
+      ReplicationConfig replicationConfig, Set<ContainerReplica> replicas);
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
@@ -49,23 +60,44 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   List<Pipeline> getPipelines();
 
-  List<Pipeline> getPipelines(ReplicationType type);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig
+  );
 
-  List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig, Pipeline.PipelineState state
+  );
 
-  List<Pipeline> getPipelines(ReplicationType type,
-      Pipeline.PipelineState state);
+  List<Pipeline> getPipelines(
+      ReplicationConfig replicationConfig,
+      Pipeline.PipelineState state,
+      Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines
+  );
 
-  List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor, Pipeline.PipelineState state);
-
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines);
+  /**
+   * Returns the count of pipelines meeting the given ReplicationConfig and
+   * state.
+   * @param replicationConfig The ReplicationConfig of the pipelines to count
+   * @param state The current state of the pipelines to count
+   * @return The count of pipelines meeting the above criteria
+   */
+  int getPipelineCount(
+      ReplicationConfig replicationConfig, Pipeline.PipelineState state
+  );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException;
+
+  /**
+   * Add container to pipeline during SCM Start.
+   *
+   * @param pipelineID ID of the pipeline to which container is added.
+   * @param containerID ID of the container which is added to the pipeline.
+   * @throws IOException in case of any Exception
+   */
+  void addContainerToPipelineSCMStart(PipelineID pipelineID,
+      ContainerID containerID) throws IOException;
 
   void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException;
@@ -75,13 +107,14 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
 
-  void openPipeline(PipelineID pipelineId) throws IOException;
+  void openPipeline(PipelineID pipelineId) throws IOException, TimeoutException;
 
-  void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
+  void closePipeline(Pipeline pipeline, boolean onTimeout)
+      throws IOException, TimeoutException;
 
-  void scrubPipeline(ReplicationType type, ReplicationFactor factor)
-      throws IOException;
+  void closeStalePipelines(DatanodeDetails datanodeDetails);
+
+  void scrubPipelines() throws IOException, TimeoutException;
 
   void startPipelineCreator();
 
@@ -99,7 +132,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
    * @param pipelineID ID of the pipeline to activate.
    * @throws IOException in case of any Exception
    */
-  void activatePipeline(PipelineID pipelineID) throws IOException;
+  void activatePipeline(PipelineID pipelineID)
+      throws IOException, TimeoutException;
 
   /**
    * Deactivates an active pipeline.
@@ -107,7 +141,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
    * @param pipelineID ID of the pipeline to deactivate.
    * @throws IOException in case of any Exception
    */
-  void deactivatePipeline(PipelineID pipelineID) throws IOException;
+  void deactivatePipeline(PipelineID pipelineID)
+      throws IOException, TimeoutException;
 
   /**
    * Wait a pipeline to be OPEN.
@@ -121,8 +156,60 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
   }
 
   /**
+   * Wait one pipeline to be OPEN among a collection pipelines.
+   * @param pipelineIDs ID collection of the pipelines to wait for
+   * @param timeout wait timeout(millisecond), if 0, use default timeout
+   * @return Pipeline the pipeline which is OPEN
+   * @throws IOException in case of any Exception, such as timeout
+   */
+  default Pipeline waitOnePipelineReady(Collection<PipelineID> pipelineIDs,
+                                    long timeout)
+          throws IOException {
+    return null;
+  }
+
+  /**
    * Get SafeMode status.
    * @return boolean
    */
   boolean getSafeModeStatus();
+
+  /**
+   * Reinitialize the pipelineManager with the lastest pipeline store
+   * during SCM reload.
+   */
+  void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
+      throws IOException;
+
+  /**
+   * Ask pipeline manager to not create any new pipelines.
+   */
+  void freezePipelineCreation();
+
+  /**
+   * Ask pipeline manager to resume creating new pipelines.
+   */
+  void resumePipelineCreation();
+
+  boolean isPipelineCreationFrozen();
+
+  /**
+   * Acquire read lock.
+   */
+  void acquireReadLock();
+
+  /**
+   * Release read lock.
+   */
+  void releaseReadLock();
+
+  /**
+   * Acquire write lock.
+   */
+  void acquireWriteLock();
+
+  /**
+   * Release write lock.
+   */
+  void releaseWriteLock();
 }

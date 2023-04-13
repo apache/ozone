@@ -17,30 +17,18 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.ozone.container.common.interfaces
-    .ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicyTemplate;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * TopN Ordered choosing policy that choosing containers based on pending
  * deletion blocks' number.
  */
 public class TopNOrderedContainerDeletionChoosingPolicy
-    implements ContainerDeletionChoosingPolicy {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TopNOrderedContainerDeletionChoosingPolicy.class);
-
+    extends ContainerDeletionChoosingPolicyTemplate {
   /** customized comparator used to compare differentiate container data. **/
   private static final Comparator<KeyValueContainerData>
         KEY_VALUE_CONTAINER_DATA_COMPARATOR = (KeyValueContainerData c1,
@@ -49,43 +37,9 @@ public class TopNOrderedContainerDeletionChoosingPolicy
                   c1.getNumPendingDeletionBlocks());
 
   @Override
-  public List<ContainerData> chooseContainerForBlockDeletion(int count,
-      Map<Long, ContainerData> candidateContainers)
-      throws StorageContainerException {
-    Preconditions.checkNotNull(candidateContainers,
-        "Internal assertion: candidate containers cannot be null");
-
-    List<ContainerData> result = new LinkedList<>();
-    List<KeyValueContainerData> orderedList = new LinkedList<>();
-    for (ContainerData entry : candidateContainers.values()) {
-      orderedList.add((KeyValueContainerData)entry);
-    }
-    Collections.sort(orderedList, KEY_VALUE_CONTAINER_DATA_COMPARATOR);
-
+  protected void orderByDescendingPriority(
+      List<KeyValueContainerData> candidateContainers) {
     // get top N list ordered by pending deletion blocks' number
-    int currentCount = 0;
-    for (KeyValueContainerData entry : orderedList) {
-      if (currentCount < count) {
-        if (entry.getNumPendingDeletionBlocks() > 0) {
-          result.add(entry);
-          currentCount++;
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Select container {} for block deletion, "
-                    + "pending deletion blocks num: {}.",
-                entry.getContainerID(),
-                entry.getNumPendingDeletionBlocks());
-          }
-        } else {
-          LOG.debug("Stop looking for next container, there is no"
-              + " pending deletion block contained in remaining containers.");
-          break;
-        }
-      } else {
-        break;
-      }
-    }
-
-    return result;
+    candidateContainers.sort(KEY_VALUE_CONTAINER_DATA_COMPARATOR);
   }
 }

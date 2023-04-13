@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -79,7 +78,11 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
   @Override
   public void removeIf(Predicate<K> predicate) {
     Objects.requireNonNull(predicate);
-    map.keySet().removeIf(predicate);
+    for (K key : map.keySet()) {
+      if (predicate.test(key)) {
+        remove(key);
+      }
+    }
   }
 
   @Override

@@ -21,8 +21,6 @@ import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.security.KeyPair;
-import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -33,31 +31,35 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
-import org.apache.hadoop.hdds.DatanodeVersions;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
+import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.util.OzoneNetUtils;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -66,12 +68,14 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.sun.jmx.mbeanserver.Introspector;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
-import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -90,6 +94,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       HddsDatanodeService.class);
 
   private OzoneConfiguration conf;
+  private SecurityConfig secConf;
   private DatanodeDetails datanodeDetails;
   private DatanodeStateMachine datanodeStateMachine;
   private List<ServicePlugin> plugins;
@@ -101,20 +106,41 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
   private DNMXBeanImpl serviceRuntimeInfo =
-      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
+  private DatanodeCRLStore dnCRLStore;
 
   //Constructor for DataNode PluginService
-  public HddsDatanodeService(){}
+  public HddsDatanodeService() { }
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
+  private void cleanTmpDir() {
+    if (datanodeStateMachine != null) {
+      MutableVolumeSet volumeSet =
+          datanodeStateMachine.getContainer().getVolumeSet();
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          try {
+            KeyValueContainerUtil.ContainerDeleteDirectory
+                .cleanTmpDir(hddsVolume);
+          } catch (IOException ex) {
+            LOG.error("Error while cleaning tmp delete directory " +
+                "under {}", hddsVolume.getWorkingDir(), ex);
+          }
+        }
+      }
+    }
+  }
+
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    * <p>
    * This method is intended for unit tests only. It suppresses the
    * startup/shutdown message and skips registering Unix signal handlers.
@@ -129,7 +155,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    *
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
@@ -142,7 +168,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
-      Introspector.checkCompliance(DNMXBeanImpl.class);
+      OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
+              new OzoneConfiguration());
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);
       hddsDatanodeService.run(args);
@@ -158,12 +185,20 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
+    OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
       StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-          HddsDatanodeService.class, args, LOG);
+          HddsDatanodeService.class, args, LOG, configuration);
     }
-    start(createOzoneConfiguration());
-    join();
+    start(configuration);
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      try {
+        stop();
+        join();
+      } catch (Exception e) {
+        LOG.error("Error during stop Ozone Datanode.", e);
+      }
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -193,8 +228,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   public void start() {
     serviceRuntimeInfo.setStartTime();
 
-    RatisDropwizardExports.
-        registerRatisMetricReporters(ratisMetricsMap);
+    ratisReporterList = RatisDropwizardExports
+        .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
@@ -210,7 +245,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
+      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -219,20 +254,24 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         component = "dn-" + datanodeDetails.getUuidString();
 
-        dnCertClient = new DNCertificateClient(new SecurityConfig(conf),
-            datanodeDetails.getCertSerialId());
+        secConf = new SecurityConfig(conf);
+        dnCertClient = new DNCertificateClient(secConf, datanodeDetails,
+            datanodeDetails.getCertSerialId(), this::saveNewCertId,
+            this::terminateDatanode);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
               DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-              conf.get(DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY));
+              conf.get(
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
           UserGroupInformation.setConfiguration(conf);
 
           SecurityUtil
-              .login(conf, DFSConfigKeysLegacy.DFS_DATANODE_KEYTAB_FILE_KEY,
+              .login(conf,
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY,
                   hostname);
         } else {
@@ -242,14 +281,33 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
         LOG.info("Hdds Datanode login successful.");
       }
+
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+          datanodeDetails.getUuidString());
+      if (layoutStorage.getState() != INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
+      // initialize datanode CRL store
+      dnCRLStore = new DatanodeCRLStoreImpl(conf);
+
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        initializeCertificateClient(conf);
+        dnCertClient = initializeCertificateClient(dnCertClient);
       }
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode);
+          dnCertClient, this::terminateDatanode, dnCRLStore);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
+        HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+        if (policy.isHttpEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
+                  httpServer.getHttpAddress().getPort()));
+        }
+        if (policy.isHttpsEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
+                  httpServer.getHttpsAddress().getPort()));
+        }
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
@@ -282,18 +340,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * datanode.
    */
   private void startRatisForTest() throws IOException {
-    String scmId = "scm-01";
     String clusterId = "clusterId";
-    datanodeStateMachine.getContainer().start(scmId);
+    datanodeStateMachine.getContainer().start(clusterId);
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
 
-    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = entry.getValue();
-      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-          clusterId, LOG);
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
+      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
+          clusterId, conf, LOG, null);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
@@ -304,18 +361,30 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * Initializes secure Datanode.
    * */
   @VisibleForTesting
-  public void initializeCertificateClient(OzoneConfiguration config)
-      throws IOException {
+  public CertificateClient initializeCertificateClient(
+      CertificateClient certClient) throws IOException {
     LOG.info("Initializing secure Datanode.");
 
-    CertificateClient.InitResponse response = dnCertClient.init();
+    CertificateClient.InitResponse response = certClient.init();
+    if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      certClient.close();
+      LOG.info("Re-initialize certificate client.");
+      certClient = new DNCertificateClient(secConf, datanodeDetails, null,
+          this::saveNewCertId, this::terminateDatanode);
+      response = certClient.init();
+    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:
       LOG.info("Initialization successful, case:{}.", response);
       break;
     case GETCERT:
-      getSCMSignedCert(config);
+      CertificateSignRequest.Builder csrBuilder = certClient.getCSRBuilder();
+      String dnCertSerialId =
+          certClient.signAndStoreCertificate(csrBuilder.build());
+      // persist cert ID to VERSION file
+      datanodeDetails.setCertSerialId(dnCertSerialId);
+      persistDatanodeDetails(datanodeDetails);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -331,45 +400,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           response);
       throw new RuntimeException("DN security initialization failed.");
     }
-  }
 
-  /**
-   * Get SCM signed certificate and store it using certificate client.
-   * @param config
-   * */
-  private void getSCMSignedCert(OzoneConfiguration config) {
-    try {
-      PKCS10CertificationRequest csr = getCSR(config);
-      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsServerUtil.getScmSecurityClient(config);
-      SCMGetCertResponseProto response = secureScmClient.
-          getDataNodeCertificateChain(
-              datanodeDetails.getProtoBufMessage(),
-              getEncodedString(csr));
-      // Persist certificates.
-      if(response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        dnCertClient.storeCertificate(pemEncodedCert, true);
-        dnCertClient.storeCertificate(response.getX509CACertificate(), true,
-            true);
-        String dnCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        datanodeDetails.setCertSerialId(dnCertSerialId);
-        persistDatanodeDetails(datanodeDetails);
-        // Rebuild dnCertClient with the new CSR result so that the default
-        // certSerialId and the x509Certificate can be updated.
-        dnCertClient = new DNCertificateClient(
-            new SecurityConfig(config), dnCertSerialId);
-
-      } else {
-        throw new RuntimeException("Unable to retrieve datanode certificate " +
-            "chain");
-      }
-    } catch (IOException | CertificateException e) {
-      LOG.error("Error while storing SCM signed certificate.", e);
-      throw new RuntimeException(e);
-    }
+    return certClient;
   }
 
   private void registerMXBean() {
@@ -388,30 +420,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Creates CSR for DN.
-   * @param config
-   * */
-  @VisibleForTesting
-  public PKCS10CertificationRequest getCSR(ConfigurationSource config)
-      throws IOException {
-    CertificateSignRequest.Builder builder = dnCertClient.getCSRBuilder();
-    KeyPair keyPair = new KeyPair(dnCertClient.getPublicKey(),
-        dnCertClient.getPrivateKey());
-
-    String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = UserGroupInformation.getCurrentUser()
-        .getShortUserName() + "@" + hostname;
-
-    builder.setCA(false)
-        .setKey(keyPair)
-        .setConfiguration(config)
-        .setSubject(subject);
-
-    LOG.info("Creating csr for DN-> subject:{}", subject);
-    return builder.build();
-  }
-
-  /**
    * Returns DatanodeDetails or null in case of Error.
    *
    * @return DatanodeDetails
@@ -419,16 +427,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     if (idFile.exists()) {
@@ -438,8 +436,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // is started.
       DatanodeDetails details = DatanodeDetails.newBuilder()
           .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersions.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersions.CURRENT_VERSION);
+      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
+      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       return details;
     }
   }
@@ -453,19 +451,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (idFilePath == null || idFilePath.isEmpty()) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR +
-          " must be defined. See" +
-          " https://wiki.apache.org/hadoop/Ozone#Configuration" +
-          " for details on configuring Ozone.");
-    }
-
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
 
   /**
@@ -517,6 +505,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return datanodeStateMachine;
   }
 
+  @VisibleForTesting
+  public DatanodeCRLStore getCRLStore() {
+    return dnCRLStore;
+  }
+
   public void join() {
     if (datanodeStateMachine != null) {
       try {
@@ -533,10 +526,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     terminate(1);
   }
 
-
   @Override
   public void stop() {
     if (!isStopped.getAndSet(true)) {
+      // Clean <HddsVolume>/tmp/container_delete_service dir.
+      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {
@@ -558,6 +552,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
       }
       unregisterMXBean();
+      // stop dn crl store
+      try {
+        if (dnCRLStore != null) {
+          dnCRLStore.stop();
+        }
+      } catch (Exception ex) {
+        LOG.error("Datanode CRL store stop failed", ex);
+      }
+      RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
     }
   }
 
@@ -572,6 +575,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         }
       }
     }
+
+    if (dnCertClient != null) {
+      try {
+        dnCertClient.close();
+      } catch (IOException e) {
+        LOG.warn("Certificate client could not be closed", e);
+      }
+    }
   }
 
   @VisibleForTesting
@@ -584,7 +595,30 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
+  }
+
+  @Override
+  public void printError(Throwable error) {
+    LOG.error("Exception in HddsDatanodeService.", error);
+  }
+
+  public void saveNewCertId(String newCertId) {
+    // save new certificate Id to VERSION file
+    datanodeDetails.setCertSerialId(newCertId);
+    try {
+      persistDatanodeDetails(datanodeDetails);
+    } catch (IOException ex) {
+      // New cert ID cannot be persisted into VERSION file.
+      String msg = "Failed to persist new cert ID " + newCertId +
+          "to VERSION file. Terminating datanode...";
+      LOG.error(msg, ex);
+      terminateDatanode();
+    }
   }
 }

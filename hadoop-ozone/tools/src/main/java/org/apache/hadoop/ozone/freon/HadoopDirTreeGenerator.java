@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class HadoopDirTreeGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
@@ -70,7 +71,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
           "written in each directory. Full name --fileSize will be removed " +
           "in later versions.",
       defaultValue = "4096")
-  private int fileSizeInBytes;
+  private long fileSizeInBytes;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",
@@ -175,7 +176,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       }
     }
 
-    while(spanIndex < span) {
+    while (spanIndex < span) {
       String levelSubDir = makeDirWithGivenNumberOfFiles(parent);
       ++spanIndex;
 

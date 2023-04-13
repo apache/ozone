@@ -19,11 +19,10 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
+import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -31,33 +30,41 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.token.SecretManager;
 
-import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_DEFAULT;
@@ -116,12 +123,10 @@ public final class OmUtils {
     Map<String, List<InetSocketAddress>> result = new HashMap<>();
     for (String serviceId : conf.getTrimmedStringCollection(
         OZONE_OM_SERVICE_IDS_KEY)) {
-      if (!result.containsKey(serviceId)) {
-        result.put(serviceId, new ArrayList<>());
-      }
-      for (String nodeId : getOMNodeIds(conf, serviceId)) {
+      result.computeIfAbsent(serviceId, x -> new ArrayList<>());
+      for (String nodeId : getActiveOMNodeIds(conf, serviceId)) {
         String rpcAddr = getOmRpcAddress(conf,
-            addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+            ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
         if (rpcAddr != null) {
           result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
         } else {
@@ -158,7 +163,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getOmRpcPort(conf, confKey);
+      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT);
     } else {
       // The specified confKey is not set
       return null;
@@ -217,24 +223,6 @@ public final class OmUtils {
   }
 
   /**
-   * Retrieve the port that is used by OM as specified by the confKey.
-   * Return default port if port is not specified in the confKey.
-   * @param conf configuration
-   * @param confKey configuration key to lookup address from
-   * @return Port on which OM RPC server will listen on
-   */
-  public static int getOmRpcPort(ConfigurationSource conf, String confKey) {
-    return getPortNumberFromConfigKeys(conf, confKey)
-        .orElse(OZONE_OM_PORT_DEFAULT);
-  }
-
-  public static int getOmRestPort(ConfigurationSource conf) {
-    return getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY)
-        .orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
-  }
-
-
-  /**
    * Checks if the OM request is read only or not.
    * @param omRequest OMRequest proto
    * @return True if its readOnly, false otherwise.
@@ -259,6 +247,22 @@ public final class OmUtils {
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
+    case FinalizeUpgradeProgress:
+    case PrepareStatus:
+    case GetS3VolumeContext:
+    case ListTenant:
+    case TenantGetUserInfo:
+    case TenantListUser:
+    case ListSnapshot:
+    case EchoRPC:
+    case RangerBGSync:
+      // RangerBGSync is a read operation in the sense that it doesn't directly
+      // write to OM DB. And therefore it doesn't need a OMClientRequest.
+      // Although indirectly the Ranger sync service task could invoke write
+      // operation SetRangerServiceVersion.
+    case GetKeyInfo:
+    case SnapshotDiff:
+    case TransferLeadership:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -288,21 +292,30 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+    case FinalizeUpgrade:
+    case Prepare:
+    case CancelPrepare:
     case DeleteOpenKeys:
+    case SetS3Secret:
+    case RevokeS3Secret:
+    case PurgeDirectories:
+    case PurgePaths:
+    case CreateTenant:
+    case DeleteTenant:
+    case TenantAssignUserAccessId:
+    case TenantRevokeUserAccessId:
+    case TenantAssignAdmin:
+    case TenantRevokeAdmin:
+    case SetRangerServiceVersion:
+    case CreateSnapshot:
+    case DeleteSnapshot:
+    case SnapshotMoveDeletedKeys:
+    case SnapshotPurge:
+    case RecoverLease:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
-    }
-  }
-
-  public static byte[] getMD5Digest(String input) throws IOException {
-    try {
-      MessageDigest md = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
-      return md.digest(input.getBytes(StandardCharsets.UTF_8));
-    } catch (NoSuchAlgorithmException ex) {
-      throw new IOException("Error creating an instance of MD5 digest.\n" +
-          "This could possibly indicate a faulty JRE");
     }
   }
 
@@ -318,50 +331,37 @@ public final class OmUtils {
   }
 
   /**
-   * Add non empty and non null suffix to a key.
+   * Get a collection of all active omNodeIds (excluding decommissioned nodes)
+   * for the given omServiceId.
    */
-  private static String addSuffix(String key, String suffix) {
-    if (suffix == null || suffix.isEmpty()) {
-      return key;
-    }
-    assert !suffix.startsWith(".") :
-        "suffix '" + suffix + "' should not already have '.' prepended.";
-    return key + "." + suffix;
-  }
-
-  /**
-   * Concatenate list of suffix strings '.' separated.
-   */
-  private static String concatSuffixes(String... suffixes) {
-    if (suffixes == null) {
-      return null;
-    }
-    return Joiner.on(".").skipNulls().join(suffixes);
-  }
-
-  /**
-   * Return configuration key of format key.suffix1.suffix2...suffixN.
-   */
-  public static String addKeySuffixes(String key, String... suffixes) {
-    String keySuffix = concatSuffixes(suffixes);
-    return addSuffix(key, keySuffix);
-  }
-
-  /**
-   * Match input address to local address.
-   * Return true if it matches, false otherwsie.
-   */
-  public static boolean isAddressLocal(InetSocketAddress addr) {
-    return NetUtils.isLocalAddress(addr.getAddress());
-  }
-
-  /**
-   * Get a collection of all omNodeIds for the given omServiceId.
-   */
-  public static Collection<String> getOMNodeIds(ConfigurationSource conf,
+  public static Collection<String> getActiveOMNodeIds(ConfigurationSource conf,
       String omServiceId) {
-    String key = addSuffix(OZONE_OM_NODES_KEY, omServiceId);
-    return conf.getTrimmedStringCollection(key);
+    String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
+    Collection<String> nodeIds = conf.getTrimmedStringCollection(nodeIdsKey);
+    String decommNodesKey = ConfUtils.addKeySuffixes(
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
+    Collection<String> decommNodeIds = conf.getTrimmedStringCollection(
+        decommNodesKey);
+    nodeIds.removeAll(decommNodeIds);
+
+    return nodeIds;
+  }
+
+  /**
+   * Get a collection of all omNodeIds (active and decommissioned) for a
+   * gived omServiceId.
+   */
+  private static Collection<String> getAllOMNodeIds(ConfigurationSource conf,
+      String omServiceId) {
+    Set<String> nodeIds = new HashSet<>();
+    String nodeIdsKey = ConfUtils.addSuffix(OZONE_OM_NODES_KEY, omServiceId);
+    String decommNodesKey = ConfUtils.addKeySuffixes(
+        OZONE_OM_DECOMMISSIONED_NODES_KEY, omServiceId);
+
+    nodeIds.addAll(conf.getTrimmedStringCollection(nodeIdsKey));
+    nodeIds.addAll(conf.getTrimmedStringCollection(decommNodesKey));
+
+    return nodeIds;
   }
 
   /**
@@ -378,23 +378,6 @@ public final class OmUtils {
   }
 
   /**
-   * If a OM conf is only set with key suffixed with OM Node ID, return the
-   * set value.
-   * @return if the value is set for key suffixed with OM Node ID, return the
-   * value, else return null.
-   */
-  public static String getConfSuffixedWithOMNodeId(ConfigurationSource conf,
-      String confKey, String omServiceID, String omNodeId) {
-    String suffixedConfKey = OmUtils.addKeySuffixes(
-        confKey, omServiceID, omNodeId);
-    String confValue = conf.getTrimmed(suffixedConfKey);
-    if (StringUtils.isNotEmpty(confValue)) {
-      return confValue;
-    }
-    return null;
-  }
-
-  /**
    * Returns the http address of peer OM node.
    * @param conf Configuration
    * @param omNodeId peer OM node ID
@@ -404,13 +387,16 @@ public final class OmUtils {
   public static String getHttpAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
 
     final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
@@ -427,13 +413,16 @@ public final class OmUtils {
   public static String getHttpsAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
 
     final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
-        addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
+        ConfUtils.addKeySuffixes(
+            OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
@@ -463,7 +452,7 @@ public final class OmUtils {
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
    *                     For regular Key deletes, this value should be set to
-   *                     the same updaeID as is in keyInfo.
+   *                     the same updateID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
@@ -472,7 +461,9 @@ public final class OmUtils {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
-    if(Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
+    if (Boolean.parseBoolean(
+            keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
+    ) {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
@@ -482,7 +473,7 @@ public final class OmUtils {
     // Set the updateID
     keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
 
-    if(repeatedOmKeyInfo == null) {
+    if (repeatedOmKeyInfo == null) {
       //The key doesn't exist in deletedTable, so create a new instance.
       repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyInfo);
     } else {
@@ -519,24 +510,27 @@ public final class OmUtils {
   }
 
   /**
+   * Verify snapshot name is a valid DNS name.
+   */
+  public static void validateSnapshotName(String snapshotName)
+      throws OMException {
+    // allow null name, for when user wants generated name
+    if (snapshotName == null) {
+      return;
+    }
+    try {
+      HddsClientUtils.verifyResourceName(snapshotName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid snapshot name: " + snapshotName,
+          OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
+    }
+  }
+
+  /**
    * Return OM Client Rpc Time out.
    */
   public static long getOMClientRpcTimeOut(ConfigurationSource configuration) {
     return configuration.getObject(OMClientConfig.class).getRpcTimeOut();
-  }
-
-  /**
-   * Return OmKeyInfo that would be recovered.
-   */
-  public static OmKeyInfo prepareKeyForRecover(OmKeyInfo keyInfo,
-      RepeatedOmKeyInfo repeatedOmKeyInfo) {
-
-    /* TODO: HDDS-2425. HDDS-2426.*/
-    if (repeatedOmKeyInfo.getOmKeyInfoList().contains(keyInfo)) {
-      return keyInfo;
-    } else {
-      return null;
-    }
   }
 
   public static int getOMEpoch(boolean isRatisEnabled) {
@@ -641,27 +635,6 @@ public final class OmUtils {
   }
 
   /**
-   * Unwrap exception to check if it is some kind of access control problem
-   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
-   */
-  public static boolean isAccessControlException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof AccessControlException ||
-            t instanceof SecretManager.InvalidToken) {
-          return true;
-        }
-        t = t.getCause();
-      }
-    }
-    return false;
-  }
-
-  /**
    * Normalize the key name. This method used {@link Path} to
    * normalize the key name.
    * @param keyName
@@ -682,18 +655,169 @@ public final class OmUtils {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
       }
-      if (!keyName.equals(normalizedKeyName)) {
+      if (!keyName.equals(normalizedKeyName) && LOG.isDebugEnabled()) {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
-      if (preserveTrailingSlash) {
-        if (keyName.endsWith("/")) {
-          return normalizedKeyName.substring(1) + "/";
-        }
+      if (preserveTrailingSlash && keyName.endsWith("/")) {
+        return normalizedKeyName.substring(1) + "/";
       }
       return normalizedKeyName.substring(1);
     }
 
     return keyName;
+  }
+
+
+  /**
+   * For a given service ID, return list of configured OM hosts.
+   * @param conf configuration
+   * @param omServiceId service id
+   * @return Set of hosts.
+   */
+  public static Set<String> getOmHostsFromConfig(OzoneConfiguration conf,
+                                                 String omServiceId) {
+    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
+        omServiceId);
+    Set<String> omHosts = new HashSet<>();
+    for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
+      String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
+          omServiceId, nodeId);
+      String rpcAddrStr = OmUtils.getOmRpcAddress(conf, rpcAddrKey);
+      Optional<String> hostName = getHostName(rpcAddrStr);
+      hostName.ifPresent(omHosts::add);
+    }
+    return omHosts;
+  }
+
+  /**
+   * Get a list of all OM details (address and ports) from the specified config.
+   */
+  public static List<OMNodeDetails> getAllOMHAAddresses(OzoneConfiguration conf,
+      String omServiceId, boolean includeDecommissionedNodes) {
+
+    List<OMNodeDetails> omNodesList = new ArrayList<>();
+    Collection<String> omNodeIds;
+    if (includeDecommissionedNodes) {
+      omNodeIds = OmUtils.getAllOMNodeIds(conf, omServiceId);
+    } else {
+      omNodeIds = OmUtils.getActiveOMNodeIds(conf, omServiceId);
+    }
+    Collection<String> decommissionedNodeIds = conf.getTrimmedStringCollection(
+            ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
+                    omServiceId));
+
+    if (omNodeIds.isEmpty()) {
+      // If there are no nodeIds present, return empty list
+      return Collections.emptyList();
+    }
+
+    for (String nodeId : omNodeIds) {
+      try {
+        OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
+            conf, omServiceId, nodeId);
+        if (decommissionedNodeIds.contains(omNodeDetails.getNodeId())) {
+          omNodeDetails.setDecommissioningState();
+        }
+        omNodesList.add(omNodeDetails);
+      } catch (IOException e) {
+        String omRpcAddressStr = OMNodeDetails.getOMNodeAddressFromConf(conf,
+            omServiceId, nodeId);
+        LOG.error("OM {} is present in config file but it's address {} could " +
+            "not be resolved. Hence, OM {} is not added to list of peer nodes.",
+            nodeId, omRpcAddressStr, nodeId);
+      }
+    }
+
+    return omNodesList;
+  }
+
+  /**
+   * Return a comma separated list of OM node details
+   * (NodeID[HostAddress:RpcPort]).
+   */
+  public static String getOMAddressListPrintString(List<OMNodeDetails> omList) {
+    if (omList.isEmpty()) {
+      return null;
+    }
+    StringBuilder printString = new StringBuilder();
+    printString.append("OM");
+    if (omList.size() == 1) {
+      printString.append(" [");
+    } else {
+      printString.append("(s) [");
+    }
+    printString.append(omList.get(0).getOMPrintInfo());
+    for (int i = 1; i < omList.size(); i++) {
+      printString.append(",")
+          .append(omList.get(i).getOMPrintInfo());
+    }
+    printString.append("]");
+    return printString.toString();
+  }
+
+  // Key points to entire bucket's snapshot
+  public static boolean isBucketSnapshotIndicator(String key) {
+    return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
+  }
+
+  public static String format(List<ServiceInfo> nodes, int port,
+                              String leaderId) {
+    StringBuilder sb = new StringBuilder();
+    // Ensuring OM's are printed in correct order
+    List<ServiceInfo> omNodes = nodes.stream()
+        .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
+        .sorted(Comparator.comparing(ServiceInfo::getHostname))
+        .collect(Collectors.toList());
+    int count = 0;
+    for (ServiceInfo info : omNodes) {
+      // Printing only the OM's running
+      if (info.getNodeType() == HddsProtos.NodeType.OM) {
+        String role =
+            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
+                "FOLLOWER";
+        sb.append(
+            String.format(
+                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
+                info.getHostname(),
+                info.getOmRoleInfo().getNodeId(),
+                port,
+                role
+            ));
+        count++;
+      }
+    }
+    // Print Stand-alone if only one OM exists
+    if (count == 1) {
+      return "STANDALONE";
+    } else {
+      return sb.toString();
+    }
+  }
+
+  /**
+   * @param omHost
+   * @param omPort
+   * If the authority in the URI is not one of the service ID's,
+   * it is treated as a hostname. Check if this hostname can be resolved
+   * and if it's reachable.
+   */
+  public static void resolveOmHost(String omHost, int omPort)
+      throws IOException {
+    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    if (omHostAddress.isUnresolved()) {
+      throw new IOException(
+          "Cannot resolve OM host " + omHost + " in the URI",
+          new UnknownHostException());
+    }
+    try {
+      if (!omHostAddress.getAddress().isReachable(5000)) {
+        throw new IOException(
+            "OM host " + omHost + " unreachable in the URI");
+      }
+    } catch (IOException e) {
+      LOG.error("Failure in resolving OM host address", e);
+      throw e;
+    }
   }
 }

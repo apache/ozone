@@ -133,5 +133,6 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     return prefixManager.addAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo,
         trxnLogIndex);
   }
+
 }
 

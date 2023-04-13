@@ -54,7 +54,7 @@ Static list can be configured with the help of ```TableMapping```:
 </property>
 ```
 
-The second configuration option should point to a text file. The file format is a two column text file, with columns separated by whitespace. The first column is a DNS or IP address and the second column specifies the rack where the address maps. If no entry corresponding to a host in the cluster is found, then `/default-rack` is assumed. 
+The second configuration option should point to a text file. The file format is a two column text file, with columns separated by whitespace. The first column is IP address and the second column specifies the rack where the address maps. If no entry corresponding to a host in the cluster is found, then `/default-rack` is assumed. 
 
 ### Dynamic list 
 
@@ -64,10 +64,10 @@ Rack information can be identified with the help of an external script:
 ```XML
 <property>
    <name>net.topology.node.switch.mapping.impl</name>
-   <value>org.apache.hadoop.net.TableMapping</value>
+   <value>org.apache.hadoop.net.ScriptBasedMapping</value>
 </property>
 <property>
-   <name>org.apache.hadoop.net.ScriptBasedMapping</name>
+   <name>net.topology.script.file.name</name>
    <value>/usr/local/bin/rack.sh</value>
 </property>
 ```
@@ -76,7 +76,7 @@ If implementing an external script, it will be specified with the `net.topology.
 
 ## Write path
 
-Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/hadoop-ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). 
+Placement of the closed containers can be configured with `ozone.scm.container.placement.impl` configuration key. The available container placement policies can be found in the `org.apache.hdds.scm.container.placement` [package](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms).
 
 By default the `SCMContainerPlacementRandom` is used for topology-awareness the `SCMContainerPlacementRackAware` can be used:
 

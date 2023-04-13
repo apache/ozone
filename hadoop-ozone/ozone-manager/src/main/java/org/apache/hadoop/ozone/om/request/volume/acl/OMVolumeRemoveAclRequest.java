@@ -110,7 +110,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onSuccess(OMResponse.Builder omResponse,
-      OmVolumeArgs omVolumeArgs, boolean aclApplied){
+      OmVolumeArgs omVolumeArgs, boolean aclApplied) {
     omResponse.setRemoveAclResponse(OzoneManagerProtocolProtos.RemoveAclResponse
         .newBuilder().setResponse(aclApplied).build());
     return new OMVolumeAclOpResponse(omResponse.build(), omVolumeArgs);

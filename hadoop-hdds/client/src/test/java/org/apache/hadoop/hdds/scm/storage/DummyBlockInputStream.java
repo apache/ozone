@@ -46,7 +46,7 @@ class DummyBlockInputStream extends BlockInputStream {
       Token<OzoneBlockTokenIdentifier> token,
       boolean verifyChecksum,
       XceiverClientFactory xceiverClientManager,
-      Function<BlockID, Pipeline> refreshFunction,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks) {
     super(blockId, blockLen, pipeline, token, verifyChecksum,

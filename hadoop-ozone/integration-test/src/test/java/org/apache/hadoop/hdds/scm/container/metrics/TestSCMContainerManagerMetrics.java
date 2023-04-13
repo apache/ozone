@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.metrics;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -25,62 +27,59 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.HashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.fail;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
  */
+@Timeout(300)
 public class TestSCMContainerManagerMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
+  private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "3000s");
     conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     scm = cluster.getStorageContainerManager();
   }
 
 
-  @After
+  @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
 
   @Test
-  public void testContainerOpsMetrics() throws IOException {
+  public void testContainerOpsMetrics() throws Exception {
     MetricsRecordBuilder metrics;
     ContainerManager containerManager = scm.getContainerManager();
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
@@ -88,58 +87,51 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
+    Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), ++numSuccessfulCreateContainers);
 
-    try {
-      containerManager.allocateContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-      fail("testContainerOpsMetrics failed");
-    } catch (IOException ex) {
-      // Here it should fail, so it should have the old metric value.
-      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
-          metrics), numSuccessfulCreateContainers);
-      Assert.assertEquals(getLongCounter("NumFailureCreateContainers",
-          metrics), 1);
-    }
+    Assertions.assertThrows(IOException.class, () ->
+        containerManager.allocateContainer(
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE));
+    // allocateContainer should fail, so it should have the old metric value.
+    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
+        metrics), numSuccessfulCreateContainers);
+    Assertions.assertEquals(getLongCounter("NumFailureCreateContainers",
+        metrics), 1);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     long numSuccessfulDeleteContainers = getLongCounter(
         "NumSuccessfulDeleteContainers", metrics);
 
     containerManager.deleteContainer(
-        new ContainerID(containerInfo.getContainerID()));
+        ContainerID.valueOf(containerInfo.getContainerID()));
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+    Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers + 1);
 
-
-    try {
-      // Give random container to delete.
-      containerManager.deleteContainer(
-          new ContainerID(RandomUtils.nextLong(10000, 20000)));
-      fail("testContainerOpsMetrics failed");
-    } catch (IOException ex) {
-      // Here it should fail, so it should have the old metric value.
-      metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
-          metrics), numSuccessfulCreateContainers);
-      Assert.assertEquals(getLongCounter("NumFailureDeleteContainers",
-          metrics), 1);
-    }
-
-    containerManager.listContainer(
-        new ContainerID(containerInfo.getContainerID()), 1);
+    Assertions.assertThrows(ContainerNotFoundException.class, () ->
+        containerManager.deleteContainer(
+            ContainerID.valueOf(RandomUtils.nextLong(10000, 20000))));
+    // deleteContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumListContainerOps",
+    Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+        metrics), numSuccessfulCreateContainers);
+    Assertions.assertEquals(getLongCounter("NumFailureDeleteContainers",
         metrics), 1);
+
+    long currentValue = getLongCounter("NumListContainerOps", metrics);
+    containerManager.getContainers(
+        ContainerID.valueOf(containerInfo.getContainerID()), 1);
+    metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+    Assertions.assertEquals(currentValue + 1,
+        getLongCounter("NumListContainerOps", metrics));
 
   }
 
@@ -151,15 +143,15 @@ public class TestSCMContainerManagerMetrics {
 
     MetricsRecordBuilder metrics =
         getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assert.assertEquals(getLongCounter("NumContainerReportsProcessedSuccessful",
-        metrics), 1);
+    Assertions.assertEquals(1L,
+        getLongCounter("NumContainerReportsProcessedSuccessful", metrics));
 
     // Create key should create container on DN.
-    cluster.getRpcClient().getObjectStore().getClientProxy()
+    client.getObjectStore().getClientProxy()
         .createVolume(volumeName);
-    cluster.getRpcClient().getObjectStore().getClientProxy()
+    client.getObjectStore().getClientProxy()
         .createBucket(volumeName, bucketName);
-    OzoneOutputStream ozoneOutputStream = cluster.getRpcClient()
+    OzoneOutputStream ozoneOutputStream = client
         .getObjectStore().getClientProxy().createKey(volumeName, bucketName,
             key, 0, ReplicationType.RATIS, ReplicationFactor.ONE,
             new HashMap<>());

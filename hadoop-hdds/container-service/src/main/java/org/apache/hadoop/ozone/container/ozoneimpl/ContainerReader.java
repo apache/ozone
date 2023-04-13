@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto.State.RECOVERING;
 
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
@@ -46,22 +47,22 @@ import org.slf4j.LoggerFactory;
  * Layout of the container directory on disk is as follows:
  *
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >/metadata/<<containerID>>.container}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >/<<dataPath>>}
  * <p>
  * Some ContainerTypes will have extra metadata other than the .container
  * file. For example, KeyValueContainer will have a .db file. This .db file
  * will also be stored in the metadata folder along with the .container file.
  * <p>
- * {@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<KVcontainerID
+ * {@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<KVcontainerID
  * >/metadata/<<KVcontainerID>>.db}
  * <p>
  * Note that the {@literal <<dataPath>>} is dependent on the ContainerType.
  * For KeyValueContainers, the data is stored in a "chunks" folder. As such,
  * the {@literal <<dataPath>>} layout for KeyValueContainers is:
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<KVcontainerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<KVcontainerID
  * >/chunks/<<chunksFile>>}
  *
  */
@@ -74,26 +75,28 @@ public class ContainerReader implements Runnable {
   private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
+  private final boolean shouldDeleteRecovering;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-      ConfigurationSource conf
-  ) {
+      ConfigurationSource conf, boolean shouldDeleteRecovering) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
+    this.shouldDeleteRecovering = shouldDeleteRecovering;
   }
 
   @Override
   public void run() {
     try {
       readVolume(hddsVolumeDir);
-    } catch (RuntimeException ex) {
-      LOG.error("Caught a Run time exception during reading container files" +
-          " from Volume {} {}", hddsVolumeDir, ex);
+    } catch (Throwable t) {
+      LOG.error("Caught an exception during reading container files" +
+          " from Volume {} {}", hddsVolumeDir, t);
+      volumeSet.failVolume(hddsVolumeDir.getPath());
     }
   }
 
@@ -101,30 +104,46 @@ public class ContainerReader implements Runnable {
     Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
         "cannot be null");
 
-    //filtering scm directory
-    File[] scmDir = hddsVolumeRootDir.listFiles(new FileFilter() {
-      @Override
-      public boolean accept(File pathname) {
-        return pathname.isDirectory();
-      }
-    });
+    //filtering storage directory
+    File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
 
-    if (scmDir == null) {
+    if (storageDirs == null) {
       LOG.error("IO error for the volume {}, skipped loading",
           hddsVolumeRootDir);
       volumeSet.failVolume(hddsVolumeRootDir.getPath());
       return;
     }
 
-    if (scmDir.length > 1) {
-      LOG.error("Volume {} is in Inconsistent state", hddsVolumeRootDir);
-      volumeSet.failVolume(hddsVolumeRootDir.getPath());
-      return;
-    }
+    // If there are no storage dirs yet, the volume needs to be formatted
+    // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
+    // operations to perform here in that case.
+    if (storageDirs.length > 0) {
+      File clusterIDDir = new File(hddsVolumeRootDir,
+          hddsVolume.getClusterID());
+      // The subdirectory we should verify containers within.
+      // If this volume was formatted pre SCM HA, this will be the SCM ID.
+      // A cluster ID symlink will exist in this case only if this cluster is
+      // finalized for SCM HA.
+      // If the volume was formatted post SCM HA, this will be the cluster ID.
+      File idDir = clusterIDDir;
+      if (storageDirs.length == 1 && !clusterIDDir.exists()) {
+        // If the one directory is not the cluster ID directory, assume it is
+        // the old SCM ID directory used before SCM HA.
+        idDir = storageDirs[0];
+      } else {
+        // There are 1 or more storage directories. We only care about the
+        // cluster ID directory.
+        if (!clusterIDDir.exists()) {
+          LOG.error("Volume {} is in an inconsistent state. Expected " +
+              "clusterID directory {} not found.", hddsVolumeRootDir,
+              clusterIDDir);
+          volumeSet.failVolume(hddsVolumeRootDir.getPath());
+          return;
+        }
+      }
 
-    LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-    for (File scmLoc : scmDir) {
-      File currentDir = new File(scmLoc, Storage.STORAGE_DIR_CURRENT);
+      LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
+      File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null) {
         for (File containerTopDir : containerTopDirs) {
@@ -132,14 +151,20 @@ public class ContainerReader implements Runnable {
             File[] containerDirs = containerTopDir.listFiles();
             if (containerDirs != null) {
               for (File containerDir : containerDirs) {
-                File containerFile = ContainerUtils.getContainerFile(
-                    containerDir);
-                long containerID = ContainerUtils.getContainerID(containerDir);
-                if (containerFile.exists()) {
-                  verifyContainerFile(containerID, containerFile);
-                } else {
-                  LOG.error("Missing .container file for ContainerID: {}",
-                      containerDir.getName());
+                try {
+                  File containerFile = ContainerUtils.getContainerFile(
+                      containerDir);
+                  long containerID =
+                      ContainerUtils.getContainerID(containerDir);
+                  if (containerFile.exists()) {
+                    verifyContainerFile(containerID, containerFile);
+                  } else {
+                    LOG.error("Missing .container file for ContainerID: {}",
+                        containerDir.getName());
+                  }
+                } catch (Throwable e) {
+                  LOG.error("Failed to load container from {}",
+                      containerDir.getAbsolutePath(), e);
                 }
               }
             }
@@ -150,7 +175,8 @@ public class ContainerReader implements Runnable {
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
-  private void verifyContainerFile(long containerID, File containerFile) {
+  private void verifyContainerFile(long containerID,
+                                   File containerFile) {
     try {
       ContainerData containerData = ContainerDataYaml.readContainerFile(
           containerFile);
@@ -167,9 +193,9 @@ public class ContainerReader implements Runnable {
   }
 
   /**
-   * verify ContainerData loaded from disk and fix-up stale members.
-   * Specifically blockCommitSequenceId, delete related metadata
-   * and bytesUsed
+   * Verify ContainerData loaded from disk and fix-up stale members.
+   * Specifically the in memory values of blockCommitSequenceId, delete related
+   * metadata, bytesUsed and block count.
    * @param containerData
    * @throws IOException
    */
@@ -181,11 +207,17 @@ public class ContainerReader implements Runnable {
         KeyValueContainerData kvContainerData = (KeyValueContainerData)
             containerData;
         containerData.setVolume(hddsVolume);
-
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
-        KeyValueContainer kvContainer = new KeyValueContainer(
-            kvContainerData, config);
-
+        KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
+            config);
+        if (kvContainer.getContainerState() == RECOVERING) {
+          if (shouldDeleteRecovering) {
+            kvContainer.delete();
+            LOG.info("Delete recovering container {}.",
+                kvContainer.getContainerData().getContainerID());
+          }
+          return;
+        }
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +

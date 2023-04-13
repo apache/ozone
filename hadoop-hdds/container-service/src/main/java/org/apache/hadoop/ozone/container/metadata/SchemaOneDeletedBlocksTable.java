@@ -76,6 +76,11 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
+  public void deleteRange(String beginKey, String endKey) throws IOException {
+    super.deleteRange(prefix(beginKey), prefix(endKey));
+  }
+
+  @Override
   public boolean isExist(String key) throws IOException {
     return super.isExist(prefix(key));
   }
@@ -97,7 +102,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
 
   @Override
   public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
-          String startKey, int count,
+          String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
@@ -105,12 +110,12 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this and return results that are not deleted blocks.
     return unprefix(super.getRangeKVs(prefix(startKey), count,
-            getDeletedFilter()));
+        prefix, getDeletedFilter()));
   }
 
   @Override
   public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
-          String startKey, int count,
+          String startKey, int count, String prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
@@ -118,7 +123,7 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this and return results that are not deleted blocks.
     return unprefix(super.getSequentialRangeKVs(prefix(startKey), count,
-            getDeletedFilter()));
+        prefix, getDeletedFilter()));
   }
 
   private static String prefix(String key) {

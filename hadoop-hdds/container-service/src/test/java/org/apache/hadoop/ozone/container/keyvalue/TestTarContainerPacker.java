@@ -22,10 +22,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,19 +37,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorInputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.SpyInputStream;
+import org.apache.ozone.test.SpyOutputStream;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -55,7 +56,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
+import static java.nio.file.Files.newInputStream;
+import static java.nio.file.Files.newOutputStream;
+import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 
 /**
  * Test the tar/untar for a given container.
@@ -73,8 +76,7 @@ public class TestTarContainerPacker {
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "descriptor";
 
-  private final ContainerPacker<KeyValueContainerData> packer
-      = new TarContainerPacker();
+  private TarContainerPacker packer;
 
   private static final Path SOURCE_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-source-dir");
@@ -87,15 +89,31 @@ public class TestTarContainerPacker {
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
+  private final String schemaVersion;
+  private OzoneConfiguration conf;
 
-  public TestTarContainerPacker(ChunkLayOutVersion layout) {
-    this.layout = layout;
+  public TestTarContainerPacker(ContainerTestVersionInfo versionInfo,
+      CopyContainerCompression compression) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    this.conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    packer = new TarContainerPacker(compression);
+
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    List<ContainerTestVersionInfo> layoutList =
+        ContainerTestVersionInfo.getLayoutList();
+    List<Object[]> parameterList = new ArrayList<>();
+    for (ContainerTestVersionInfo containerTestVersionInfo : layoutList) {
+      for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+        parameterList.add(new Object[]{containerTestVersionInfo, compr});
+      }
+    }
+    return parameterList;
   }
 
   @BeforeClass
@@ -120,30 +138,37 @@ public class TestTarContainerPacker {
   }
 
   private KeyValueContainerData createContainer(Path dir) throws IOException {
+    return createContainer(dir, true);
+  }
+
+  private KeyValueContainerData createContainer(Path dir, boolean createDir)
+      throws IOException {
     long id = CONTAINER_ID.getAndIncrement();
 
-    Path containerDir = dir.resolve("container" + id);
+    Path containerDir = dir.resolve(String.valueOf(id));
     Path dbDir = containerDir.resolve("db");
-    Path dataDir = containerDir.resolve("data");
-    Files.createDirectories(dbDir);
-    Files.createDirectories(dataDir);
+    Path dataDir = containerDir.resolve("chunks");
+    Path metaDir = containerDir.resolve("metadata");
+    if (createDir) {
+      Files.createDirectories(metaDir);
+      Files.createDirectories(dbDir);
+      Files.createDirectories(dataDir);
+    }
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         id, layout,
         -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    containerData.setSchemaVersion(schemaVersion);
     containerData.setChunksPath(dataDir.toString());
-    containerData.setMetadataPath(dbDir.getParent().toString());
+    containerData.setMetadataPath(metaDir.toString());
     containerData.setDbFile(dbDir.toFile());
 
     return containerData;
   }
 
   @Test
-  public void pack() throws IOException, CompressorException {
-
+  public void pack() throws IOException {
     //GIVEN
-    OzoneConfiguration conf = new OzoneConfiguration();
-
     KeyValueContainerData sourceContainerData =
         createContainer(SOURCE_CONTAINER_ROOT);
 
@@ -159,59 +184,64 @@ public class TestTarContainerPacker {
     //sample container descriptor file
     writeDescriptor(sourceContainer);
 
-    Path targetFile = TEMP_DIR.resolve("container.tar.gz");
+    Path targetFile = TEMP_DIR.resolve("container.tar");
 
     //WHEN: pack it
-    try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {
-      packer.pack(sourceContainer, output);
-    }
+    SpyOutputStream outputForPack =
+        new SpyOutputStream(newOutputStream(targetFile));
+    packer.pack(sourceContainer, outputForPack);
 
     //THEN: check the result
     TarArchiveInputStream tarStream = null;
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      CompressorInputStream uncompressed = new CompressorStreamFactory()
-          .createCompressorInputStream(GZIP, input);
+      InputStream uncompressed = packer.decompress(input);
       tarStream = new TarArchiveInputStream(uncompressed);
 
+      boolean first = true;
       TarArchiveEntry entry;
       Map<String, TarArchiveEntry> entries = new HashMap<>();
       while ((entry = tarStream.getNextTarEntry()) != null) {
+        if (first) {
+          Assert.assertEquals(CONTAINER_FILE_NAME, entry.getName());
+          first = false;
+        }
         entries.put(entry.getName(), entry);
       }
 
-      Assert.assertTrue(
-          entries.containsKey("container.yaml"));
-
+      Assert.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
     } finally {
       if (tarStream != null) {
         tarStream.close();
       }
     }
+    outputForPack.assertClosedExactlyOnce();
 
     //read the container descriptor only
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      String containerYaml = new String(packer.unpackContainerDescriptor(input),
-          UTF_8);
-      Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
-    }
+    SpyInputStream inputForUnpackDescriptor =
+        new SpyInputStream(newInputStream(targetFile));
+    String containerYaml = new String(
+        packer.unpackContainerDescriptor(inputForUnpackDescriptor),
+        UTF_8);
+    Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, containerYaml);
+    inputForUnpackDescriptor.assertClosedExactlyOnce();
 
     KeyValueContainerData destinationContainerData =
-        createContainer(DEST_CONTAINER_ROOT);
+        createContainer(DEST_CONTAINER_ROOT, false);
 
     KeyValueContainer destinationContainer =
         new KeyValueContainer(destinationContainerData, conf);
 
-    String descriptor;
-
     //unpackContainerData
-    try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
-      descriptor =
-          new String(packer.unpackContainerData(destinationContainer, input),
-              UTF_8);
-    }
+    SpyInputStream inputForUnpackData =
+        new SpyInputStream(newInputStream(targetFile));
+    String descriptor = new String(
+        packer.unpackContainerData(destinationContainer, inputForUnpackData,
+            TEMP_DIR, DEST_CONTAINER_ROOT.resolve(String.valueOf(
+                destinationContainer.getContainerData().getContainerID()))),
+        UTF_8);
 
     assertExampleMetadataDbIsGood(
-        destinationContainerData.getDbFile().toPath(),
+        TarContainerPacker.getDbPath(destinationContainerData),
         TEST_DB_FILE_NAME);
     assertExampleChunkFileIsGood(
         Paths.get(destinationContainerData.getChunksPath()),
@@ -221,6 +251,7 @@ public class TestTarContainerPacker {
             + "unpackContainerData Call",
         destinationContainer.getContainerFile().exists());
     Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
+    inputForUnpackData.assertClosedExactlyOnce();
   }
 
   @Test
@@ -240,7 +271,8 @@ public class TestTarContainerPacker {
     KeyValueContainerData dest = unpackContainerData(containerFile);
 
     // THEN
-    assertExampleMetadataDbIsGood(dest.getDbFile().toPath(), fileName);
+    assertExampleMetadataDbIsGood(
+        TarContainerPacker.getDbPath(dest), fileName);
   }
 
   @Test
@@ -300,10 +332,10 @@ public class TestTarContainerPacker {
   private KeyValueContainerData unpackContainerData(File containerFile)
       throws IOException {
     try (FileInputStream input = new FileInputStream(containerFile)) {
-      OzoneConfiguration conf = new OzoneConfiguration();
-      KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT);
+      KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT, false);
       KeyValueContainer container = new KeyValueContainer(data, conf);
-      packer.unpackContainerData(container, input);
+      packer.unpackContainerData(container, input, TEMP_DIR,
+          DEST_CONTAINER_ROOT.resolve(String.valueOf(data.getContainerID())));
       return data;
     }
   }
@@ -320,40 +352,36 @@ public class TestTarContainerPacker {
   private File writeChunkFile(
       KeyValueContainerData containerData, String chunkFileName)
       throws IOException {
-    Path path = Paths.get(containerData.getChunksPath())
-        .resolve(chunkFileName);
-    Files.createDirectories(path.getParent());
-    File file = path.toFile();
-    FileOutputStream fileStream = new FileOutputStream(file);
-    try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
-        UTF_8)) {
-      IOUtils.write(TEST_CHUNK_FILE_CONTENT, writer);
-    }
-    return file;
+    return writeSingleFile(Paths.get(containerData.getChunksPath()),
+        chunkFileName, TEST_CHUNK_FILE_CONTENT);
   }
 
   private File writeDbFile(
       KeyValueContainerData containerData, String dbFileName)
       throws IOException {
-    Path path = containerData.getDbFile().toPath()
-        .resolve(dbFileName);
+    return writeSingleFile(TarContainerPacker.getDbPath(containerData),
+        dbFileName, TEST_DB_FILE_CONTENT);
+  }
+
+  private File writeSingleFile(Path parentPath, String fileName,
+      String content) throws IOException {
+    Path path = parentPath.resolve(fileName);
     Files.createDirectories(path.getParent());
     File file = path.toFile();
     FileOutputStream fileStream = new FileOutputStream(file);
     try (OutputStreamWriter writer = new OutputStreamWriter(fileStream,
         UTF_8)) {
-      IOUtils.write(TEST_DB_FILE_CONTENT, writer);
+      IOUtils.write(content, writer);
     }
     return file;
   }
 
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
-    File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
+    File targetFile = TEMP_DIR.resolve("container.tar").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
-         CompressorOutputStream gzipped = new CompressorStreamFactory()
-             .createCompressorOutputStream(GZIP, output);
-         ArchiveOutputStream archive = new TarArchiveOutputStream(gzipped)) {
+         OutputStream compressed = packer.compress(output);
+         ArchiveOutputStream archive = new TarArchiveOutputStream(compressed)) {
       TarContainerPacker.includeFile(file, entryName, archive);
     }
     return targetFile;
@@ -361,34 +389,29 @@ public class TestTarContainerPacker {
 
   private void assertExampleMetadataDbIsGood(Path dbPath, String filename)
       throws IOException {
-
-    Path dbFile = dbPath.resolve(filename);
-
-    Assert.assertTrue(
-        "example DB file is missing after pack/unpackContainerData: " + dbFile,
-        Files.exists(dbFile));
-
-    try (FileInputStream testFile = new FileInputStream(dbFile.toFile())) {
-      List<String> strings = IOUtils.readLines(testFile, UTF_8);
-      Assert.assertEquals(1, strings.size());
-      Assert.assertEquals(TEST_DB_FILE_CONTENT, strings.get(0));
-    }
+    assertExampleFileIsGood(dbPath, filename, TEST_DB_FILE_CONTENT);
   }
 
   private void assertExampleChunkFileIsGood(Path chunkPath, String filename)
       throws IOException {
+    assertExampleFileIsGood(chunkPath, filename, TEST_CHUNK_FILE_CONTENT);
+  }
 
-    Path chunkFile = chunkPath.resolve(filename);
+  private void assertExampleFileIsGood(Path parentPath, String filename,
+      String content) throws IOException {
+
+    Path exampleFile = parentPath.resolve(filename);
 
     Assert.assertTrue(
-        "example chunk file is missing after pack/unpackContainerData: "
-            + chunkFile,
-        Files.exists(chunkFile));
+        "example file is missing after pack/unpackContainerData: "
+            + exampleFile,
+        Files.exists(exampleFile));
 
-    try (FileInputStream testFile = new FileInputStream(chunkFile.toFile())) {
+    try (FileInputStream testFile =
+             new FileInputStream(exampleFile.toFile())) {
       List<String> strings = IOUtils.readLines(testFile, UTF_8);
       Assert.assertEquals(1, strings.size());
-      Assert.assertEquals(TEST_CHUNK_FILE_CONTENT, strings.get(0));
+      Assert.assertEquals(content, strings.get(0));
     }
   }
 

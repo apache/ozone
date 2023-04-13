@@ -57,5 +57,4 @@ public class ITestRootedOzoneContractRootDir extends
   public void testRmNonEmptyRootDirNonRecursive() {
     // OFS doesn't support creating files directly under root
   }
-
 }

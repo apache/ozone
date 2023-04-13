@@ -21,9 +21,9 @@ import java.io.File;
 import java.time.Duration;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 

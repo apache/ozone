@@ -17,23 +17,24 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-ozone</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>ozone</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
+  <artifactId>ozone-filesystem-shaded</artifactId>
   <name>Apache Ozone FileSystem Shaded</name>
   <packaging>jar</packaging>
-  <version>1.1.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
 
   <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-filesystem-common</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem-common</artifactId>
       <exclusions>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
@@ -52,12 +53,24 @@
           <artifactId>hadoop-annotations</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>org.apache.hadoop.thirdparty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>log4j</groupId>
           <artifactId>log4j</artifactId>
         </exclusion>
         <exclusion>
+          <groupId>ch.qos.reload4j</groupId>
+          <artifactId>reload4j</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.google.protobuf</groupId>
@@ -106,7 +119,6 @@
                     <include>org.sqlite.**.*</include>
                     <include>org.tukaani.**.*</include>
                     <include>org.bouncycastle.**.*</include>
-                    <include>org.fusesource.leveldbjni.**.*</include>
                     <include>org.rocksdb.**.*</include>
                     <include>org.apache.commons.cli.**.*</include>
                     <include>org.apache.commons.compress.**.*</include>
@@ -114,6 +126,7 @@
                     <include>org.apache.commons.beanutils.**.*</include>
                     <include>org.apache.commons.collections.**.*</include>
                     <include>org.apache.commons.digester.**.*</include>
+                    <include>org.apache.commons.io.**.*</include>
                     <include>org.apache.commons.logging.**.*</include>
                     <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
@@ -131,10 +144,17 @@
                     <include>com.google.common.**.*</include>
                     <include>com.google.gson.**.*</include>
                     <include>com.codahale.**.*</include>
+                    <include>com.fasterxml.**.*</include>
                     <include>com.lmax.**.*</include>
                     <include>com.github.joshelser.**.*</include>
                     <include>com.twitter.**.*</include>
                   </includes>
+                </relocation>
+                <relocation>
+                  <pattern>kotlin</pattern>
+                  <shadedPattern>
+                    ${shaded.prefix}.kotlin
+                  </shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>
@@ -153,6 +173,9 @@
                   <shadedPattern>
                     ${shaded.prefix}.io
                   </shadedPattern>
+                  <excludes>
+                    <exclude>io!netty!*</exclude>
+                  </excludes>
                 </relocation>
 
                 <!-- handling some special packages with special names -->

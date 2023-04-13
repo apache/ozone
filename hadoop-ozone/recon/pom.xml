@@ -16,13 +16,16 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-ozone</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>ozone</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <name>Apache Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>hadoop-ozone-recon</artifactId>
+  <artifactId>ozone-recon</artifactId>
+  <properties>
+    <pnpm.version>5.18.9</pnpm.version>
+  </properties>
   <build>
     <resources>
       <resource>
@@ -100,16 +103,16 @@
               <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
-              <nodeVersion>v12.14.1</nodeVersion>
+              <nodeVersion>v16.14.2</nodeVersion>
             </configuration>
           </execution>
           <execution>
-            <id>set pnpm store path</id>
+            <id>set pnpm@${pnpm.version} store path</id>
             <goals>
               <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>pnpm config set store-dir ~/.pnpm-store</arguments>
+              <arguments>pnpm@${pnpm.version} config set store-dir ~/.pnpm-store</arguments>
             </configuration>
           </execution>
           <execution>
@@ -118,7 +121,7 @@
               <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>pnpm install --frozen-lockfile</arguments>
+              <arguments>pnpm@${pnpm.version} install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
@@ -127,7 +130,7 @@
               <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>pnpm run build</arguments>
+              <arguments>pnpm@${pnpm.version} run build</arguments>
             </configuration>
           </execution>
         </executions>
@@ -174,8 +177,8 @@
   </build>
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-common</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-common</artifactId>
       <exclusions>
         <exclusion>
           <artifactId>jersey-server</artifactId>
@@ -192,13 +195,13 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-reconcodegen</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-reconcodegen</artifactId>
       <version>${ozone.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-ozone-manager</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-manager</artifactId>
       <exclusions>
         <exclusion>
           <groupId>com.sun.jersey</groupId>
@@ -207,14 +210,14 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- visible only for ContainerOperationClient -->
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-tools</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-tools</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -223,8 +226,8 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-server-scm</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.inject</groupId>
@@ -259,12 +262,16 @@
       <artifactId>jersey-media-json-jackson</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-jaxb</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-common</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
@@ -279,8 +286,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
       <exclusions>
         <exclusion>
@@ -323,7 +330,6 @@
     <dependency>
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
-      <version>10.14.2.0</version>
     </dependency>
     <dependency>
       <groupId>org.xerial</groupId>
@@ -340,8 +346,12 @@
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs</artifactId>
+      <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.javassist</groupId>
+      <artifactId>javassist</artifactId>
     </dependency>
   </dependencies>
 </project>

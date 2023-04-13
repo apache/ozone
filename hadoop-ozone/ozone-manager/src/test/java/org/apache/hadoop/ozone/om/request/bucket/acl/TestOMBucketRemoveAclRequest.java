@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -41,7 +41,7 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:testUser:rw");
 
-    OMRequest originalRequest = TestOMRequestUtils
+    OMRequest originalRequest = OMRequestTestUtils
         .createBucketRemoveAclRequest(volumeName, bucketName, acl);
     long originModTime = originalRequest.getRemoveAclRequest()
         .getModificationTime();
@@ -65,14 +65,14 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     String ownerName = "testUser";
 
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OMRequestTestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
     // Add acl
-    OMRequest addAclRequest = TestOMRequestUtils
+    OMRequest addAclRequest = OMRequestTestUtils
         .createBucketAddAclRequest(volumeName, bucketName, acl);
     OMBucketAddAclRequest omBucketAddAclRequest =
         new OMBucketAddAclRequest(addAclRequest);
@@ -93,7 +93,7 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     Assert.assertEquals(acl, bucketAcls.get(0));
 
     // Remove acl.
-    OMRequest removeAclRequest = TestOMRequestUtils
+    OMRequest removeAclRequest = OMRequestTestUtils
         .createBucketRemoveAclRequest(volumeName, bucketName, acl);
     OMBucketRemoveAclRequest omBucketRemoveAclRequest =
         new OMBucketRemoveAclRequest(removeAclRequest);
@@ -118,7 +118,7 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 
-    OMRequest originalRequest = TestOMRequestUtils
+    OMRequest originalRequest = OMRequestTestUtils
         .createBucketRemoveAclRequest(volumeName, bucketName, acl);
     OMBucketRemoveAclRequest omBucketRemoveAclRequest =
         new OMBucketRemoveAclRequest(originalRequest);

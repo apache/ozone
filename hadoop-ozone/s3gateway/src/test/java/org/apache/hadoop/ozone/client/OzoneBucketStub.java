@@ -32,9 +32,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts.PartInfo;
@@ -57,33 +62,74 @@ public class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
-  /**
-   * Constructs OzoneBucket instance.
-   *
-   * @param volumeName   Name of the volume the bucket belongs to.
-   * @param bucketName   Name of the bucket.
-   * @param storageType  StorageType of the bucket.
-   * @param versioning   versioning status of the bucket.
-   * @param creationTime creation time of the bucket.
-   */
-  public OzoneBucketStub(
-      String volumeName,
-      String bucketName,
-      StorageType storageType, Boolean versioning,
-      long creationTime) {
-    super(volumeName,
-        bucketName,
-        ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE,
-        storageType,
-        versioning,
-        creationTime);
+  private ArrayList<OzoneAcl> aclList = new ArrayList<>();
+  private ReplicationConfig replicationConfig;
+
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
+  public OzoneBucketStub(Builder b) {
+    super(b);
+    this.replicationConfig = super.getReplicationConfig();
+  }
+
+  /**
+   * Inner builder for OzoneBucketStub.
+   */
+  public static final class Builder extends OzoneBucket.Builder {
+
+    private Builder() {
+    }
+
+    @Override
+    public Builder setVolumeName(String volumeName) {
+      super.setVolumeName(volumeName);
+      return this;
+    }
+
+    @Override
+    public Builder setName(String name) {
+      super.setName(name);
+      return this;
+    }
+
+    @Override
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplicationConfig) {
+      super.setDefaultReplicationConfig(defaultReplicationConfig);
+      return this;
+    }
+
+    @Override
+    public Builder setStorageType(StorageType storageType) {
+      super.setStorageType(storageType);
+      return this;
+    }
+
+    @Override
+    public Builder setVersioning(Boolean versioning) {
+      super.setVersioning(versioning);
+      return this;
+    }
+
+    @Override
+    public Builder setCreationTime(long creationTime) {
+      super.setCreationTime(creationTime);
+      return this;
+    }
+
+    @Override
+    public OzoneBucketStub build() {
+      return new OzoneBucketStub(this);
+    }
+  }
+  
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
-    return createKey(key, size, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+    return createKey(key, size,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+        ReplicationFactor.ONE), new HashMap<>());
   }
 
   @Override
@@ -104,13 +150,45 @@ public class OzoneBucketStub extends OzoneBucket {
                 size,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
-                new ArrayList<>(), type, metadata, null,
-                factor.getValue()
+                new ArrayList<>(), replicationConfig, metadata, null,
+                () -> readKey(key)
             ));
             super.close();
           }
         };
-    return new OzoneOutputStream(byteArrayOutputStream);
+    return new OzoneOutputStream(byteArrayOutputStream, null);
+  }
+
+  @Override
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> metadata)
+      throws IOException {
+    final ReplicationConfig repConfig;
+    if (rConfig == null) {
+      repConfig = getReplicationConfig();
+    } else {
+      repConfig = rConfig;
+    }
+    ReplicationConfig finalReplicationCon = repConfig;
+    ByteArrayOutputStream byteArrayOutputStream =
+        new ByteArrayOutputStream((int) size) {
+          @Override
+          public void close() throws IOException {
+            keyContents.put(key, toByteArray());
+            keyDetails.put(key, new OzoneKeyDetails(
+                getVolumeName(),
+                getName(),
+                key,
+                size,
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                new ArrayList<>(), finalReplicationCon, metadata, null,
+                () -> readKey(key)
+            ));
+            super.close();
+          }
+        };
+    return new OzoneOutputStream(byteArrayOutputStream, null);
   }
 
   @Override
@@ -122,6 +200,22 @@ public class OzoneBucketStub extends OzoneBucket {
   public OzoneKeyDetails getKey(String key) throws IOException {
     if (keyDetails.containsKey(key)) {
       return keyDetails.get(key);
+    } else {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  @Override
+  public OzoneKey headObject(String key) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
+      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
+          ozoneKeyDetails.getBucketName(),
+          ozoneKeyDetails.getName(),
+          ozoneKeyDetails.getDataSize(),
+          ozoneKeyDetails.getCreationTime().toEpochMilli(),
+          ozoneKeyDetails.getModificationTime().toEpochMilli(),
+          ozoneKeyDetails.getReplicationConfig());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -165,6 +259,14 @@ public class OzoneBucketStub extends OzoneBucket {
                                                  ReplicationType type,
                                                  ReplicationFactor factor)
       throws IOException {
+    String uploadID = UUID.randomUUID().toString();
+    multipartUploadIdMap.put(keyName, uploadID);
+    return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
+  }
+
+  @Override
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig repConfig) throws IOException {
     String uploadID = UUID.randomUUID().toString();
     multipartUploadIdMap.put(keyName, uploadID);
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
@@ -253,8 +355,9 @@ public class OzoneBucketStub extends OzoneBucket {
     List<PartInfo> partInfoList = new ArrayList<>();
 
     if (partList.get(key) == null) {
-      return new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-          ReplicationFactor.ONE, 0, false);
+      return new OzoneMultipartUploadPartListParts(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          0, false);
     } else {
       Map<Integer, Part> partMap = partList.get(key);
       Iterator<Map.Entry<Integer, Part>> partIterator =
@@ -283,15 +386,34 @@ public class OzoneBucketStub extends OzoneBucket {
       }
 
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-              ReplicationFactor.ONE,
+          new OzoneMultipartUploadPartListParts(replicationConfig,
               nextPartNumberMarker, truncated);
       ozoneMultipartUploadPartListParts.addAllParts(partInfoList);
 
       return ozoneMultipartUploadPartListParts;
 
     }
+  }
 
+  @Override
+  public List<OzoneAcl> getAcls() throws IOException {
+    return (List<OzoneAcl>)aclList.clone();
+  }
+
+  @Override
+  public boolean removeAcl(OzoneAcl removeAcl) throws IOException {
+    return aclList.remove(removeAcl);
+  }
+
+  @Override
+  public boolean addAcl(OzoneAcl addAcl) throws IOException {
+    return aclList.add(addAcl);
+  }
+
+  @Override
+  public boolean setAcl(List<OzoneAcl> acls) throws IOException {
+    aclList.clear();
+    return aclList.addAll(acls);
   }
 
   /**
@@ -313,5 +435,15 @@ public class OzoneBucketStub extends OzoneBucket {
     public byte[] getContent() {
       return content.clone();
     }
+  }
+
+  @Override
+  public void setReplicationConfig(ReplicationConfig replicationConfig) {
+    this.replicationConfig = replicationConfig;
+  }
+
+  @Override
+  public ReplicationConfig getReplicationConfig() {
+    return this.replicationConfig;
   }
 }

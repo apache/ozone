@@ -31,12 +31,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.util.LifeCycle;
@@ -81,10 +81,8 @@ public class TestOzoneManagerConfiguration {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId("testClusterId");
-    omStore.setScmId("testScmId");
     // writes the version file properties
     omStore.initialize();
   }
@@ -101,6 +99,7 @@ public class TestOzoneManagerConfiguration {
       .setClusterId(clusterId)
       .setScmId(scmId)
       .setOmId(omId)
+      .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
   }
@@ -197,14 +196,14 @@ public class TestOzoneManagerConfiguration {
     final String omNode3Id = "omNode3";
 
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
     String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode2Id);
     String omNode3RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode3Id);
 
-    String omNode3RatisPortKey = OmUtils.addKeySuffixes(
+    String omNode3RatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNode3Id);
 
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
@@ -241,7 +240,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :
@@ -272,14 +271,14 @@ public class TestOzoneManagerConfiguration {
     final String node3Hostname = "node3.example.com";
 
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
     String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode2Id);
     String omNode3RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode3Id);
 
-    String omNode3RatisPortKey = OmUtils.addKeySuffixes(
+    String omNode3RatisPortKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNode3Id);
 
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
@@ -324,7 +323,7 @@ public class TestOzoneManagerConfiguration {
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
-        expectedPeerAddress = "0.0.0.0:"+
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode3Id :
@@ -350,7 +349,7 @@ public class TestOzoneManagerConfiguration {
     String omNode2Id = "omNode2";
     String omNode3Id = "omNode3";
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
@@ -409,7 +408,7 @@ public class TestOzoneManagerConfiguration {
     String omNode2Id = "omNode2";
     String omNode3Id = "omNode3";
     String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
-    String omNodesKey = OmUtils.addKeySuffixes(
+    String omNodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
 
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
@@ -445,9 +444,9 @@ public class TestOzoneManagerConfiguration {
     // Set the node Ids for the 2 services. The nodeIds need to be
     // distinch within one service. The ids can overlap between
     // different services.
-    String om1NodesKey = OmUtils.addKeySuffixes(
+    String om1NodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, om1ServiceId);
-    String om2NodesKey = OmUtils.addKeySuffixes(
+    String om2NodesKey = ConfUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_NODES_KEY, om2ServiceId);
     conf.set(om1NodesKey, omNodesKeyValue);
     conf.set(om2NodesKey, omNodesKeyValue);
@@ -484,7 +483,7 @@ public class TestOzoneManagerConfiguration {
   }
 
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
-    return OmUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    return ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
   }
 }

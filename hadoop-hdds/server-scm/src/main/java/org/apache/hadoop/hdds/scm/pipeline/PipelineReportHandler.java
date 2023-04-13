@@ -19,16 +19,19 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
@@ -36,6 +39,8 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,14 +57,18 @@ public class PipelineReportHandler implements
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
   private final SafeModeManager scmSafeModeManager;
+  private final SCMContext scmContext;
   private final boolean pipelineAvailabilityCheck;
   private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
-      PipelineManager pipelineManager, ConfigurationSource conf) {
+                               PipelineManager pipelineManager,
+                               SCMContext scmContext,
+                               ConfigurationSource conf) {
     Preconditions.checkNotNull(pipelineManager);
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
+    this.scmContext = scmContext;
     this.conf = conf;
     this.metrics = SCMPipelineMetrics.create();
     this.pipelineAvailabilityCheck = conf.getBoolean(
@@ -82,7 +91,12 @@ public class PipelineReportHandler implements
     for (PipelineReport report : pipelineReport.getPipelineReportList()) {
       try {
         processPipelineReport(report, dn, publisher);
-      } catch (IOException e) {
+      } catch (NotLeaderException ex) {
+        // Avoid NotLeaderException logging which happens when processing
+        // pipeline report on followers.
+      } catch (PipelineNotFoundException e) {
+        LOGGER.error("Could not find pipeline {}", report.getPipelineID());
+      } catch (IOException | TimeoutException e) {
         LOGGER.error("Could not process pipeline report={} from dn={}.",
             report, dn, e);
       }
@@ -90,17 +104,20 @@ public class PipelineReportHandler implements
   }
 
   protected void processPipelineReport(PipelineReport report,
-      DatanodeDetails dn, EventPublisher publisher) throws IOException {
+      DatanodeDetails dn, EventPublisher publisher)
+      throws IOException, TimeoutException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     Pipeline pipeline;
     try {
       pipeline = pipelineManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException e) {
-      final ClosePipelineCommand closeCommand =
-          new ClosePipelineCommand(pipelineID);
-      final CommandForDatanode datanodeCommand =
-          new CommandForDatanode<>(dn.getUuid(), closeCommand);
-      publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+      if (scmContext.isLeader()) {
+        LOGGER.info("Reported pipeline {} is not found", pipelineID);
+        SCMCommand< ? > command = new ClosePipelineCommand(pipelineID);
+        command.setTerm(scmContext.getTermOfLeader());
+        publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+            new CommandForDatanode<>(dn.getUuid(), command));
+      }
       return;
     }
 
@@ -109,8 +126,10 @@ public class PipelineReportHandler implements
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
-            pipeline.getId(), dn);
+        LOGGER.debug("Pipeline {} {} reported by {}",
+            pipeline.getReplicationConfig(),
+            pipeline.getId(),
+            dn);
       }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
@@ -134,7 +153,8 @@ public class PipelineReportHandler implements
                                      DatanodeDetails dn) {
     // ONE replica pipeline doesn't have leader flag
     if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
+        RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
+            ReplicationFactor.ONE)) {
       pipeline.setLeaderId(dn.getUuid());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }

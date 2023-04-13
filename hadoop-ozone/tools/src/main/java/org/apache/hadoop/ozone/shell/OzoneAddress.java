@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -53,6 +54,8 @@ public class OzoneAddress {
   private String volumeName = "";
 
   private String bucketName = "";
+
+  private String snapshotNameWithIndicator = "";
 
   private String keyName = "";
 
@@ -151,7 +154,7 @@ public class OzoneAddress {
         client = createRpcClientFromHostPort(ozoneURI.getHost(),
             ozoneURI.getPort(), conf);
       }
-    } else {// When host is not specified
+    } else { // When host is not specified
 
       Collection<String> omServiceIds = conf.getTrimmedStringCollection(
           OZONE_OM_SERVICE_IDS_KEY);
@@ -270,7 +273,7 @@ public class OzoneAddress {
 
     // add leading slash to the path, if it does not exist
     int firstSlash = path.indexOf('/');
-    if(firstSlash != 0) {
+    if (firstSlash != 0) {
       path = "/" + path;
     }
 
@@ -291,6 +294,10 @@ public class OzoneAddress {
 
   public String getBucketName() {
     return bucketName;
+  }
+
+  public String getSnapshotNameWithIndicator() {
+    return snapshotNameWithIndicator;
   }
 
   public String getKeyName() {
@@ -340,6 +347,35 @@ public class OzoneAddress {
     } else if (bucketName.length() == 0) {
       throw new OzoneClientException(
           "Bucket name is missing");
+    }
+  }
+
+  /**
+   * Checking for a volume and a bucket
+   * but also accepting a snapshot
+   * indicator and a snapshot name.
+   * If the keyName can't be considered
+   * a valid snapshot, an exception is thrown.
+   *
+   * @throws OzoneClientException
+   */
+  public void ensureSnapshotAddress()
+      throws OzoneClientException {
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        snapshotNameWithIndicator = keyName;
+      } else {
+        throw new OzoneClientException(
+            "Delimiters (/) not allowed following " +
+                "a bucket name. Only a snapshot name with " +
+                "a snapshot indicator is accepted");
+      }
+    } else if (volumeName.length() == 0) {
+      throw new OzoneClientException(
+          "Volume name is missing.");
+    } else if (bucketName.length() == 0) {
+      throw new OzoneClientException(
+          "Bucket name is missing.");
     }
   }
 

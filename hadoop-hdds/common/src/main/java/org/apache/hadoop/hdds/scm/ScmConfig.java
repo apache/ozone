@@ -43,7 +43,7 @@ public class ScmConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = "The keytab file used by SCM daemon to login as "+
+      description = "The keytab file used by SCM daemon to login as " +
           "its service principal."
   )
   private String keytab;
@@ -79,10 +79,11 @@ public class ScmConfig {
 
   @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "20000",
+      defaultValue = "100000",
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "
+              + "The block num is counted at the replica level."
               + "If SCM has 100000 blocks which need to be deleted and the "
               + "configuration is 5000 then it would only send 5000 blocks "
               + "for deletion to the datanodes."
@@ -100,6 +101,17 @@ public class ScmConfig {
               + "postfix (ns,ms,s,m,h,d). "
   )
   private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+
+  @Config(key = "init.default.layout.version",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = { ConfigTag.SCM, ConfigTag.UPGRADE },
+      description =
+          " Default Layout Version to init the SCM with. Intended to be used " +
+              "in tests to finalize from an older version of SCM to the " +
+              "latest. By default, SCM init uses the highest layout version."
+  )
+  private int defaultLayoutVersionOnInit = -1;
 
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
@@ -150,6 +162,10 @@ public class ScmConfig {
     return blockDeletionLimit;
   }
 
+  public int getScmDefaultLayoutVersionOnInit() {
+    return defaultLayoutVersionOnInit;
+  }
+
   /**
    * Configuration strings class.
    * required for SCMSecurityProtocol where the KerberosInfo references
@@ -163,6 +179,8 @@ public class ScmConfig {
           "hdds.scm.kerberos.principal";
     public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
           "hdds.scm.kerberos.keytab.file";
+    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION =
+        "hdds.scm.init.default.layout.version";
   }
 
   public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =

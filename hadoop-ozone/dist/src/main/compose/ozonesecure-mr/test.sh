@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:MR
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -35,7 +37,6 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-execute_command_in_container rm sudo yum install -y krb5-workstation
 execute_robot_test rm kinit-hadoop.robot
 
 for scheme in o3fs ofs; do

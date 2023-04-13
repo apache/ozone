@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -94,9 +94,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    // In production this will never happen, this request will be called only
-    // when we have quota in bytes is set in setVolumePropertyRequest.
-    if (!setVolumePropertyRequest.hasQuotaInBytes()) {
+    if (!setVolumePropertyRequest.hasQuotaInBytes()
+        && !setVolumePropertyRequest.hasQuotaInNamespace()) {
       omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
           .setSuccess(false);
       return new OMVolumeSetQuotaResponse(omResponse.build());
@@ -135,8 +134,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       } else {
         omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
-      if (checkQuotaNamespaceValid(
-          setVolumePropertyRequest.getQuotaInNamespace())) {
+      if (checkQuotaNamespaceValid(omMetadataManager,
+          setVolumePropertyRequest.getQuotaInNamespace(), volume)) {
         omVolumeArgs.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
       } else {
@@ -151,7 +150,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
@@ -193,32 +192,62 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         || volumeQuotaInBytes == 0) {
       return false;
     }
+    
+    // if volume quota is for reset, no need further check
+    if (volumeQuotaInBytes == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
 
+    boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE);
-    for(OmBucketInfo bucketInfo : bucketList) {
+    for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
-      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+      if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;
+      } else {
+        isBucketQuotaSet = false;
+        break;
       }
     }
-    if(volumeQuotaInBytes < totalBucketQuota &&
+    
+    if (!isBucketQuotaSet) {
+      throw new OMException("Can not set volume space quota on volume " +
+          "as some of buckets in this volume have no quota set.",
+          OMException.ResultCodes.QUOTA_ERROR);
+    }
+    
+    if (volumeQuotaInBytes < totalBucketQuota &&
         volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
-      throw new IllegalArgumentException("Total buckets quota in this volume " +
+      throw new OMException("Total buckets quota in this volume " +
           "should not be greater than volume quota : the total space quota is" +
           ":" + totalBucketQuota + ". But the volume space quota is:" +
-          volumeQuotaInBytes);
+          volumeQuotaInBytes, OMException.ResultCodes.QUOTA_EXCEEDED);
     }
     return true;
   }
 
-  public boolean checkQuotaNamespaceValid(long quotaInNamespace) {
-
+  public boolean checkQuotaNamespaceValid(OMMetadataManager metadataManager,
+      long quotaInNamespace, String volumeName) throws IOException {
     if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
     }
+
+    // if volume quota is for reset, no need further check
+    if (quotaInNamespace == OzoneConsts.QUOTA_RESET) {
+      return true;
+    }
+
+    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
+        volumeName, null, null, Integer.MAX_VALUE);
+    if (bucketList.size() > quotaInNamespace) {
+      throw new OMException("Total number of buckets " + bucketList.size() +
+          " in this volume should not be greater than volume namespace quota "
+          + quotaInNamespace, OMException.ResultCodes.QUOTA_EXCEEDED);
+    }
     return true;
   }
+
 }
 
 

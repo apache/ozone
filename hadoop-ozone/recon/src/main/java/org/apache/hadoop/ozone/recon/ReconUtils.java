@@ -29,7 +29,6 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
-import java.util.zip.GZIPOutputStream;
 
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -41,7 +40,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -97,23 +95,20 @@ public class ReconUtils {
   }
 
   /**
-   * Given a source directory, create a tar.gz file from it.
+   * Given a source directory, create a tar file from it.
    *
    * @param sourcePath the path to the directory to be archived.
-   * @return tar.gz file
+   * @return tar file
    * @throws IOException
    */
   public static File createTarFile(Path sourcePath) throws IOException {
     TarArchiveOutputStream tarOs = null;
     FileOutputStream fileOutputStream = null;
-    GZIPOutputStream gzipOutputStream = null;
     try {
       String sourceDir = sourcePath.toString();
-      String fileName = sourceDir.concat(".tar.gz");
+      String fileName = sourceDir.concat(".tar");
       fileOutputStream = new FileOutputStream(fileName);
-      gzipOutputStream =
-          new GZIPOutputStream(new BufferedOutputStream(fileOutputStream));
-      tarOs = new TarArchiveOutputStream(gzipOutputStream);
+      tarOs = new TarArchiveOutputStream(fileOutputStream);
       File folder = new File(sourceDir);
       File[] filesInDir = folder.listFiles();
       if (filesInDir != null) {
@@ -126,7 +121,6 @@ public class ReconUtils {
       try {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
         org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
-        org.apache.hadoop.io.IOUtils.closeStream(gzipOutputStream);
       } catch (Exception e) {
         LOG.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
@@ -170,12 +164,8 @@ public class ReconUtils {
       throws IOException {
 
     FileInputStream fileInputStream = null;
-    BufferedInputStream buffIn = null;
-    GzipCompressorInputStream gzIn = null;
     try {
       fileInputStream = new FileInputStream(tarFile);
-      buffIn = new BufferedInputStream(fileInputStream);
-      gzIn = new GzipCompressorInputStream(buffIn);
 
       //Create Destination directory if it does not exist.
       if (!destPath.toFile().exists()) {
@@ -186,7 +176,7 @@ public class ReconUtils {
       }
 
       try (TarArchiveInputStream tarInStream =
-               new TarArchiveInputStream(gzIn)) {
+               new TarArchiveInputStream(fileInputStream)) {
         TarArchiveEntry entry;
 
         while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
@@ -216,8 +206,6 @@ public class ReconUtils {
         }
       }
     } finally {
-      IOUtils.closeStream(gzIn);
-      IOUtils.closeStream(buffIn);
       IOUtils.closeStream(fileInputStream);
     }
   }
@@ -298,5 +286,36 @@ public class ReconUtils {
     } else {
       globalStatsDao.update(newRecord);
     }
+  }
+
+  public static long getFileSizeUpperBound(long fileSize) {
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest file size being tracked for count
+    // is 1 KB i.e. 1024 = 2 ^ 10.
+    int binIndex = getBinIndex(fileSize);
+    return (long) Math.pow(2, (10 + binIndex));
+  }
+
+  public static int getBinIndex(long fileSize) {
+    // if the file size is larger than our track scope,
+    // we map it to the last bin
+    if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_BINS - 1;
+    }
+    int index = nextClosestPowerIndexOfTwo(fileSize);
+    // if the file size is smaller than our track scope,
+    // we map it to the first bin
+    return index < 10 ? 0 : index - 10;
+  }
+
+  private static int nextClosestPowerIndexOfTwo(long dataSize) {
+    int index = 0;
+    while (dataSize != 0) {
+      dataSize >>= 1;
+      index += 1;
+    }
+    return index;
   }
 }
