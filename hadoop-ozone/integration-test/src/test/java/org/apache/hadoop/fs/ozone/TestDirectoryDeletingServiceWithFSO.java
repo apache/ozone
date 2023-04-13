@@ -27,11 +27,13 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -172,7 +174,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(root.getName(),
         dirTable.iterator().next().getValue().getName());
 
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
   }
 
   /**
@@ -221,7 +223,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
 
-    long preRunCount = dirDeletingService.getRunCount();
+    long preRunCount = dirDeletingService.getRunCount().get();
 
     // Delete the appRoot
     fs.delete(appRoot, true);
@@ -238,8 +240,8 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 18);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
-    long elapsedRunCount = dirDeletingService.getRunCount() - preRunCount;
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
     assertTrue(elapsedRunCount >= 7);
   }
@@ -290,7 +292,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
-    assertTrue(dirDeletingService.getRunCount() > 1);
+    assertTrue(dirDeletingService.getRunCount().get() > 1);
   }
 
   @Test
@@ -372,6 +374,128 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify whether KeyDeletingService has purged the keys
     currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     assertEquals(prevDeletedKeyCount + 5, currentDeletedKeyCount);
+  }
+
+  @Test
+  public void testDirDeletedTableCleanUpForSnapshot() throws Exception {
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, OmKeyInfo> keyTable =
+        cluster.getOzoneManager().getMetadataManager()
+            .getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> dirTable =
+        cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, RepeatedOmKeyInfo> deletedKeyTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedTable();
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
+
+    /*    DirTable                               KeyTable
+    /v/b/snapDir                       /v/b/snapDir/testKey0 - testKey5
+    /v/b/snapDir/appRoot/              /v/b/snapDir/appRoot/parentDir0/childFile
+    /v/b/snapDir/appRoot/parentDir0/   /v/b/snapDir/appRoot/parentDir1/childFile
+    /v/b/snapDir/appRoot/parentDir1/   /v/b/snapDir/appRoot/parentDir2/childFile
+    /v/b/snapDir/appRoot/parentDir2/
+     */
+
+    Path root = new Path("/snapDir");
+    Path appRoot = new Path(root, "appRoot");
+    // Create  parent dir from root.
+    fs.mkdirs(root);
+
+    // Added 5 sub files inside root dir
+    for (int i = 0; i < 5; i++) {
+      Path path = new Path(root, "testKey" + i);
+      try (FSDataOutputStream stream = fs.create(path)) {
+        stream.write(1);
+      }
+    }
+
+    // Add 3 more sub files in different level
+    for (int i = 0; i < 3; i++) {
+      Path parent = new Path(appRoot, "parentDir" + i);
+      Path child = new Path(parent, "childFile");
+      ContractTestUtils.touch(fs, child);
+    }
+
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDeletingService();
+
+    // Before delete
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(keyTable, 8);
+    assertTableRowCount(dirTable, 5);
+
+    // Create snapshot
+    client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
+    assertTableRowCount(snapshotInfoTable, 1);
+
+    // Case-1) Delete 3 Files directly.
+    for (int i = 0; i < 3; i++) {
+      Path path = new Path(root, "testKey" + i);
+      fs.delete(path, true);
+    }
+
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+
+    // After delete. 5 more files left out under the root dir
+    assertTableRowCount(keyTable, 5);
+    assertTableRowCount(dirTable, 5);
+
+    // KeyDeletingService and DirectoryDeletingService will not
+    // clean up because the paths are part of a snapshot.
+    assertTableRowCount(deletedDirTable, 0);
+    assertTableRowCount(deletedKeyTable, 3);
+
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+
+    // Case-2) Delete dir
+    fs.delete(root, true);
+
+    // After delete. 5 sub files are still in keyTable.
+    // 4 dirs in dirTable.
+    assertTableRowCount(keyTable, 5);
+    assertTableRowCount(dirTable, 4);
+
+    // KeyDeletingService and DirectoryDeletingService will not
+    // clean up because the paths are part of a snapshot.
+    // As a result on 1 deleted dir and 3 deleted files will
+    // remain in dirTable and keyTable respectively.
+    assertTableRowCount(deletedDirTable, 1);
+    assertTableRowCount(deletedKeyTable, 3);
+
+    assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
+    assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
+    assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 0);
+
+    // Manual cleanup deletedDirTable for next tests
+    cleanupTables();
+  }
+
+  private void cleanupTables() throws IOException {
+    cluster.getOzoneManager().getMetadataManager()
+        .getDeletedDirTable().iterator().removeFromDB();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = cluster.getOzoneManager().getMetadataManager()
+        .getFileTable().iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        iterator.removeFromDB();
+      }
+    }
+    try (TableIterator<String, ? extends Table.KeyValue<String,
+        OmDirectoryInfo>> deletedItr = cluster.getOzoneManager()
+        .getMetadataManager().getDirectoryTable().iterator()) {
+      while (deletedItr.hasNext()) {
+        deletedItr.next();
+        deletedItr.removeFromDB();
+      }
+    }
   }
 
   static void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
