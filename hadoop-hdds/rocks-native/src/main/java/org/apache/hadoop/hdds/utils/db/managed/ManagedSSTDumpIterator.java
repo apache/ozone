@@ -27,6 +27,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -176,12 +177,16 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   @Override
-  public synchronized void close() throws IOException {
+  public synchronized void close() throws UncheckedIOException {
     if (this.sstDumpToolTask != null) {
       if (!this.sstDumpToolTask.getFuture().isDone()) {
         this.sstDumpToolTask.getFuture().cancel(true);
       }
-      this.processOutput.close();
+      try {
+        this.processOutput.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
     open.compareAndSet(true, false);
   }

@@ -53,16 +53,11 @@ public class ManagedSstFileReader {
     this.sstFiles = sstFiles;
   }
 
-  public static <T> Stream<T> getStreamFromIterator(
-      ClosableIterator<T> itr) {
-    final Spliterator<T> spliterator = Spliterators
-        .spliteratorUnknownSize(itr, 0);
+  public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
+    final Spliterator<T> spliterator =
+        Spliterators.spliteratorUnknownSize(itr, 0);
     return StreamSupport.stream(spliterator, false).onClose(() -> {
-      try {
-        itr.close();
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
+      itr.close();
     });
   }
 
@@ -75,8 +70,8 @@ public class ManagedSstFileReader {
           private ReadOptions readOptions = new ManagedReadOptions();
 
           @Override
-          protected ClosableIterator<String>
-          getKeyIteratorForFile(String file) throws RocksDBException {
+          protected ClosableIterator<String> getKeyIteratorForFile(String file)
+              throws RocksDBException {
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
@@ -87,7 +82,7 @@ public class ManagedSstFileReader {
           }
 
           @Override
-          public void close() throws IOException {
+          public void close() throws UncheckedIOException {
             super.close();
             options.close();
             readOptions.close();
@@ -105,8 +100,7 @@ public class ManagedSstFileReader {
           private ManagedOptions options = new ManagedOptions();
 
           @Override
-          protected ClosableIterator<String>
-          getKeyIteratorForFile(String file)
+          protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
@@ -118,7 +112,7 @@ public class ManagedSstFileReader {
           }
 
           @Override
-          public void close() throws IOException {
+          public void close() throws UncheckedIOException {
             super.close();
             options.close();
           }
@@ -206,8 +200,12 @@ public class ManagedSstFileReader {
     }
 
     @Override
-    public void close() throws IOException {
-      closeCurrentFile();
+    public void close() throws UncheckedIOException {
+      try {
+        closeCurrentFile();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
 
     private boolean moveToNextFile() throws IOException, RocksDBException,
