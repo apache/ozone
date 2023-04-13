@@ -360,30 +360,42 @@ public final class HddsUtils {
    */
   public static InetSocketAddress getSolrAddress(
       ConfigurationSource conf) {
-    String name = conf.get(OZONE_SOLR_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
+    String solrAddresses = conf.get(OZONE_SOLR_ADDRESS_KEY);
+    LOG.info("Solr Live Host Addresses: {}", solrAddresses);
+    if (StringUtils.isEmpty(solrAddresses)) {
+      throw new IllegalArgumentException(String.format("For heatmap " +
+              "feature Solr host and port configuration must be provided " +
+              "for config key %s. Example format -> <Host>:<Port>",
+          OZONE_SOLR_ADDRESS_KEY));
     }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Solr Server: "
-          + name);
-    }
-    int port = OZONE_SOLR_SERVER_PORT_DEFAULT;
-    try {
-      port = getHostPort(name).orElse(OZONE_SOLR_SERVER_PORT_DEFAULT);
-    } catch (Exception exp) {
-      String[] hostPort = name.split(":");
-      if (hostPort.length > 1) {
-        // Below split is done to extract out port number from
-        // SOLR HOST URL format in zookeeper node.
-        // URL format: https://<host>:<port>_solr
-        String[] portSplit = hostPort[1].split("_");
-        port = portSplit.length > 1 ? Integer.parseInt(portSplit[0]) :
-            OZONE_SOLR_SERVER_PORT_DEFAULT;
+    String[] splitAddresses = solrAddresses.split(",");
+    if (solrAddresses.length() > 0) {
+      String name = splitAddresses[0];
+      if (StringUtils.isEmpty(name)) {
+        return null;
       }
+      Optional<String> hostname = getHostName(name);
+      if (!hostname.isPresent()) {
+        throw new IllegalArgumentException("Invalid hostname for Solr Server: "
+            + name);
+      }
+      int port = OZONE_SOLR_SERVER_PORT_DEFAULT;
+      try {
+        port = getHostPort(name).orElse(OZONE_SOLR_SERVER_PORT_DEFAULT);
+      } catch (Exception exp) {
+        String[] hostPort = name.split(":");
+        if (hostPort.length > 1) {
+          // Below split is done to extract out port number from
+          // SOLR HOST URL format in zookeeper node.
+          // URL format: https://<host>:<port>_solr
+          String[] portSplit = hostPort[1].split("_");
+          port = portSplit.length > 1 ? Integer.parseInt(portSplit[0]) :
+              OZONE_SOLR_SERVER_PORT_DEFAULT;
+        }
+      }
+      return NetUtils.createSocketAddr(hostname.get(), port);
     }
-    return NetUtils.createSocketAddr(hostname.get(), port);
+    return null;
   }
 
   /**

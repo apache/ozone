@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.solr;
 
 import com.google.inject.Inject;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -39,6 +40,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
@@ -109,6 +111,12 @@ public class SolrAccessAuditsService extends AccessAuditsService {
       UserGroupInformation.setConfiguration(conf);
 
       InetSocketAddress socAddr = HddsUtils.getSolrAddress(conf);
+      if (null == socAddr) {
+        throw new ConfigurationException(String.format("For heatmap " +
+                "feature Solr host and port configuration must be provided " +
+                "for config key %s. Example format -> <Host>:<Port>",
+            OZONE_SOLR_ADDRESS_KEY));
+      }
       LOG.info("Get principal config for Solr host address: {} " + socAddr);
       String principalConfig = conf.get(OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
           System.getProperty("user.name"));

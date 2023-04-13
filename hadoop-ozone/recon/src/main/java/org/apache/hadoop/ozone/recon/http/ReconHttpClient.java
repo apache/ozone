@@ -48,6 +48,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -118,11 +120,15 @@ public class ReconHttpClient {
     HttpPost post = new HttpPost(solrHostBaseQuery);
     LOG.info("Making Http Query to Solr: {} ", solrHostBaseQuery);
     post.setEntity(new UrlEncodedFormEntity(urlParameters));
+    Instant start = Instant.now();
     try (CloseableHttpClient httpClient = getCloseableHttpClient();
          CloseableHttpResponse response = httpClient.execute(post,
              getHttpClientContext())) {
+      Instant end = Instant.now();
       int statusCode = response.getStatusLine().getStatusCode();
       LOG.info("Status Code: {}", statusCode);
+      long duration = Duration.between(start, end).toMillis();
+      LOG.info("Time taken by Solr Query to return: {} milliseconds", duration);
       //Verify response
       if (statusCode == 200) {
         entityResponse = EntityUtils.toString(response.getEntity());

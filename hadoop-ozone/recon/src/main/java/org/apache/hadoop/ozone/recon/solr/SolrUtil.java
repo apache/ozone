@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.AuditLogFacetsResources;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+import org.apache.hadoop.ozone.recon.api.types.LastXUnit;
 import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
-import org.apache.hadoop.ozone.recon.http.LastXUnit;
 import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -377,11 +377,11 @@ public class SolrUtil {
     List<EntityReadAccessHeatMapResponse> children =
         rootEntity.getChildren();
     Arrays.stream(entities).forEach(entityMetaData -> {
-      String[] split = entityMetaData.getVal().split("/");
       String path = entityMetaData.getVal();
+      String[] split = path.split("/");
       long keySize = 0;
       try {
-        keySize = getKeySize(split);
+        keySize = getEntitySize(path);
       } catch (IOException e) {
         LOG.error("IOException while getting key size for key : " +
             "{} - {}", path, e);
@@ -404,24 +404,19 @@ public class SolrUtil {
     updateRootEntitySize(rootEntity);
   }
 
-  private long getKeySize(String[] split) throws IOException {
-    long keySize = 0;
-    BucketHandler bucketHandler = BucketHandler.getBucketHandler(
-        reconNamespaceSummaryManager,
-        omMetadataManager, reconSCM,
-        split[0], split[1]);
-    LOG.error("split[0]: " + split[0]);
-    LOG.error("split[1]: " + split[1]);
-    if (null != bucketHandler) {
-      String[] names = Arrays.stream(split)
-          .filter(elem -> !StringUtils.isEmpty(elem))
-          .toArray(size -> new String[size]);
-      LOG.error("names []: " + Arrays.toString(names));
-      OmKeyInfo keyInfo = bucketHandler.getKeyInfo(names);
-      if (null != keyInfo) {
-        return keyInfo.getReplicatedSize();
+  private long getEntitySize(String path) throws IOException {
+    long entitySize = 0;
+    LOG.info("Getting entity size for {}: ", path);
+    EntityHandler entityHandler =
+        EntityHandler.getEntityHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, path);
+    if (null != entityHandler) {
+      DUResponse duResponse = entityHandler.getDuResponse(false, false);
+      if (null != duResponse) {
+        return duResponse.getSize();
       }
     }
+    // returning some default value due to some issue
     return 256L;
   }
 

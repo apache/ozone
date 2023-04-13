@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.http;
+package org.apache.hadoop.ozone.recon.api.types;
 
 /**
  * Last X units of time used to get Audit logs.
