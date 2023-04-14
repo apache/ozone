@@ -134,7 +134,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * |-------------------------------------------|
    * |  KEY     |  VALUE                         |
    * |-------------------------------------------|
-   * |  jobId   | noOfTotalEntriesInReportTable  |
+   * |  jobId   | numOfTotalEntriesInReportTable |
    * |-------------------------------------------|
    */
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
@@ -175,7 +175,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           dbPath, columnFamilyDescriptors, columnFamilyHandles);
 
       snapDiffJobCf = getOrCreateColumnFamily(SNAP_DIFF_JOB_TABLE_NAME,
-              columnFamilyDescriptors, columnFamilyHandles);
+          columnFamilyDescriptors, columnFamilyHandles);
       snapDiffReportCf = getOrCreateColumnFamily(SNAP_DIFF_REPORT_TABLE_NAME,
           columnFamilyDescriptors, columnFamilyHandles);
       snapDiffPurgedJobCf = getOrCreateColumnFamily(

@@ -163,7 +163,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // inefficient. Especially, when OM node restarts and loses its leadership.
     // However, it is hard to determine if node is leader node because consensus
     // happens inside Ratis. We can add something like Awaitility.wait() here
-    // but that is not full proof either.
+    // but that is not foolproof either.
     // Hence, we decided that it is OK to let this run on all the OM nodes for
     // now knowing that it would be inefficient.
     // When SnapshotDiffManager loads for very first time, loadJobsOnStartUp
