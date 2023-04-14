@@ -16,30 +16,27 @@
  * limitations under the License.
  */
 
-interface IAclIdentityColorMap {
-    [aclIdentity: string]: string;
+@progress-gray: #d0d0d0;
+@progress-blue: #1890ff;
+
+.quota-cell-container {
+  position: relative;
+  .capacity-bar {
+    .ant-progress-text {
+      font-size: 0.8em;
+    }
+    .ant-progress-inner {
+      background-color: @progress-gray;
+    }
+    position: absolute;
+    bottom: -12px;
+  }
 }
 
-interface IAclRightColorMap {
-    [aclRight: string]: string;
+.quota-used-bg {
+  color: @progress-blue;
 }
 
-export const aclIdentityTypeColorMap: IAclIdentityColorMap = {
-    USER: 'green',
-    GROUP: 'blue',
-    WORLD: 'magenta',
-    ANONYMOUS: 'gray',
-    CLIENT_IP: 'gold',
-};
-
-export const aclRightColorMap: IAclRightColorMap = {
-    READ: 'green',
-    WRITE: 'blue',
-    CREATE: 'orange',
-    LIST: 'magenta',
-    DELETE: 'red',
-    READ_ACL: 'lime',
-    WRITE_ACL: 'purple',
-    ALL: 'gold',
-    NONE: 'gray',
+.quota-remaining-bg {
+  color: @progress-gray;
 }

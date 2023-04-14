@@ -18,8 +18,8 @@
 
 import React from 'react';
 import {Table, Drawer, Tag} from 'antd';
-import {IAcl} from "../../types/om.types";
-import {aclRightColorMap, aclTypeColorMap} from "../../constants/aclDrawer.constants";
+import {ACLIdentity, ACLIdentityTypeList, IAcl} from "../../types/om.types";
+import {aclRightColorMap, aclIdentityTypeColorMap} from "../../constants/aclDrawer.constants";
 
 interface IAclDrawerProps extends RouteComponentProps<object> {
     visible: boolean;
@@ -42,7 +42,7 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
         });
     };
 
-    renderAclList(_, acl: IAcl) {
+    renderAclList(text: string, acl: IAcl) {
         return acl.aclList.map((aclRight) => {
             return (
                 <Tag color={aclRightColorMap[aclRight]}>{aclRight}</Tag>
@@ -50,9 +50,9 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
         })
     }
 
-    renderAclType(_, acl: IAcl) {
+    renderAclIdentityType(text: string, acl: IAcl) {
         return (
-            <Tag color={aclTypeColorMap[acl.type]}>{acl.type}</Tag>
+            <Tag color={aclIdentityTypeColorMap[acl.type]}>{acl.type}</Tag>
         )
     }
 
@@ -73,10 +73,20 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
                     style={{position: 'absolute'}}
                     onClose={this.onClose}
                 >
-                    <Table dataSource={acls}>
+                    <Table dataSource={acls} rowKey={'name'}>
                         <Column title='Name' dataIndex='name' key='name'/>
-                        <Column title='ACL Type' dataIndex='type' render={this.renderAclType} key='type'/>
-                        <Column title='ACLs' dataIndex='aclList' render={this.renderAclList} key='aclList'/>
+                        <Column
+                            title='ACL Type'
+                            dataIndex='type'
+                            key='type'
+                            filterMultiple={true}
+                            filters={ACLIdentityTypeList.map(state => ({text:state, value: state}))}
+                            onFilter={(value: ACLIdentity, record: IAcl) => record.type === value}
+                            sorter={(a: IAcl, b: IAcl) => a.type.localeCompare(b.type)}
+                            render={this.renderAclIdentityType}
+                        />
+                        <Column title='ACL Scope' dataIndex='scope' key='scope'/>
+                        <Column title='ACLs' dataIndex='aclList' key='acls' render={this.renderAclList}/>
                     </Table>
                 </Drawer>
             </div>

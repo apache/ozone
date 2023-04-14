@@ -97,13 +97,13 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       axios.get('/api/v1/clusterState'),
       axios.get('/api/v1/task/status')
     ]).then(axios.spread((clusterStateResponse, taskstatusResponse) => {
-      
+
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
-    
+
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -133,7 +133,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       loading: true
     });
 
-    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -159,7 +159,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers } = this.state;
-      
+
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
@@ -167,7 +167,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
-    const duLink = '/DiskUsage';
+    const volumesLink = '/Volumes';
+    const bucketsLink = '/Buckets';
     const containersElement = missingContainersCount > 0 ? (
       <span>
         <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
@@ -219,10 +220,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         </Row>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={duLink}/>
+            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={volumesLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl='/Buckets'/>
+            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl={bucketsLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>

@@ -28,9 +28,11 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {byteToSize, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
-import {IAcl, IVolume} from "types/om.types";
+import {IAcl, IBucket, IVolume} from "types/om.types";
 import {AclPanel} from "../../components/aclDrawer/aclDrawer";
 import {ColumnProps} from "antd/es/table";
+import QuotaBar from "../../components/quotaBar/quotaBar";
+import {Link} from "react-router-dom";
 
 interface IVolumeResponse {
   volume: string;
@@ -60,7 +62,6 @@ interface IVolumesState {
   columnOptions: IOption[];
   currentRow?: IVolume;
   showPanel: boolean;
-  columns: VolumnTableColumn[]
 }
 
 const COLUMNS: VolumnTableColumn[] = [
@@ -118,23 +119,34 @@ const COLUMNS: VolumnTableColumn[] = [
     }
   },
   {
-    title: 'Quota (Count)',
-    dataIndex: 'quotaInNamespace',
-    key: 'quotaInNamespace',
+    title: 'Namespace Capacity',
+    key: 'namespaceCapacity',
     isVisible: true,
-    render: (quotaInNamespace: number) => {
-      return quotaInNamespace && quotaInNamespace !== -1 ? quotaInNamespace: 'NA';
-    }
+    sorter: (a: IVolume, b:IVolume) => a.quotaInNamespace - b.quotaInNamespace,
+    render: (text: string, record: IBucket) => (
+        <QuotaBar
+            quota={record.quotaInNamespace}
+            used={record.usedNamespace}
+            quotaType={'namespace'}
+        />
+    )
   },
   {
-    title: 'Used Namespace',
-    dataIndex: 'usedNamespace',
-    key: 'usedNamespace',
+    title: 'Buckets',
+    key: 'listBuckets',
     isVisible: true,
-    render: (usedNamespace: number) => {
-      return usedNamespace && usedNamespace > 0 ? usedNamespace : 'NA';
+    render: (_: any, record: IVolume) => {
+      const searchParams = new URLSearchParams()
+      searchParams.append("volume", record.volume)
+
+      return <Link to={`/Buckets?${searchParams.toString()}`}>
+        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+        <a key="listBuckets">
+          Show buckets
+        </a>
+      </Link>
     }
-  },
+  }
 ];
 
 const allColumnsOption: IOption = {
@@ -174,7 +186,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       dataIndex: 'acls',
       key: 'acls',
       isVisible: true,
-      render: (_, record: IVolume) => {
+      render: (_: any, record: IVolume) => {
         // eslint-disable-next-line jsx-a11y/anchor-is-valid
         return <a
             key="acl"

@@ -25,6 +25,7 @@ import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
 import {DiskUsage} from './views/diskUsage/diskUsage';
 import {Volumes} from "./views/volumes/volumes";
+import {Buckets} from "./views/buckets/buckets";
 
 export const routes: IRoute[] = [
   {
@@ -38,6 +39,10 @@ export const routes: IRoute[] = [
   {
     path: '/Volumes',
     component: Volumes
+  },
+  {
+    path: '/Buckets',
+    component: Buckets
   },
   {
     path: '/Pipelines',

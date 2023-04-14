@@ -16,30 +16,25 @@
  * limitations under the License.
  */
 
-interface IAclIdentityColorMap {
-    [aclIdentity: string]: string;
-}
+.buckets-container {
+  .content-div {
+    .pipeline-container {
+      margin-bottom: 5px;
+    }
+  }
 
-interface IAclRightColorMap {
-    [aclRight: string]: string;
-}
-
-export const aclIdentityTypeColorMap: IAclIdentityColorMap = {
-    USER: 'green',
-    GROUP: 'blue',
-    WORLD: 'magenta',
-    ANONYMOUS: 'gray',
-    CLIENT_IP: 'gold',
-};
-
-export const aclRightColorMap: IAclRightColorMap = {
-    READ: 'green',
-    WRITE: 'blue',
-    CREATE: 'orange',
-    LIST: 'magenta',
-    DELETE: 'red',
-    READ_ACL: 'lime',
-    WRITE_ACL: 'purple',
-    ALL: 'gold',
-    NONE: 'gray',
+  .filter-block { 
+    font-size: 14px;
+    font-weight: normal;
+    display: inline-block;
+    margin-left: 20px;
+  }
+  
+  .multi-select-container {
+    padding-left: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    min-width: 200px;
+    z-index: 99;
+  }
 }
