@@ -591,13 +591,13 @@ public class TestOzoneFileSystem {
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
 
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = o3fs.listStatus(root, EXCLUDE_TRASH);
     Assert.assertEquals("Should be empty", 0, fileStatuses.length);
 
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
-    fileStatuses = o3fs.listStatus(root);
+    fileStatuses = o3fs.listStatus(root, EXCLUDE_TRASH);
     Assert.assertEquals("Should have created parent",
             1, fileStatuses.length);
     Assert.assertEquals("Parent path doesn't match",
@@ -675,7 +675,7 @@ public class TestOzoneFileSystem {
     if (!enabledFileSystemPaths) {
       GenericTestUtils.waitFor(() -> {
         try {
-          return fs.listStatus(parent).length != 0;
+          return fs.listStatus(parent, EXCLUDE_TRASH).length != 0;
         } catch (IOException e) {
           LOG.error("listStatus() Failed", e);
           Assert.fail("listStatus() Failed");
@@ -683,7 +683,7 @@ public class TestOzoneFileSystem {
         }
       }, 1000, 120000);
     }
-    FileStatus[] fileStatuses = fs.listStatus(parent);
+    FileStatus[] fileStatuses = fs.listStatus(parent, EXCLUDE_TRASH);
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
     Assert.assertEquals(fileStatuses[0].isErasureCoded(),
@@ -710,7 +710,7 @@ public class TestOzoneFileSystem {
     // ListStatus on root should return dir1 (even though /dir1 key does not
     // exist) and dir2 only. dir12 is not an immediate child of root and
     // hence should not be listed.
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = o3fs.listStatus(root, EXCLUDE_TRASH);
     assertEquals("FileStatus should return only the immediate children",
         2, fileStatuses.length);
 
@@ -736,7 +736,7 @@ public class TestOzoneFileSystem {
       paths.add(p.getName());
     }
 
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = o3fs.listStatus(root, EXCLUDE_TRASH);
     // Added logs for debugging failures, to check any sub-path mismatches.
     Set<String> actualPaths = new TreeSet<>();
     ArrayList<String> actualPathList = new ArrayList<>();
@@ -782,7 +782,7 @@ public class TestOzoneFileSystem {
     TestDataUtil.createKey(ozoneBucket, keyName, "");
     FileStatus[] fileStatuses;
 
-    fileStatuses = fs.listStatus(new Path("/"));
+    fileStatuses = fs.listStatus(new Path("/"), EXCLUDE_TRASH);
     assertEquals(1, fileStatuses.length);
     assertEquals("/dir1", fileStatuses[0].getPath().toUri().getPath());
     assertTrue(fileStatuses[0].isDirectory());
