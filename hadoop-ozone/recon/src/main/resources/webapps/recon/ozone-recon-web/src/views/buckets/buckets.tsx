@@ -26,12 +26,12 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
-import {showDataFetchError} from 'utils/common';
+import {nullAwareLocalCompare, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
-import {BucketLayout, BucketLayoutTypeList, BucketStorage, BucketStorageTypeList, IAcl, IBucket} from "types/om.types";
-import {AclPanel} from "../../components/aclDrawer/aclDrawer";
-import {ColumnProps} from "antd/es/table";
-import QuotaBar from "../../components/quotaBar/quotaBar";
+import {BucketLayout, BucketLayoutTypeList, BucketStorage, BucketStorageTypeList, IAcl, IBucket} from 'types/om.types';
+import {AclPanel} from '../../components/aclDrawer/aclDrawer';
+import {ColumnProps} from 'antd/es/table';
+import QuotaBar from '../../components/quotaBar/quotaBar';
 
 interface IBucketResponse {
   volumeName: string;
@@ -48,7 +48,7 @@ interface IBucketResponse {
   quotaInBytes: number;
   quotaInNamespace: number;
   owner: string;
-  acls?: IAcl[]
+  acls?: IAcl[];
 }
 
 interface IBucketsResponse {
@@ -56,7 +56,7 @@ interface IBucketsResponse {
   buckets: IBucketResponse[];
 }
 
-type BucketTableColumn = ColumnProps<any> & any
+type BucketTableColumn = ColumnProps<any> & any;
 
 interface IBucketsState {
   loading: boolean;
@@ -67,28 +67,27 @@ interface IBucketsState {
   volumeBucketMap: Map<string, Set<IBucket>>;
   selectedVolumes: IOption[];
   selectedBuckets: IBucket[];
-  volumeOptions: IOption[],
+  volumeOptions: IOption[];
   currentRow?: IBucket;
   showPanel: boolean;
 }
 
 const renderIsVersionEnabled = (isVersionEnabled: boolean) => {
   return isVersionEnabled ?
-      <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/>
-      :
-      <Icon type='close-circle' theme='outlined' className='icon-neutral'/>
-}
+    <Icon type='check-circle' theme='outlined' twoToneColor='#1da57a' className='icon-success'/> :
+    <Icon type='close-circle' theme='outlined' className='icon-neutral'/>;
+};
 
 const renderStorageType = (bucketStorage: BucketStorage) => {
   const bucketStorageIconMap = {
     RAM_DISK: <Icon type='laptop' theme='outlined'/>,
     SSD: <Icon type='save' theme='outlined'/>,
-    DISK:<Icon type='hdd' theme='outlined'/>,
-    ARCHIVE:<Icon type='cloud-server' theme='outlined'/>,
+    DISK: <Icon type='hdd' theme='outlined'/>,
+    ARCHIVE: <Icon type='cloud-server' theme='outlined'/>
   };
   const icon = bucketStorage in bucketStorageIconMap ?
-      bucketStorageIconMap[bucketStorage]:
-      <Icon type='file-unknown'/>;
+    bucketStorageIconMap[bucketStorage] :
+    <Icon type='file-unknown'/>;
   return <span>{icon} {bucketStorage}</span>;
 };
 
@@ -99,7 +98,7 @@ const renderBucketLayout = (bucketLayout: BucketLayout) => {
     LEGACY: 'gray'
   };
   const color = bucketLayout in bucketLayoutColorMap ?
-      bucketLayoutColorMap[bucketLayout]: '';
+    bucketLayoutColorMap[bucketLayout] : '';
   return <Tag color={color}>{bucketLayout}</Tag>;
 };
 
@@ -121,15 +120,14 @@ const COLUMNS: BucketTableColumn[] = [
     isVisible: true,
     isSearchable: true,
     sorter: (a: IBucket, b: IBucket) => a.volumeName.localeCompare(b.volumeName),
-    defaultSortOrder: 'ascend' as const,
+    defaultSortOrder: 'ascend' as const
   },
   {
     title: 'Owner',
     dataIndex: 'owner',
     key: 'owner',
     isVisible: true,
-    isSearchable: true,
-    sorter: (a: IBucket, b:IBucket) => a.owner.localeCompare(b.owner),
+    sorter: (a: IBucket, b: IBucket) => nullAwareLocalCompare(a.owner, b.owner)
   },
   {
     title: 'Versioning',
@@ -182,12 +180,12 @@ const COLUMNS: BucketTableColumn[] = [
     title: 'Storage Capacity',
     key: 'quotaCapacityBytes',
     isVisible: true,
-    sorter: (a: IBucket, b: IBucket) => a.quotaInBytes - b.quotaInBytes,
+    sorter: (a: IBucket, b: IBucket) => a.usedBytes - b.usedBytes,
     render: (text: string, record: IBucket) => (
       <QuotaBar
         quota={record.quotaInBytes}
         used={record.usedBytes}
-        quotaType={'size'}
+        quotaType='size'
       />
     )
   },
@@ -195,13 +193,13 @@ const COLUMNS: BucketTableColumn[] = [
     title: 'Namespace Capacity',
     key: 'namespaceCapacity',
     isVisible: true,
-    sorter: (a: IBucket, b: IBucket) => a.quotaInNamespace - b.quotaInNamespace,
+    sorter: (a: IBucket, b: IBucket) => a.usedNamespace - b.usedNamespace,
     render: (text: string, record: IBucket) => (
-        <QuotaBar
-            quota={record.quotaInNamespace}
-            used={record.usedNamespace}
-            quotaType={'namespace'}
-        />
+      <QuotaBar
+        quota={record.quotaInNamespace}
+        used={record.usedNamespace}
+        quotaType='namespace'
+      />
     )
   },
   {
@@ -219,7 +217,7 @@ const COLUMNS: BucketTableColumn[] = [
     render: (sourceBucket: string) => {
       return sourceBucket ? sourceBucket : 'NA';
     }
-  },
+  }
 ];
 
 const allColumnsOption: IOption = {
@@ -237,13 +235,12 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
-
 export class Buckets extends React.Component<Record<string, object>, IBucketsState> {
   autoReload: AutoReloadHelper;
 
   constructor(props = {}) {
     super(props);
-    this._addAclColumn()
+    this._addAclColumn();
     this.state = {
       loading: false,
       totalCount: 0,
@@ -255,10 +252,9 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       selectedVolumes: [],
       volumeOptions: [],
       showPanel: false,
-      currentRow: {},
+      currentRow: {}
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
-
   }
 
   _addAclColumn = () => {
@@ -269,31 +265,36 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       key: 'acls',
       isVisible: true,
       render: (_: any, record: IBucket) => {
-        // eslint-disable-next-line jsx-a11y/anchor-is-valid
-      return <a
-          key="acl"
-          onClick={() => {this._handleAclLinkClick(record)}}>
-        Show ACL
-      </a>
+        return (
+          // eslint-disable-next-line jsx-a11y/anchor-is-valid
+          <a
+            key='acl'
+            onClick={() => {
+              this._handleAclLinkClick(record);
+            }}
+          >
+            Show ACL
+          </a>
+        );
       }
-    }
+    };
 
     if (COLUMNS.length > 0 && COLUMNS[COLUMNS.length - 1].key !== 'acls') {
       // Push the ACL column for initial
-      COLUMNS.push(aclLinkColumn)
+      COLUMNS.push(aclLinkColumn);
     } else {
       // Replace old ACL column with new ACL column with correct reference
       // e.g. After page is reloaded / redirect from other page
-      COLUMNS[COLUMNS.length - 1] = aclLinkColumn
+      COLUMNS[COLUMNS.length - 1] = aclLinkColumn;
     }
 
     if (defaultColumns.length > 0 && defaultColumns[defaultColumns.length - 1].label !== 'acls') {
       defaultColumns.push({
         label: aclLinkColumn.key,
-        value: aclLinkColumn.key,
-      })
+        value: aclLinkColumn.key
+      });
     }
-  }
+  };
 
   _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
     const selectedColumns = (selected as IOption[]);
@@ -310,17 +311,17 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
     let selectedBuckets: IBucket[] = [];
 
     if (selectedVolumes && selectedVolumes.length > 0) {
-      selectedVolumes.forEach((selectedVolume) => {
+      selectedVolumes.forEach(selectedVolume => {
         if (volumeBucketMap.has(selectedVolume.value) && volumeBucketMap.get(selectedVolume.value)) {
-          const bucketsUnderVolume: IBucket[] = Array.from(volumeBucketMap.get(selectedVolume.value)!)
-          selectedBuckets = [...selectedBuckets, ...bucketsUnderVolume]
+          const bucketsUnderVolume: IBucket[] = Array.from(volumeBucketMap.get(selectedVolume.value)!);
+          selectedBuckets = [...selectedBuckets, ...bucketsUnderVolume];
         }
-      })
+      });
     }
 
     this.setState({
-      selectedVolumes: selectedVolumes,
-      selectedBuckets,
+      selectedVolumes,
+      selectedBuckets
     });
   };
 
@@ -335,20 +336,20 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
   _handleAclLinkClick = (bucket: IBucket) => {
     this.setState({
       showPanel: true,
-      currentRow: bucket,
-    })
-  }
+      currentRow: bucket
+    });
+  };
 
   _getVolumeSearchParam = () => {
-    const searchParams = new URLSearchParams(this.props.location.search as string)
-    return searchParams.get("volume")
-  }
+    const searchParams = new URLSearchParams(this.props.location.search as string);
+    return searchParams.get('volume');
+  };
 
   _loadData = () => {
     this.setState(prevState => ({
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
-      showPanel: false,
+      showPanel: false
     }));
     axios.get('/api/v1/om/buckets').then(response => {
       const bucketsResponse: IBucketsResponse = response.data;
@@ -371,45 +372,45 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           quotaInBytes: bucket.quotaInBytes,
           quotaInNamespace: bucket.quotaInNamespace,
           owner: bucket.owner,
-          acls: bucket.acls,
+          acls: bucket.acls
         };
       });
 
       // Map for fast buckets lookup based on volume
       // Act as the base data source
       const volumeBucketMap: Map<string, Set<IBucket>> = dataSource.reduce(
-          (map: Map<string, Set<IBucket>>, current) => {
-            const volume = current.volumeName
-            if (map.has(volume)) {
-              const buckets = Array.from(map.get(volume)!);
-              map.set(volume, new Set([...buckets, current]));
-            } else {
-              map.set(volume, new Set().add(current));
-            }
+        (map: Map<string, Set<IBucket>>, current) => {
+          const volume = current.volumeName;
+          if (map.has(volume)) {
+            const buckets = Array.from(map.get(volume)!);
+            map.set(volume, new Set([...buckets, current]));
+          } else {
+            map.set(volume, new Set().add(current));
+          }
 
-            return map;
-          }, new Map<string, Set<IBucket>>());
+          return map;
+        }, new Map<string, Set<IBucket>>());
 
       // Set options for volume selection dropdown
       const volumeOptions: IOption[] = Array.from(volumeBucketMap.keys()).map(k => ({
         label: k,
         value: k
-      }))
+      }));
 
       this.setState({
         loading: false,
         totalCount,
-        volumeBucketMap: volumeBucketMap,
-        volumeOptions: volumeOptions,
+        volumeBucketMap,
+        volumeOptions,
         lastUpdated: Number(moment()),
-        showPanel: false,
+        showPanel: false
       }, () => {
         if (!this.state.selectedVolumes || this.state.selectedVolumes.length === 0) {
           // Select all volumes if it is first page load and volume search param is not specified
-          this._handleVolumeChange([allVolumesOption, ...volumeOptions], {action: 'select-option'})
+          this._handleVolumeChange([allVolumesOption, ...volumeOptions], {action: 'select-option'});
         } else {
           // The selected volumes remain unchanged if volumes have been previously selected
-          this._handleVolumeChange(this.state.selectedVolumes, {action: 'select-option'})
+          this._handleVolumeChange(this.state.selectedVolumes, {action: 'select-option'});
         }
       });
     }).catch(error => {
@@ -423,13 +424,14 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
 
   componentDidMount(): void {
     // For initial page (re)load, we get the volume from the URL search param
-    const initialVolume = this._getVolumeSearchParam()
+    const initialVolume = this._getVolumeSearchParam();
     if (initialVolume) {
-      const initialVolumeOption = {label: initialVolume, value: initialVolume}
+      const initialVolumeOption = {label: initialVolume, value: initialVolume};
       this.setState({
         selectedVolumes: [initialVolumeOption]
-      })
+      });
     }
+
     // Fetch buckets on component mount
     this._loadData();
     this.autoReload.startPolling();
@@ -457,15 +459,15 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           Buckets ({totalCount})
           <div className='filter-block'>
             <MultiSelect
-                allowSelectAll
-                isMulti
-                className='multi-select-container'
-                options={volumeOptions}
-                closeMenuOnSelect={false}
-                hideSelectedOptions={false}
-                value={selectedVolumes}
-                allOption={allVolumesOption}
-                onChange={this._handleVolumeChange}
+              allowSelectAll
+              isMulti
+              className='multi-select-container'
+              options={volumeOptions}
+              closeMenuOnSelect={false}
+              hideSelectedOptions={false}
+              value={selectedVolumes}
+              allOption={allVolumesOption}
+              onChange={this._handleVolumeChange}
             />
             Volumes
           </div>
@@ -515,7 +517,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
           />
         </div>
-        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType={"Bucket"}/>
+        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.bucketName} objType='Bucket'/>
       </div>
     );
   }

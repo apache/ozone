@@ -17,29 +17,29 @@
  */
 
 interface IAclIdentityColorMap {
-    [aclIdentity: string]: string;
+  [aclIdentity: string]: string;
 }
 
 interface IAclRightColorMap {
-    [aclRight: string]: string;
+  [aclRight: string]: string;
 }
 
 export const aclIdentityTypeColorMap: IAclIdentityColorMap = {
-    USER: 'green',
-    GROUP: 'blue',
-    WORLD: 'magenta',
-    ANONYMOUS: 'gray',
-    CLIENT_IP: 'gold',
+  USER: 'green',
+  GROUP: 'blue',
+  WORLD: 'magenta',
+  ANONYMOUS: 'gray',
+  CLIENT_IP: 'gold'
 };
 
 export const aclRightColorMap: IAclRightColorMap = {
-    READ: 'green',
-    WRITE: 'blue',
-    CREATE: 'orange',
-    LIST: 'magenta',
-    DELETE: 'red',
-    READ_ACL: 'lime',
-    WRITE_ACL: 'purple',
-    ALL: 'gold',
-    NONE: 'gray',
-}
+  READ: 'green',
+  WRITE: 'blue',
+  CREATE: 'orange',
+  LIST: 'magenta',
+  DELETE: 'red',
+  READ_ACL: 'lime',
+  WRITE_ACL: 'purple',
+  ALL: 'gold',
+  NONE: 'gray'
+};

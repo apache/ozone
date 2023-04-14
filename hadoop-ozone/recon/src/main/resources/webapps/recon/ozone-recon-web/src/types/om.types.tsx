@@ -17,56 +17,56 @@
  */
 
 export interface IAcl {
-    type: string;
-    name: string;
-    scope: string;
-    aclList: string[];
+  type: string;
+  name: string;
+  scope: string;
+  aclList: string[];
 }
 
 export interface IVolume {
-    volume: string;
-    owner: string;
-    admin: string;
-    creationTime: string;
-    modificationTime: string;
-    quotaInBytes: number;
-    quotaInNamespace: number;
-    usedNamespace: number;
-    acls?: IAcl[];
+  volume: string;
+  owner: string;
+  admin: string;
+  creationTime: string;
+  modificationTime: string;
+  quotaInBytes: number;
+  quotaInNamespace: number;
+  usedNamespace: number;
+  acls?: IAcl[];
 }
 
 export interface IBucket {
-    volumeName: string;
-    bucketName: string;
-    isVersionEnabled: boolean;
-    storageType: BucketStorage;
-    creationTime: string;
-    modificationTime: string;
-    sourceVolume?: string;
-    sourceBucket?: string;
-    usedBytes: number;
-    usedNamespace: number;
-    quotaInBytes: number;
-    quotaInNamespace: number;
-    owner: string;
-    acls?: IAcl[];
-    bucketLayout: BucketLayout
+  volumeName: string;
+  bucketName: string;
+  isVersionEnabled: boolean;
+  storageType: BucketStorage;
+  creationTime: string;
+  modificationTime: string;
+  sourceVolume?: string;
+  sourceBucket?: string;
+  usedBytes: number;
+  usedNamespace: number;
+  quotaInBytes: number;
+  quotaInNamespace: number;
+  owner: string;
+  acls?: IAcl[];
+  bucketLayout: BucketLayout;
 }
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
-export const BucketStorageTypeList = ['RAM_DISK', 'SSD', 'DISK', 'ARCHIVE']
-type BucketStorageType = typeof BucketStorageTypeList
-export type BucketStorage = BucketStorageType[number]
+export const BucketStorageTypeList = ['RAM_DISK', 'SSD', 'DISK', 'ARCHIVE'];
+type BucketStorageType = typeof BucketStorageTypeList;
+export type BucketStorage = BucketStorageType[number];
 
 // Corresponds to OzoneManagerProtocolProtos.BucketLayoutProto
-export const BucketLayoutTypeList = ['FILE_SYSTEM_OPTIMIZED', 'OBJECT_STORE', 'LEGACY']
-type BucketLayoutType = typeof BucketLayoutTypeList
-export type BucketLayout = BucketLayoutType[number]
+export const BucketLayoutTypeList = ['FILE_SYSTEM_OPTIMIZED', 'OBJECT_STORE', 'LEGACY'];
+type BucketLayoutType = typeof BucketLayoutTypeList;
+export type BucketLayout = BucketLayoutType[number];
 
-export const ACLIdentityTypeList = ['USER', 'GROUP', 'WORLD', 'ANONYMOUS', 'CLIENT_IP']
-type ACLIdentityType = typeof ACLIdentityTypeList
-export type ACLIdentity = ACLIdentityType[number]
+export const ACLIdentityTypeList = ['USER', 'GROUP', 'WORLD', 'ANONYMOUS', 'CLIENT_IP'];
+type ACLIdentityType = typeof ACLIdentityTypeList;
+export type ACLIdentity = ACLIdentityType[number];
 
-export const ACLRightList = ['READ', 'WRITE', 'CREATE', 'LIST', 'DELETE', 'READ_ACL', 'WRITE_ACL', 'ALL', 'NONE']
-type ACLRightType = typeof ACLRightList
-export type ACLRight = ACLRightType[number]
+export const ACLRightList = ['READ', 'WRITE', 'CREATE', 'LIST', 'DELETE', 'READ_ACL', 'WRITE_ACL', 'ALL', 'NONE'];
+type ACLRightType = typeof ACLRightList;
+export type ACLRight = ACLRightType[number];

@@ -28,11 +28,11 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {byteToSize, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
-import {IAcl, IBucket, IVolume} from "types/om.types";
-import {AclPanel} from "../../components/aclDrawer/aclDrawer";
-import {ColumnProps} from "antd/es/table";
-import QuotaBar from "../../components/quotaBar/quotaBar";
-import {Link} from "react-router-dom";
+import {IAcl, IBucket, IVolume} from 'types/om.types';
+import {AclPanel} from '../../components/aclDrawer/aclDrawer';
+import {ColumnProps} from 'antd/es/table';
+import QuotaBar from '../../components/quotaBar/quotaBar';
+import {Link} from 'react-router-dom';
 
 interface IVolumeResponse {
   volume: string;
@@ -46,7 +46,7 @@ interface IVolumeResponse {
   acls: IAcl[];
 }
 
-type VolumnTableColumn = ColumnProps<any> & any
+type VolumnTableColumn = ColumnProps<any> & any;
 
 interface IVolumesResponse {
   totalCount: number;
@@ -81,7 +81,7 @@ const COLUMNS: VolumnTableColumn[] = [
     key: 'owner',
     isVisible: true,
     isSearchable: true,
-    sorter: (a: IVolume, b:IVolume) => a.owner.localeCompare(b.owner),
+    sorter: (a: IVolume, b: IVolume) => a.owner.localeCompare(b.owner)
   },
   {
     title: 'Admin',
@@ -89,7 +89,7 @@ const COLUMNS: VolumnTableColumn[] = [
     key: 'admin',
     isVisible: true,
     isSearchable: true,
-    sorter: (a: IVolume, b:IVolume) => a.admin.localeCompare(b.admin),
+    sorter: (a: IVolume, b: IVolume) => a.admin.localeCompare(b.admin)
   },
   {
     title: 'Creation Time',
@@ -122,13 +122,13 @@ const COLUMNS: VolumnTableColumn[] = [
     title: 'Namespace Capacity',
     key: 'namespaceCapacity',
     isVisible: true,
-    sorter: (a: IVolume, b:IVolume) => a.quotaInNamespace - b.quotaInNamespace,
+    sorter: (a: IVolume, b: IVolume) => a.usedNamespace - b.usedNamespace,
     render: (text: string, record: IBucket) => (
-        <QuotaBar
-            quota={record.quotaInNamespace}
-            used={record.usedNamespace}
-            quotaType={'namespace'}
-        />
+      <QuotaBar
+        quota={record.quotaInNamespace}
+        used={record.usedNamespace}
+        quotaType='namespace'
+      />
     )
   },
   {
@@ -136,15 +136,17 @@ const COLUMNS: VolumnTableColumn[] = [
     key: 'listBuckets',
     isVisible: true,
     render: (_: any, record: IVolume) => {
-      const searchParams = new URLSearchParams()
-      searchParams.append("volume", record.volume)
+      const searchParams = new URLSearchParams();
+      searchParams.append('volume', record.volume);
 
-      return <Link to={`/Buckets?${searchParams.toString()}`}>
-        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-        <a key="listBuckets">
-          Show buckets
-        </a>
-      </Link>
+      return (
+        <Link to={`/Buckets?${searchParams.toString()}`}>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+          <a key='listBuckets'>
+            Show buckets
+          </a>
+        </Link>
+      );
     }
   }
 ];
@@ -159,13 +161,12 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
-
 export class Volumes extends React.Component<Record<string, object>, IVolumesState> {
   autoReload: AutoReloadHelper;
 
   constructor(props = {}) {
     super(props);
-    this._addAclColumn()
+    this._addAclColumn();
     this.state = {
       loading: false,
       dataSource: [],
@@ -174,7 +175,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       selectedColumns: [],
       columnOptions: defaultColumns,
       showPanel: false,
-      currentRow: {},
+      currentRow: {}
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -187,37 +188,40 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       key: 'acls',
       isVisible: true,
       render: (_: any, record: IVolume) => {
-        // eslint-disable-next-line jsx-a11y/anchor-is-valid
-        return <a
-            key="acl"
-            onClick={() => this._handleAclLinkClick(record)}>
-          Show ACL
-        </a>
+        return (
+          // eslint-disable-next-line jsx-a11y/anchor-is-valid
+          <a
+            key='acl'
+            onClick={() => this._handleAclLinkClick(record)}
+          >
+            Show ACL
+          </a>
+        );
       }
-    }
+    };
 
     if (COLUMNS.length > 0 && COLUMNS[COLUMNS.length - 1].key !== 'acls') {
       // Push the ACL column for initial
-      COLUMNS.push(aclLinkColumn)
+      COLUMNS.push(aclLinkColumn);
     } else {
       // Replace old ACL column with new ACL column with correct reference
       // e.g. After page is reloaded / redirect from other page
-      COLUMNS[COLUMNS.length - 1] = aclLinkColumn
+      COLUMNS[COLUMNS.length - 1] = aclLinkColumn;
     }
 
     if (defaultColumns.length > 0 && defaultColumns[defaultColumns.length - 1].label !== 'acls') {
       defaultColumns.push({
         label: aclLinkColumn.key,
-        value: aclLinkColumn.key,
-      })
+        value: aclLinkColumn.key
+      });
     }
-  }
+  };
 
   _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
     const selectedColumns = (selected as IOption[]);
     this.setState({
       selectedColumns,
-      showPanel: false,
+      showPanel: false
     });
   };
 
@@ -232,15 +236,15 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   _handleAclLinkClick = (volume: IVolume) => {
     this.setState({
       showPanel: true,
-      currentRow: volume,
-    })
-  }
+      currentRow: volume
+    });
+  };
 
   _loadData = () => {
     this.setState(prevState => ({
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
-      showPanel: false,
+      showPanel: false
     }));
     axios.get('/api/v1/om/volumes').then(response => {
       const volumesResponse: IVolumesResponse = response.data;
@@ -256,7 +260,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
           quotaInBytes: volume.quotaInBytes,
           quotaInNamespace: volume.quotaInNamespace,
           usedNamespace: volume.usedNamespace,
-          acls: volume.acls,
+          acls: volume.acls
         };
       });
 
@@ -265,7 +269,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
         dataSource,
         totalCount,
         lastUpdated: Number(moment()),
-        showPanel: false,
+        showPanel: false
       });
     }).catch(error => {
       this.setState({
@@ -347,7 +351,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
           />
         </div>
-        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType={"Volume"}/>
+        <AclPanel visible={showPanel} acls={currentRow.acls} objName={currentRow.volume} objType='Volume'/>
       </div>
     );
   }

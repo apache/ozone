@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
 import java.util.List;
 
@@ -41,8 +42,10 @@ public final class BucketMetadata {
   private boolean isVersionEnabled;
   @XmlElement(name = "storageType")
   private String storageType;
+  @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "creationTime")
   private Instant creationTime;
+  @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "modificationTime")
   private Instant modificationTime;
   @XmlElement(name = "sourceVolume")

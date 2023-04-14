@@ -2193,7 +2193,6 @@
         "usedNamespace": 300,
         "quotaInBytes": -1,
         "quotaInNamespace": -1,
-        "owner": "testuser4",
         "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
         "acls": [
           {

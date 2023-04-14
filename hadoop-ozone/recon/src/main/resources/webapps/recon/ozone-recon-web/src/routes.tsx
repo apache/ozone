@@ -24,8 +24,8 @@ import {IRoute} from './types/routes.types';
 import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
 import {DiskUsage} from './views/diskUsage/diskUsage';
-import {Volumes} from "./views/volumes/volumes";
-import {Buckets} from "./views/buckets/buckets";
+import {Volumes} from './views/volumes/volumes';
+import {Buckets} from './views/buckets/buckets';
 
 export const routes: IRoute[] = [
   {

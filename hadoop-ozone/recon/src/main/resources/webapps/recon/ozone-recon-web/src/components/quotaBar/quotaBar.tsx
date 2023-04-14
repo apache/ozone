@@ -29,60 +29,60 @@ import './quotaBar.less';
 const size = filesize.partial({standard: 'iec'});
 
 interface IQuotaBarProps extends RouteComponentProps<object> {
-    quota: number
-    used: number;
-    quotaType: string;
-    showMeta?: boolean;
+  quota: number;
+  used: number;
+  quotaType: string;
+  showMeta?: boolean;
 }
 
 const defaultProps = {
-    quota: -1,
-    used: 0,
-    quotaType: 'namespace',
-    showMeta: true,
+  quota: -1,
+  used: 0,
+  quotaType: 'namespace',
+  showMeta: true
 };
 
-
 class QuotaBar extends React.Component<IQuotaBarProps> {
-    static defaultProps = defaultProps;
+  static defaultProps = defaultProps;
 
-    render() {
-        const {quota, used, quotaType, showMeta} = this.props;
-        const remaining = quota - used;
+  render() {
+    const {quota, used, quotaType, showMeta} = this.props;
+    const remaining = quota - used;
 
-        const renderQuota = (quota: number) => {
-            // Quota not set / invalid
-            if (quota <= -1) {
-                return '-';
-            }
+    const renderQuota = (quota: number) => {
+      // Quota not set / invalid
+      if (quota <= -1) {
+        return '-';
+      }
 
-            if (quotaType === 'size') {
-                return size(quota)
-            }
-            return quota;
-        }
+      if (quotaType === 'size') {
+        return size(quota);
+      }
 
-        const tooltip = (
-            <div>
-                <div><Icon component={FilledIcon} className='quota-used-bg' /> Used ({renderQuota(used)})</div>
-                <div><Icon component={FilledIcon} className='quota-remaining-bg'/> Remaining ({renderQuota(remaining)})</div>
-            </div>
-        );
-        const metaElement = showMeta ? <div>{renderQuota(used)} / {renderQuota(quota)}</div> : null;
-        return (
-            <div className='quota-cell-container'>
-                <Tooltip title={tooltip} placement='bottomLeft'>
-                    {metaElement}
-                    <Progress
-                        type='line'
-                        status='normal'
-                        strokeLinecap='square'
-                        percent={getCapacityPercent(used, quota)}
-                        className='capacity-bar' strokeWidth={3}/>
-                </Tooltip>
-            </div>
-        );
-    }
+      return quota;
+    };
+
+    const tooltip = (
+      <div>
+        <div><Icon component={FilledIcon} className='quota-used-bg'/> Used ({renderQuota(used)})</div>
+        <div><Icon component={FilledIcon} className='quota-remaining-bg'/> Remaining ({renderQuota(remaining)})</div>
+      </div>
+    );
+    const metaElement = showMeta ? <div>{renderQuota(used)} / {renderQuota(quota)}</div> : null;
+    return (
+      <div className='quota-cell-container'>
+        <Tooltip title={tooltip} placement='bottomLeft'>
+          {metaElement}
+          <Progress
+            type='line'
+            status='normal'
+            strokeLinecap='square'
+            percent={getCapacityPercent(used, quota)}
+            className='capacity-bar' strokeWidth={3}/>
+        </Tooltip>
+      </div>
+    );
+  }
 }
 
 export default withRouter(QuotaBar);
