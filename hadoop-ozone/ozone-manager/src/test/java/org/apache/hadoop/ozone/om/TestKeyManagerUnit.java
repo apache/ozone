@@ -26,12 +26,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -84,6 +84,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -125,7 +126,7 @@ public class TestKeyManagerUnit {
     metadataManager = omTestManagers.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
-    startDate = Instant.now();
+    startDate = Instant.ofEpochMilli(Time.now());
   }
 
   @After
@@ -335,8 +336,8 @@ public class TestKeyManagerUnit {
 
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.of(multipartKeyInfo),
-            RandomUtils.nextInt()));
+            uploadID)),
+        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
@@ -344,8 +345,7 @@ public class TestKeyManagerUnit {
       String volume, String bucket, String key, String uploadID) {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.absent(),
-            RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.nextInt()));
   }
 
   @Test
@@ -574,7 +574,7 @@ public class TestKeyManagerUnit {
         .map(DatanodeDetails::getUuidString)
         .collect(toList());
 
-    List<Long> containerIDs = new ArrayList<>();
+    Set<Long> containerIDs = new HashSet<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
     for (long i = 1; i <= 10; i++) {
       final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
@@ -622,6 +622,12 @@ public class TestKeyManagerUnit {
     Assert.assertEquals(10, fileStatusList.size());
     verify(containerClient).getContainerWithPipelineBatch(containerIDs);
     verify(blockClient).sortDatanodes(nodes, client);
+
+    // call list status the second time, and verify no more calls to
+    // SCM.
+    keyManager.listStatus(builder.build(), false,
+        null, Long.MAX_VALUE, client);
+    verify(containerClient, times(1)).getContainerWithPipelineBatch(anySet());
   }
 
   @Test

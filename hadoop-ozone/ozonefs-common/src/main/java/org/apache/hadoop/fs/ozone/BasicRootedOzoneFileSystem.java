@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -70,6 +71,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
@@ -77,6 +79,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
@@ -109,6 +112,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private int listingPageSize =
       OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 
+  private boolean hsyncEnabled = OZONE_FS_HSYNC_ENABLED_DEFAULT;
+
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
       "ofs://om-service-id/path/to/key  OR " +
@@ -124,6 +129,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
+    hsyncEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OZONE_FS_HSYNC_ENABLED_DEFAULT);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -181,6 +189,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String omHost, int omPort) throws IOException {
     return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
+  }
+
+  protected boolean isHsyncEnabled() {
+    return hsyncEnabled;
   }
 
   @Override
@@ -259,8 +271,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return new FSDataOutputStream(adapter.createStreamFile(key,
           replication, overwrite, recursive), statistics);
     }
-    return new FSDataOutputStream(adapter.createFile(key,
-        replication, overwrite, recursive), statistics);
+    return new FSDataOutputStream(createFSOutputStream(
+            adapter.createFile(key,
+        replication, overwrite, recursive)), statistics);
+  }
+
+  protected OutputStream createFSOutputStream(
+      OzoneFSOutputStream outputStream) {
+    return outputStream;
   }
 
   @Override
@@ -462,6 +480,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     } else {
       rename(src, dst);
     }
+  }
+
+  @Override
+  public Path createSnapshot(Path path, String snapshotName)
+          throws IOException {
+    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
+    return new Path(path,
+        OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
   }
 
   private class DeleteIterator extends OzoneListingIterator {
@@ -1425,6 +1451,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           bucket.getSourceBucket());
     }
     return f;
+  }
+  
+  /**
+   * Start the lease recovery of a file.
+   *
+   * @param f a file
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  public boolean recoverLease(final Path f) throws IOException {
+    return adapterImpl.recoverLease(f);
   }
 
 }

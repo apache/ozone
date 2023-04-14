@@ -65,7 +65,7 @@ public class ListSubcommand extends ScmCertSubcommand {
       description = "Filter certificate by the type: valid or revoked",
       defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
   private String type;
-  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s";
+  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s";
 
   private HddsProtos.NodeType parseCertRole(String r) {
     if (r.equalsIgnoreCase("om")) {
@@ -79,17 +79,20 @@ public class ListSubcommand extends ScmCertSubcommand {
 
   private void printCert(X509Certificate cert) {
     LOG.info(String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
-        cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN()));
+        cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN(),
+        cert.getIssuerDN()));
   }
 
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
     boolean isRevoked = type.equalsIgnoreCase("revoked");
-    List<String> certPemList = client.listCertificate(
-        parseCertRole(role), startSerialId, count, isRevoked);
-    LOG.info("Total {} {} certificates: ", certPemList.size(), type);
+    HddsProtos.NodeType nodeType = parseCertRole(role);
+    List<String> certPemList = client.listCertificate(nodeType,
+        startSerialId, count, isRevoked);
+    LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
+        type.toUpperCase(), count, certPemList.size());
     LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
-        "Expiry", "Subject"));
+        "Expiry", "Subject", "Issuer"));
     for (String certPemStr : certPemList) {
       try {
         X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);

@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -66,6 +67,7 @@ import org.slf4j.LoggerFactory;
 public class KeyOutputStream extends OutputStream implements Syncable {
 
   private OzoneClientConfig config;
+  private final ReplicationConfig replication;
 
   /**
    * Defines stream action while calling handleFlushOrClose.
@@ -91,7 +93,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   private long clientID;
 
-  public KeyOutputStream(ContainerClientMetrics clientMetrics) {
+  private OzoneManagerProtocol omClient;
+
+  public KeyOutputStream(ReplicationConfig replicationConfig,
+      ContainerClientMetrics clientMetrics) {
+    this.replication = replicationConfig;
     closed = false;
     this.retryPolicyMap = HddsClientUtils.getExceptionList()
         .stream()
@@ -139,6 +145,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       ContainerClientMetrics clientMetrics
   ) {
     this.config = config;
+    this.replication = replicationConfig;
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(
             config,
@@ -156,6 +163,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.omClient = omClient;
   }
 
   /**
@@ -448,13 +456,20 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   @Override
   public void hsync() throws IOException {
+    if (replication.getReplicationType() != ReplicationType.RATIS) {
+      throw new UnsupportedOperationException(
+          "Replication type is not " + ReplicationType.RATIS);
+    }
+    if (replication.getRequiredNodes() <= 1) {
+      throw new UnsupportedOperationException("The replication factor = "
+          + replication.getRequiredNodes() + " <= 1");
+    }
     checkNotClosed();
+    final long hsyncPos = writeOffset;
     handleFlushOrClose(StreamAction.HSYNC);
-    //TODO HDDS-7593: send hsyncKey to update length;
-    //     where the hsyncKey op is similar to
-    //     blockOutputStreamEntryPool.commitKey(offset)
-    //     except that hsyncKey only updates the key length
-    //     instead of committing it.
+    Preconditions.checkState(offset >= hsyncPos,
+        "offset = %s < hsyncPos = %s", offset, hsyncPos);
+    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
   }
 
   /**

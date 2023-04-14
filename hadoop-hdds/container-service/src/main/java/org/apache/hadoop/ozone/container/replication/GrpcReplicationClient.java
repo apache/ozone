@@ -26,8 +26,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
@@ -62,12 +62,15 @@ public class GrpcReplicationClient implements AutoCloseable {
 
   private final IntraDatanodeProtocolServiceStub client;
 
-  private final ContainerProtos.CopyContainerCompressProto compression;
+  private final CopyContainerCompression compression;
+
+  private final AtomicBoolean closed = new AtomicBoolean();
+  private final String debugString;
 
   public GrpcReplicationClient(
       String host, int port,
       SecurityConfig secConfig, CertificateClient certClient,
-      String compression)
+      CopyContainerCompression compression)
       throws IOException {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
@@ -92,8 +95,11 @@ public class GrpcReplicationClient implements AutoCloseable {
     }
     channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    this.compression =
-        ContainerProtos.CopyContainerCompressProto.valueOf(compression);
+    this.compression = compression;
+    debugString = getClass().getSimpleName()
+        + "{" + host + ":" + port + "}"
+        + "@" + Integer.toHexString(hashCode());
+    LOG.debug("{}: created", this);
   }
 
   public CompletableFuture<Path> download(long containerId, Path dir) {
@@ -102,7 +108,7 @@ public class GrpcReplicationClient implements AutoCloseable {
             .setContainerID(containerId)
             .setLen(-1)
             .setReadOffset(0)
-            .setCompression(compression)
+            .setCompression(compression.toProto())
             .build();
 
     CompletableFuture<Path> response = new CompletableFuture<>();
@@ -121,19 +127,27 @@ public class GrpcReplicationClient implements AutoCloseable {
     return client.upload(responseObserver);
   }
 
-  public void shutdown() {
-    channel.shutdown();
-    try {
-      channel.awaitTermination(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.error("failed to shutdown replication channel", e);
-      Thread.currentThread().interrupt();
+  private void shutdown() {
+    if (!closed.getAndSet(true)) {
+      LOG.debug("{}: shutdown", this);
+      channel.shutdown();
+      try {
+        channel.awaitTermination(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        LOG.error("failed to shutdown replication channel", e);
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
   @Override
   public void close() throws Exception {
     shutdown();
+  }
+
+  @Override
+  public String toString() {
+    return debugString;
   }
 
   /**

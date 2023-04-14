@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto
     .Builder;
@@ -46,6 +46,8 @@ public final class ReplicateContainerCommand
   private final List<DatanodeDetails> sourceDatanodes;
   private final DatanodeDetails targetDatanode;
   private int replicaIndex = 0;
+  private ReplicationCommandPriority priority =
+      ReplicationCommandPriority.NORMAL;
 
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -82,9 +84,18 @@ public final class ReplicateContainerCommand
     replicaIndex = index;
   }
 
+  public void setPriority(ReplicationCommandPriority priority) {
+    this.priority = priority;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
+  }
+
+  @Override
+  public boolean contributesToQueueSize() {
+    return priority == ReplicationCommandPriority.NORMAL;
   }
 
   @Override
@@ -99,6 +110,7 @@ public final class ReplicateContainerCommand
     if (targetDatanode != null) {
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
+    builder.setPriority(priority);
     return builder.build();
   }
 
@@ -122,6 +134,9 @@ public final class ReplicateContainerCommand
     if (protoMessage.hasReplicaIndex()) {
       cmd.setReplicaIndex(protoMessage.getReplicaIndex());
     }
+    if (protoMessage.hasPriority()) {
+      cmd.setPriority(protoMessage.getPriority());
+    }
     return cmd;
   }
 
@@ -141,17 +156,22 @@ public final class ReplicateContainerCommand
     return replicaIndex;
   }
 
+  public ReplicationCommandPriority getPriority() {
+    return priority;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType());
-    sb.append(": containerId: ").append(getContainerID());
-    sb.append(", replicaIndex: ").append(getReplicaIndex());
+    sb.append(": containerId=").append(getContainerID());
+    sb.append(", replicaIndex=").append(getReplicaIndex());
     if (targetDatanode != null) {
-      sb.append(", targetNode: ").append(targetDatanode);
+      sb.append(", targetNode=").append(targetDatanode);
     } else {
-      sb.append(", sourceNodes: ").append(sourceDatanodes);
+      sb.append(", sourceNodes=").append(sourceDatanodes);
     }
+    sb.append(", priority=").append(priority);
     return sb.toString();
   }
 }

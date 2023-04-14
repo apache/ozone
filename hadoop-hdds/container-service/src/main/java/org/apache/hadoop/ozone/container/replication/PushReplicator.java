@@ -17,16 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+
+import org.apache.commons.io.output.CountingOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
-
-import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 
 /**
  * Pushes the container to the target datanode.
@@ -36,11 +36,13 @@ public class PushReplicator implements ContainerReplicator {
   private static final Logger LOG =
       LoggerFactory.getLogger(PushReplicator.class);
 
+  private final ConfigurationSource conf;
   private final ContainerReplicationSource source;
   private final ContainerUploader uploader;
 
-  public PushReplicator(ContainerReplicationSource source,
-      ContainerUploader uploader) {
+  public PushReplicator(ConfigurationSource conf,
+      ContainerReplicationSource source, ContainerUploader uploader) {
+    this.conf = conf;
     this.source = source;
     this.uploader = uploader;
   }
@@ -50,17 +52,28 @@ public class PushReplicator implements ContainerReplicator {
     long containerID = task.getContainerId();
     DatanodeDetails target = task.getTarget();
     CompletableFuture<Void> fut = new CompletableFuture<>();
+    CopyContainerCompression compression =
+        CopyContainerCompression.getConf(conf);
+
+    LOG.info("Starting replication of container {} to {} using {}",
+        containerID, target, compression);
 
     source.prepare(containerID);
 
-    OutputStream output = null;
+    CountingOutputStream output = null;
     try {
-      output = uploader.startUpload(containerID, target, fut);
-      source.copyData(containerID, output, NO_COMPRESSION.name());
+      output = new CountingOutputStream(
+          uploader.startUpload(containerID, target, fut, compression));
+      source.copyData(containerID, output, compression);
       fut.get();
+
+      task.setTransferredBytes(output.getByteCount());
       task.setStatus(Status.DONE);
     } catch (Exception e) {
       LOG.warn("Container {} replication was unsuccessful.", containerID, e);
+      if (output != null) {
+        task.setTransferredBytes(output.getByteCount());
+      }
       task.setStatus(Status.FAILED);
     } finally {
       // output may have already been closed, ignore such errors

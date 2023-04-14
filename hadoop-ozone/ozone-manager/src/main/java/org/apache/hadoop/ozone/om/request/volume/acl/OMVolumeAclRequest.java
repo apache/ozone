@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -116,7 +115,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
         // update cache.
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-            new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
+            CacheValue.get(trxnLogIndex, omVolumeArgs));
       }
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, applyAcl);

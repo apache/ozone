@@ -22,7 +22,6 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Objects;
 
 /**
@@ -34,6 +33,7 @@ public class ECReconstructionCoordinatorTask
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
+  private final String debugString;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
@@ -43,6 +43,7 @@ public class ECReconstructionCoordinatorTask
         reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
+    debugString = reconstructionCommandInfo.toString();
   }
 
   @Override
@@ -74,7 +75,7 @@ public class ECReconstructionCoordinatorTask
       long elapsed = Time.monotonicNow() - start;
       LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
       setStatus(Status.DONE);
-    } catch (IOException e) {
+    } catch (Exception e) {
       long elapsed = Time.monotonicNow() - start;
       LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
       setStatus(Status.FAILED);
@@ -82,8 +83,8 @@ public class ECReconstructionCoordinatorTask
   }
 
   @Override
-  public String toString() {
-    return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
+  protected Object getCommandForDebug() {
+    return debugString;
   }
 
   @Override

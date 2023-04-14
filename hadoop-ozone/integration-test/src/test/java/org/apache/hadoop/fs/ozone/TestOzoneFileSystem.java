@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -40,10 +39,12 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
@@ -86,7 +87,10 @@ import java.util.TreeSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -150,6 +154,7 @@ public class TestOzoneFileSystem {
   private static boolean omRatisEnabled;
 
   private static MiniOzoneCluster cluster;
+  private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
   private static FileSystem fs;
   private static OzoneFileSystem o3fs;
@@ -177,10 +182,11 @@ public class TestOzoneFileSystem {
             .build();
     cluster.waitForClusterToBeReady();
 
-    writeClient = cluster.getRpcClient().getObjectStore()
+    client = cluster.newClient();
+    writeClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
@@ -199,6 +205,7 @@ public class TestOzoneFileSystem {
 
   @AfterClass
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -1443,7 +1450,7 @@ public class TestOzoneFileSystem {
     if (isDirectory) {
       key = key + "/";
     }
-    return cluster.getClient().getObjectStore().getVolume(volumeName)
+    return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(key);
   }
 
@@ -1511,7 +1518,7 @@ public class TestOzoneFileSystem {
   public void testCreateKeyShouldUseRefreshedBucketReplicationConfig()
       throws IOException {
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, bucketLayout);
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
     final TestClock testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
 
     String rootPath = String
@@ -1740,5 +1747,12 @@ public class TestOzoneFileSystem {
       paths.remove(pathname);
     }
     Assert.assertTrue("ListStatus failed:" + paths, paths.isEmpty());
+  }
+
+  @Test
+  public void testFileSystemDeclaresCapability() throws Throwable {
+    Path root = new Path(OZONE_URI_DELIMITER);
+    assertHasPathCapabilities(fs, root, FS_ACLS);
+    assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
   }
 }

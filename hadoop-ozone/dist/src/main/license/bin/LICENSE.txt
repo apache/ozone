@@ -292,10 +292,10 @@ Apache License 2.0
    com.google.guava:guava
    com.google.guava:listenablefuture
    com.google.inject.extensions:guice-assistedinject
-   com.google.inject.extensions:guice-multibindings
    com.google.inject.extensions:guice-servlet
    com.google.inject:guice
    com.google.j2objc:j2objc-annotations
+   com.googlecode.json-simple:json-simple
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
@@ -366,6 +366,8 @@ Apache License 2.0
    org.apache.commons:commons-lang3
    org.apache.commons:commons-pool2
    org.apache.commons:commons-text
+   org.apache.curator:curator-client
+   org.apache.curator:curator-framework
    org.apache.derby:derby
    org.apache.hadoop:hadoop-annotations
    org.apache.hadoop:hadoop-auth
@@ -411,6 +413,8 @@ Apache License 2.0
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
    org.apache.thrift:libthrift
+   org.apache.zookeeper:zookeeper
+   org.apache.zookeeper:zookeeper-jute
    org.codehaus.jackson:jackson-core-asl
    org.codehaus.jackson:jackson-jaxrs
    org.codehaus.jackson:jackson-mapper-asl
@@ -430,21 +434,21 @@ Apache License 2.0
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
    org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jboss.weld.servlet:weld-servlet
+   org.jboss.weld.servlet:weld-servlet-shaded
+   org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
    org.rocksdb:rocksdbjni
    org.springframework:spring-beans
    org.springframework:spring-core
-   org.springframework:spring-jcl
    org.springframework:spring-jdbc
    org.springframework:spring-tx
    org.xerial.snappy:snappy-java
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
-
+   org.awaitility:awaitility
 
 MIT
 =====================
@@ -459,6 +463,22 @@ MIT
    org.slf4j:slf4j-reload4j
 
 
+EPL 2.0
+=====================
+
+   jakarta.annotation:jakarta.annotation-api
+   jakarta.ws.rs:jakarta.ws.rs-api
+
+
+CDDL + GPLv2 with classpath exception
+=====================
+
+   javax.annotation:javax.annotation-api
+   javax.el:javax.el-api
+   javax.interceptor:javax.interceptor-api
+   javax.servlet:javax.servlet-api
+
+
 Public Domain
 =====================
 
@@ -468,6 +488,7 @@ Public Domain
 BSD 3-Clause
 =====================
 
+   com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
    com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
@@ -491,7 +512,7 @@ WTFPL
 
 
 --------------------------------------------------------------------------------
-hdds-server-scm, ozone-manager, ozone-s3gateway and hdds-server-framework
+hdds-server-scm, ozone-manager, ozone-s3gateway, hdds-rocks-native and hdds-server-framework
 contains the source of the following javascript/css components (See licenses/ for text of these licenses):
 
 Apache Software Foundation License 2.0

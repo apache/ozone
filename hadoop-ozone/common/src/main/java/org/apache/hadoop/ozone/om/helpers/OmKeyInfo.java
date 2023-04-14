@@ -190,6 +190,10 @@ public final class OmKeyInfo extends WithParentObjectId {
     return isFile;
   }
 
+  public boolean isHsync() {
+    return metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID);
+  }
+
   /**
    * updates the length of the each block in the list given.
    * This will be called when the key is being committed to OzoneManager.
@@ -761,7 +765,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
-        .setFileName(fileName);
+        .setFileName(fileName)
+        .setFile(isFile);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(

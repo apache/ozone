@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,14 +45,14 @@ public final class OzoneConfigUtil {
 
   /**
    * Return list of OzoneAdministrators from config.
+   * The service startup user will default to an admin.
    */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf)
-          throws IOException {
-    Collection<String> ozAdmins =
-            conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
+  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
+      String starterUser) {
+    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS);
+    if (!ozAdmins.contains(starterUser)) {
+      ozAdmins.add(starterUser);
     }
     return ozAdmins;
   }
@@ -98,18 +99,20 @@ public final class OzoneConfigUtil {
       HddsProtos.ReplicationFactor clientFactor,
       HddsProtos.ECReplicationConfig clientECReplicationConfig,
       DefaultReplicationConfig bucketDefaultReplicationConfig,
-      ReplicationConfig omDefaultReplicationConfig) {
+      OzoneManager ozoneManager) throws OMException {
     ReplicationConfig replicationConfig = null;
     if (clientType != HddsProtos.ReplicationType.NONE) {
       // Client passed the replication config, so let's use it.
       replicationConfig = ReplicationConfig
           .fromProto(clientType, clientFactor, clientECReplicationConfig);
+
+      ozoneManager.validateReplicationConfig(replicationConfig);
     } else if (bucketDefaultReplicationConfig != null) {
       // type is NONE, so, let's look for the bucket defaults.
       replicationConfig = bucketDefaultReplicationConfig.getReplicationConfig();
     } else {
       // if bucket defaults also not available, then use server defaults.
-      replicationConfig = omDefaultReplicationConfig;
+      replicationConfig = ozoneManager.getDefaultReplicationConfig();
     }
     return replicationConfig;
   }

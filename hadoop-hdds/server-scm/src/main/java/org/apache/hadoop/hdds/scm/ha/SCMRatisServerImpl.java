@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -320,6 +321,45 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
   }
 
+  @Override
+  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+    final List<RaftPeer> newRaftPeerList =
+        new ArrayList<>(division.getGroup().getPeers());
+    // remove the SCM node from the raft peer list
+
+    final RaftPeer raftPeer = RaftPeer.newBuilder().setId(request.getScmId())
+        .setAddress(request.getRatisAddr()).build();
+
+    newRaftPeerList.remove(raftPeer);
+
+    LOG.info("{}: Submitting SetConfiguration request to Ratis server with" +
+            " updated SCM peers list: {}", request.getScmId(),
+        newRaftPeerList);
+    final SetConfigurationRequest configRequest =
+        new SetConfigurationRequest(clientId, division.getPeer().getId(),
+            division.getGroup().getGroupId(), nextCallId(), newRaftPeerList);
+
+    try {
+      RaftClientReply raftClientReply = server.setConfiguration(configRequest);
+      if (raftClientReply.isSuccess()) {
+        LOG.info("Successfully removed SCM: {}.", request.getScmId());
+      } else {
+        LOG.error("Failed to remove SCM: {}. Ratis reply: {}" +
+            request.getScmId(), raftClientReply);
+        throw new IOException(raftClientReply.getException());
+      }
+      return raftClientReply.isSuccess();
+    } catch (IOException e) {
+      if (e instanceof NotLeaderException) {
+        LOG.debug("Cannot remove peer: {}", request.getScmId(), e);
+      } else {
+        LOG.error("Failed to update Ratis configuration and remove peer. " +
+            "Cannot remove SCM: {}.", request.getScmId(), e);
+      }
+      throw e;
+    }
+  }
+
   private static RaftGroup buildRaftGroup(SCMNodeDetails details,
       String scmId, String clusterId) {
     Preconditions.checkNotNull(scmId);
@@ -349,7 +389,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }
 
-  private RaftPeer getLeader() {
+  public RaftPeer getLeader() {
     if (division.getInfo().isLeader()) {
       return division.getPeer();
     } else {

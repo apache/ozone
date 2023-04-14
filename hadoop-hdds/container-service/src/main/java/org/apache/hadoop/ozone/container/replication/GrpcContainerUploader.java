@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -24,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,30 +44,51 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
-  private final CopyContainerCompression compression;
 
   public GrpcContainerUploader(
       ConfigurationSource conf, CertificateClient certClient) {
     this.certClient = certClient;
     securityConfig = new SecurityConfig(conf);
-    compression = CopyContainerCompression.getConf(conf);
   }
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback) throws IOException {
-    GrpcReplicationClient client =
-        new GrpcReplicationClient(target.getIpAddress(),
-            target.getPort(Port.Name.REPLICATION).getValue(),
-            securityConfig, certClient, compression.toString());
-    StreamObserver<SendContainerRequest> requestStream = client.upload(
-        new SendContainerResponseStreamObserver(containerId, target, callback));
-    return new SendContainerOutputStream(requestStream, containerId,
-        GrpcReplicationService.BUFFER_SIZE);
+      CompletableFuture<Void> callback, CopyContainerCompression compression)
+      throws IOException {
+    GrpcReplicationClient client = createReplicationClient(target, compression);
+    try {
+      StreamObserver<SendContainerRequest> requestStream = client.upload(
+          new SendContainerResponseStreamObserver(containerId, target,
+              callback));
+      return new SendContainerOutputStream(requestStream, containerId,
+          GrpcReplicationService.BUFFER_SIZE, compression) {
+        @Override
+        public void close() throws IOException {
+          try {
+            super.close();
+          } finally {
+            IOUtils.close(LOG, client);
+          }
+        }
+      };
+    } catch (Exception e) {
+      IOUtils.close(LOG, client);
+      throw e;
+    }
+  }
+
+  @VisibleForTesting
+  protected GrpcReplicationClient createReplicationClient(
+      DatanodeDetails target, CopyContainerCompression compression)
+      throws IOException {
+    return new GrpcReplicationClient(target.getIpAddress(),
+        target.getPort(Port.Name.REPLICATION).getValue(),
+        securityConfig, certClient, compression);
   }
 
   /**
-   *
+   * Observes gRPC response for SendContainer request, notifies callback on
+   * completion/error.
    */
   private static class SendContainerResponseStreamObserver
       implements StreamObserver<SendContainerResponse> {
@@ -82,7 +105,7 @@ public class GrpcContainerUploader implements ContainerUploader {
 
     @Override
     public void onNext(SendContainerResponse sendContainerResponse) {
-      LOG.info("Response for upload container {} to {}", containerId, target);
+      LOG.debug("Response for upload container {} to {}", containerId, target);
     }
 
     @Override

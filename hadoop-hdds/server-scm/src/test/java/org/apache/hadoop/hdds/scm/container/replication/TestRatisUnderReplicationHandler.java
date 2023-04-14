@@ -34,8 +34,10 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,12 +45,14 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 
 /**
@@ -62,9 +66,11 @@ public class TestRatisUnderReplicationHandler {
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @Before
-  public void setup() throws NodeNotFoundException {
+  public void setup() throws NodeNotFoundException,
+      CommandTargetOverloadedException, NotLeaderException {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
@@ -77,15 +83,22 @@ public class TestRatisUnderReplicationHandler {
         .thenReturn(new ReplicationManagerConfiguration());
 
     /*
-     Return NodeStatus with NodeOperationalState as specified in
-     DatanodeDetails, and NodeState as HEALTHY.
-     */
-    Mockito.when(nodeManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+      Return NodeStatus with NodeOperationalState as specified in
+      DatanodeDetails, and NodeState as HEALTHY.
+    */
+    Mockito.when(
+        replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
           return new NodeStatus(dn.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY);
         });
+
+    commandsSent = new HashSet<>();
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent);
+    ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
+        commandsSent);
   }
 
   /**
@@ -187,15 +200,65 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
         conf);
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager,
-            replicationManager);
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
 
     Assert.assertThrows(IOException.class,
-        () -> handler.processAndCreateCommands(replicas,
+        () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+  }
+
+  @Test
+  public void testInsufficientTargetsFoundBecauseOfPlacementPolicy() {
+    policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(
+        nodeManager, conf, 2);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    // Only one replica is available, so we need to create 2 new ones.
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0);
+
+    Assert.assertThrows(InsufficientDatanodesException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // One command should be sent to the replication manager as we could only
+    // fine one node rather than two.
+    Assert.assertEquals(1, commandsSent.size());
+  }
+
+  @Test
+  public void testUnhealthyReplicasAreReplicatedWhenHealthyAreUnavailable()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    testProcessing(replicas, pendingOps, getUnderReplicatedHealthResult(), 2,
+        1);
+  }
+
+  @Test
+  public void onlyHealthyReplicasShouldBeReplicatedWhenAvailable()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0);
+    ContainerReplica closedReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED);
+    replicas.add(closedReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    Assert.assertEquals(1, commands.size());
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.stream()
+        .findFirst().get();
+
+    Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
   }
 
   /**
@@ -211,18 +274,17 @@ public class TestRatisUnderReplicationHandler {
    * @param expectNumCommands number of commands expected to be created by
    *                          the handler
    */
-  private void testProcessing(
+  private Set<Pair<DatanodeDetails, SCMCommand<?>>> testProcessing(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult healthResult,
       int minHealthyForMaintenance, int expectNumCommands) throws IOException {
     RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, nodeManager,
-            replicationManager);
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
 
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
-        handler.processAndCreateCommands(replicas, pendingOps,
+    handler.processAndSendCommands(replicas, pendingOps,
             healthResult, minHealthyForMaintenance);
-    Assert.assertEquals(expectNumCommands, commands.size());
+    Assert.assertEquals(expectNumCommands, commandsSent.size());
+    return commandsSent;
   }
 
   private UnderReplicatedHealthResult getUnderReplicatedHealthResult() {

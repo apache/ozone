@@ -30,6 +30,7 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
+  private final String debugString;
 
   /**
    * Counter for the transferred bytes.
@@ -39,8 +40,17 @@ public class ReplicationTask extends AbstractReplicationTask {
   public ReplicationTask(ReplicateContainerCommand cmd,
                          ContainerReplicator replicator) {
     super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
+    setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
+    if (cmd.getTargetDatanode() != null) {
+      // Only push replication will have a target datanode set, and it must be
+      // sent to the source datanode to be executed. It is possible the source
+      // is out of service, so we need to set the flag to allow the command to
+      // run.
+      setShouldOnlyRunOnInServiceDatanodes(false);
+    }
+    debugString = cmd.toString();
   }
 
   /**
@@ -82,12 +92,17 @@ public class ReplicationTask extends AbstractReplicationTask {
   }
 
   @Override
+  protected Object getCommandForDebug() {
+    return debugString;
+  }
+
+  @Override
   public String toString() {
-    return "ReplicationTask{" +
-        "status=" + getStatus() +
-        ", cmd={" + cmd + "}" +
-        ", queued=" + getQueued() +
-        '}';
+    String str = super.toString();
+    if (transferredBytes > 0) {
+      str += ", transferred " + transferredBytes + " bytes";
+    }
+    return str;
   }
 
   public long getTransferredBytes() {
@@ -100,10 +115,6 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
-  }
-
-  ReplicateContainerCommand getCommand() {
-    return cmd;
   }
 
   @Override

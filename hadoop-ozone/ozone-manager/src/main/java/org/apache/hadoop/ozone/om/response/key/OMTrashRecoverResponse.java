@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -58,12 +57,12 @@ public class OMTrashRecoverResponse extends OmKeyResponse {
             omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
     RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager
         .getDeletedTable().get(trashKey);
-    omKeyInfo = OmUtils.prepareKeyForRecover(omKeyInfo, repeatedOmKeyInfo);
-    omMetadataManager.getDeletedTable()
-        .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());
-    /* TODO: trashKey should be updated to destinationBucket. */
-    omMetadataManager.getKeyTable(getBucketLayout())
-        .putWithBatch(batchOperation, trashKey, omKeyInfo);
+    if (repeatedOmKeyInfo.getOmKeyInfoList().contains(omKeyInfo)) {
+      omMetadataManager.getDeletedTable()
+              .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());
+      /* TODO: trashKey should be updated to destinationBucket. */
+      omMetadataManager.getKeyTable(getBucketLayout())
+              .putWithBatch(batchOperation, trashKey, omKeyInfo);
+    }
   }
-
 }

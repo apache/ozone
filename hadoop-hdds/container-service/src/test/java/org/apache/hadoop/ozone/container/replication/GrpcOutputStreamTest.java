@@ -35,6 +35,7 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -158,6 +159,16 @@ abstract class GrpcOutputStreamTest<T> {
     verifyResponses(concat(bytes1, bytes2));
   }
 
+  @Test
+  void rejectsWriteAfterClose() throws IOException {
+    subject.close();
+
+    assertThrows(IllegalStateException.class, () -> subject.write(42));
+    assertThrows(IllegalStateException.class, () -> writeBytes(subject, 42));
+
+    subject.close(); // close is idempotent
+  }
+
   private void verifyResponses(byte[] bytes) {
     int expectedResponseCount = bytes.length / bufferSize;
     if (bytes.length % bufferSize > 0) {
@@ -207,7 +218,7 @@ abstract class GrpcOutputStreamTest<T> {
     return bytes;
   }
 
-  private static byte[] getRandomBytes(int size) {
+  static byte[] getRandomBytes(int size) {
     byte[] bytes = new byte[size];
     RND.nextBytes(bytes);
     return bytes;

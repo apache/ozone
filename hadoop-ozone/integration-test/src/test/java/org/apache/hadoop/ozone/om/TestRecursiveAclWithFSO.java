@@ -85,7 +85,7 @@ public class TestRecursiveAclWithFSO {
     List<String> keys = new ArrayList<>();
     // Create volumes with user1
 
-    OzoneClient client = cluster.getClient();
+    OzoneClient client = cluster.newClient();
     ObjectStore objectStore = client.getObjectStore();
 
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
@@ -95,7 +95,7 @@ public class TestRecursiveAclWithFSO {
 
     // Login as user1, create directories and keys
     UserGroupInformation.setLoginUser(user1);
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     OzoneVolume volume = objectStore.getVolume("volume1");
@@ -168,7 +168,7 @@ public class TestRecursiveAclWithFSO {
     List<OzoneAcl> aclList1;
 
     UserGroupInformation.setLoginUser(user2);
-    client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
     volume = objectStore.getVolume("volume1");
     ozoneBucket = volume.getBucket("bucket1");

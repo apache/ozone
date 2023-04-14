@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 public interface ContainerDownloader extends Closeable {
 
   Path getContainerDataFromReplicas(long containerId,
-      List<DatanodeDetails> sources, Path downloadDir);
+      List<DatanodeDetails> sources, Path downloadDir,
+      CopyContainerCompression compression);
 
 }

@@ -54,7 +54,7 @@ public class TestMeasuredReplicator {
         e.printStackTrace();
       }
     };
-    measuredReplicator = new MeasuredReplicator(replicator);
+    measuredReplicator = new MeasuredReplicator(replicator, "test");
   }
 
   @AfterEach

@@ -293,6 +293,21 @@ public abstract class GenericTestUtils {
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
+  /***
+   * Removed all files and dirs in the given dir recursively.
+   */
+  public static boolean deleteDirectory(File dir) {
+    File[] allContents = dir.listFiles();
+    if (allContents != null) {
+      for (File content : allContents) {
+        if (!deleteDirectory(content)) {
+          return false;
+        }
+      }
+    }
+    return dir.delete();
+  }
+
   /**
    * Class to capture logs for doing assertions.
    */

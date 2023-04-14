@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -48,7 +49,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -97,7 +97,7 @@ public class TestECContainerRecovery {
    */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024;
+    chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
@@ -158,6 +158,7 @@ public class TestECContainerRecovery {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -227,6 +228,7 @@ public class TestECContainerRecovery {
         .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -239,22 +241,25 @@ public class TestECContainerRecovery {
     // Let's verify for Over replications now.
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Restart the DN to make the over replication and expect replication to be
     // increased.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     // Check container is over replicated.
     waitForContainerCount(6, container.containerID(), scm);
+
+    // Resume RM and wait the over replicated replica deleted.
+    // ReplicationManager fix container replica state if different
+    scm.getReplicationManager().start();
+
     // Wait for all the replicas to be closed.
     container = scm.getContainerInfo(container.getContainerID());
     waitForDNContainerState(container, scm);
 
-    // Resume RM and wait the over replicated replica deleted.
-    scm.getReplicationManager().start();
     waitForContainerCount(5, container.containerID(), scm);
   }
 
-  @Flaky("HDDS-7617")
   @Test
   public void testECContainerRecoveryWithTimedOutRecovery() throws Exception {
     byte[] inputData = getInputBytes(3);
@@ -329,6 +334,7 @@ public class TestECContainerRecovery {
             .ContainerReplicaProto.State.CLOSED, container.containerID());
     //Temporarily stop the RM process.
     scm.getReplicationManager().stop();
+    waitForReplicationManagerStopped(scm.getReplicationManager());
 
     // Wait for the lower replication.
     waitForContainerCount(4, container.containerID(), scm);
@@ -403,6 +409,11 @@ public class TestECContainerRecovery {
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;
+  }
+
+  private void waitForReplicationManagerStopped(ReplicationManager rm)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
   }
 
 }

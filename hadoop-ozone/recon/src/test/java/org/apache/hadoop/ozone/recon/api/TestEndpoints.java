@@ -89,10 +89,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,6 +117,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -255,6 +258,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     dslContext = getDslContext();
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
@@ -366,9 +370,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     } catch (Exception ex) {
       Assertions.fail(ex.getMessage());
     }
-
     // Write Data to OM
-
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
     // Create a new volume and bucket and then write keys to the bucket.
@@ -393,12 +395,29 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
-
     // key = key_two
     writeDataToOm(reconOMMetadataManager, "key_two");
-
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
+
+    // Populate the deletedKeys table in OM DB
+    List<String> deletedKeysList1 = Arrays.asList("key1");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList1, "Bucket1", "Volume1");
+    List<String> deletedKeysList2 = Arrays.asList("key2", "key2");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList2, "Bucket2", "Volume2");
+    List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList3, "Bucket3", "Volume3");
+
+    // Populate the deletedDirectories table in OM DB
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
+        3L, 2L, 1L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
+        6L, 5L, 4L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
+        9L, 8L, 7L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -612,6 +631,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 
   @Test
@@ -635,22 +656,44 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     given(omKeyInfo3.getDataSize()).willReturn(1000L);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
+        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
+        keyTableLegacy);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
+
+    when(mockKeyIterLegacy.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
+    when(mockKeyIterFso.hasNext())
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(false);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+
+    when(mockKeyValueLegacy.getValue())
+        .thenReturn(omKeyInfo1)
+        .thenReturn(omKeyInfo2)
+        .thenReturn(omKeyInfo3);
+    when(mockKeyValueFso.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
@@ -666,13 +709,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(3, resultSet.size());
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
 
     // Test for "volume" query param
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);

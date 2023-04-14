@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
@@ -67,7 +65,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -120,6 +117,9 @@ public class OzoneContainer {
   private DatanodeDetails datanodeDetails;
   private StateContext context;
 
+
+  private final ContainerMetrics metrics;
+
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
   }
@@ -163,7 +163,7 @@ public class OzoneContainer {
     metadataScanner = null;
 
     buildContainerSet();
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
     IncrementalReportSender<Container> icrSender = container -> {
@@ -208,7 +208,7 @@ public class OzoneContainer {
         secConf,
         certClient,
         new ContainerImporter(conf, containerSet, controller,
-            new TarContainerPacker(), volumeSet));
+            volumeSet));
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);
@@ -249,11 +249,9 @@ public class OzoneContainer {
             containerSet);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
-      List<X509Certificate> x509Certificates =
-          HAUtils.buildCAX509List(certClient, conf);
       tlsClientConfig = new GrpcTlsConfig(
-          certClient.getPrivateKey(), certClient.getCertificate(),
-          x509Certificates, true);
+          certClient.getClientKeyStoresFactory().getKeyManagers()[0],
+          certClient.getClientKeyStoresFactory().getTrustManagers()[0], true);
     } else {
       tlsClientConfig = null;
     }
@@ -521,5 +519,9 @@ public class OzoneContainer {
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
+  }
+
+  public ContainerMetrics getMetrics() {
+    return metrics;
   }
 }

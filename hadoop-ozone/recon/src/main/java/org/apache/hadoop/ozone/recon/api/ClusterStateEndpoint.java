@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.ContainerStateCounts;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -45,7 +46,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -88,25 +91,37 @@ public class ClusterStateEndpoint {
    */
   @GET
   public Response getClusterState() {
+    ContainerStateCounts containerStateCounts = new ContainerStateCounts();
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-    int containers = this.containerManager.getContainers().size();
+
     int pipelines = this.pipelineManager.getPipelines().size();
+
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0, MISSING_CONTAINER_COUNT_LIMIT);
-    int totalMissingContainerCount = missingContainers.size() ==
-        MISSING_CONTAINER_COUNT_LIMIT ?
-        MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
-    int openContainersCount = this.containerManager.getContainerStateCount(
-        HddsProtos.LifeCycleState.OPEN);
+
+    containerStateCounts.setMissingContainerCount(
+        missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?
+            MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size());
+
+    containerStateCounts.setOpenContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.OPEN));
+
+    containerStateCounts.setDeletedContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.DELETED));
+
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
+
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),
             stats.getScmUsed().get(), stats.getRemaining().get());
+
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(VOLUME_TABLE));
@@ -118,6 +133,12 @@ public class ClusterStateEndpoint {
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
     GlobalStats fileRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(FILE_TABLE));
+    // Keys from the DeletedTable
+    GlobalStats deletedKeyRecord = globalStatsDao.findById(
+        TableCountTask.getRowKeyFromTable(DELETED_TABLE));
+    // Directories from the DeletedDirectoryTable
+    GlobalStats deletedDirRecord = globalStatsDao.findById(
+        TableCountTask.getRowKeyFromTable(DELETED_DIR_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
@@ -127,22 +148,39 @@ public class ClusterStateEndpoint {
     }
 
     Long totalKeys = 0L;
+    Long deletedKeys = 0L;
+    Long deletedDirs = 0L;
+
     if (keyRecord != null) {
       totalKeys += keyRecord.getValue();
     }
     if (fileRecord != null) {
       totalKeys += fileRecord.getValue();
     }
-    builder.setKeys(totalKeys);
+    if (deletedKeyRecord != null) {
+      deletedKeys += deletedKeyRecord.getValue();
+    }
+    if (deletedDirRecord != null) {
+      deletedDirs += deletedDirRecord.getValue();
+    }
 
+    builder.setKeys(totalKeys);
+    builder.setDeletedKeys(deletedKeys);
+    builder.setDeletedDirs(deletedDirs);
+
+    // Subtract deleted containers from total containers.
+    containerStateCounts.setTotalContainerCount(
+        this.containerManager.getContainers().size() -
+            containerStateCounts.getDeletedContainersCount());
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
         .setPipelines(pipelines)
-        .setContainers(containers)
-        .setMissingContainers(totalMissingContainerCount)
+        .setContainers(containerStateCounts.getTotalContainerCount())
+        .setMissingContainers(containerStateCounts.getMissingContainerCount())
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
-        .setOpenContainers(openContainersCount)
+        .setOpenContainers(containerStateCounts.getOpenContainersCount())
+        .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
         .build();
     return Response.ok(response).build();
   }

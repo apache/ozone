@@ -21,11 +21,11 @@ Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${SCM}       scm
+${PREFIX}    ${EMPTY}
+${VOLUME}    vol${PREFIX}
 
 *** Keywords ***
 Prepare For Tests
-    ${random}    Generate Random String  5  [NUMBERS]
-    Set Suite Variable  ${prefix}  ${random}
     Execute             dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1
     Execute             dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2
     Execute             dd if=/dev/urandom of=/tmp/3mb bs=1048576 count=3
@@ -33,10 +33,10 @@ Prepare For Tests
 
 # xcompat/test.sh creates unified test data files in /tmp for client containers
 Prepare Data For Xcompat Tests
-    Execute             ozone sh volume create /${prefix}vol1
-    Execute             ozone sh bucket create /${prefix}vol1/${prefix}default
-    Execute             ozone sh bucket create --replication 3 --type RATIS /${prefix}vol1/${prefix}ratis
-    Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${prefix}vol1/${prefix}ec
-    Execute             ozone sh key put /${prefix}vol1/${prefix}default/${prefix}3mb /tmp/3mb
-    Execute             ozone sh key put /${prefix}vol1/${prefix}ratis/${prefix}3mb /tmp/3mb
-    Execute             ozone sh key put /${prefix}vol1/${prefix}ec/${prefix}3mb /tmp/3mb
+    Execute             ozone sh volume create /${VOLUME}
+    Execute             ozone sh bucket create /${VOLUME}/default
+    Execute             ozone sh bucket create --replication 3 --type RATIS /${VOLUME}/ratis
+    Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /${VOLUME}/ecbucket
+    Execute             ozone sh key put /${VOLUME}/default/3mb /tmp/3mb
+    Execute             ozone sh key put /${VOLUME}/ratis/3mb /tmp/3mb
+    Execute             ozone sh key put /${VOLUME}/ecbucket/3mb /tmp/3mb

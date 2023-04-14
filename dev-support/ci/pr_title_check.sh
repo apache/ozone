@@ -35,6 +35,13 @@ assertNotMatch() {
     fi
 }
 
+# strip starting 'Revert "', if any
+TITLE=${TITLE#Revert \"}
+if [ "$1" != "${TITLE}" ]; then
+  echo "Leading 'Revert \"' in the PR title has been stripped solely for this title checking purpose. Performing actual title check on:"
+  echo "${TITLE}"
+fi
+
 assertMatch    '^HDDS'                             'Fail: must start with HDDS'
 assertMatch    '^HDDS-'                            'Fail: missing dash in Jira'
 assertNotMatch '^HDDS-0'                           'Fail: leading zero in Jira'
