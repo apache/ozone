@@ -648,7 +648,7 @@ public class TestOzoneFileSystem {
     FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
 
     // the number of immediate children of root is 1
-    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(Arrays.toString(fileStatuses), 1, fileStatuses.length);
     writeClient.deleteKey(keyArgs);
   }
 
