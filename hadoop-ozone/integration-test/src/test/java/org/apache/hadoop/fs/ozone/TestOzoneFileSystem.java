@@ -1505,12 +1505,11 @@ public class TestOzoneFileSystem {
   @Test
   public void testGetTrashRoot() throws IOException {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
     // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = new Path(trashRoot, username);
+    Path expectedOutPath1 = new Path(TRASH_ROOT, username);
     Assert.assertEquals(expectedOutPath1, outPath1);
   }
 
@@ -1577,8 +1576,7 @@ public class TestOzoneFileSystem {
   @Test
   public void testGetTrashRoots() throws IOException {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
+    Path userTrash = new Path(TRASH_ROOT, username);
 
     Collection<FileStatus> res = o3fs.getTrashRoots(false);
     Assert.assertEquals(0, res.size());
@@ -1594,12 +1592,12 @@ public class TestOzoneFileSystem {
 
     // Create a few more random user trash dir
     for (int i = 1; i <= 5; i++) {
-      Path moreUserTrash = new Path(trashRoot, "trashuser" + i);
+      Path moreUserTrash = new Path(TRASH_ROOT, "trashuser" + i);
       fs.mkdirs(moreUserTrash);
     }
 
     // And create a file, which should be ignored
-    fs.create(new Path(trashRoot, "trashuser99"));
+    fs.create(new Path(TRASH_ROOT, "trashuser99"));
 
     // allUsers = false should still return current user trash
     res = o3fs.getTrashRoots(false);
@@ -1630,8 +1628,7 @@ public class TestOzoneFileSystem {
 
     // Construct paths
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
+    Path userTrash = new Path(TRASH_ROOT, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
     Path trashPath = new Path(userTrashCurrent, testKeyName);
 
@@ -1661,8 +1658,7 @@ public class TestOzoneFileSystem {
 
     // Construct paths
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    Path userTrash = new Path(trashRoot, username);
+    Path userTrash = new Path(TRASH_ROOT, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
     Path trashPath = new Path(userTrashCurrent, testKeyName);
 
