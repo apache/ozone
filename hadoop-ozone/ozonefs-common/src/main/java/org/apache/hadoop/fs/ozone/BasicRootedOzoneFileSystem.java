@@ -671,14 +671,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         handleTrailingSlash = f.toString().endsWith(OZONE_URI_DELIMITER);
       }
 
-      // if link, don't delete contents
+      // if link and rm path does not have trailing slash,
+      // don't delete contents
       if (isBucketLink && !handleTrailingSlash) {
         result = true;
       } else {
         result = innerDelete(f, recursive);
       }
 
-      // Handle delete bucket
+      // check if rm path does not have trailing slash
+      // if so, the contents of bucket were deleted and skip delete bucket
+      // otherwise, Handle delete bucket
       if (ofsPath.isBucket() && !handleTrailingSlash) {
         OzoneVolume volume =
             adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());

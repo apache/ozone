@@ -59,7 +59,7 @@ public class TestOzoneFsShell {
           .filter(c -> c.equals(rmCmd)).count());
       Command instance = factory.getInstance(rmCmd);
       Assert.assertNotNull(instance);
-      Assert.assertEquals(OzoneDelete.Rm.class, instance.getClass());
+      Assert.assertEquals(OzoneFsDelete.Rm.class, instance.getClass());
       Assert.assertEquals(rmCmdName, instance.getCommandName());
       shell.close();
       System.setErr(oldErr);

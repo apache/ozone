@@ -46,14 +46,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 
-public final class OzoneDelete {
+public final class OzoneFsDelete {
 
-  private OzoneDelete() {
+  private OzoneFsDelete() {
   }
 
   public static void registerCommands(CommandFactory factory) {
-    factory.addClass(OzoneDelete.Rm.class, "-rm");
-    factory.addClass(OzoneDelete.Rmr.class, "-rmr");
+    factory.addClass(OzoneFsDelete.Rm.class, "-rm");
+    factory.addClass(OzoneFsDelete.Rmr.class, "-rmr");
   }
 
   /** remove non-directory paths. */
@@ -132,10 +132,10 @@ public final class OzoneDelete {
       if (isSymlink && trailing) {
         path = new Path(URI.create(path.toString() + OZONE_URI_DELIMITER));
       }
-      // TODO: if the user wants the trash to be used but there is any
-      // problem (ie. creating the trash dir, moving the item to be deleted,
-      // etc), then the path will just be deleted because moveToTrash returns
-      // false and it falls thru to fs.delete.  this doesn't seem right
+      // Any problem (ie. creating the trash dir,
+      // moving the item to be deleted, etc), has the trash
+      // service throw exceptions.  User can retry correcting
+      // the problem.
       if (moveToTrash(item) || !canBeSafelyDeleted(item)) {
         return;
       }
@@ -188,7 +188,7 @@ public final class OzoneDelete {
   }
 
   /** remove any path. */
-  static class Rmr extends OzoneDelete.Rm {
+  static class Rmr extends OzoneFsDelete.Rm {
     public static final String NAME = "rmr";
 
     @Override

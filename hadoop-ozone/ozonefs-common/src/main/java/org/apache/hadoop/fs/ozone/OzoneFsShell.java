@@ -59,8 +59,8 @@ public class OzoneFsShell extends FsShell {
     // commands, and then this method can be abstract
     if (this.getClass().equals(OzoneFsShell.class)) {
       factory.registerCommands(FsCommand.class);
-      // ozone delete rm command registration superscedes fs delete
-      factory.registerCommands(OzoneDelete.class);
+      // ozone delete rm command registration supersedes fs delete
+      factory.registerCommands(OzoneFsDelete.class);
     }
   }
 

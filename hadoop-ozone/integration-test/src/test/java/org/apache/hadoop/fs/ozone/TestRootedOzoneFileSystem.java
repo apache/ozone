@@ -1626,7 +1626,7 @@ public class TestRootedOzoneFileSystem {
         Assert.assertEquals(0, res);
 
         try {
-          objectStore.getVolume(destVolume).getBucket(destVolume);
+          objectStore.getVolume(destVolume).getBucket(srcBucket);
           Assert.fail("Bucket should not exist, should throw OMException");
         } catch (OMException ex) {
           Assert.assertEquals(BUCKET_NOT_FOUND, ex.getResult());
@@ -1675,6 +1675,7 @@ public class TestRootedOzoneFileSystem {
 
         Assert.assertEquals(srcBucket, objectStore.getVolume(srcVolume)
             .getBucket(srcBucket).getName());
+        // test link existence
         try {
           objectStore.getVolume(destVolume).getBucket(srcBucket);
           Assert.fail("link should not exist, " +
@@ -1682,6 +1683,9 @@ public class TestRootedOzoneFileSystem {
         } catch (OMException ex) {
           Assert.assertEquals(BUCKET_NOT_FOUND, ex.getResult());
         }
+        // test src bucket existence
+        Assert.assertEquals(objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getName(), srcBucket);
       } finally {
         shell.close();
       }
