@@ -173,7 +173,8 @@ public class SnapshotDiffJob {
 
   @Override
   public int hashCode() {
-    return Objects.hash(jobId);
+    return Objects.hash(creationTime, jobId, status, volume, bucket,
+        fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
   }
 
   /**
