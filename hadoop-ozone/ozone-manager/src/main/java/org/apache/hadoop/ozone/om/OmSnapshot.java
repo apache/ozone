@@ -260,6 +260,14 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     omMetadataManager.getStore().close();
   }
 
+  @Override
+  protected void finalize() throws IOException {
+    // Close the DB if it hasn't been closed when GC'ed by JVM
+    if (!omMetadataManager.getStore().isClosed()) {
+      omMetadataManager.getStore().close();
+    }
+  }
+
   @VisibleForTesting
   public OMMetadataManager getMetadataManager() {
     return omMetadataManager;

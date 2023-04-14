@@ -927,6 +927,11 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
     String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
+
+    // Block SnapDiff if either one of the snapshots is not active
+    ozoneManager.getOmSnapshotManager().checkSnapshotActive(fsKey);
+    ozoneManager.getOmSnapshotManager().checkSnapshotActive(tsKey);
+
     try {
       submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
           snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);

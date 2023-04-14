@@ -600,6 +600,7 @@ public final class OzoneConfigKeys {
       "org.apache.hadoop.ozone.om.TrashPolicyOzone";
 
 
+  // TODO: [SNAPSHOT] Document this in ozone-default.xml
   public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
       "ozone.om.snapshot.cache.max.size";
   public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
