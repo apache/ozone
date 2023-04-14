@@ -129,11 +129,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
+      List<String> purgeSnapshotKeys = new ArrayList<>();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         long snapshotLimit = snapshotDeletionPerTask;
-        List<String> purgeSnapshotKeys = new ArrayList<>();
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
@@ -292,10 +292,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           submitSnapshotMoveDeletedKeys(snapInfo, toReclaimList,
               toNextDBList, renamedKeysList, dirsToMove);
         }
-        submitSnapshotPurgeRequest(purgeSnapshotKeys);
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
       }
+      submitSnapshotPurgeRequest(purgeSnapshotKeys);
 
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
@@ -310,14 +310,18 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       try (TableIterator<String, ? extends Table.KeyValue<String,
           RepeatedOmKeyInfo>> iterator = snapshotDeletedTable.iterator();) {
         iterator.seek(snapshotBucketKey);
-        isKeyTableCleanedUp = iterator.hasNext() && iterator.next().getKey()
+        // If the next entry doesn't start with snapshotBucketKey then
+        // deletedKeyTable is already cleaned up.
+        isKeyTableCleanedUp = !iterator.hasNext() || !iterator.next().getKey()
             .startsWith(snapshotBucketKey);
       }
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
                iterator = snapshotDeletedDirTable.iterator()) {
         iterator.seek(dbBucketKeyForDir);
-        isDirTableCleanedUp = iterator.hasNext() && iterator.next().getKey()
+        // If the next entry doesn't start with dbBucketKeyForDir then
+        // deletedDirTable is already cleaned up.
+        isDirTableCleanedUp = !iterator.hasNext() || !iterator.next().getKey()
             .startsWith(dbBucketKeyForDir);
       }
 
@@ -395,9 +399,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        // TODO: [SNAPSHOT] Submit request once KeyDeletingService,
-        //  DirectoryDeletingService for snapshots are modified.
-        // submitRequest(omRequest);
+        submitRequest(omRequest);
       }
     }
 
@@ -579,22 +581,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   private boolean shouldRun() {
     return !suspended.get() && ozoneManager.isLeaderReady();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  void resume() {
-    suspended.set(false);
   }
 
   public long getSuccessfulRunCount() {

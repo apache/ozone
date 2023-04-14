@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.util.Objects;
+
 /**
  * SnapshotChain supporting SnapshotInfo class.
  *
@@ -54,4 +56,22 @@ public class SnapshotChainInfo {
     return previousSnapshotID;
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    SnapshotChainInfo that = (SnapshotChainInfo) o;
+    return Objects.equals(snapshotID, that.snapshotID) &&
+        Objects.equals(previousSnapshotID, that.previousSnapshotID) &&
+        Objects.equals(nextSnapshotID, that.nextSnapshotID);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(snapshotID, previousSnapshotID, nextSnapshotID);
+  }
 }

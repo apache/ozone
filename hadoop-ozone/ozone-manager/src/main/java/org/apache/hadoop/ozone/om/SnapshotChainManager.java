@@ -533,4 +533,9 @@ public class SnapshotChainManager {
     loadFromSnapshotInfoTable(metadataManager);
   }
 
+  @VisibleForTesting
+  public LinkedHashMap<String, SnapshotChainInfo> getSnapshotChainPath(
+      String path) {
+    return snapshotChainPath.get(path);
+  }
 }
