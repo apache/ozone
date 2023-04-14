@@ -185,8 +185,13 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         // OzoneDeletePathKey. Changing it back to check the previous DirTable.
         String prevDbKey = metadataManager.getOzoneDeletePathDirKey(key);
         OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
-        return prevDirInfo != null &&
+        boolean result = prevDirInfo != null &&
             prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
+
+        // TODO: [Snapshot] Need to wrap this in try-finally.
+        omSnapshotManager.getSnapshotCache().release(latestSnapshot);
+
+        return result;
       }
       return false;
     }

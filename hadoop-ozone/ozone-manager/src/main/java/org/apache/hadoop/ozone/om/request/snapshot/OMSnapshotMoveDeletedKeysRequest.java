@@ -113,6 +113,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
+      // TODO: [SNAPSHOT] Call snapshotCache.release()
     }
 
     return omClientResponse;

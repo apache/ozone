@@ -20,7 +20,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -36,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -102,7 +102,7 @@ public class TestOMSnapshotDeleteRequest {
 
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
     when(omSnapshotManager.getSnapshotCache())
-        .thenReturn(mock(LoadingCache.class));
+        .thenReturn(mock(SnapshotCache.class));
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
 
     volumeName = UUID.randomUUID().toString();

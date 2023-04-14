@@ -274,6 +274,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 renamedKeysList.add(renamedKey.build());
               }
               deletionCount++;
+
+              // TODO: [SNAPSHOT] Call snapshotCache.release()
             }
 
             // Delete keys From deletedTable
@@ -291,6 +293,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // Submit Move request to OM.
           submitSnapshotMoveDeletedKeys(snapInfo, toReclaimList,
               toNextDBList, renamedKeysList, dirsToMove);
+
+          // TODO: [SNAPSHOT] Call snapshotCache.release()
         }
         submitSnapshotPurgeRequest(purgeSnapshotKeys);
       } catch (IOException e) {

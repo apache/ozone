@@ -139,6 +139,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
+      if (omFromSnapshot != null) {
+        ozoneManager.getOmSnapshotManager().getSnapshotCache()
+            .release(omFromSnapshot);
+      }
     }
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(

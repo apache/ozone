@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.RefCount;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -44,18 +46,18 @@ import java.util.stream.Collectors;
 
 /**
  * Metadata Reading class for OM Snapshots.
- *
+ * <p>
  * This abstraction manages all the metadata key/acl reading from a
  * rocksDb instance, for OM snapshots.  It's basically identical to
  * the ozoneManager OmMetadataReader with two exceptions: 
- *
+ * <p>
  * 1. Its keymanager and prefix manager contain an OmMetadataManager
  * that reads from a snapshot.  
- *
+ * <p>
  * 2. It normalizes/denormalizes each request as it comes in to
  * remove/replace the ".snapshot/snapshotName" prefix.
  */
-public class OmSnapshot implements IOmMetadataReader, Closeable {
+public class OmSnapshot implements IOmMetadataReader, Closeable, RefCount {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshot.class);
@@ -257,6 +259,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public void close() throws IOException {
+    // Close DB
     omMetadataManager.getStore().close();
   }
 
@@ -267,5 +270,12 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   public KeyManager getKeyManager() {
     return keyManager;
+  }
+
+  /**
+   * @return DB snapshot table key for this OmSnapshot instance.
+   */
+  public String getSnapshotTableKey() {
+    return SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
   }
 }

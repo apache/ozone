@@ -1518,6 +1518,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 blockGroupList.clear();
                 break;
               }
+
+              // TODO: [Snapshot] Need to wrap this in try-finally.
+              omSnapshotManager.getSnapshotCache().release(latestSnapshot);
             }
 
             // Add all blocks from all versions of the key to the deletion list

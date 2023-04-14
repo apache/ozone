@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import com.google.common.cache.LoadingCache;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,7 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -99,7 +97,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final ManagedRocksDB db;
   private final RocksDBCheckpointDiffer differ;
   private final OzoneManager ozoneManager;
-  private final LoadingCache<String, OmSnapshot> snapshotCache;
+  private final SnapshotCache snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
 
@@ -128,7 +126,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   public SnapshotDiffManager(ManagedRocksDB db,
                              RocksDBCheckpointDiffer differ,
                              OzoneManager ozoneManager,
-                             LoadingCache<String, OmSnapshot> snapshotCache,
+                             SnapshotCache snapshotCache,
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions) {
@@ -927,12 +925,10 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
     String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
-    try {
-      submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
-          snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);
-    } catch (ExecutionException e) {
-      throw new IOException(e.getCause());
-    }
+    submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
+        snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);
+
+    // TODO: [SNAPSHOT] Call snapshotCache.release() when the diff job is done
   }
 
   @Override

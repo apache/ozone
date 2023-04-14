@@ -94,6 +94,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
+      // TODO: [SNAPSHOT] Call snapshotCache.release()
     }
 
     return omClientResponse;
