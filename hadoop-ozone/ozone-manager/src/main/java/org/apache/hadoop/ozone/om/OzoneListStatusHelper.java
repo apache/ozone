@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -444,6 +445,11 @@ public class OzoneListStatusHelper {
           continue;
         }
 
+        // Copy cache value to local copy and work on it
+        Value copyOmInfo = ObjectUtils.clone(cacheOmInfo);
+        if (copyOmInfo != null) {
+          cacheOmInfo = copyOmInfo;
+        }
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"
           if (cacheKey.startsWith(prefixKey)) {
