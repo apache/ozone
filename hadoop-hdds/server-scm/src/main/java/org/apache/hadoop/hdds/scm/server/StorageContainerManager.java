@@ -142,6 +142,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -1434,6 +1435,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public SCMNodeDetails getScmNodeDetails() {
     return scmHANodeDetails.getLocalNodeDetails();
+  }
+
+  @Override
+  public DBStore getScmDBStore() {
+    return getScmMetadataStore().getStore();
   }
 
   public SCMHANodeDetails getSCMHANodeDetails() {

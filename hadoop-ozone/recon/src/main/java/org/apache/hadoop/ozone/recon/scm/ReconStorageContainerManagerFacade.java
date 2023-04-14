@@ -673,6 +673,11 @@ public class ReconStorageContainerManagerFacade
     return reconNodeDetails;
   }
 
+  @Override
+  public DBStore getScmDBStore() {
+    return dbStore;
+  }
+
   public EventQueue getEventQueue() {
     return eventQueue;
   }
