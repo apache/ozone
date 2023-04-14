@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
@@ -111,6 +112,15 @@ import static org.junit.Assert.fail;
 public class TestOzoneFileSystem {
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
+
+  private static final Path ROOT =
+      new Path(OZONE_URI_DELIMITER);
+
+  private static final Path TRASH_ROOT =
+      new Path(ROOT, TRASH_PREFIX);
+
+  private static final PathFilter EXCLUDE_TRASH =
+      p -> !p.toString().startsWith(TRASH_ROOT.toString());
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -630,7 +640,7 @@ public class TestOzoneFileSystem {
     if (!enabledFileSystemPaths) {
       GenericTestUtils.waitFor(() -> {
         try {
-          return fs.listStatus(parent).length != 0;
+          return fs.listStatus(parent, EXCLUDE_TRASH).length != 0;
         } catch (IOException e) {
           LOG.error("listStatus() Failed", e);
           Assert.fail("listStatus() Failed");
@@ -639,7 +649,7 @@ public class TestOzoneFileSystem {
       }, 1000, 120000);
     }
 
-    FileStatus[] fileStatuses = fs.listStatus(parent);
+    FileStatus[] fileStatuses = fs.listStatus(parent, EXCLUDE_TRASH);
 
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.length);
