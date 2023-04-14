@@ -200,11 +200,6 @@ public final class SCMContainerPlacementRackAware
       // are on different racks.
       for (int i = 0; i < excludedNodesCount; i++) {
         for (int j = i + 1; j < excludedNodesCount; j++) {
-          if (excludedNodes.get(j).isDecomissioned()) {
-            // Node is decommissioned,
-            // Skip this node for considering in rack aware placement
-            continue;
-          }
           if (networkTopology.isSameParent(
               excludedNodes.get(i), excludedNodes.get(j))) {
             // choose remaining nodes on different racks

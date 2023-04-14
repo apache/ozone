@@ -1273,7 +1273,6 @@ public class LegacyReplicationManager {
         // maintenance nodes, as the replicas will remain present in the
         // container manager, even when they go dead.
         .filter(r -> getNodeStatus(r.getDatanodeDetails()).isHealthy()
-            && !r.getDatanodeDetails().isDecomissioned()
             && !deletionInFlight.contains(r.getDatanodeDetails())
             && (validReplicaStateSet.isEmpty() ||
               validReplicaStateSet.contains(r.getState())))
@@ -2190,6 +2189,7 @@ public class LegacyReplicationManager {
         final long dataSizeRequired = Math.max(container.getUsedBytes(),
             currentContainerSize);
         final List<DatanodeDetails> excludeList = replicas.stream()
+                .filter(r -> !r.getDatanodeDetails().isDecomissioned())
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         excludeList.addAll(replicationInFlight);

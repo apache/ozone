@@ -216,6 +216,7 @@ public class RatisUnderReplicationHandler
     // DNs that already have replicas cannot be targets and should be excluded
     final List<DatanodeDetails> excludeList =
         replicaCount.getReplicas().stream()
+            .filter(r -> !r.getDatanodeDetails().isDecomissioned())
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
 

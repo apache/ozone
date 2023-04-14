@@ -52,7 +52,6 @@ import org.mockito.Mockito;
 import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -588,66 +587,5 @@ public class TestSCMContainerPlacementRackAware {
       }
       dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
     }
-  }
-
-  @Test
-  public void testDecommissionedNodeNotSelectedForRackPlacement()
-          throws SCMException {
-    int datanodeCount = 12;
-    setup(datanodeCount);
-    int nodeNum = 1;
-    List<DatanodeDetails> excludedNodes = new ArrayList<>();
-
-    // 3 replicas, two DNs on one rack third on different rack
-    // Node 0,1 on rack0
-    // Node 5 on rack1
-    excludedNodes.add(datanodes.get(0));
-    excludedNodes.add(datanodes.get(1));
-    excludedNodes.add(datanodes.get(5));
-
-    // Node1 is decommissioned.
-    dnInfos.get(1).setPersistedOpState(DECOMMISSIONED);
-
-    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
-            excludedNodes, null, nodeNum, 0, 15);
-    Assertions.assertEquals(nodeNum, datanodeDetails.size());
-
-    // Policy should return node in same rack as either DN1 or DN5
-    // Which is rack0 or rack1
-    Assertions.assertTrue(cluster.isSameParent(
-            datanodeDetails.get(0), excludedNodes.get(0)) ||
-            cluster.isSameParent(datanodeDetails.get(0), excludedNodes.get(2)));
-
-    excludedNodes.clear();
-    excludedNodes.add(datanodes.get(0));
-    excludedNodes.add(datanodes.get(1));
-    excludedNodes.add(datanodes.get(5));
-
-    dnInfos.get(1).setPersistedOpState(IN_SERVICE);
-    // Node5 is decommissioned.
-    dnInfos.get(5).setPersistedOpState(DECOMMISSIONED);
-
-    datanodeDetails = policy.chooseDatanodes(
-            excludedNodes, null, nodeNum, 0, 15);
-    Assertions.assertEquals(nodeNum, datanodeDetails.size());
-
-    // Policy should return node in different rack than rack0
-    // which already has 2 replica
-    Assertions.assertFalse(cluster.isSameParent(
-        datanodeDetails.get(0), excludedNodes.get(0)));
-
-    excludedNodes.clear();
-    excludedNodes.add(datanodes.get(0));
-    excludedNodes.add(datanodes.get(1));
-    excludedNodes.add(datanodes.get(5));
-
-    dnInfos.get(1).setPersistedOpState(IN_SERVICE);
-    // Node5 is decommissioned.
-    dnInfos.get(5).setPersistedOpState(DECOMMISSIONED);
-
-    datanodeDetails = policy.chooseDatanodes(
-            excludedNodes, null, nodeNum, 0, 15);
-    Assertions.assertEquals(nodeNum, datanodeDetails.size());
-
   }
 }
