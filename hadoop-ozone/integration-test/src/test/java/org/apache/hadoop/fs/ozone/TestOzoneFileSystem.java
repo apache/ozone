@@ -120,7 +120,7 @@ public class TestOzoneFileSystem {
       new Path(ROOT, TRASH_PREFIX);
 
   private static final PathFilter EXCLUDE_TRASH =
-      p -> !p.toString().startsWith(TRASH_ROOT.toString());
+      p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
