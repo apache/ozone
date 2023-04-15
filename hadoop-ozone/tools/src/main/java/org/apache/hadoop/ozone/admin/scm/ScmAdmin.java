@@ -40,7 +40,7 @@ import picocli.CommandLine.Spec;
         FinalizationScmStatusSubcommand.class,
         TransferScmLeaderSubCommand.class,
         DeletedBlocksTxnCommands.class,
-        ScmDecommissionSubcommand.class
+        DecommissionScmSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ScmAdmin extends GenericCli implements SubcommandWithParent {

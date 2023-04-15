@@ -31,21 +31,25 @@ import java.io.IOException;
  * Handler of ozone admin scm decommission command.
  */
 @CommandLine.Command(
-    name = "decommissionScm",
+    name = "decommission",
     description = "Decommission SCM <scmid>.  Includes removing from ratis "
     + "ring and removing its certificate from certStore",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 
 
-public class ScmDecommissionSubcommand extends ScmSubcommand {
+public class DecommissionScmSubcommand extends ScmSubcommand {
   @CommandLine.ParentCommand
   private ScmAdmin parent;
 
-  @CommandLine.Parameters(description = "clusterId")
+  @CommandLine.Option(names = {"-clusterid", "--clusterid"},
+      description = "ClusterID of the SCM cluster to decommission node from.",
+      required = true)
   private String clusterId;
 
-  @CommandLine.Parameters(description = "nodeId")
+  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
+      description = "NodeID of the SCM to be decommissioned.",
+      required = true)
   private String nodeId;
 
   @Override
