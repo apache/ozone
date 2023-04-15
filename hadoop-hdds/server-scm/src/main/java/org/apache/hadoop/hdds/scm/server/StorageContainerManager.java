@@ -149,6 +149,8 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.lease.LeaseManager;
+import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
@@ -236,6 +238,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private WritableContainerFactory writableContainerFactory;
   private FinalizationManager finalizationManager;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private LeaseManager<Object> leaseManager;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -423,9 +426,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
 
   private void initializeEventHandlers() {
+    long timeDuration = configuration.getTimeDuration(
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+            .getDuration(), TimeUnit.MILLISECONDS);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            leaseManager, timeDuration);
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
     PipelineReportHandler pipelineReportHandler =
@@ -613,6 +621,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager = configurator.getSCMHAManager();
     } else {
       scmHAManager = new SCMHAManagerImpl(conf, this);
+    }
+
+    if (configurator.getLeaseManager() != null) {
+      leaseManager = configurator.getLeaseManager();
+    } else {
+      long timeDuration = conf.getTimeDuration(
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+              .getDuration(), TimeUnit.MILLISECONDS);
+      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
@@ -1483,6 +1501,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmBlockManager.start();
+    leaseManager.start();
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
@@ -1653,6 +1672,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
+    try {
+      leaseManager.shutdown();
+    } catch (LeaseManagerNotRunningException ex) {
+      LOG.debug("Lease manager not running, ignore");
+    }
     RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     if (scmCertificateClient != null) {

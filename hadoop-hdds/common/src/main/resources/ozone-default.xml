@@ -3338,6 +3338,13 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
+  <property>
+    <name>ozone.scm.close.container.wait.duration</name>
+    <value>150s</value>
+    <tag>SCM, OZONE, RECON</tag>
+    <description>Wait duration before which close container
+      is send to DN.</description>
+  </property>
 
 
   <property>

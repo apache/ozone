@@ -630,6 +630,12 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT = "1024MB";
 
+  public static final TimeDuration
+      OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT =
+      TimeDuration.valueOf(150, TimeUnit.SECONDS);
+  public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
+      "ozone.scm.close.container.wait.duration";
+  
   /**
    * There is no need to instantiate this class.
    */
