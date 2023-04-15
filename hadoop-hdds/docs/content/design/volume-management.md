@@ -125,10 +125,11 @@ Note: Sanjay is added to the authors as the original proposal of this approach.
  * `bucket link` operation creates a link bucket.  Links are like regular buckets, stored in DB the same way, but with two new, optional pieces of information: source volume and bucket.  (The bucket being referenced by the link is called "source", not "target", to follow symlink terminology.)
  * Link buckets share the namespace with regular buckets.  If a bucket or link with the same name already exists, a `BUCKET_ALREADY_EXISTS` result is returned.
  * Link buckets are not inherently specific to a user, access is restricted only by ACL.
+ * Link buckets themselves do not store ACLs. All ACLs operations (eg. addacl/getacl/setacl/removeacl) and checks on the link bucket will be applied to the source bucket.
  * Links are persistent, ie. they can be used until they are deleted.
  * Existing bucket operations (info, delete, ACL) work on the link object in the same way as they do on regular buckets.  No new link-specific RPC is required.
  * Links are followed for key operations (list, get, put, etc.).  Read permission on the link is required for this.
- * Checks for existence of the source bucket, as well as ACL, are performed only when following the link (similar to symlinks).  Source bucket is not checked when operating on the link bucket itself (eg. deleting it).  This avoids the need for reverse checks for each bucket delete or ACL change.
+ * Checks for existence of the source bucket are performed only when following the link (similar to symlinks).  Source bucket ACL is checked when deleting operating on the link bucket itself (Source bucket is not deleted).
  * Bucket links are generic, not restricted to the `s3v` volume.
 
 ## Alternative approaches and reasons to reject
