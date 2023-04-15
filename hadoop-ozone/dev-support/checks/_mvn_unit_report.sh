@@ -34,10 +34,12 @@ find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
     | awk -F/ '{sub("'"TEST-"'",""); sub(".xml",""); print $NF}' \
     > "${tempfile}"
 
-find "." -not -path '*/iteration*' -name '*-output.txt' -print0 \
-    | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
-    | awk -F/ '{sub("-output.txt",""); print $NF}' \
-    >> "${tempfile}"
+if [[ "${CHECK:-unit}" == "integration" ]]; then
+  find "." -not -path '*/iteration*' -name '*-output.txt' -print0 \
+      | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
+      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      >> "${tempfile}"
+fi
 
 #Copy heap dump and dump leftovers
 find "." -not -path '*/iteration*' \
