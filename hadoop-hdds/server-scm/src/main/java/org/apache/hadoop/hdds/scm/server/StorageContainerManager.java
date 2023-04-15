@@ -818,7 +818,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmCertificateServer = new DefaultCAServer(subject,
           scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          certificateStore, new DefaultProfile(),
+          certificateStore, new DefaultCAProfile(),
           scmCertificateClient.getComponentName());
       // INTERMEDIARY_CA which issues certs to DN and OM.
       scmCertificateServer.init(new SecurityConfig(configuration),
@@ -854,8 +854,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
-        scmCertificateClient != null ?
-            scmCertificateClient.getCACertificate() : null, this);
+        scmCertificateClient == null ? null :
+            scmCertificateClient.getRootCACertificate() != null ?
+            scmCertificateClient.getRootCACertificate() :
+            scmCertificateClient.getCACertificate(), this);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
@@ -904,7 +906,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public void setScmCertificateClient(CertificateClient client) {
+  public void setScmCertificateClient(CertificateClient client)
+      throws IOException {
+    if (scmCertificateClient != null) {
+      scmCertificateClient.close();
+    }
     scmCertificateClient = client;
   }
 
@@ -1099,6 +1105,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
+
+    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
+
     final String persistedClusterId = scmStorageConfig.getClusterID();
     StorageState state = scmStorageConfig.getState();
     if (state == StorageState.INITIALIZED && conf
@@ -1115,7 +1124,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       return true;
     }
 
-    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
     OzoneConfiguration config =
@@ -1646,6 +1654,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmSafeModeManager.stop();
     serviceManager.stop();
     RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
+
+    if (scmCertificateClient != null) {
+      try {
+        scmCertificateClient.close();
+      } catch (IOException ioe) {
+        LOG.error("Closing certificate client failed", ioe);
+      }
+    }
 
     try {
       LOG.info("Stopping SCM MetadataStore.");

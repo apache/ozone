@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -41,6 +42,7 @@ import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -285,9 +287,7 @@ public final class ReplicationTestUtil {
           throw new SCMException("Insufficient Nodes available to choose",
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
         }
-        List<DatanodeDetails> dns = new ArrayList<>();
-        dns.add(nodeToReturn);
-        return dns;
+        return Collections.singletonList(nodeToReturn);
       }
 
       @Override
@@ -309,6 +309,37 @@ public final class ReplicationTestUtil {
               throws SCMException {
         throw new SCMException("No nodes available",
                 FAILED_TO_FIND_SUITABLE_NODE);
+      }
+
+      @Override
+      public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
+        return null;
+      }
+    };
+  }
+
+  /**
+   * Placement policy that throws an exception when the number of requested
+   * nodes is greater or equal to throwWhenThisOrMoreNodesRequested, otherwise
+   * returns a random node.
+   */
+  public static PlacementPolicy getInsufficientNodesTestPlacementPolicy(
+      final NodeManager nodeManager, final OzoneConfiguration conf,
+      int throwWhenThisOrMoreNodesRequested) {
+    return new SCMCommonPlacementPolicy(nodeManager, conf) {
+      @Override
+      protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, int nodesRequiredToChoose,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
+        if (nodesRequiredToChoose >= throwWhenThisOrMoreNodesRequested) {
+          throw new SCMException("No nodes available",
+              FAILED_TO_FIND_SUITABLE_NODE);
+        }
+        return Collections
+            .singletonList(MockDatanodeDetails.randomDatanodeDetails());
       }
 
       @Override
@@ -342,6 +373,27 @@ public final class ReplicationTestUtil {
     }).when(mock).sendThrottledReplicationCommand(
         Mockito.any(ContainerInfo.class), Mockito.anyList(),
         Mockito.any(DatanodeDetails.class), anyInt());
+  }
+
+  /**
+   * Given a Mockito mock of ReplicationManager, this method will mock the
+   * SendThrottledReconstructionCommand method so that it adds the command
+   * created to the commandsSent set.
+   * @param mock Mock of ReplicationManager
+   * @param commandsSent Set to add the command to rather than sending it.
+   * @throws NotLeaderException
+   * @throws CommandTargetOverloadedException
+   */
+  public static void mockSendThrottledReconstructionCommand(
+      ReplicationManager mock,
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      throws NotLeaderException, CommandTargetOverloadedException {
+    doAnswer((Answer<Void>) invocationOnMock -> {
+      ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
+      commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
+      return null;
+    }).when(mock).sendThrottledReconstructionCommand(
+        Mockito.any(ContainerInfo.class), Mockito.any());
   }
 
   /**

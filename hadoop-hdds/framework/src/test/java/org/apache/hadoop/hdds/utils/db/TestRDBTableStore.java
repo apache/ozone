@@ -51,6 +51,7 @@ import org.rocksdb.StatsLevel;
  * Tests for RocksDBTable Store.
  */
 public class TestRDBTableStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -113,7 +114,8 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
   @AfterEach

@@ -92,36 +92,37 @@ public final class HASecurityUtils {
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
 
-    CertificateClient certClient =
+    try (CertificateClient certClient =
         new SCMCertificateClient(
-            new SecurityConfig(conf), scmStorageConfig.getScmId());
-    InitResponse response = certClient.init();
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful.");
-      break;
-    case GETCERT:
-      if (!primaryscm) {
-        getRootCASignedSCMCert(certClient, conf, scmStorageConfig,
-            scmAddress);
-      } else {
-        getPrimarySCMSelfSignedCert(certClient, conf, scmStorageConfig,
-            scmAddress);
+            new SecurityConfig(conf), scmStorageConfig.getScmId())) {
+      InitResponse response = certClient.init();
+      LOG.info("Init response: {}", response);
+      switch (response) {
+      case SUCCESS:
+        LOG.info("Initialization successful.");
+        break;
+      case GETCERT:
+        if (!primaryscm) {
+          getRootCASignedSCMCert(certClient, conf, scmStorageConfig,
+              scmAddress);
+        } else {
+          getPrimarySCMSelfSignedCert(certClient, conf, scmStorageConfig,
+              scmAddress);
+        }
+        LOG.info("Successfully stored SCM signed certificate.");
+        break;
+      case FAILURE:
+        LOG.error("SCM security initialization failed.");
+        throw new RuntimeException("OM security initialization failed.");
+      case RECOVER:
+        LOG.error("SCM security initialization failed. SCM certificate is " +
+            "missing.");
+        throw new RuntimeException("SCM security initialization failed.");
+      default:
+        LOG.error("SCM security initialization failed. Init response: {}",
+            response);
+        throw new RuntimeException("SCM security initialization failed.");
       }
-      LOG.info("Successfully stored SCM signed certificate.");
-      break;
-    case FAILURE:
-      LOG.error("SCM security initialization failed.");
-      throw new RuntimeException("OM security initialization failed.");
-    case RECOVER:
-      LOG.error("SCM security initialization failed. SCM certificate is " +
-          "missing.");
-      throw new RuntimeException("SCM security initialization failed.");
-    default:
-      LOG.error("SCM security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("SCM security initialization failed.");
     }
   }
 

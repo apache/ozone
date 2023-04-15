@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -68,6 +69,8 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
@@ -296,6 +299,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
+        HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+        if (policy.isHttpEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
+                  httpServer.getHttpAddress().getPort()));
+        }
+        if (policy.isHttpsEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
+                  httpServer.getHttpsAddress().getPort()));
+        }
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
@@ -355,6 +367,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      certClient.close();
       LOG.info("Re-initialize certificate client.");
       certClient = new DNCertificateClient(secConf, datanodeDetails, null,
           this::saveNewCertId, this::terminateDatanode);
@@ -440,7 +453,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
 
   /**
@@ -582,7 +595,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
   }
 

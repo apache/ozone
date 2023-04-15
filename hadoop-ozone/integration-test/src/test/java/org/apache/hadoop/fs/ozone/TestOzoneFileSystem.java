@@ -87,7 +87,10 @@ import java.util.TreeSet;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
+import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -1744,5 +1747,12 @@ public class TestOzoneFileSystem {
       paths.remove(pathname);
     }
     Assert.assertTrue("ListStatus failed:" + paths, paths.isEmpty());
+  }
+
+  @Test
+  public void testFileSystemDeclaresCapability() throws Throwable {
+    Path root = new Path(OZONE_URI_DELIMITER);
+    assertHasPathCapabilities(fs, root, FS_ACLS);
+    assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
   }
 }

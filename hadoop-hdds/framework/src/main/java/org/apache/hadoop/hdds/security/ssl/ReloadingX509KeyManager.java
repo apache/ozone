@@ -33,8 +33,9 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.Principal;
 import java.security.PrivateKey;
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -64,7 +65,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    * materials are changed.
    */
   private PrivateKey currentPrivateKey;
-  private String currentCertId;
+  private List<String> currentCertIdsList = new ArrayList<>();
 
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
@@ -150,11 +151,14 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   private X509ExtendedKeyManager loadKeyManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     PrivateKey privateKey = caClient.getPrivateKey();
-    X509Certificate cert = caClient.getCertificate();
-    String certId = cert.getSerialNumber().toString();
-    // Security materials keep the same
-    if (currentCertId != null && currentPrivateKey != null &&
-        currentCertId.equals(certId) && currentPrivateKey.equals(privateKey)) {
+    List<X509Certificate> newCertList = caClient.getTrustChain();
+    if (currentPrivateKey != null && currentPrivateKey.equals(privateKey) &&
+        currentCertIdsList.size() > 0 &&
+        newCertList.size() == currentCertIdsList.size() &&
+        !newCertList.stream().filter(
+            c -> !currentCertIdsList.contains(c.getSerialNumber().toString()))
+            .findAny().isPresent()) {
+      // Security materials(key and certificates) keep the same.
       return null;
     }
 
@@ -163,7 +167,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     keystore.load(null, null);
 
     keystore.setKeyEntry(caClient.getComponentName() + "_key",
-        privateKey, EMPTY_PASSWORD, new Certificate[]{cert});
+        privateKey, EMPTY_PASSWORD,
+        newCertList.toArray(new X509Certificate[0]));
 
     KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
         KeyManagerFactory.getDefaultAlgorithm());
@@ -176,7 +181,10 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     }
 
     currentPrivateKey = privateKey;
-    currentCertId = cert.getSerialNumber().toString();
+    currentCertIdsList.clear();
+    for (X509Certificate cert: newCertList) {
+      currentCertIdsList.add(cert.getSerialNumber().toString());
+    }
     return keyManager;
   }
 }

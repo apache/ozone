@@ -71,7 +71,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.NOT_A_PRIMARY_SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 
 /**
@@ -191,28 +190,18 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
-    String primaryScmId =
-        storageContainerManager.getScmStorageConfig().getPrimaryScmNodeId();
-
-    if (primaryScmId != null &&
-        primaryScmId.equals(storageContainerManager.getScmId())) {
-      LOGGER.info("Processing CSR for scm {}, nodeId: {}",
-          scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
-
-      // Check clusterID
-      if (!storageContainerManager.getClusterId().equals(
-          scmNodeDetails.getClusterId())) {
-        throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
-            scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
-            + storageContainerManager.getClusterId());
-      }
-
-      return getEncodedCertToString(certSignReq, NodeType.SCM);
-    } else {
-      throw new SCMSecurityException("Get SCM Certificate can be run only " +
-          "primary SCM", NOT_A_PRIMARY_SCM);
+    // Check clusterID
+    if (!storageContainerManager.getClusterId().equals(
+        scmNodeDetails.getClusterId())) {
+      throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
+          scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
+          + storageContainerManager.getClusterId());
     }
 
+    LOGGER.info("Processing CSR for scm {}, nodeId: {}",
+        scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
+
+    return getEncodedCertToString(certSignReq, NodeType.SCM);
   }
 
   /**
@@ -225,9 +214,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private String getEncodedCertToString(String certSignReq, NodeType nodeType)
       throws IOException {
     Future<CertPath> future;
-    if (nodeType == NodeType.SCM) {
+    if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(certSignReq,
-              KERBEROS_TRUSTED, nodeType);
+          KERBEROS_TRUSTED, nodeType);
     } else {
       future = scmCertificateServer.requestCertificate(certSignReq,
           KERBEROS_TRUSTED, nodeType);

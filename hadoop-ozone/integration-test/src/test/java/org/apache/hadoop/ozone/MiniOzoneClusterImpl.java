@@ -492,7 +492,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   @Override
   public void startHddsDatanodes() {
     hddsDatanodes.forEach((datanode) -> {
-      datanode.setCertificateClient(getCAClient());
+      try {
+        datanode.setCertificateClient(getCAClient());
+      } catch (IOException e) {
+        LOG.error("Exception while setting certificate client to DataNode.", e);
+      }
       datanode.start();
     });
   }
