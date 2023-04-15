@@ -709,7 +709,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Stop metadata manager.
    */
   @Override
-  public void stop() throws Exception {
+  public void stop() throws IOException {
     if (store != null) {
       store.close();
       store = null;
