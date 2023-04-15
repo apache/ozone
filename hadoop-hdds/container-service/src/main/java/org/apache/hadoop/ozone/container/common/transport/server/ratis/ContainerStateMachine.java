@@ -541,7 +541,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         }
         raftFuture.complete(r::toByteString);
         metrics.recordWriteStateMachineCompletion(
-            Time.monotonicNowNanos() - startTime);
+            Time.monotonicNow() - startTime);
       }
 
       writeChunkFutureMap.remove(entryIndex);
@@ -621,7 +621,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public CompletableFuture<Message> write(LogEntryProto entry) {
     try {
       metrics.incNumWriteStateMachineOps();
-      long writeStateMachineStartTime = Time.monotonicNowNanos();
+      long writeStateMachineStartTime = Time.monotonicNow();
       ContainerCommandRequestProto requestProto =
           getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
@@ -878,7 +878,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
               .setLogIndex(index);
 
-      long applyTxnStartTime = Time.monotonicNowNanos();
+      long applyTxnStartTime = Time.monotonicNow();
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
@@ -967,7 +967,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         }
         applyTransactionSemaphore.release();
         metrics.recordApplyTransactionCompletion(
-            Time.monotonicNowNanos() - applyTxnStartTime);
+            Time.monotonicNow() - applyTxnStartTime);
       });
       return applyTransactionFuture;
     } catch (InterruptedException e) {
