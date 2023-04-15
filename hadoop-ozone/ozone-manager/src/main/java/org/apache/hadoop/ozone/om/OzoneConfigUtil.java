@@ -29,7 +29,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collection;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SUPER_READ_USERNAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SUPER_READ_GROUPS;
 
 /**
  * Utility class for ozone configurations.

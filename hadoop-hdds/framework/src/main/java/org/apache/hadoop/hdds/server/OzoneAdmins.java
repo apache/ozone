@@ -43,14 +43,6 @@ public class OzoneAdmins {
    * Ozone super user / admin group list.
    */
   private final Set<String> adminGroups;
-  /**
-   * Ozone super only read user / admin username list.
-   */
-  private final Set<String> superReadUsernames;
-  /**
-   * Ozone super only read user / admin group list.
-   */
-  private final Set<String> superReadGroups;
 
   public OzoneAdmins(Collection<String> adminUsernames) {
     this(adminUsernames, null);
@@ -58,32 +50,14 @@ public class OzoneAdmins {
 
   public OzoneAdmins(Collection<String> adminUsernames,
       Collection<String> adminGroups) {
-    this(adminUsernames, adminGroups, null, null);
-  }
-
-  public OzoneAdmins(Collection<String> adminUsernames,
-       Collection<String> adminGroups,
-       Collection<String> superReadUsernames,
-       Collection<String> superReadGroups) {
     setAdminUsernames(adminUsernames);
     this.adminGroups = adminGroups != null ?
         Collections.unmodifiableSet(new LinkedHashSet<>(adminGroups)) :
-        Collections.emptySet();
-    this.superReadUsernames = superReadUsernames != null ?
-        Collections.unmodifiableSet(new LinkedHashSet<>(superReadUsernames)) :
-        Collections.emptySet();
-    this.superReadGroups = superReadGroups != null ?
-        Collections.unmodifiableSet(new LinkedHashSet<>(superReadGroups)) :
         Collections.emptySet();
   }
 
   private boolean hasAdminGroup(Collection<String> userGroups) {
     return !Sets.intersection(adminGroups,
-        new LinkedHashSet<>(userGroups)).isEmpty();
-  }
-
-  private boolean hasSuperReadGroup(Collection<String> userGroups) {
-    return !Sets.intersection(superReadGroups,
         new LinkedHashSet<>(userGroups)).isEmpty();
   }
 
@@ -100,12 +74,6 @@ public class OzoneAdmins {
         || hasAdminGroup(user.getGroups());
   }
 
-  public boolean isSuperRead(UserGroupInformation user) {
-    return superReadUsernames.contains(user.getShortUserName())
-        || superReadUsernames.contains(user.getUserName())
-        || hasSuperReadGroup(user.getGroups());
-  }
-
   public Collection<String> getAdminGroups() {
     return adminGroups;
   }
@@ -118,13 +86,5 @@ public class OzoneAdmins {
     this.adminUsernames = adminUsernames != null ?
         Collections.unmodifiableSet(new LinkedHashSet<>(adminUsernames)) :
         Collections.emptySet();
-  }
-
-  public Collection<String> getSuperReadGroups() {
-    return superReadGroups;
-  }
-
-  public Set<String> getSuperReadUsernames() {
-    return superReadUsernames;
   }
 }
