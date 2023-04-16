@@ -135,7 +135,8 @@ public class TestOzoneAdministrators {
           "read operations", nativeAuthorizer.checkAccess(obj, context));
     } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
       Assert.assertFalse("mismatching super read groups are allowed to " +
-          "preform read operations", nativeAuthorizer.checkAccess(obj, context));
+          "preform read operations",
+              nativeAuthorizer.checkAccess(obj, context));
     }
 
     nativeAuthorizer.setOzoneSuperReadAdmins(new OzoneAdmins(

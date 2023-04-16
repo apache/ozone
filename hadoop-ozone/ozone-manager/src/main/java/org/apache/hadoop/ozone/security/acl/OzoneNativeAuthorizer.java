@@ -201,8 +201,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.ozAdmins = ozoneAdmins;
   }
 
-  public void setOzoneSuperReadAdmins(OzoneAdmins ozSuperReadAdmins) {
-    this.ozSuperReadAdmins = ozSuperReadAdmins;
+  public void setOzoneSuperReadAdmins(OzoneAdmins ozoneSuperReadAdmins) {
+    this.ozSuperReadAdmins = ozoneSuperReadAdmins;
   }
 
   public OzoneAdmins getOzoneAdmins() {
