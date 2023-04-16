@@ -72,6 +72,13 @@ public class ManagedSstFileReader {
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws RocksDBException {
+            if (this.options == null) {
+              this.options = new ManagedOptions();
+            }
+
+            if (this.readOptions == null) {
+              this.readOptions = new ManagedReadOptions();
+            }
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
@@ -97,11 +104,14 @@ public class ManagedSstFileReader {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
-          private ManagedOptions options = new ManagedOptions();
+          private ManagedOptions options;
 
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
+            if (this.options == null) {
+              this.options = new ManagedOptions();
+            }
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
               @Override
