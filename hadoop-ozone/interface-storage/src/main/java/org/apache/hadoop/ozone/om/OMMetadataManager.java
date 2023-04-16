@@ -467,6 +467,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzoneDeletePathKey(long objectId, String pathKey);
 
   /**
+   * Given ozone delete path key return the corresponding
+   * DB path key for directory table.
+   *
+   * @param ozoneDeletePath - ozone delete path
+   * @return DB directory key as String.
+   */
+  String getOzoneDeletePathDirKey(String ozoneDeletePath);
+
+  /**
    * Returns DB key name of an open file in OM metadata store. Should be
    * #open# prefix followed by actual leaf node name.
    *
