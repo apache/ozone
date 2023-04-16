@@ -66,19 +66,18 @@ public class ManagedSstFileReader {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
-          private ManagedOptions options = new ManagedOptions();
-          private ReadOptions readOptions = new ManagedReadOptions();
+          private ManagedOptions options;
+          private ReadOptions readOptions;
+
+          @Override
+          protected void init() {
+            this.options = new ManagedOptions();
+            this.readOptions = new ManagedReadOptions();
+          }
 
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws RocksDBException {
-            if (this.options == null) {
-              this.options = new ManagedOptions();
-            }
-
-            if (this.readOptions == null) {
-              this.readOptions = new ManagedReadOptions();
-            }
             return new ManagedSstFileIterator(file, options, readOptions) {
               @Override
               protected String getIteratorValue(
@@ -107,11 +106,13 @@ public class ManagedSstFileReader {
           private ManagedOptions options;
 
           @Override
+          protected void init() {
+            this.options = new ManagedOptions();
+          }
+
+          @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
-            if (this.options == null) {
-              this.options = new ManagedOptions();
-            }
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
               @Override
@@ -177,8 +178,11 @@ public class ManagedSstFileReader {
         throws IOException, RocksDBException,
         NativeLibraryNotLoadedException {
       this.fileNameIterator = files.iterator();
+      init();
       moveToNextFile();
     }
+
+    protected abstract void init();
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file)
         throws RocksDBException, NativeLibraryNotLoadedException,
