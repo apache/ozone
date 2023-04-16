@@ -4035,7 +4035,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return OzoneAdmins
+   * Return OzoneAdmins.
    */
   public OzoneAdmins getOmAdmins() {
     return omAdmins;

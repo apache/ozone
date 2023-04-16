@@ -102,14 +102,14 @@ public class TestOzoneAdministrators {
         Collections.singletonList("testuser"), null));
     if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
       Assert.assertTrue("matching super read user are allowed to preform" +
-        "read operations", nativeAuthorizer.checkAccess(obj, context));
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
     } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
       Assert.assertFalse("mismatching super read user are allowed to preform" +
-        "read operations", nativeAuthorizer.checkAccess(obj, context));
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
     }
 
     nativeAuthorizer.setOzoneSuperReadAdmins(new OzoneAdmins(
-      Collections.singletonList("testuser1"), null));
+        Collections.singletonList("testuser1"), null));
     Assert.assertFalse("mismatching super read user are allowed to preform" +
         "read operations", nativeAuthorizer.checkAccess(obj, context));
   }
@@ -134,8 +134,8 @@ public class TestOzoneAdministrators {
       Assert.assertTrue("matching super read groups are allowed to preform" +
           "read operations", nativeAuthorizer.checkAccess(obj, context));
     } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
-      Assert.assertFalse("mismatching super read groups are allowed to preform" +
-          "read operations", nativeAuthorizer.checkAccess(obj, context));
+      Assert.assertFalse("mismatching super read groups are allowed to " +
+          "preform read operations", nativeAuthorizer.checkAccess(obj, context));
     }
 
     nativeAuthorizer.setOzoneSuperReadAdmins(new OzoneAdmins(
