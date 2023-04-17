@@ -217,7 +217,51 @@ public class OMDBInsightEndpoint {
     return Response.ok(openKeyInsightInfo).build();
   }
 
-  /** This method retrieves set of keys/files/dirs pending for deletion. */
+  /** This method retrieves set of keys/files/dirs pending for deletion.
+   * Sample API Response:
+   * {
+   *   "replicatedTotal": -1530804718628866300,
+   *   "unreplicatedTotal": -1530804718628866300,
+   *   "deletedkeyinfo": [
+   *     {
+   *       "omKeyInfoList": [
+   *         {
+   *           "metadata": {},
+   *           "objectID": 0,
+   *           "updateID": 0,
+   *           "parentObjectID": 0,
+   *           "volumeName": "sampleVol",
+   *           "bucketName": "bucketOne",
+   *           "keyName": "key_one",
+   *           "dataSize": -1530804718628866300,
+   *           "keyLocationVersions": [],
+   *           "creationTime": 0,
+   *           "modificationTime": 0,
+   *           "replicationConfig": {
+   *             "replicationFactor": "ONE",
+   *             "requiredNodes": 1,
+   *             "replicationType": "STANDALONE"
+   *           },
+   *           "fileChecksum": null,
+   *           "fileName": "key_one",
+   *           "acls": [],
+   *           "path": "0/key_one",
+   *           "file": false,
+   *           "latestVersionLocations": null,
+   *           "replicatedSize": -1530804718628866300,
+   *           "fileEncryptionInfo": null,
+   *           "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne',
+   *           key='key_one', dataSize='-1530804718628866186', creationTime='0',
+   *           objectID='0', parentID='0', replication='STANDALONE/ONE',
+   *           fileChecksum='null}",
+   *           "updateIDset": false
+   *         }
+   *       ]
+   *     }
+   *   ],
+   *   "status": "OK"
+   * }
+   */
   @GET
   @Path("/keys/deletePending")
   public Response getDeletedKeyInfo(
