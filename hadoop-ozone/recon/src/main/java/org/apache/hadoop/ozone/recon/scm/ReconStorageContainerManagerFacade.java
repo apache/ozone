@@ -115,7 +115,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.jooq.DSLContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,14 +230,13 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy, reconTaskConfig);
 
-    ContainerSizeCountTask containerSizeCountTask = new ContainerSizeCountTask(
+    ContainerSizeCountTask containerSizeCountTask = new c(
         containerManager,
         scmServiceProvider,
         reconTaskStatusDao,
         reconTaskConfig,
         containerCountBySizeDao,
-        dslContext);
-
+        utilizationSchemaDefinition);
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
             conf, pipelineSyncTask);
