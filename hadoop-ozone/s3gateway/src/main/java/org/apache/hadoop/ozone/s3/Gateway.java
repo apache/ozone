@@ -69,7 +69,7 @@ public class Gateway extends GenericCli {
     new Gateway().run(args);
   }
 
-  private void setHttpBaseDir(OzoneConfiguration ozoneConfiguration)
+  private void setHttpBaseDir()
       throws IOException {
     if (StringUtils.isEmpty(ozoneConfiguration.get(
         OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
