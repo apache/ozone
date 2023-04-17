@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -86,7 +87,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
@@ -191,17 +191,13 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
-        conf,
-        nodeManager,
+        conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-        eventQueue,
-        scmhaManager,
-        scmContext);
+        eventQueue, scmhaManager, scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         conf, Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
-        dbStore,
-        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore, ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
@@ -221,17 +217,12 @@ public class ReconStorageContainerManagerFacade
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig);
+        pipelineManager, nodeManager, scmServiceProvider,
+        reconTaskStatusDao, reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
-        containerManager,
-        scmServiceProvider,
+        containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig);
+        containerPlacementPolicy, reconTaskConfig);
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
@@ -248,7 +239,8 @@ public class ReconStorageContainerManagerFacade
             containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            null, 0);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
     // Use the same executor for both ICR and FCR.
@@ -426,11 +418,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
-    try {
-      dbStore.close();
-    } catch (Exception e) {
-      LOG.error("Can't close dbStore ", e);
-    }
+    IOUtils.close(LOG, dbStore);
   }
 
   @Override
@@ -604,8 +592,9 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
+      IOUtils.close(LOG, dbStore);
       deleteOldSCMDB();
-      setDbStore(newStore);
+      dbStore = newStore;
       File newDb = new File(dbFile.getParent() +
           OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
       boolean success = dbFile.renameTo(newDb);
@@ -634,10 +623,6 @@ public class ReconStorageContainerManagerFacade
           columnFamily.getValueCodec());
     }
     return dbStoreBuilder.build();
-  }
-
-  public void setDbStore(DBStore dbStore) {
-    this.dbStore = dbStore;
   }
 
   @Override

@@ -442,7 +442,6 @@ Apache License 2.0
    org.rocksdb:rocksdbjni
    org.springframework:spring-beans
    org.springframework:spring-core
-   org.springframework:spring-jcl
    org.springframework:spring-jdbc
    org.springframework:spring-tx
    org.xerial.snappy:snappy-java

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 
+import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMDBCheckpointServlet;
@@ -46,6 +47,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.Matchers;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -99,7 +102,9 @@ public class TestSCMDbCheckpointServlet {
   }
 
   @Test
-  public void testDoGet() throws ServletException, IOException {
+  public void testDoGet()
+      throws ServletException, IOException, CompressorException,
+      InterruptedException {
 
     File tempFile = null;
     try {
@@ -114,6 +119,8 @@ public class TestSCMDbCheckpointServlet {
           Collections.emptyList(),
           Collections.emptyList(),
           false);
+      doCallRealMethod().when(scmDbCheckpointServletMock)
+         .writeDbDataToStream(any(), any(), any());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);

@@ -870,7 +870,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.impl</name>
-    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -2761,7 +2761,7 @@
   </property>
   <property>
     <name>ozone.network.topology.aware.read</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       Whether to enable topology aware read to improve the read performance.
@@ -2857,6 +2857,18 @@
     <description>
       Recon each time get a limited delta updates from OM.
       The actual fetched data might be larger than this limit.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.delta.update.data.size.max.limit</name>
+    <value>1024MB</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Recon get a limited delta updates from OM periodically since sequence number.
+      Based on sequence number passed, OM DB delta update may have large number of
+      log files and each log batch data may be huge depending on frequent writes and
+      updates by ozone client, so to avoid increase in heap memory, this config is used
+      as limiting factor of default 1 GB while preparing DB updates object.
     </description>
   </property>
   <property>
@@ -3334,6 +3346,13 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
+  <property>
+    <name>ozone.scm.close.container.wait.duration</name>
+    <value>150s</value>
+    <tag>SCM, OZONE, RECON</tag>
+    <description>Wait duration before which close container
+      is send to DN.</description>
+  </property>
 
 
   <property>
@@ -3572,6 +3591,15 @@
     <tag>OZONE, DATANODE</tag>
     <description>
       To enable/disable filesystem write via ratis streaming.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.fs.hsync.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Enable hsync/hflush. By default they are disabled.
     </description>
   </property>
 

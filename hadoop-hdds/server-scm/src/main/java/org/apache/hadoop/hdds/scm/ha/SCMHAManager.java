@@ -28,7 +28,7 @@ import java.io.IOException;
 /**
  * SCMHAManager provides HA service for SCM.
  */
-public interface SCMHAManager {
+public interface SCMHAManager extends AutoCloseable {
 
   /**
    * Starts HA service.

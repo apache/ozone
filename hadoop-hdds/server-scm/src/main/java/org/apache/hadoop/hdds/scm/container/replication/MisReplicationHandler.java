@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -89,10 +90,9 @@ public abstract class MisReplicationHandler implements
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-                    + " any number of nodes. Number of required "
-                    + "Nodes %d, Datasize Required: %d",
-            containerPlacement.getClass(), requiredNodes, dataSizeRequired),
-            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+        + " any nodes. Number of required Nodes %d, Datasize Required: %d",
+        containerPlacement.getClass(), requiredNodes, dataSizeRequired),
+        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
   private Set<ContainerReplica> filterSources(Set<ContainerReplica> replicas) {
@@ -195,17 +195,23 @@ public abstract class MisReplicationHandler implements
     List<DatanodeDetails> excludedDns = replicasToBeReplicated.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
+    int requiredNodes = replicasToBeReplicated.size();
     List<DatanodeDetails> targetDatanodes = getTargetDatanodes(usedDns,
-           excludedDns, container, replicasToBeReplicated.size());
-    if (targetDatanodes.size() < replicasToBeReplicated.size()) {
+           excludedDns, container, requiredNodes);
+
+    int count = sendReplicateCommands(container, replicasToBeReplicated,
+        targetDatanodes);
+
+    int found = targetDatanodes.size();
+    if (found < requiredNodes) {
       LOG.warn("Placement Policy {} found only {} nodes for Container: {}," +
-               " number of required nodes: {}, usedNodes : {}",
-              containerPlacement.getClass(), targetDatanodes.size(),
-              container.getContainerID(), replicasToBeReplicated.size(),
-              usedDns);
+          " number of required nodes: {}, usedNodes : {}",
+          containerPlacement.getClass(), found,
+          container.getContainerID(), requiredNodes,
+          usedDns);
+      throw new InsufficientDatanodesException(requiredNodes, found);
     }
 
-    return sendReplicateCommands(container, replicasToBeReplicated,
-        targetDatanodes);
+    return count;
   }
 }

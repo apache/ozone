@@ -94,7 +94,6 @@ public class TestRocksDbPersistentList {
   @Test
   public void testRocksDBPersistentList() throws IOException, RocksDBException {
     ColumnFamilyHandle columnFamily = null;
-
     try {
       CodecRegistry codecRegistry = new CodecRegistry();
       codecRegistry.addCodec(Integer.class, new IntegerCodec());

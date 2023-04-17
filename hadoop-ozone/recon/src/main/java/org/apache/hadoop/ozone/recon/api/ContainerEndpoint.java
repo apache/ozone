@@ -62,8 +62,11 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -89,13 +92,21 @@ public class ContainerEndpoint {
 
   private final ReconContainerManager containerManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final OzoneStorageContainerManager reconSCM;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ContainerEndpoint.class);
+  private BucketLayout layout = BucketLayout.DEFAULT;
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-      ContainerHealthSchemaManager containerHealthSchemaManager) {
+               ContainerHealthSchemaManager containerHealthSchemaManager,
+               ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconSCM = reconSCM;
   }
 
   /**
@@ -165,16 +176,22 @@ public class ContainerEndpoint {
       Map<ContainerKeyPrefix, Integer> containerKeyPrefixMap =
           reconContainerMetadataManager.getKeyPrefixesForContainer(containerID,
               prevKeyPrefix);
-
       // Get set of Container-Key mappings for given containerId.
       for (ContainerKeyPrefix containerKeyPrefix : containerKeyPrefixMap
           .keySet()) {
 
-        // Directly calling get() on the Key table instead of iterating since
-        // only full keys are supported now. When we change to using a prefix
-        // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        // Directly calling getSkipCache() on the Key/FileTable table
+        // instead of iterating since only full keys are supported now. We will
+        // try to get the OmKeyInfo object by searching the KEY_TABLE table with
+        // the key prefix. If it's not found, we will then search the FILE_TABLE
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
             .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        if (omKeyInfo == null) {
+          omKeyInfo =
+              omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+                  .getSkipCache(containerKeyPrefix.getKeyPrefix());
+        }
+
         if (null != omKeyInfo) {
           // Filter keys by version.
           List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
