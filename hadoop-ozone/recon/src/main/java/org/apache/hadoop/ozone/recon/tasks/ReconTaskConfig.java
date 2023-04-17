@@ -88,8 +88,8 @@ public class ReconTaskConfig {
       type = ConfigType.TIME,
       defaultValue = "60s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
-      description = "The time interval of the periodic check for " +
-          "container size distribution in the cluster as reported "
+      description = "The time interval to wait between each runs of " +
+          "container count task."
   )
   private long containerSizeCountTaskInterval =
       Duration.ofMinutes(1).toMillis();

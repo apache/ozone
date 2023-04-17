@@ -41,7 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Class to test a process and reprocess methods of ContainerSizeCountTask.
+ * Class to test the process method of ContainerSizeCountTask.
  */
 public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 

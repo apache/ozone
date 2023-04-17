@@ -109,6 +109,12 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSetContainerCount = metaData.getColumns(null, null,
         CONTAINER_COUNT_BY_SIZE_TABLE_NAME, null);
 
+    List<Pair<String, Integer>> expectedPairsContainerCount = new ArrayList<>();
+    expectedPairsContainerCount.add(
+        new ImmutablePair<>("container_size", Types.BIGINT));
+    expectedPairsContainerCount.add(
+        new ImmutablePair<>("count", Types.BIGINT));
+
     List<Pair<String, Integer>> actualPairsContainerCount = new ArrayList<>();
     while (resultSetContainerCount.next()) {
       actualPairsContainerCount.add(
@@ -118,6 +124,8 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     }
     assertEquals(2, actualPairsContainerCount.size(),
         "Unexpected number of columns");
+    assertEquals(expectedPairsContainerCount, actualPairsContainerCount,
+        "Columns Do not Match ");
 
   }
 

@@ -81,8 +81,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * The run() method is the main loop of the ContainerSizeCountTask class.
    * It periodically retrieves a list of containers from the containerManager,
-   * and then calls either to reprocess() or process() method depending on
-   * whether the processedContainers map is empty or not.
+   * and then calls the process() function to update the containerSizeCountMap.
    */
   @Override
   protected synchronized void run() {
