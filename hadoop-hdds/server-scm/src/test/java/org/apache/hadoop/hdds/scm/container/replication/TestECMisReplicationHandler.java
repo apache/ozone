@@ -207,6 +207,6 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new ECMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
   }
 }

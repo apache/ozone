@@ -37,9 +37,8 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, ReplicationManager replicationManager,
-          boolean push) {
-    super(containerPlacement, conf, replicationManager, push);
+          ConfigurationSource conf, ReplicationManager replicationManager) {
+    super(containerPlacement, conf, replicationManager);
   }
 
   @Override

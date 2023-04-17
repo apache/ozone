@@ -57,18 +57,15 @@ public abstract class MisReplicationHandler implements
   private final PlacementPolicy<ContainerReplica> containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
-  private boolean push;
 
   public MisReplicationHandler(
           final PlacementPolicy<ContainerReplica> containerPlacement,
-          final ConfigurationSource conf, ReplicationManager replicationManager,
-      final boolean push) {
+          final ConfigurationSource conf, ReplicationManager replicationManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
-    this.push = push;
   }
 
   protected abstract ContainerReplicaCount getContainerReplicaCount(
@@ -118,7 +115,7 @@ public abstract class MisReplicationHandler implements
   protected abstract ReplicateContainerCommand updateReplicateCommand(
           ReplicateContainerCommand command, ContainerReplica replica);
 
-  private int sendReplicateCommands(
+  protected int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
       List<DatanodeDetails> targetDns)
@@ -132,7 +129,7 @@ public abstract class MisReplicationHandler implements
       long containerID = containerInfo.getContainerID();
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
-      if (push) {
+      if (replicationManager.getConfig().isPush()) {
         replicationManager.sendThrottledReplicationCommand(containerInfo,
             Collections.singletonList(source), target,
             replica.getReplicaIndex());

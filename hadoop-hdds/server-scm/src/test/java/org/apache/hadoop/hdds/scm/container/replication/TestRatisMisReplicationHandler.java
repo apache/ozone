@@ -194,6 +194,6 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new RatisMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
   }
 }
