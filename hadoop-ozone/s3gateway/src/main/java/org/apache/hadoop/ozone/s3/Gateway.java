@@ -69,6 +69,27 @@ public class Gateway extends GenericCli {
     new Gateway().run(args);
   }
 
+  private void setHttpBaseDir(OzoneConfiguration ozoneConfiguration)
+      throws IOException {
+    if (StringUtils.isEmpty(ozoneConfiguration.get(
+        OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
+      //Setting ozone.http.basedir if not set so that server setup doesn't
+      // fail.
+      Path tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+          "ozone_s3g_tmp_base_dir");
+      ShutdownHookManager.get().addShutdownHook(() -> {
+        try {
+          FileUtils.deleteDirectory(tmpMetaDir.toFile());
+        } catch (IOException e) {
+          LOG.error("Failed to cleanup temporary S3 Gateway Metadir {}",
+              tmpMetaDir.toFile().getAbsolutePath(), e);
+        }
+      }, 0);
+      ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+          tmpMetaDir.toFile().getAbsolutePath());
+    }
+  }
+
   @Override
   public Void call() throws Exception {
     ozoneConfiguration = createOzoneConfiguration();
@@ -76,25 +97,7 @@ public class Gateway extends GenericCli {
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     UserGroupInformation.setConfiguration(ozoneConfiguration);
     loginS3GUser(ozoneConfiguration);
-
-    if (StringUtils.isEmpty(ozoneConfiguration.get(
-            OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
-      //Setting ozone.metadata.dirs if not set so that server setup doesn't
-      // fail.
-      Path tmpMetaDir = Files.createTempDirectory(Paths.get(""),
-              "ozone_s3g_tmp_base_dir");
-      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-        try {
-          FileUtils.deleteDirectory(tmpMetaDir.toFile());
-        } catch (IOException e) {
-          LOG.error("Failed to cleanup temporary S3 Gateway Metadir {}",
-                  tmpMetaDir.toFile().getAbsolutePath(), e);
-        }
-      }));
-      ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
-              tmpMetaDir.toFile().getAbsolutePath());
-    }
-
+    setHttpBaseDir(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     metrics = S3GatewayMetrics.create();
     start();
