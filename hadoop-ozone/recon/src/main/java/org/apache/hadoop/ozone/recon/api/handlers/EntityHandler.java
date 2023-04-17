@@ -191,12 +191,12 @@ public abstract class EntityHandler {
   protected int[] getTotalFileSizeDist(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary == null) {
-      return new int[ReconConstants.NUM_OF_BINS];
+      return new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
     }
     int[] res = nsSummary.getFileSizeBucket();
     for (long childId: nsSummary.getChildDir()) {
       int[] subDirFileSizeDist = getTotalFileSizeDist(childId);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         res[i] += subDirFileSizeDist[i];
       }
     }

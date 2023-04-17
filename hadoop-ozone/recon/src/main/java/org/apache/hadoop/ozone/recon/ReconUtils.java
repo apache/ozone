@@ -294,18 +294,41 @@ public class ReconUtils {
     }
     // The smallest file size being tracked for count
     // is 1 KB i.e. 1024 = 2 ^ 10.
-    int binIndex = getBinIndex(fileSize);
+    int binIndex = getFileSizeBinIndex(fileSize);
     return (long) Math.pow(2, (10 + binIndex));
   }
 
-  public static int getBinIndex(long fileSize) {
+  public static long getContainerSizeUpperBound(long containerSize) {
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return Long.MAX_VALUE;
+    }
+    // The smallest container size being tracked for count
+    // is 128 MB i.e. 134217728 = 2 ^ 27.
+    int binIndex = getContainerSizeBinIndex(containerSize);
+    return (long) Math.pow(2, (10 + binIndex));
+  }
+
+
+  public static int getFileSizeBinIndex(long fileSize) {
     // if the file size is larger than our track scope,
     // we map it to the last bin
     if (fileSize >= ReconConstants.MAX_FILE_SIZE_UPPER_BOUND) {
-      return ReconConstants.NUM_OF_BINS - 1;
+      return ReconConstants.NUM_OF_FILE_SIZE_BINS - 1;
     }
     int index = nextClosestPowerIndexOfTwo(fileSize);
     // if the file size is smaller than our track scope,
+    // we map it to the first bin
+    return index < 10 ? 0 : index - 10;
+  }
+
+  public static int getContainerSizeBinIndex(long containerSize) {
+    // if the container size is larger than our track scope,
+    // we map it to the last bin
+    if (containerSize >= ReconConstants.MAX_CONTAINER_SIZE_UPPER_BOUND) {
+      return ReconConstants.NUM_OF_CONTAINER_SIZE_BINS - 1;
+    }
+    int index = nextClosestPowerIndexOfTwo(containerSize);
+    // if the container size is smaller than our track scope,
     // we map it to the first bin
     return index < 10 ? 0 : index - 10;
   }

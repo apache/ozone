@@ -171,9 +171,7 @@ public class ReconStorageContainerManagerFacade
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
     this.scmContext = new SCMContext.Builder()
-        .setIsPreCheckComplete(true)
-        .setSCM(this)
-        .build();
+        .setIsPreCheckComplete(true).setSCM(this).build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
@@ -199,7 +197,9 @@ public class ReconStorageContainerManagerFacade
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-        eventQueue, scmhaManager, scmContext);
+        eventQueue,
+        scmhaManager,
+        scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         conf, Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
@@ -212,12 +212,10 @@ public class ReconStorageContainerManagerFacade
 
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
-
     this.safeModeManager = safeModeManager;
     ReconPipelineReportHandler pipelineReportHandler =
         new ReconPipelineReportHandler(safeModeManager,
             pipelineManager, scmContext, conf, scmServiceProvider);
-
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
@@ -230,7 +228,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy, reconTaskConfig);
 
-    ContainerSizeCountTask containerSizeCountTask = new c(
+    ContainerSizeCountTask containerSizeCountTask = new (
         containerManager,
         scmServiceProvider,
         reconTaskStatusDao,
@@ -241,9 +239,8 @@ public class ReconStorageContainerManagerFacade
         new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
             pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
-        pipelineManager, containerManager,
-        scmServiceProvider, containerHealthTask, pipelineSyncTask,
-        containerSizeCountTask);
+        pipelineManager, containerManager, scmServiceProvider,
+        containerHealthTask, pipelineSyncTask, containerSizeCountTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);

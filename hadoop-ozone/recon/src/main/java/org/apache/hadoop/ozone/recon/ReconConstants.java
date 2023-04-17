@@ -63,9 +63,21 @@ public final class ReconConstants {
       "recon-node.db";
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
+  // 1024 = 1KB
   public static final long MIN_FILE_SIZE_UPPER_BOUND = 1024L;
   // 41 bins
-  public static final int NUM_OF_BINS = (int) Math.ceil(Math.log(
+  public static final int NUM_OF_FILE_SIZE_BINS = (int) Math.ceil(Math.log(
       (double) MAX_FILE_SIZE_UPPER_BOUND / MIN_FILE_SIZE_UPPER_BOUND) /
+      Math.log(2)) + 1;
+
+
+  // 1125899906842624L = 1PB
+  public static final long MAX_CONTAINER_SIZE_UPPER_BOUND = 1125899906842624L;
+  // 134217728L = 128MB
+  public static final long MIN_CONTAINER_SIZE_UPPER_BOUND = 134217728L;
+  // 14 bins
+  public static final int NUM_OF_CONTAINER_SIZE_BINS = (int) Math.ceil(Math.log(
+      (double) MAX_CONTAINER_SIZE_UPPER_BOUND /
+          MIN_CONTAINER_SIZE_UPPER_BOUND) /
       Math.log(2)) + 1;
 }
