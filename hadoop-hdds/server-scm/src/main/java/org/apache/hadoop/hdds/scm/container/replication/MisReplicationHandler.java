@@ -68,6 +68,10 @@ public abstract class MisReplicationHandler implements
     this.replicationManager = replicationManager;
   }
 
+  protected ReplicationManager getReplicationManager() {
+    return replicationManager;
+  }
+
   protected abstract ContainerReplicaCount getContainerReplicaCount(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas,
       List<ContainerReplicaOp> pendingOps, int remainingMaintenanceRedundancy)
@@ -115,35 +119,11 @@ public abstract class MisReplicationHandler implements
   protected abstract ReplicateContainerCommand updateReplicateCommand(
           ReplicateContainerCommand command, ContainerReplica replica);
 
-  protected int sendReplicateCommands(
+  protected abstract int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
       List<DatanodeDetails> targetDns)
-      throws CommandTargetOverloadedException, NotLeaderException {
-    int commandsSent = 0;
-    int datanodeIdx = 0;
-    for (ContainerReplica replica : replicasToBeReplicated) {
-      if (datanodeIdx == targetDns.size()) {
-        break;
-      }
-      long containerID = containerInfo.getContainerID();
-      DatanodeDetails source = replica.getDatanodeDetails();
-      DatanodeDetails target = targetDns.get(datanodeIdx);
-      if (replicationManager.getConfig().isPush()) {
-        replicationManager.sendThrottledReplicationCommand(containerInfo,
-            Collections.singletonList(source), target,
-            replica.getReplicaIndex());
-      } else {
-        ReplicateContainerCommand cmd = ReplicateContainerCommand
-            .fromSources(containerID, Collections.singletonList(source));
-        updateReplicateCommand(cmd, replica);
-        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
-      }
-      commandsSent++;
-      datanodeIdx += 1;
-    }
-    return commandsSent;
-  }
+      throws CommandTargetOverloadedException, NotLeaderException;
 
   @Override
   public int processAndSendCommands(
