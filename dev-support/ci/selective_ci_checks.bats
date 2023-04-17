@@ -117,6 +117,18 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "script change including junit.sh" {
+  run dev-support/ci/selective_ci_checks.sh 66093e52c6
+
+  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs","unit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "unit only" {
   run dev-support/ci/selective_ci_checks.sh 1dd1d0ba3
 

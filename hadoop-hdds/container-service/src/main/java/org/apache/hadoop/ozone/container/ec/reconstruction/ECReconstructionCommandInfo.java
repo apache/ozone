@@ -29,6 +29,7 @@ import java.util.stream.IntStream;
 
 import static java.util.Collections.unmodifiableSortedMap;
 import static java.util.stream.Collectors.toMap;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 
 /**
  * This class is to keep the required EC reconstruction info.
@@ -86,12 +87,12 @@ public class ECReconstructionCommandInfo {
 
   @Override
   public String toString() {
-    return "ECReconstructionCommand{"
-        + "containerID=" + containerID
+    return reconstructECContainersCommand
+        + ": containerID=" + containerID
         + ", replication=" + ecReplicationConfig.getReplication()
         + ", missingIndexes=" + Arrays.toString(missingContainerIndexes)
         + ", sources=" + sourceNodeMap
-        + ", targets=" + targetNodeMap + "}";
+        + ", targets=" + targetNodeMap;
   }
 
   public long getTerm() {

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -109,6 +110,7 @@ public class TestReplicationSupervisor {
 
   private StateContext context;
   private TestClock clock;
+  private DatanodeDetails datanode;
 
   public TestReplicationSupervisor(ContainerLayoutVersion layout) {
     this.layout = layout;
@@ -123,11 +125,15 @@ public class TestReplicationSupervisor {
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
+    DatanodeStateMachine stateMachine =
+        Mockito.mock(DatanodeStateMachine.class);
     context = new StateContext(
         new OzoneConfiguration(),
         DatanodeStateMachine.DatanodeStates.getInitState(),
-        Mockito.mock(DatanodeStateMachine.class));
+        stateMachine);
     context.setTermOfLeaderSCM(CURRENT_TERM);
+    datanode = MockDatanodeDetails.randomDatanodeDetails();
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
   }
 
   @After
@@ -342,6 +348,30 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(1, supervisor.getReplicationTimeoutCount());
     Assert.assertEquals(2, set.containerCount());
 
+  }
+
+  @Test
+  public void testDatanodeOutOfService() {
+    ReplicationSupervisor supervisor =
+        supervisorWithReplicator(FakeReplicator::new);
+    datanode.setPersistedOpState(
+        HddsProtos.NodeOperationalState.DECOMMISSIONING);
+
+    ReplicateContainerCommand pushCmd = ReplicateContainerCommand.toTarget(
+        1, MockDatanodeDetails.randomDatanodeDetails());
+    pushCmd.setTerm(CURRENT_TERM);
+    ReplicateContainerCommand pullCmd = createCommand(2);
+
+    supervisor.addTask(new ReplicationTask(pushCmd, replicatorRef.get()));
+    supervisor.addTask(new ReplicationTask(pullCmd, replicatorRef.get()));
+
+    Assert.assertEquals(2, supervisor.getReplicationRequestCount());
+    Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
+    Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+    Assert.assertEquals(0, supervisor.getTotalInFlightReplications());
+    Assert.assertEquals(0, supervisor.getQueueSize());
+    Assert.assertEquals(0, supervisor.getReplicationTimeoutCount());
+    Assert.assertEquals(1, set.containerCount());
   }
 
   @Test

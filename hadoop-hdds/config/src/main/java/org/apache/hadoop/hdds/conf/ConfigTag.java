@@ -18,34 +18,39 @@
 package org.apache.hadoop.hdds.conf;
 
 /**
- * Available config tags.
- * <p>
- * Note: the values are defined in ozone-default.xml by hadoop.tags.custom.
+ * The definitive list of configuration tags.  Used as a source to define the
+ * value of {@code hadoop.tags.custom} and {@code ozone.tags.system}.
  */
 public enum ConfigTag {
-  OZONE,
-  MANAGEMENT,
-  SECURITY,
-  PERFORMANCE,
-  DEBUG,
-  CLIENT,
-  SERVER,
-  OM,
-  SCM,
-  CRITICAL,
-  RATIS,
-  CONTAINER,
-  REQUIRED,
-  REST,
-  STORAGE,
-  PIPELINE,
-  STANDALONE,
-  S3GATEWAY,
-  DATANODE,
-  RECON,
-  DELETION,
-  HA,
+  ACL,
   BALANCER,
+  CLIENT,
+  CONTAINER,
+  DATANODE,
+  DATASTREAM,
+  DEBUG,
+  DELETION,
+  DEPRECATED,
+  FREON,
+  HA,
+  HDDS,
+  KERBEROS,
+  MANAGEMENT,
+  OM,
+  OPERATION,
+  OZONE,
+  OZONEFS,
+  PERFORMANCE,
+  PIPELINE,
+  RATIS,
+  RECON,
+  REQUIRED,
+  S3GATEWAY,
+  SCM,
+  SECURITY,
+  STORAGE,
+  TLS,
+  TOKEN,
   UPGRADE,
-  DATASTREAM
+  X509
 }

@@ -22,6 +22,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -162,7 +163,7 @@ public class DBCheckpointServlet extends HttpServlet {
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
+      writeDbDataToStream(checkpoint, request,
           response.getOutputStream());
       Instant end = Instant.now();
 
@@ -186,6 +187,21 @@ public class DBCheckpointServlet extends HttpServlet {
         }
       }
     }
+  }
+
+  /**
+   * Write checkpoint to the stream.
+   *
+   * @param checkpoint The checkpoint to be written.
+   * @param ignoredRequest The httpRequest which generated this checkpoint.
+   *        (Parameter is ignored in this class but used in child classes).
+   * @param destination The stream to write to.
+   */
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
+                                  HttpServletRequest ignoredRequest,
+                                  OutputStream destination)
+      throws IOException, InterruptedException {
+    writeDBCheckpointToStream(checkpoint, destination);
   }
 
 }

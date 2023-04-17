@@ -19,5 +19,5 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 /**
- * This package contains OM Ratis Snapshot related classes.
+ * This package contains OM Snapshot related classes.
  */

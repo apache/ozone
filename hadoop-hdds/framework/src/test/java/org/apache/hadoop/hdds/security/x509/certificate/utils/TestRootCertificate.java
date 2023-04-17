@@ -185,13 +185,13 @@ public class TestRootCertificate {
         certificateHolder.getSerialNumber());
 
     CertificateCodec codec = new CertificateCodec(securityConfig, "scm");
-    String pemString = codec.getPEMEncodedString(certificateHolder);
+    String pemString = CertificateCodec.getPEMEncodedString(certificateHolder);
 
     codec.writeCertificate(basePath, "pemcertificate.crt",
-        pemString, false);
+        pemString);
 
     X509CertificateHolder loadedCert =
-        codec.readCertificate(basePath, "pemcertificate.crt");
+        codec.getTargetCertHolder(basePath, "pemcertificate.crt");
     Assertions.assertNotNull(loadedCert);
     Assertions.assertEquals(certificateHolder.getSerialNumber(),
         loadedCert.getSerialNumber());

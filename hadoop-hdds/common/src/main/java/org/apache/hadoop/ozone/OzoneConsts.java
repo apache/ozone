@@ -141,6 +141,8 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
+  public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
+      "includeSnapshotData";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
@@ -236,6 +238,11 @@ public final class OzoneConsts {
   public static final int MAX_LISTVOLUMES_SIZE = 1024;
 
   public static final int INVALID_PORT = -1;
+
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
 
 
   /**
@@ -393,6 +400,9 @@ public final class OzoneConsts {
   public static final int S3_SECRET_KEY_MIN_LENGTH = 8;
 
   public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
+
+  /** Metadata stored in OmKeyInfo. */
+  public static final String HSYNC_CLIENT_ID = "hsyncClientId";
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
@@ -554,9 +564,34 @@ public final class OzoneConsts {
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 
   public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_CHECKPOINT_DIR = "db.checkpoints";
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "diffState";
+
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
+  public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
 }

@@ -28,7 +28,9 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -51,7 +53,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private boolean isLeader;
-  private DBTransactionBuffer transactionBuffer;
+  private final DBTransactionBuffer transactionBuffer;
 
   public static SCMHAManager getInstance(boolean isLeader) {
     return new SCMHAManagerStub(isLeader);
@@ -88,6 +90,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
   @Override
   public void stop() throws IOException {
     ratisServer.stop();
+  }
+
+  @Override
+  public void close() {
+    IOUtils.closeQuietly(transactionBuffer);
   }
 
   /**
@@ -128,6 +135,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public boolean addSCM(AddSCMRequest request) throws IOException {
+    return false;
+  }
+
+  @Override
+  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
     return false;
   }
 
@@ -248,6 +260,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
     @Override
     public boolean addSCM(AddSCMRequest request) throws IOException {
+      return false;
+    }
+
+    @Override
+    public boolean removeSCM(RemoveSCMRequest request) throws IOException {
       return false;
     }
 

@@ -64,7 +64,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelP
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
@@ -400,6 +400,14 @@ public interface OzoneManagerProtocol
   ServiceInfoEx getServiceInfo() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
    * Triggers Ranger background sync task immediately.
    *
    * Requires Ozone administrator privilege.
@@ -695,13 +703,19 @@ public interface OzoneManagerProtocol
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param fromSnapshot The name of the starting snapshot
    * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  default SnapshotDiffReport snapshotDiff(String volumeName,
-                                          String bucketName,
-                                          String fromSnapshot,
-                                          String toSnapshot)
+  default SnapshotDiffResponse snapshotDiff(String volumeName,
+                                            String bucketName,
+                                            String fromSnapshot,
+                                            String toSnapshot,
+                                            String token,
+                                            int pageSize,
+                                            boolean forceFullDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
@@ -969,4 +983,16 @@ public interface OzoneManagerProtocol
                              int payloadSizeResp)
           throws IOException;
 
+
+  /**
+   * Start the lease recovery of a file.
+   *
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  boolean recoverLease(String volumeName, String bucketName,
+                              String keyName) throws IOException;
 }

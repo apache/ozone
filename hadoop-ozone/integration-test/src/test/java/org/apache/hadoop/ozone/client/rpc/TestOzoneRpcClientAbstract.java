@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -205,7 +206,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .setClusterId(clusterId)
-        .setDataStreamMinPacketSize(1024)
+        .setDataStreamMinPacketSize(1) // 1MB
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -1207,25 +1208,29 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
 
     RpcClient client = new RpcClient(cluster.getConf(), null);
-    String directoryName1 = UUID.randomUUID().toString();
-    String directoryName2 = UUID.randomUUID().toString();
+    try {
+      String directoryName1 = UUID.randomUUID().toString();
+      String directoryName2 = UUID.randomUUID().toString();
 
-    client.createDirectory(volumeName, bucketName, directoryName1);
-    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
-    // Test create a directory twice will not increase usedNamespace twice
-    client.createDirectory(volumeName, bucketName, directoryName2);
-    Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
-    client.deleteKey(volumeName, bucketName,
-        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
-    Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
-    client.deleteKey(volumeName, bucketName,
-        OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
-    Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+      client.createDirectory(volumeName, bucketName, directoryName1);
+      Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      // Test create a directory twice will not increase usedNamespace twice
+      client.createDirectory(volumeName, bucketName, directoryName2);
+      Assert.assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+      client.deleteKey(volumeName, bucketName,
+          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName1), false);
+      Assert.assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      client.deleteKey(volumeName, bucketName,
+          OzoneFSUtils.addTrailingSlashIfNeeded(directoryName2), false);
+      Assert.assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
 
-    String multiComponentsDir = "dir1/dir2/dir3/dir4";
-    client.createDirectory(volumeName, bucketName, multiComponentsDir);
-    Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
-        getBucketUsedNamespace(volumeName, bucketName));
+      String multiComponentsDir = "dir1/dir2/dir3/dir4";
+      client.createDirectory(volumeName, bucketName, multiComponentsDir);
+      Assert.assertEquals(OzoneFSUtils.getFileCount(multiComponentsDir),
+          getBucketUsedNamespace(volumeName, bucketName));
+    } finally {
+      client.close();
+    }
   }
 
   @ParameterizedTest
@@ -1674,6 +1679,8 @@ public abstract class TestOzoneRpcClientAbstract {
       RpcClient client = new RpcClient(configuration, null);
       try (InputStream is = client.getKey(volumeName, bucketName, keyName)) {
         is.read(new byte[100]);
+      } finally {
+        client.close();
       }
       if (verifyChecksum) {
         fail("Reading corrupted data should fail, as verify checksum is " +
@@ -2085,16 +2092,25 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
-
-    // Rename to empty string should fail.
+    BucketLayout bucketLayout = bucket.getBucketLayout();
     OMException oe = null;
     String toKeyName = "";
-    try {
+
+    if (!bucketLayout.isFileSystemOptimized()) {
+      // Rename to an empty string should fail only in non FSO buckets
+      try {
+        bucket.renameKey(fromKeyName, toKeyName);
+      } catch (OMException e) {
+        oe = e;
+      }
+      Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
+    } else {
+      // Rename to an empty key in FSO should be okay, as we are handling the
+      // empty dest key on the server side and the source key name will be used
       bucket.renameKey(fromKeyName, toKeyName);
-    } catch (OMException e) {
-      oe = e;
+      OzoneKey emptyRenameKey = bucket.getKey(fromKeyName);
+      Assert.assertEquals(fromKeyName, emptyRenameKey.getName());
     }
-    Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
@@ -2745,70 +2761,70 @@ public abstract class TestOzoneRpcClientAbstract {
     String userName = "test-user";
     UserGroupInformation remoteUser =
         UserGroupInformation.createRemoteUser(userName);
-    OzoneClient client =
-        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
-          return OzoneClientFactory.getRpcClient(cluster.getConf());
-        });
-    OzoneAcl acl5 = new OzoneAcl(USER, userName, ACLType.READ, DEFAULT);
-    OzoneAcl acl6 = new OzoneAcl(USER, userName, ACLType.READ, ACCESS);
-    OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
-        .setResType(OzoneObj.ResourceType.VOLUME).build();
-    OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setStoreType(OzoneObj.StoreType.OZONE)
-        .setResType(OzoneObj.ResourceType.BUCKET).build();
-    store.addAcl(volumeObj, acl5);
-    store.addAcl(volumeObj, acl6);
-    store.addAcl(bucketObj, acl5);
-    store.addAcl(bucketObj, acl6);
+    try (OzoneClient client =
+        remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)
+            () -> OzoneClientFactory.getRpcClient(cluster.getConf()))) {
+      OzoneAcl acl5 = new OzoneAcl(USER, userName, ACLType.READ, DEFAULT);
+      OzoneAcl acl6 = new OzoneAcl(USER, userName, ACLType.READ, ACCESS);
+      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.VOLUME).build();
+      OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setStoreType(OzoneObj.StoreType.OZONE)
+          .setResType(OzoneObj.ResourceType.BUCKET).build();
+      store.addAcl(volumeObj, acl5);
+      store.addAcl(volumeObj, acl6);
+      store.addAcl(bucketObj, acl5);
+      store.addAcl(bucketObj, acl6);
 
-    // User without permission cannot start multi-upload
-    String keyName2 = UUID.randomUUID().toString();
-    OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
-        .getBucket(bucketName);
-    try {
-      initiateMultipartUpload(bucket2, keyName2, anyReplication());
-      fail("User without permission should fail");
-    } catch (Exception e) {
-      assertTrue(e instanceof OMException);
-      assertEquals(ResultCodes.PERMISSION_DENIED,
-          ((OMException) e).getResult());
-    }
+      // User without permission cannot start multi-upload
+      String keyName2 = UUID.randomUUID().toString();
+      OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
+      try {
+        initiateMultipartUpload(bucket2, keyName2, anyReplication());
+        fail("User without permission should fail");
+      } catch (Exception e) {
+        assertTrue(e instanceof OMException);
+        assertEquals(ResultCodes.PERMISSION_DENIED,
+            ((OMException) e).getResult());
+      }
 
-    // Add create permission for user, and try multi-upload init again
-    OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
-    OzoneAcl acl8 = new OzoneAcl(USER, userName, ACLType.CREATE, ACCESS);
-    OzoneAcl acl9 = new OzoneAcl(USER, userName, WRITE, DEFAULT);
-    OzoneAcl acl10 = new OzoneAcl(USER, userName, WRITE, ACCESS);
-    store.addAcl(volumeObj, acl7);
-    store.addAcl(volumeObj, acl8);
-    store.addAcl(volumeObj, acl9);
-    store.addAcl(volumeObj, acl10);
+      // Add create permission for user, and try multi-upload init again
+      OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
+      OzoneAcl acl8 = new OzoneAcl(USER, userName, ACLType.CREATE, ACCESS);
+      OzoneAcl acl9 = new OzoneAcl(USER, userName, WRITE, DEFAULT);
+      OzoneAcl acl10 = new OzoneAcl(USER, userName, WRITE, ACCESS);
+      store.addAcl(volumeObj, acl7);
+      store.addAcl(volumeObj, acl8);
+      store.addAcl(volumeObj, acl9);
+      store.addAcl(volumeObj, acl10);
 
-    store.addAcl(bucketObj, acl7);
-    store.addAcl(bucketObj, acl8);
-    store.addAcl(bucketObj, acl9);
-    store.addAcl(bucketObj, acl10);
-    String uploadId = initiateMultipartUpload(bucket2, keyName2,
-        anyReplication());
+      store.addAcl(bucketObj, acl7);
+      store.addAcl(bucketObj, acl8);
+      store.addAcl(bucketObj, acl9);
+      store.addAcl(bucketObj, acl10);
+      String uploadId = initiateMultipartUpload(bucket2, keyName2,
+          anyReplication());
 
-    // Upload part
-    byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte)1);
-    String partName = uploadPart(bucket, keyName2, uploadId, 1, data);
-    Map<Integer, String> partsMap = new TreeMap<>();
-    partsMap.put(1, partName);
+      // Upload part
+      byte[] data = generateData(OzoneConsts.OM_MULTIPART_MIN_SIZE, (byte) 1);
+      String partName = uploadPart(bucket, keyName2, uploadId, 1, data);
+      Map<Integer, String> partsMap = new TreeMap<>();
+      partsMap.put(1, partName);
 
-    // Complete multipart upload request
-    completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
+      // Complete multipart upload request
+      completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
 
-    // User without permission cannot read multi-uploaded object
-    try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-      fail("User without permission should fail");
-    } catch (Exception e) {
-      assertTrue(e instanceof OMException);
-      assertEquals(ResultCodes.PERMISSION_DENIED,
-          ((OMException) e).getResult());
+      // User without permission cannot read multi-uploaded object
+      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+        fail("User without permission should fail");
+      } catch (Exception e) {
+        assertTrue(e instanceof OMException);
+        assertEquals(ResultCodes.PERMISSION_DENIED,
+            ((OMException) e).getResult());
+      }
     }
   }
 
@@ -4081,7 +4097,7 @@ public abstract class TestOzoneRpcClientAbstract {
             HddsProtos.ReplicationFactor.ONE),
         currentReplicationConfig);
     ECReplicationConfig ecReplicationConfig =
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+        new ECReplicationConfig(3, 2, EcCodec.RS, (int) OzoneConsts.MB);
     bucket.setReplicationConfig(ecReplicationConfig);
 
     // Get the bucket and check the updated config.

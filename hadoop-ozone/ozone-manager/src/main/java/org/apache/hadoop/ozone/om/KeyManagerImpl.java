@@ -39,6 +39,8 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -84,7 +86,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -111,6 +113,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -135,6 +141,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,6 +167,7 @@ public class KeyManagerImpl implements KeyManager {
   private BackgroundService keyDeletingService;
 
   private BackgroundService snapshotSstFilteringService;
+  private BackgroundService snapshotDeletingService;
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
@@ -262,6 +270,25 @@ public class KeyManagerImpl implements KeyManager {
         snapshotSstFilteringService.start();
       }
     }
+
+    if (snapshotDeletingService == null) {
+      long snapshotServiceInterval = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long snapshotServiceTimeout = configuration.getTimeDuration(
+          OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      try {
+        snapshotDeletingService = new SnapshotDeletingService(
+            snapshotServiceInterval, snapshotServiceTimeout,
+            ozoneManager, scmClient.getBlockClient());
+        snapshotDeletingService.start();
+      } catch (IOException e) {
+        LOG.error("Error starting Snapshot Deleting Service", e);
+      }
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -285,6 +312,10 @@ public class KeyManagerImpl implements KeyManager {
     if (snapshotSstFilteringService != null) {
       snapshotSstFilteringService.shutdown();
       snapshotSstFilteringService = null;
+    }
+    if (snapshotDeletingService != null) {
+      snapshotDeletingService.shutdown();
+      snapshotDeletingService = null;
     }
   }
 
@@ -589,11 +620,14 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
-    return  metadataManager.getPendingDeletionKeys(count);
+    OmMetadataManagerImpl omMetadataManager =
+        (OmMetadataManagerImpl) metadataManager;
+    return omMetadataManager
+        .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
   }
 
   @Override
-  public List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold,
+  public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
     return metadataManager.getExpiredOpenKeys(expireThreshold, count,
         bucketLayout);
@@ -620,6 +654,10 @@ public class KeyManagerImpl implements KeyManager {
 
   public BackgroundService getSnapshotSstFilteringService() {
     return snapshotSstFilteringService;
+  }
+
+  public BackgroundService getSnapshotDeletingService() {
+    return snapshotDeletingService;
   }
 
   @Override
@@ -1176,27 +1214,51 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
       String keyName, BucketLayout layout) throws IOException {
-    OmKeyInfo fakeDirKeyInfo = null;
     String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-    String fileKeyBytes = metadataManager.getOzoneKey(volume, bucket, keyName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             keyTblItr = metadataManager.getKeyTable(layout).iterator()) {
-      Table.KeyValue<String, OmKeyInfo> keyValue =
-          keyTblItr
-              .seek(OzoneFSUtils.addTrailingSlashIfNeeded(fileKeyBytes));
+    String targetKey = OzoneFSUtils.addTrailingSlashIfNeeded(
+        metadataManager.getOzoneKey(volume, bucket, keyName));
 
-      if (keyValue != null) {
-        Path fullPath = Paths.get(keyValue.getValue().getKeyName());
-        Path subPath = Paths.get(dirKey);
-        OmKeyInfo omKeyInfo = keyValue.getValue();
-        if (fullPath.startsWith(subPath)) {
-          // create fake directory
-          fakeDirKeyInfo = createDirectoryKey(omKeyInfo, dirKey);
+    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIterator =
+        keyTable.cacheIterator();
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> cacheEntry =
+          cacheIterator.next();
+      String cacheKey = cacheEntry.getKey().getCacheKey();
+      CacheValue<OmKeyInfo> cacheValue = cacheEntry.getValue();
+      boolean exists = cacheValue != null && cacheValue.getCacheValue() != null;
+      if (exists
+          && cacheKey.startsWith(targetKey)
+          && !Objects.equals(cacheKey, targetKey)) {
+        LOG.debug("Fake dir {} required for {}", targetKey, cacheKey);
+        return createDirectoryKey(cacheValue.getCacheValue(), dirKey);
+      }
+    }
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+        keyTblItr = keyTable.iterator(targetKey)) {
+      while (keyTblItr.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
+        if (keyValue != null) {
+          String key = keyValue.getKey();
+          // HDDS-7871: RocksIterator#seek() may position at the key
+          // past the target, we should check the full dbKeyName.
+          // For example, seeking "/vol1/bucket1/dir2/" may return a key
+          // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
+          if (key.startsWith(targetKey)) {
+            if (!Objects.equals(key, targetKey)
+                && !isKeyDeleted(key, keyTable)) {
+              LOG.debug("Fake dir {} required for {}", targetKey, key);
+              return createDirectoryKey(keyValue.getValue(), dirKey);
+            }
+          } else {
+            break;
+          }
         }
       }
     }
 
-    return fakeDirKeyInfo;
+    return null;
   }
 
 
@@ -1497,7 +1559,8 @@ public class KeyManagerImpl implements KeyManager {
     if (args.getLatestVersionLocation()) {
       slimLocationVersion(keyInfoList.toArray(new OmKeyInfo[0]));
     }
-    refreshPipeline(keyInfoList);
+
+    refreshPipelineFromCache(keyInfoList);
 
     if (args.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1629,7 +1692,7 @@ public class KeyManagerImpl implements KeyManager {
     // refreshPipeline flag check has been removed as part of
     // https://issues.apache.org/jira/browse/HDDS-3658.
     // Please refer this jira for more details.
-    refreshPipeline(keyInfoList);
+    refreshPipelineFromCache(keyInfoList);
 
     if (omKeyArgs.getSortDatanodes()) {
       sortDatanodes(clientAddress, keyInfoList.toArray(new OmKeyInfo[0]));
@@ -1891,18 +1954,39 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
+  private void refreshPipelineFromCache(Iterable<OmKeyInfo> keyInfos)
+      throws IOException {
+    Set<Long> containerIds = new HashSet<>();
+    for (OmKeyInfo keyInfo : keyInfos) {
+      extractContainerIDs(keyInfo).forEach(containerIds::add);
+    }
+
+    // List API never force cache refresh. If a client detects a block
+    // location is outdated, it'll call getKeyInfo with cacheRefresh=true
+    // to request cache refresh on individual container.
+    Map<Long, Pipeline> containerLocations =
+        scmClient.getContainerLocations(containerIds, false);
+
+    for (OmKeyInfo keyInfo : keyInfos) {
+      setUpdatedContainerLocation(keyInfo, containerLocations);
+    }
+  }
+
   protected void refreshPipelineFromCache(OmKeyInfo keyInfo,
                                           boolean forceRefresh)
       throws IOException {
-    Set<Long> containerIds = keyInfo.getKeyLocationVersions().stream()
-        .flatMap(v -> v.getLocationList().stream())
-        .map(BlockLocationInfo::getContainerID)
+    Set<Long> containerIds = extractContainerIDs(keyInfo)
         .collect(Collectors.toSet());
 
     metrics.setForceContainerCacheRefresh(forceRefresh);
     Map<Long, Pipeline> containerLocations =
         scmClient.getContainerLocations(containerIds, forceRefresh);
 
+    setUpdatedContainerLocation(keyInfo, containerLocations);
+  }
+
+  private void setUpdatedContainerLocation(OmKeyInfo keyInfo,
+                         Map<Long, Pipeline> containerLocations) {
     for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
       for (List<OmKeyLocationInfo> omKeyLocationInfoList :
           key.getLocationLists()) {
@@ -1916,5 +2000,12 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
+  }
+
+  @NotNull
+  private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
+    return keyInfo.getKeyLocationVersions().stream()
+        .flatMap(v -> v.getLocationList().stream())
+        .map(BlockLocationInfo::getContainerID);
   }
 }

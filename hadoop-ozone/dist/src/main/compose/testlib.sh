@@ -126,6 +126,16 @@ wait_for_om_leader() {
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+
+      local grep_command="grep -e FOLLOWER -e LEADER | sort -r -k3 | awk '{ print \$1 }' | xargs echo | sed 's/ /,/g'"
+      local new_order
+      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+        new_order=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command | ${grep_command}")
+      else
+        new_order=$(docker-compose exec -T ${SCM} bash -c "$command | ${grep_command}")
+      fi
+
+      reorder_om_nodes "${new_order}"
       return
     else
       echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
@@ -214,6 +224,19 @@ execute_robot_test(){
   return ${rc}
 }
 
+## @description Replace OM node order in config
+reorder_om_nodes() {
+  local c pid procname new_order
+  local new_order="$1"
+
+  if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
+      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
+      echo "Replaced OM order with ${new_order} in ${c}"
+    done
+  fi
+}
+
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
   local c pid procname
@@ -292,6 +315,33 @@ wait_for_port(){
    return 1
 }
 
+## @description wait for the stat to be ready
+## @param The container ID
+## @param The maximum time to wait in seconds
+## @param The command line to be executed
+wait_for_execute_command(){
+  local container=$1
+  local timeout=$2
+  local command=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose exec -T $container bash -c '$command'
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "$command succeed"
+         return;
+     fi
+     echo "$command hasn't succeed yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $command to be successful"
+   return 1
+}
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){

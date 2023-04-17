@@ -31,4 +31,9 @@
     <value>4</value>
   </property>
 
+  <property>
+    <name>ozone.scm.close.container.wait.duration</name>
+    <value>1s</value>
+  </property>
+
 </configuration>

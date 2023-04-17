@@ -30,6 +30,7 @@ public class DBUpdatesWrapper {
   private List<byte[]> dataList = new ArrayList<>();
   private long currentSequenceNumber = -1;
   private long latestSequenceNumber = -1;
+  private boolean isDBUpdateSuccess = true;
 
   public void addWriteBatch(byte[] data, long sequenceNumber) {
     dataList.add(data);
@@ -56,6 +57,14 @@ public class DBUpdatesWrapper {
 
   public long getLatestSequenceNumber() {
     return latestSequenceNumber;
+  }
+
+  public boolean isDBUpdateSuccess() {
+    return isDBUpdateSuccess;
+  }
+
+  public void setDBUpdateSuccess(boolean dbUpdateSuccess) {
+    this.isDBUpdateSuccess = dbUpdateSuccess;
   }
 }
 
