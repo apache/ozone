@@ -163,7 +163,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo != null ?
                   bucketInfo.getDefaultReplicationConfig() :
-                  null, ozoneManager.getDefaultReplicationConfig());
+                  null, ozoneManager);
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())

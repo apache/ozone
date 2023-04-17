@@ -36,6 +36,12 @@ public interface ReconfigureProtocol {
   long VERSIONID = 1L;
 
   /**
+   * Get the name of service to be reconfigured.
+   */
+  @Idempotent
+  String getServerName() throws IOException;
+
+  /**
    * Asynchronously reload configuration on disk and apply changes.
    */
   @Idempotent

@@ -81,7 +81,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
+    OMRequest request = super.preExecute(ozoneManager);
+    CommitKeyRequest commitKeyRequest = request.getCommitKeyRequest();
     Preconditions.checkNotNull(commitKeyRequest);
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
@@ -103,9 +104,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath);
 
-    return getOmRequest().toBuilder()
+    return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).setUserInfo(getUserInfo()).build();
+            .setKeyArgs(newKeyArgs)).build();
   }
 
   @Override
@@ -207,6 +208,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+      }
+      if (isHSync) {
+        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+            String.valueOf(commitKeyRequest.getClientID()));
       }
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
@@ -408,6 +413,29 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         BucketLayout bucketLayout = ctx.getBucketLayout(
             keyArgs.getVolumeName(), keyArgs.getBucketName());
         bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitKey
+  )
+  public static OMRequest disallowHsync(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.HSYNC)) {
+      CommitKeyRequest commitKeyRequest = req.getCommitKeyRequest();
+      boolean isHSync = commitKeyRequest.hasHsync() &&
+          commitKeyRequest.getHsync();
+      if (isHSync) {
+        throw new OMException("Cluster does not have the hsync support "
+            + "feature finalized yet, but the request contains"
+            + " an hsync field. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }
     return req;

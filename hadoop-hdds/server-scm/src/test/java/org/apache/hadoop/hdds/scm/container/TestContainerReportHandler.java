@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -57,6 +58,8 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -106,6 +109,8 @@ public class TestContainerReportHandler {
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
+            conf, Clock.system(ZoneId.systemDefault())))
         .build();
     publisher = Mockito.mock(EventPublisher.class);
 

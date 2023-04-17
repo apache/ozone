@@ -51,9 +51,9 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   private final String type;
   private final AtomicReference<X509TrustManager> trustManagerRef;
   /**
-   * Current CA cert in trustManager, to detect if certificate is changed.
+   * Current Root CA cert in trustManager, to detect if certificate is changed.
    */
-  private String currentCACertId = null;
+  private String currentRootCACertId = null;
 
   /**
    * Creates a reloadable trustmanager. The trustmanager reloads itself
@@ -124,17 +124,21 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
 
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
-    X509Certificate cert = caClient.getCACertificate();
-    String certId = cert.getSerialNumber().toString();
+    // SCM certificate client sets root CA as CA cert instead of root CA cert
+    X509Certificate rootCACert = caClient.getRootCACertificate() != null ?
+        caClient.getRootCACertificate() : caClient.getCACertificate();
+
+    String rootCACertId = rootCACert.getSerialNumber().toString();
     // Certificate keeps the same.
-    if (currentCACertId != null && currentCACertId.equals(certId)) {
+    if (currentRootCACertId != null &&
+        currentRootCACertId.equals(rootCACertId)) {
       return null;
     }
 
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    ks.setCertificateEntry(certId, cert);
+    ks.setCertificateEntry(rootCACertId, rootCACert);
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -146,7 +150,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
         break;
       }
     }
-    currentCACertId = certId;
+    currentRootCACertId = rootCACertId;
     return trustManager;
   }
 }

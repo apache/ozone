@@ -218,7 +218,7 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.STANDALONE,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
-    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf, null, null,
                  null)) {

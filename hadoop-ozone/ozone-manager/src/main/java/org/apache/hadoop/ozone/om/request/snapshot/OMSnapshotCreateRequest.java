@@ -18,16 +18,17 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -47,11 +48,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-
 
 /**
  * Handles CreateSnapshot Request.
@@ -99,7 +101,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-    return omRequest;
+
+    return omRequest.toBuilder().setCreateSnapshotRequest(
+        omRequest.getCreateSnapshotRequest().toBuilder()
+            .setSnapshotId(UUID.randomUUID().toString())
+            .build()).build();
   }
   
   @Override
@@ -113,8 +119,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
@@ -133,7 +142,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
               volumeName, bucketName, snapshotName);
 
-      //Check if snapshot already exists
+      // Check if snapshot already exists
       if (omMetadataManager.getSnapshotInfoTable().isExist(key)) {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
@@ -146,16 +155,51 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
 
+      // Set previous path and global snapshot
+      String latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshot(snapshotPath);
+      String latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshot();
+
+      if (StringUtils.isEmpty(latestPathSnapshot)) {
+        snapshotInfo.setPathPreviousSnapshotID(null);
+      } else {
+        snapshotInfo.setPathPreviousSnapshotID(latestPathSnapshot);
+      }
+
+      if (StringUtils.isEmpty(latestGlobalSnapshot)) {
+        snapshotInfo.setGlobalPreviousSnapshotID(null);
+      } else {
+        snapshotInfo.setGlobalPreviousSnapshotID(latestGlobalSnapshot);
+      }
+
+      snapshotChainManager.addSnapshot(snapshotInfo);
+
       omMetadataManager.getSnapshotInfoTable()
           .addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, snapshotInfo));
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
           .setSnapshotInfo(snapshotInfo.getProtobuf()));
       omClientResponse = new OMSnapshotCreateResponse(
-          omResponse.build(), volumeName, bucketName, snapshotName);
+          omResponse.build(), snapshotInfo);
     } catch (IOException ex) {
+      // Remove snapshot from the SnapshotChainManager in case of any failure.
+      // It is possible that createSnapshot request fails after snapshot gets
+      // added to snapshot chain manager because couldn't add it to cache/DB.
+      // In that scenario, SnapshotChainManager#globalSnapshotId will point to
+      // failed createSnapshot request's snapshotId but in actual it doesn't
+      // exist in the SnapshotInfo table.
+      // If it doesn't get removed, OM restart will crash on
+      // SnapshotChainManager#loadFromSnapshotInfoTable because it could not
+      // find the previous snapshot which doesn't exist because it was never
+      // added to the SnapshotInfo table.
+      if (Objects.equals(snapshotInfo.getSnapshotID(),
+          snapshotChainManager.getLatestGlobalSnapshot())) {
+        removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
+            snapshotInfo);
+      }
       exception = ex;
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -186,5 +230,25 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     }
     return omClientResponse;
   }
-  
+
+  /**
+   * Removes the snapshot from the SnapshotChainManager.
+   * In case of any failure, it logs the exception as an error and swallow it.
+   * Ideally, there should not be any failure in deletion.
+   * If it happens, and we throw the exception, we lose the track why snapshot
+   * creation failed itself.
+   * Hence, to not lose that information it is better just log and swallow the
+   * exception.
+   */
+  private void removeSnapshotInfoFromSnapshotChainManager(
+      SnapshotChainManager snapshotChainManager,
+      SnapshotInfo info
+  ) {
+    try {
+      snapshotChainManager.deleteSnapshot(info);
+    } catch (IOException exception) {
+      LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
+          info, exception);
+    }
+  }
 }

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -106,10 +107,9 @@ public class TestMoveManager {
         .thenReturn(pendingOps);
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
+    Mockito.when(replicationManager.getClock()).thenReturn(clock);
 
-    moveManager = new MoveManager(
-        replicationManager, clock, containerManager);
-    moveManager.onLeaderReady();
+    moveManager = new MoveManager(replicationManager, containerManager);
   }
 
   @Test
@@ -218,21 +218,76 @@ public class TestMoveManager {
         containerInfo.containerID());
   }
 
+  /**
+   * Move should fail if the container will not be healthy after move.
+   * Creates a situation where container is healthy before move but mis
+   * replicated after move. Set of replicas after move will not contain the
+   * source replica but will contain the target replica.
+   */
   @Test
-  public void testMoveContainerIsNotHealthy() throws Exception {
+  public void testContainerIsNotHealthyAfterMove() throws Exception {
     replicas.addAll(ReplicationTestUtil
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
-    Iterator<ContainerReplica> iterator = replicas.iterator();
-    src = iterator.next().getDatanodeDetails();
+    ContainerReplica sourceReplica = replicas.iterator().next();
+    src = sourceReplica.getDatanodeDetails();
     tgt = MockDatanodeDetails.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
+    // Return healthy before move but mis replicated after move
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
-        .thenReturn(new ContainerHealthResult
-            .MisReplicatedHealthResult(containerInfo, false));
+        .thenAnswer(invocationOnMock -> {
+          Set<ContainerReplica> replicasBeingChecked =
+              invocationOnMock.getArgument(1);
+          if (replicasBeingChecked.contains(sourceReplica)) {
+            // before move
+            return new ContainerHealthResult.HealthyResult(containerInfo);
+          } else {
+            // after move
+            return new ContainerHealthResult.MisReplicatedHealthResult(
+                containerInfo, false);
+          }
+        });
 
-    assertMoveFailsWith(MoveManager.MoveResult.REPLICATION_NOT_HEALTHY,
+    assertMoveFailsWith(
+        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE,
+        containerInfo.containerID());
+  }
+
+  /**
+   * If the container has issues such as under, over or mis replication
+   * before moving then move should fail.
+   */
+  @Test
+  public void testContainerIsNotHealthyBeforeMove() throws Exception {
+    // return an under replicated health result from replication manager
+    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+        .thenReturn(new ContainerHealthResult.UnderReplicatedHealthResult(
+            containerInfo, 1, false, false,
+            false));
+
+    // Check for an under replicated ratis container
+    replicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(), 0, 0));
+    src = replicas.iterator().next().getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+    assertMoveFailsWith(
+        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
+        containerInfo.containerID());
+
+    // check for an under replicated EC container
+    containerInfo = ReplicationTestUtil.createContainer(
+        HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
+    replicas.clear();
+    replicas.addAll(ReplicationTestUtil.createReplicas(
+        containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,
+        1, 2, 3, 4));
+    src = replicas.iterator().next().getDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    assertMoveFailsWith(
+        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
         containerInfo.containerID());
   }
 
@@ -250,10 +305,26 @@ public class TestMoveManager {
   public void testReplicationCommandFails() throws Exception {
     Mockito.doThrow(new RuntimeException("test")).when(replicationManager)
             .sendLowPriorityReplicateContainerCommand(
-        any(), anyInt(), any(), any(), anyLong(), anyLong());
+        any(), anyInt(), any(), any(), anyLong());
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
     Assert.assertEquals(
         MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR, res.get());
+  }
+
+  @Test
+  public void testDeleteCommandFails() throws Exception {
+    CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
+
+    Mockito.doThrow(new ContainerNotFoundException("test"))
+        .when(containerManager).getContainer(any(ContainerID.class));
+
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ADD, tgt, 0, clock.millis() + 1000);
+    moveManager.opCompleted(op, containerInfo.containerID(), false);
+
+    MoveManager.MoveResult moveResult = res.get();
+    Assert.assertEquals(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+        moveResult);
   }
 
   @Test
@@ -265,7 +336,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -295,7 +366,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
-        anyLong(), anyLong());
+        anyLong());
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -303,7 +374,7 @@ public class TestMoveManager {
 
     Mockito.verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
-        eq(true));
+        eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, srcReplica.getReplicaIndex(), clock.millis() + 1000);
@@ -335,7 +406,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     Mockito.verify(replicationManager).sendDeleteCommand(
-        eq(containerInfo), eq(0), eq(src), eq(true));
+        eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
         DELETE, src, 0, clock.millis() + 1000);
@@ -440,7 +511,7 @@ public class TestMoveManager {
         moveManager.move(containerInfo.containerID(), src, tgt);
 
     Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
-        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong(), anyLong());
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
 
     return res;
   }

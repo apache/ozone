@@ -151,7 +151,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
@@ -987,15 +987,20 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   /**
@@ -1806,7 +1811,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2205,7 +2210,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2275,7 +2280,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig)
+        .setConfig(conf.getObject(OzoneClientConfig.class))
         .setClientMetrics(clientMetrics);
   }
 

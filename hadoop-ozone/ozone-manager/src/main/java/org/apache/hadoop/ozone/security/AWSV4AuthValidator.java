@@ -43,6 +43,20 @@ final class AWSV4AuthValidator {
   private AWSV4AuthValidator() {
   }
 
+  /**
+   * ThreadLocal cache of Mac instances.
+   */
+  private static final ThreadLocal<Mac> THREAD_LOCAL_MAC =
+      ThreadLocal.withInitial(() -> {
+        try {
+          return Mac.getInstance(HMAC_SHA256_ALGORITHM);
+        } catch (NoSuchAlgorithmException nsa) {
+          throw new IllegalArgumentException(
+              "Failed to initialize Mac instance that implements the " +
+                  HMAC_SHA256_ALGORITHM + " algorithm.", nsa);
+        }
+      });
+
   public static String hash(String payload) throws NoSuchAlgorithmException {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(payload.getBytes(StandardCharsets.UTF_8));
@@ -52,7 +66,9 @@ final class AWSV4AuthValidator {
   private static byte[] sign(byte[] key, String msg) {
     try {
       SecretKeySpec signingKey = new SecretKeySpec(key, HMAC_SHA256_ALGORITHM);
-      Mac mac = Mac.getInstance(HMAC_SHA256_ALGORITHM);
+      // Returns the cached Mac instance for the current thread or creates a
+      // new one if none exists.
+      Mac mac = THREAD_LOCAL_MAC.get();
       mac.init(signingKey);
       return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
     } catch (GeneralSecurityException gse) {

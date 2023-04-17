@@ -52,7 +52,11 @@ public class CsiServer extends GenericCli implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
+    String[] originalArgs = getCmd().getParseResult().originalArgs()
+            .toArray(new String[0]);
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+            CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);
 
     OzoneClient rpcClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);
@@ -85,8 +89,6 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   }
 
   public static void main(String[] args) {
-    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        CsiServer.class, args, LOG);
     new CsiServer().run(args);
   }
 

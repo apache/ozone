@@ -196,7 +196,7 @@ public class BucketEndpoint extends EndpointBase {
       String relativeKeyName = next.getName().substring(prefix.length());
 
       int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-      if (delimiter != null) {
+      if (!StringUtils.isEmpty(delimiter)) {
         if (depth > 0) {
           // means key has multiple delimiters in its value.
           // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
