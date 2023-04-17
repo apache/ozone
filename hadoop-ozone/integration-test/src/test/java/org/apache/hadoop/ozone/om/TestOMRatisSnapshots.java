@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.Assert;
@@ -67,6 +66,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -220,7 +220,7 @@ public class TestOMRatisSnapshots {
 
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
-    Assert.assertTrue(logCapture.getOutput().contains(msg));
+    assertLogCapture(logCapture, msg);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
@@ -240,8 +240,8 @@ public class TestOMRatisSnapshots {
       return followerOM.isOmRpcServerRunning();
     }, 100, 5000);
 
-    Assert.assertTrue(logCapture.getOutput().contains(
-        "Install Checkpoint is finished"));
+    assertLogCapture(logCapture,
+        "Install Checkpoint is finished");
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -360,9 +360,8 @@ public class TestOMRatisSnapshots {
 
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
-    Assert.assertTrue(logCapture.getOutput().contains(msg));
-    Assert.assertTrue(logCapture.getOutput().contains(
-        "Install Checkpoint is finished"));
+    assertLogCapture(logCapture, msg);
+    assertLogCapture(logCapture, "Install Checkpoint is finished");
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -493,9 +492,8 @@ public class TestOMRatisSnapshots {
     // Wait installation finish
     Thread.sleep(5000);
     // Verify checkpoint installation was happened.
-    Assert.assertTrue(logCapture.getOutput().contains("Reloaded OM state"));
-    Assert.assertTrue(logCapture.getOutput().contains(
-        "Install Checkpoint is finished"));
+    assertLogCapture(logCapture, "Reloaded OM state");
+    assertLogCapture(logCapture, "Install Checkpoint is finished");
   }
 
   @Test
@@ -544,7 +542,7 @@ public class TestOMRatisSnapshots {
     String errorMsg = "Cannot proceed with InstallSnapshot as OM is at " +
         "TermIndex " + followerTermIndex + " and checkpoint has lower " +
         "TermIndex";
-    Assert.assertTrue(logCapture.getOutput().contains(errorMsg));
+    assertLogCapture(logCapture, errorMsg);
     Assert.assertNull("OM installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex", newTermIndex);
     Assert.assertEquals(followerTermIndex,
@@ -552,7 +550,7 @@ public class TestOMRatisSnapshots {
     String msg = "OM DB is not stopped. Started services with Term: " +
         followerTermIndex.getTerm() + " and Index: " +
         followerTermIndex.getIndex();
-    Assert.assertTrue(logCapture.getOutput().contains(msg));
+    assertLogCapture(logCapture, msg);
   }
 
   @Test
@@ -605,13 +603,10 @@ public class TestOMRatisSnapshots {
         leaderCheckpointTrxnInfo);
 
     // Wait checkpoint installation to be finished.
-    GenericTestUtils.waitFor(() -> {
-      Assert.assertTrue(logCapture.getOutput().contains("System Exit: " +
-          "Failed to reload OM state and instantiate services."));
-      return true;
-    }, 100, 3000);
+    assertLogCapture(logCapture, "System Exit: " +
+        "Failed to reload OM state and instantiate services.");
     String msg = "RPC server is stopped";
-    Assert.assertTrue(logCapture.getOutput().contains(msg));
+    assertLogCapture(logCapture, msg);
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM)
@@ -676,6 +671,14 @@ public class TestOMRatisSnapshots {
       inputStream.read(data, 0, 100);
       inputStream.close();
     }
+  }
+
+  private void assertLogCapture(GenericTestUtils.LogCapturer logCapture,
+                              String msg)
+      throws InterruptedException, TimeoutException {
+      GenericTestUtils.waitFor(() -> {
+          return logCapture.getOutput().contains(msg);
+      }, 100, 5000);
   }
 
   private static class DummyExitManager extends ExitManager {
