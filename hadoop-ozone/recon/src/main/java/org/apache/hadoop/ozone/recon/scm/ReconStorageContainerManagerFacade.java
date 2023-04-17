@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -151,7 +152,8 @@ public class ReconStorageContainerManagerFacade
   private HDDSLayoutVersionManager scmLayoutVersionManager;
   private ReconSafeModeManager safeModeManager;
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
-
+  private ContainerSizeCountTask containerSizeCountTask;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
@@ -210,7 +212,7 @@ public class ReconStorageContainerManagerFacade
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
-
+    this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
     this.safeModeManager = safeModeManager;
@@ -229,7 +231,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy, reconTaskConfig);
 
-    ContainerSizeCountTask containerSizeCountTask = new (
+    ContainerSizeCountTask containerSizeCountTask = new ContainerSizeCountTask(
         containerManager,
         scmServiceProvider,
         reconTaskStatusDao,
@@ -683,5 +685,14 @@ public class ReconStorageContainerManagerFacade
 
   public StorageContainerServiceProvider getScmServiceProvider() {
     return scmServiceProvider;
+  }
+
+  @VisibleForTesting
+  public ContainerSizeCountTask getContainerSizeCountTask() {
+    return containerSizeCountTask;
+  }
+  @VisibleForTesting
+  public ContainerCountBySizeDao getContainerCountBySizeDao() {
+    return containerCountBySizeDao;
   }
 }

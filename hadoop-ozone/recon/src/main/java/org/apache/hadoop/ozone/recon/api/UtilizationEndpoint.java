@@ -59,7 +59,8 @@ public class UtilizationEndpoint {
   private FileCountBySizeDao fileCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerCountBySizeDao containerCountBySizeDao;
-  Logger LOG = LoggerFactory.getLogger(UtilizationEndpoint.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(UtilizationEndpoint.class);
   @Inject
   public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
                              ContainerCountBySizeDao containerCountBySizeDao,
@@ -122,6 +123,8 @@ public class UtilizationEndpoint {
       @QueryParam(RECON_QUERY_CONTAINER_SIZE)
           long containerSize) {
     DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
+    Long containerSizeUpperBound =
+        ReconUtils.getContainerSizeUpperBound(containerSize);
     List<ContainerCountBySize> resultSet;
     try {
       if (containerSize > 0) {
@@ -129,7 +132,7 @@ public class UtilizationEndpoint {
         Record1<Long> recordToFind =
             dslContext.newRecord(
                     CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
-                .value1(containerSize);
+                .value1(containerSizeUpperBound);
         ContainerCountBySize record =
             containerCountBySizeDao.findById(recordToFind.value1());
         resultSet = record != null ?
