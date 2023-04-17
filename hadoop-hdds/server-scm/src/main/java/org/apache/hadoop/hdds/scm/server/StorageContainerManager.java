@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -217,6 +218,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM metrics.
    */
   private static SCMMetrics metrics;
+  private SCMHAMetrics scmHAMetrics;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -1517,6 +1519,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     setStartTime();
+
+    // At this point leader is not known
+    scmHAMetricsUpdate(null);
   }
 
   /** Persist SCM certs to DB on bootstrap scm nodes.
@@ -1661,6 +1666,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager.stop();
     } catch (Exception ex) {
       LOG.error("SCM HA Manager stop failed", ex);
+    }
+
+    if (scmHAMetrics != null) {
+      SCMHAMetrics.unRegister();
     }
 
     IOUtils.cleanupWithLogger(LOG, containerManager);
@@ -1996,6 +2005,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHANodeDetails.getLocalNodeDetails().getNodeId();
   }
 
+  @VisibleForTesting
+  public SCMHAMetrics getScmHAMetrics() {
+    return scmHAMetrics;
+  }
+
   private void startSecretManagerIfNecessary() {
     boolean shouldRun = securityConfig.isSecurityEnabled()
         && securityConfig.isContainerTokenEnabled()
@@ -2154,5 +2168,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // TODO: Remove the certificate from certificate store.
     return scmHAManager.removeSCM(request);
 
+  }
+
+  public void scmHAMetricsUpdate(String leaderId) {
+    // unregister, in case metrics already exist
+    // so that the metric tags will get updated.
+    SCMHAMetrics.unRegister();
+
+    scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 }
