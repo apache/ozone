@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.RootedOzoneFileSystem;
+import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -34,13 +35,18 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
 /**
- * Tool that parses rocksdb file.
+ * Tool that recover the lease of a specified file.
  */
 @CommandLine.Command(
     name = "recover",
-    description = "recover the lease of a specified file")
+    customSynopsis = "ozone debug recover --path=<path>",
+    description = "recover the lease of a specified file. Make sure to " +
+        "file system scheme e.g. ofs:// if not the default file system.")
 @MetaInfServices(SubcommandWithParent.class)
 public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
+
+  @CommandLine.ParentCommand
+  private OzoneDebug parent;
 
   @Spec
   private CommandSpec spec;
