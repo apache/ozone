@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -73,7 +72,6 @@ public class TestSCMDBInsightEndPoint {
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
-  private ReconContainerMetadataManager reconContainerMetadataManager;
   private SCMDBInsightEndPoint scmdbInsightEndPoint;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -105,8 +103,6 @@ public class TestSCMDBInsightEndPoint {
         ozoneStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
         ozoneStorageContainerManager.getPipelineManager();
-    reconContainerMetadataManager =
-        reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     scmdbInsightEndPoint = reconTestInjector.getInstance(
         SCMDBInsightEndPoint.class);
     scmDBStore = ozoneStorageContainerManager.getScmDBStore();
