@@ -88,7 +88,7 @@ public class Lease<T> {
    * @throws LeaseExpiredException
    *         If the lease has already timed out
    */
-  public void registerCallBack(Callable<Void> callback)
+  public synchronized void registerCallBack(Callable<Void> callback)
       throws LeaseExpiredException {
     if (hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
@@ -143,7 +143,7 @@ public class Lease<T> {
    * @throws LeaseExpiredException
    *         If the lease has already timed out
    */
-  public void renew(long timeout) throws LeaseExpiredException {
+  public synchronized void renew(long timeout) throws LeaseExpiredException {
     if (hasExpired()) {
       throw new LeaseExpiredException(messageForResource(resource));
     }
@@ -185,7 +185,7 @@ public class Lease<T> {
   /**
    * Expires/Invalidates the lease.
    */
-  void invalidate() {
+  synchronized void invalidate() {
     callbacks = null;
     expired = true;
   }
