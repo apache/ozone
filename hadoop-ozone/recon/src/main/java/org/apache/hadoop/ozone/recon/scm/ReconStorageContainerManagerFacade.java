@@ -231,13 +231,14 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy, reconTaskConfig);
 
-    ContainerSizeCountTask containerSizeCountTask = new ContainerSizeCountTask(
+    this.containerSizeCountTask = new ContainerSizeCountTask(
         containerManager,
         scmServiceProvider,
         reconTaskStatusDao,
         reconTaskConfig,
         containerCountBySizeDao,
         utilizationSchemaDefinition);
+
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
             pipelineSyncTask);
