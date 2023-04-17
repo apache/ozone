@@ -137,7 +137,7 @@ public class OMDBInsightEndpoint {
    * }
    */
   @GET
-  @Path("openkeyinfo")
+  @Path("/keys/open")
   public Response getOpenKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
@@ -219,21 +219,21 @@ public class OMDBInsightEndpoint {
 
   /** This method retrieves set of keys/files/dirs pending for deletion. */
   @GET
-  @Path("pendingfordeletionkeyinfo")
+  @Path("/keys/deletePending")
   public Response getDeletedKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
       String prevKeyPrefix) {
     KeyInsightInfoResp deletedKeyAndDirInsightInfo = new KeyInsightInfoResp();
-    KeyInsightInfoResp pendingForDeletionKeyInfo =
-        getPendingForDeletionKeyInfo(limit, prevKeyPrefix,
-            deletedKeyAndDirInsightInfo);
-    return Response.ok(getPendingForDeletionDirInfo(limit, prevKeyPrefix,
-        pendingForDeletionKeyInfo)).build();
+    getPendingForDeletionKeyInfo(limit, prevKeyPrefix,
+        deletedKeyAndDirInsightInfo);
+    getPendingForDeletionDirInfo(limit, prevKeyPrefix,
+        deletedKeyAndDirInsightInfo);
+    return Response.ok(deletedKeyAndDirInsightInfo).build();
   }
 
-  private KeyInsightInfoResp getPendingForDeletionDirInfo(
+  private void getPendingForDeletionDirInfo(
       int limit, String prevKeyPrefix,
       KeyInsightInfoResp pendingForDeletionKeyInfo) {
 
@@ -257,7 +257,7 @@ public class OMDBInsightEndpoint {
         if (seekKeyValue == null ||
             (StringUtils.isNotBlank(prevKeyPrefix) &&
                 !seekKeyValue.getKey().equals(prevKeyPrefix))) {
-          return pendingForDeletionKeyInfo;
+          return;
         }
       }
       while (keyIter.hasNext()) {
@@ -295,10 +295,9 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return pendingForDeletionKeyInfo;
   }
 
-  private KeyInsightInfoResp getPendingForDeletionKeyInfo(
+  private void getPendingForDeletionKeyInfo(
       int limit,
       String prevKeyPrefix,
       KeyInsightInfoResp deletedKeyAndDirInsightInfo) {
@@ -322,7 +321,7 @@ public class OMDBInsightEndpoint {
         if (seekKeyValue == null ||
             (StringUtils.isNotBlank(prevKeyPrefix) &&
                 !seekKeyValue.getKey().equals(prevKeyPrefix))) {
-          return deletedKeyAndDirInsightInfo;
+          return;
         }
       }
       while (keyIter.hasNext()) {
@@ -349,7 +348,6 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return deletedKeyAndDirInsightInfo;
   }
 
   private void updateReplicatedAndUnReplicatedTotal(
@@ -368,7 +366,7 @@ public class OMDBInsightEndpoint {
   /** This method retrieves set of keys/files/dirs which are mapped to
    * containers in DELETED state in SCM. */
   @GET
-  @Path("deletedcontainerkeys")
+  @Path("/keys/deletedContainers")
   public Response getDeletedContainerKeysInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
