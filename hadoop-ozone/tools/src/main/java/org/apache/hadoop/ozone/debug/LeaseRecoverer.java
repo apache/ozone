@@ -18,14 +18,12 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.RootedOzoneFileSystem;
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
