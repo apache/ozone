@@ -1223,6 +1223,7 @@ message PurgePathsResponse {
 
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
+  optional string snapshotTableKey = 2;
 }
 
 message PurgeDirectoriesResponse {
@@ -1714,6 +1715,7 @@ message SnapshotMoveDeletedKeysRequest {
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
   repeated SnapshotMoveKeyInfos reclaimKeys = 3;
   repeated hadoop.hdds.KeyValue renamedKeys = 4;
+  repeated string deletedDirsToMove = 5;
 }
 
 message SnapshotMoveKeyInfos {

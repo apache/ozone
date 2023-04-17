@@ -38,6 +38,7 @@ OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
 OZONE-SITE.XML_ozone.scm.ratis.enable=true
+OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
 

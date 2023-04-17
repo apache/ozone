@@ -1544,7 +1544,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  private OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
+  public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
                                        OmSnapshotManager snapshotManager)
       throws IOException {
 
@@ -1845,6 +1845,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public String getOzoneDeletePathKey(long objectId, String pathKey) {
     return pathKey + OM_KEY_PREFIX + objectId;
+  }
+
+  @Override
+  public String getOzoneDeletePathDirKey(String ozoneDeletePath) {
+    return ozoneDeletePath.substring(0,
+        ozoneDeletePath.lastIndexOf(OM_KEY_PREFIX));
   }
 
   @Override
