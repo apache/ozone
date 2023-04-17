@@ -94,6 +94,7 @@ import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
@@ -111,7 +112,9 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
 import org.apache.ratis.util.ExitUtils;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.jooq.DSLContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,9 +157,12 @@ public class ReconStorageContainerManagerFacade
   private AtomicBoolean isSyncDataFromSCMRunning;
 
   @Inject
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
+      ContainerCountBySizeDao containerCountBySizeDao,
+      DSLContext dslContext,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,
@@ -223,6 +229,14 @@ public class ReconStorageContainerManagerFacade
         containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
         containerPlacementPolicy, reconTaskConfig);
+
+    ContainerSizeCountTask containerSizeCountTask = new ContainerSizeCountTask(
+        containerManager,
+        scmServiceProvider,
+        reconTaskStatusDao,
+        reconTaskConfig,
+        containerCountBySizeDao,
+        dslContext);
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
@@ -298,6 +312,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconScmTasks.add(containerSizeCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);

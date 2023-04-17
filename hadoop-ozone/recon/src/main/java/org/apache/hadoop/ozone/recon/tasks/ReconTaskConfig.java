@@ -83,4 +83,23 @@ public class ReconTaskConfig {
   public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
     this.safeModeWaitThreshold = safeModeWaitThreshold.toMillis();
   }
+
+  @Config(key = "containercounttask.interval",
+      type = ConfigType.TIME,
+      defaultValue = "300s",
+      tags = { ConfigTag.RECON, ConfigTag.OZONE },
+      description = "The time interval of the periodic check for " +
+          "container size distribution in the cluster as reported "
+  )
+  private long containerSizeCountTaskInterval =
+      Duration.ofMinutes(1).toMillis();
+
+  public Duration getContainerSizeCountTaskInterval() {
+    return Duration.ofMillis(missingContainerTaskInterval);
+  }
+
+  public void setContainerSizeCountTaskInterval(Duration interval) {
+    this.missingContainerTaskInterval = interval.toMillis();
+  }
+
 }
