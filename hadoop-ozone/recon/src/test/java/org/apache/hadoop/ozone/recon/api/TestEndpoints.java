@@ -52,6 +52,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -61,11 +63,14 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -76,6 +81,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -133,6 +139,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ClusterStateEndpoint clusterStateEndpoint;
   private UtilizationEndpoint utilizationEndpoint;
   private MetricsProxyEndpoint metricsProxyEndpoint;
+  private OMEndpoint omEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
   private TableCountTask tableCountTask;
@@ -223,6 +230,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .withContainerDB()
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
+            .addBinding(OMEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(UtilizationEndpoint.class)
@@ -232,6 +240,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
+    omEndpoint = reconTestInjector.getInstance(OMEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
@@ -378,8 +387,23 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
             .setVolume("sampleVol2")
-            .setAdminName("TestUser")
-            .setOwnerName("TestUser")
+            .setAdminName("TestUser2")
+            .setOwnerName("TestUser2")
+            .setQuotaInBytes(OzoneConsts.GB)
+            .setQuotaInNamespace(1000)
+            .setUsedNamespace(500)
+            .addOzoneAcls(new OzoneAcl(
+                IAccessAuthorizer.ACLIdentityType.USER,
+                "TestUser2",
+                IAccessAuthorizer.ACLType.WRITE,
+                OzoneAcl.AclScope.ACCESS
+            ))
+            .addOzoneAcls(new OzoneAcl(
+                IAccessAuthorizer.ACLIdentityType.USER,
+                "TestUser2",
+                IAccessAuthorizer.ACLType.READ,
+                OzoneAcl.AclScope.ACCESS
+            ))
             .build();
     reconOMMetadataManager.getVolumeTable().put(volumeKey, args);
 
@@ -752,6 +776,66 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
+  }
+
+  private void testVolumeResponse(VolumeMetadata volumeMetadata)
+      throws IOException {
+    String volumeName = volumeMetadata.getVolume();
+    switch (volumeName) {
+    case "sampleVol":
+      assertEquals("TestUser", volumeMetadata.getOwner());
+      assertEquals("TestUser", volumeMetadata.getAdmin());
+      assertEquals(-1, volumeMetadata.getQuotaInBytes());
+      assertEquals(-1, volumeMetadata.getQuotaInNamespace());
+      assertEquals(0, volumeMetadata.getUsedNamespace());
+      assertEquals(0, volumeMetadata.getAcls().size());
+      break;
+    case "sampleVol2":
+      assertEquals("TestUser2", volumeMetadata.getOwner());
+      assertEquals("TestUser2", volumeMetadata.getAdmin());
+      assertEquals(OzoneConsts.GB, volumeMetadata.getQuotaInBytes());
+      assertEquals(1000, volumeMetadata.getQuotaInNamespace());
+      assertEquals(500, volumeMetadata.getUsedNamespace());
+
+      assertEquals(1, volumeMetadata.getAcls().size());
+      AclMetadata acl = volumeMetadata.getAcls().get(0);
+      assertEquals("TestUser2", acl.getName());
+      assertEquals("USER", acl.getType());
+      assertEquals("ACCESS", acl.getScope());
+
+      assertEquals(2, acl.getAclList().size());
+
+      if (acl.getAclList().get(0).equals("WRITE")) {
+        assertEquals("READ", acl.getAclList().get(1));
+      } else if (acl.getAclList().get(0).equals("READ")) {
+        assertEquals("WRITE", acl.getAclList().get(1));
+      } else {
+        Assertions.fail(String.format("ACL %s is not recognized",
+            acl.getAclList().get(0)));
+      }
+      break;
+    default:
+      Assertions.fail(String.format("Volume %s not registered",
+          volumeName));
+    }
+
+  }
+
+  @Test
+  public void testGetVolumes() throws Exception {
+    Response response = omEndpoint.getVolumes();
+    VolumesResponse volumesResponse =
+        (VolumesResponse) response.getEntity();
+    Assertions.assertEquals(2, volumesResponse.getTotalCount());
+    Assertions.assertEquals(2, volumesResponse.getVolumes().size());
+
+    volumesResponse.getVolumes().forEach(volumeMetadata -> {
+      try {
+        testVolumeResponse(volumeMetadata);
+      } catch (IOException e) {
+        Assertions.fail(e.getMessage());
+      }
+    });
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

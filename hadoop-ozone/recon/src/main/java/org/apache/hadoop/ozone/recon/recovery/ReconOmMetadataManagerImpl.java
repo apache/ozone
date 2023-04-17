@@ -24,6 +24,10 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -31,10 +35,16 @@ import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
+import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,5 +153,73 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   @Override
   public boolean isOmTablesInitialized() {
     return omTablesInitialized;
+  }
+
+  /**
+   * Return all volumes in the file system.
+   * This method can be optimized by using username as a filter.
+   * @return a list of volume names under the system
+   */
+  @Override
+  public List<VolumeMetadata> getAllVolumes() throws IOException {
+    // TODO: Maybe reuse the listVolumes from OmMetadataManager
+    List<VolumeMetadata> result = new ArrayList<>();
+    Table<String, OmVolumeArgs> volumeTable = getVolumeTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
+             iterator = volumeTable.iterator()) {
+
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
+
+        OmVolumeArgs omVolumeArgs = kv.getValue();
+        if (omVolumeArgs != null) {
+          result.add(toVolumeMetadata(omVolumeArgs));
+        }
+      }
+    }
+    return result;
+  }
+
+  private VolumeMetadata toVolumeMetadata(OmVolumeArgs omVolumeArgs) {
+    if (omVolumeArgs == null) {
+      return null;
+    }
+
+    VolumeMetadata.Builder builder = VolumeMetadata.newBuilder();
+
+    List<AclMetadata> acls = new ArrayList<>();
+    if (omVolumeArgs.getAcls() != null) {
+      acls = omVolumeArgs.getAcls().stream()
+          .map(this::toAclMetadata).collect(Collectors.toList());
+    }
+
+    return builder.withVolume(omVolumeArgs.getVolume())
+        .withOwner(omVolumeArgs.getOwnerName())
+        .withAdmin(omVolumeArgs.getAdminName())
+        .withCreationTime(Instant.ofEpochMilli(omVolumeArgs.getCreationTime()))
+        .withModificationTime(
+            Instant.ofEpochMilli(omVolumeArgs.getModificationTime()))
+        .withQuotaInBytes(omVolumeArgs.getQuotaInBytes())
+        .withQuotaInNamespace(
+            omVolumeArgs.getQuotaInNamespace())
+        .withUsedNamespace(omVolumeArgs.getUsedNamespace())
+        .withAcls(acls)
+        .build();
+  }
+
+  private AclMetadata toAclMetadata(OzoneAcl ozoneAcl) {
+    if (ozoneAcl == null) {
+      return null;
+    }
+
+    AclMetadata.Builder builder = AclMetadata.newBuilder();
+
+    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
+        .withName(ozoneAcl.getName())
+        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
+        .withAclList(ozoneAcl.getAclList().stream().map(Enum::toString)
+            .map(String::toUpperCase)
+            .collect(Collectors.toList()))
+        .build();
   }
 }

@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.recon.recovery;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 
 /**
  * Interface for the OM Metadata Manager + DB store maintained by
@@ -47,4 +49,9 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * @return true if OM Tables are initialized, otherwise false.
    */
   boolean isOmTablesInitialized();
+
+  /**
+   * Return all volumes in the file system.
+   */
+  List<VolumeMetadata> getAllVolumes() throws IOException;
 }
