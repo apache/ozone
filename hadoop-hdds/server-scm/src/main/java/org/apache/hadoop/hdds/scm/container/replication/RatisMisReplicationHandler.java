@@ -28,9 +28,9 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Handles the Ratis mis replication processing and forming the respective SCM
@@ -72,28 +72,24 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
+    long containerID = containerInfo.getContainerID();
+    List<DatanodeDetails> sources = replicasToBeReplicated.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+
     int commandsSent = 0;
-    int datanodeIdx = 0;
-    for (ContainerReplica replica : replicasToBeReplicated) {
-      if (datanodeIdx == targetDns.size()) {
-        break;
-      }
-      long containerID = containerInfo.getContainerID();
-      DatanodeDetails source = replica.getDatanodeDetails();
-      DatanodeDetails target = targetDns.get(datanodeIdx);
+    for (DatanodeDetails target : targetDns) {
       if (replicationManager.getConfig().isPush()) {
         replicationManager.sendThrottledReplicationCommand(containerInfo,
-            Collections.singletonList(source), target,
-            replica.getReplicaIndex());
+            sources, target, 0);
       } else {
         ReplicateContainerCommand cmd = ReplicateContainerCommand
-            .fromSources(containerID, Collections.singletonList(source));
-        updateReplicateCommand(cmd, replica);
+            .fromSources(containerID, sources);
         replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
       }
       commandsSent++;
-      datanodeIdx += 1;
     }
+
     return commandsSent;
   }
 }
