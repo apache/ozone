@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,18 +76,18 @@ public class Gateway extends GenericCli {
         OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
       //Setting ozone.http.basedir if not set so that server setup doesn't
       // fail.
-      Path tmpMetaDir = Files.createTempDirectory(Paths.get(""),
-          "ozone_s3g_tmp_base_dir");
+      File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
+          "ozone_s3g_tmp_base_dir").toFile();
       ShutdownHookManager.get().addShutdownHook(() -> {
         try {
-          FileUtils.deleteDirectory(tmpMetaDir.toFile());
+          FileUtils.deleteDirectory(tmpMetaDir);
         } catch (IOException e) {
           LOG.error("Failed to cleanup temporary S3 Gateway Metadir {}",
-              tmpMetaDir.toFile().getAbsolutePath(), e);
+              tmpMetaDir.getAbsolutePath(), e);
         }
       }, 0);
       ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
-          tmpMetaDir.toFile().getAbsolutePath());
+          tmpMetaDir.getAbsolutePath());
     }
   }
 
