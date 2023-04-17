@@ -74,8 +74,8 @@ public class Gateway extends GenericCli {
       throws IOException {
     if (StringUtils.isEmpty(ozoneConfiguration.get(
         OzoneConfigKeys.OZONE_HTTP_BASEDIR))) {
-      //Setting ozone.http.basedir if not set so that server setup doesn't
-      // fail.
+      //Setting ozone.http.basedir to cwd if not set so that server setup
+      // doesn't fail.
       File tmpMetaDir = Files.createTempDirectory(Paths.get(""),
           "ozone_s3g_tmp_base_dir").toFile();
       ShutdownHookManager.get().addShutdownHook(() -> {
