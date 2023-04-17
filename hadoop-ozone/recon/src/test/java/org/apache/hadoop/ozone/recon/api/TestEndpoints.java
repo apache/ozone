@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
@@ -64,6 +65,8 @@ import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
+import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
+import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
@@ -105,6 +108,8 @@ import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderIm
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -410,12 +415,52 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol2")
         .setBucketName("bucketOne")
+        .addAcl(new OzoneAcl(
+            IAccessAuthorizer.ACLIdentityType.GROUP,
+            "TestGroup2",
+            IAccessAuthorizer.ACLType.WRITE,
+            OzoneAcl.AclScope.ACCESS
+        ))
+        .setQuotaInBytes(OzoneConsts.GB)
+        .setUsedBytes(OzoneConsts.MB)
+        .setQuotaInNamespace(5)
+        .setStorageType(StorageType.DISK)
+        .setUsedNamespace(3)
+        .setBucketLayout(BucketLayout.LEGACY)
+        .setOwner("TestUser2")
+        .setIsVersionEnabled(false)
         .build();
 
     String bucketKey = reconOMMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
 
     reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
+
+    OmBucketInfo s3BucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName("s3v")
+        .setBucketName("sampleVol2-bucketOne")
+        .addAcl(new OzoneAcl(
+            IAccessAuthorizer.ACLIdentityType.GROUP,
+            "TestGroup2",
+            IAccessAuthorizer.ACLType.WRITE,
+            OzoneAcl.AclScope.ACCESS
+        ))
+        .setQuotaInBytes(OzoneConsts.GB)
+        .setUsedBytes(OzoneConsts.MB)
+        .setQuotaInNamespace(5)
+        .setUsedNamespace(3)
+        .setSourceVolume("sampleVol2")
+        .setSourceBucket("bucketOne")
+        .setStorageType(StorageType.DISK)
+        .setBucketLayout(BucketLayout.LEGACY)
+        .setOwner("TestUser2")
+        .setIsVersionEnabled(false)
+        .build();
+
+    String s3BucketKey = reconOMMetadataManager.getBucketKey(
+        s3BucketInfo.getVolumeName(), s3BucketInfo.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(s3BucketKey, s3BucketInfo);
 
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
@@ -653,7 +698,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
-    Assertions.assertEquals(2, clusterStateResponse.getBuckets());
+    Assertions.assertEquals(3, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
@@ -824,6 +869,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   @Test
   public void testGetVolumes() throws Exception {
     Response response = omEndpoint.getVolumes();
+    Assertions.assertEquals(200, response.getStatus());
     VolumesResponse volumesResponse =
         (VolumesResponse) response.getEntity();
     Assertions.assertEquals(2, volumesResponse.getTotalCount());
@@ -836,6 +882,71 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         Assertions.fail(e.getMessage());
       }
     });
+  }
+
+  private void testBucketResponse(BucketMetadata bucketMetadata)
+      throws IOException {
+    String bucketName = bucketMetadata.getBucketName();
+    switch (bucketName) {
+    case "bucketOne":
+      assertEquals("sampleVol2", bucketMetadata.getVolumeName());
+      assertEquals("DISK", bucketMetadata.getStorageType());
+      assertNull(bucketMetadata.getSourceVolume());
+      assertNull(bucketMetadata.getSourceBucket());
+      assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());
+      assertEquals(OzoneConsts.MB, bucketMetadata.getUsedBytes());
+      assertEquals(5, bucketMetadata.getQuotaInNamespace());
+      assertEquals(3, bucketMetadata.getUsedNamespace());
+      assertFalse(bucketMetadata.isVersionEnabled());
+      assertEquals("LEGACY", bucketMetadata.getBucketLayout());
+      assertEquals("TestUser2", bucketMetadata.getOwner());
+
+
+      assertEquals(1, bucketMetadata.getAcls().size());
+      AclMetadata acl = bucketMetadata.getAcls().get(0);
+      assertEquals("TestGroup2", acl.getName());
+      assertEquals("GROUP", acl.getType());
+      assertEquals("ACCESS", acl.getScope());
+      assertEquals(1, acl.getAclList().size());
+      assertEquals("WRITE", acl.getAclList().get(0));
+      break;
+    default:
+      Assertions.fail(String.format("Bucket %s not registered",
+          bucketName));
+    }
+
+  }
+
+  @Test
+  public void testGetBuckets() throws Exception {
+    // Normal bucket under a volume
+    Response response = omEndpoint.getBuckets("sampleVol2");
+    Assertions.assertEquals(200, response.getStatus());
+    BucketsResponse bucketUnderVolumeResponse =
+        (BucketsResponse) response.getEntity();
+    Assertions.assertEquals(1, bucketUnderVolumeResponse.getTotalCount());
+    Assertions.assertEquals(1,
+        bucketUnderVolumeResponse.getBuckets().size());
+
+    bucketUnderVolumeResponse.getBuckets().forEach(bucketMetadata -> {
+      try {
+        testBucketResponse(bucketMetadata);
+      } catch (IOException e) {
+        Assertions.fail(e.getMessage());
+      }
+    });
+
+    // Listing all buckets
+    Response response3 = omEndpoint.getBuckets(null);
+    Assertions.assertEquals(200, response3.getStatus());
+    BucketsResponse allBucketsResponse =
+        (BucketsResponse) response3.getEntity();
+
+    // Include bucketOne under sampleVol in
+    // A sample volume (sampleVol) and a bucket (bucketOne) is already created
+    // in initializeNewOmMetadataManager.
+    Assertions.assertEquals(3, allBucketsResponse.getTotalCount());
+    Assertions.assertEquals(3, allBucketsResponse.getBuckets().size());
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

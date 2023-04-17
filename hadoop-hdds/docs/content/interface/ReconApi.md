@@ -491,6 +491,98 @@ Returns a summary of the current state of the Ozone cluster.
      }
 ```
 
+## Volumes
+
+### GET /api/v1/om/volumes
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Returns all the volumes in the cluster.
+
+```json
+     {
+     	"totalCount": 4,
+     	"volumes": [{
+          "volume": "vol1",
+          "owner": "testuser",
+          "admin": "ozone",
+          "creationTime": "2019-11-26T21:18:43.688Z",
+          "modificationTime": "2019-11-26T21:18:46.062Z",
+          "quotaInNamespace": 2048,
+          "quotaInBytes": 1073741824,
+          "usedNamespace": 10,
+          "acls": [
+            {
+              "type": "USER",
+              "name": "testuser",
+              "scope": "ACCESS",
+              "aclList": [
+                "WRITE",
+                "READ",
+                "DELETE"
+              ]
+            }
+          ]
+        },
+        ...
+        ]
+     }
+```
+
+## Buckets
+
+### GET /api/v1/om/buckets
+
+**Parameters**
+
+* volume (optional)
+
+  The volume in string without any protocol prefix.
+  
+
+**Returns**
+
+Returns all the volumes in the cluster if volume is not specified or it is an empty string. 
+If `volume` is specified, it returns only the buckets under `volume`.
+
+```json
+     {
+     	"totalCount": 5,
+     	"buckets": [{{
+          "volumeName": "vol1",
+          "bucketName": "buck1",
+          "isVersionEnabled": false,
+          "storageType": "DISK",
+          "creationTime": "2019-11-26T21:19:20.855Z",
+          "modificationTime": "2019-11-26T21:19:20.991Z",
+          "usedBytes": 943718400,
+          "usedNamespace": 40000,
+          "quotaInBytes": 1073741824,
+          "quotaInNamespace": 50000,
+          "owner": "testuser",
+          "bucketLayout": "OBJECT_STORE",
+          "acls": [
+            {
+              "type": "USER",
+              "name": "testuser",
+              "scope": "ACCESS",
+              "aclList": [
+                "WRITE",
+                "READ",
+                "DELETE"
+              ]
+            }
+          ]
+        },
+        ...
+        ]
+     }
+```
+
 ## Datanodes
 
 ### GET /api/v1/datanodes

@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
+import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -28,6 +30,7 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -38,7 +41,6 @@ import java.util.List;
  */
 @Path("/om")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class OMEndpoint {
 
   private static final Logger LOG =
@@ -59,6 +61,17 @@ public class OMEndpoint {
     VolumesResponse volumesResponse =
         new VolumesResponse(volumes.size(), volumes);
     return Response.ok(volumesResponse).build();
+  }
+
+  @GET
+  @Path("/buckets")
+  public Response getBuckets(@QueryParam("volume") String volume)
+      throws IOException {
+    List<BucketMetadata> buckets = omMetadataManager
+        .listBucketsUnderVolume(volume);
+    BucketsResponse bucketsResponse =
+        new BucketsResponse(buckets.size(), buckets);
+    return Response.ok(bucketsResponse).build();
   }
 
 }

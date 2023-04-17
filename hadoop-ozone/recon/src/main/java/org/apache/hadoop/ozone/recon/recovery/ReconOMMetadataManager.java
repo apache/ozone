@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
 import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 
 /**
@@ -52,6 +53,14 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Return all volumes in the file system.
+   * @return all the volumes from the OM DB
    */
   List<VolumeMetadata> getAllVolumes() throws IOException;
+
+  /**
+   * List all buckets under a volume.
+   * @return buckets under volume or all buckets if volume is null
+   */
+  List<BucketMetadata> listBucketsUnderVolume(
+      String volumeName) throws IOException;
 }
