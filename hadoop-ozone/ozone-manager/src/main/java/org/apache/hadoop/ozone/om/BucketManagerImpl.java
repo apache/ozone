@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 
@@ -119,11 +120,10 @@ public class BucketManagerImpl implements BucketManager {
       throw new IllegalArgumentException("Unexpected argument passed to " +
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-        Pair.of(obj.getVolumeName(), obj.getBucketName()), false);
-    String volume = resolvedBucket.realVolume();
-    String bucket = resolvedBucket.realBucket();
-
+    // bucket getAcl operation does not need resolveBucketLink in server side
+    // see: hadoop-hdds/docs/content/design/volume-management.md
+    String volume = obj.getVolumeName();
+    String bucket = obj.getBucketName();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);
@@ -152,15 +152,22 @@ public class BucketManagerImpl implements BucketManager {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
 
-    ResolvedBucket resolvedBucket;
-    try {
-      resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()), false);
-    } catch (IOException e) {
-      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    String volume;
+    String bucket;
+    if (context.getAclRights() == ACLType.DELETE) {
+      volume = ozObject.getVolumeName();
+      bucket = ozObject.getBucketName();
+    } else {
+      try {
+        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(
+            ozObject.getVolumeName(), ozObject.getBucketName()), false);
+        volume = resolvedBucket.realVolume();
+        bucket = resolvedBucket.realBucket();
+      } catch (IOException e) {
+        throw new OMException("Failed to resolveBucketLink: ", e,
+            INTERNAL_ERROR);
+      }
     }
-    String volume = resolvedBucket.realVolume();
-    String bucket = resolvedBucket.realBucket();
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {

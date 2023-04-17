@@ -48,6 +48,11 @@ Setup ACL tests
     Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
     Execute             ozone sh bucket addacl --acl user:testuser2:x ${target}/link-to-unreadable-bucket
 
+Verify Bucket ACL
+    [arguments]         ${bucket_type}   ${object}    ${type}   ${name}    ${acls}
+    ${actual_acls} =    Execute          ozone sh bucket getacl --type ${bucket_type} ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
+                        Should Be Equal    ${acls}    ${actual_acls}
+
 Can follow link with read access
     Execute             kdestroy
     Run Keyword         Kinit test user             testuser2         testuser2.keytab
@@ -130,10 +135,14 @@ Bucket info shows source
                         Should Contain              ${result}            creationTime
                         Should Not contain          ${result}            metadata
 
-Source and target bucket have same ACLs
+Source and target bucket have separate ACLs
     Execute             ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
     Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
     Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify Bucket ACL   SOURCE    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify Bucket ACL   TARGET    ${target}/link1      USER    user1    ${EMPTY}
+
+Source and target bucket default list same ACLs
     Execute             ozone sh bucket removeacl --acl user:user1:y ${target}/link1
     Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL
     Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE READ_ACL

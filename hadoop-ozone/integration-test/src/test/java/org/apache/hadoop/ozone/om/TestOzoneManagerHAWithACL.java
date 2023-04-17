@@ -447,7 +447,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     Assert.assertFalse(removeAcl);
 
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
-    Assert.assertTrue(addAcl); // 加进来了
+    Assert.assertTrue(addAcl);
 
     // Just changed acl type here to write, rest all is same as defaultUserAcl.
     OzoneAcl modifiedUserAcl = new OzoneAcl(USER, remoteUserName,
