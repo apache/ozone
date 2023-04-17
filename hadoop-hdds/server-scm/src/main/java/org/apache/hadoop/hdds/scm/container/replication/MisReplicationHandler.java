@@ -118,7 +118,7 @@ public abstract class MisReplicationHandler implements
   protected abstract int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
-      List<DatanodeDetails> targetDns)
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException;
 
   @Override
@@ -171,9 +171,12 @@ public abstract class MisReplicationHandler implements
     int requiredNodes = replicasToBeReplicated.size();
     List<DatanodeDetails> targetDatanodes = getTargetDatanodes(usedDns,
            excludedDns, container, requiredNodes);
+    List<DatanodeDetails> availableSources = sources.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
 
     int count = sendReplicateCommands(container, replicasToBeReplicated,
-        targetDatanodes);
+        availableSources, targetDatanodes);
 
     int found = targetDatanodes.size();
     if (found < requiredNodes) {

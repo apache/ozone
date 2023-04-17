@@ -60,7 +60,7 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
   protected int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
-      List<DatanodeDetails> targetDns)
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
     int commandsSent = 0;

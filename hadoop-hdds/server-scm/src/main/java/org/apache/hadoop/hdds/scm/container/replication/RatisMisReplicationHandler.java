@@ -30,7 +30,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Handles the Ratis mis replication processing and forming the respective SCM
@@ -63,13 +62,10 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
   protected int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
-      List<DatanodeDetails> targetDns)
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
     long containerID = containerInfo.getContainerID();
-    List<DatanodeDetails> sources = replicasToBeReplicated.stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
 
     int commandsSent = 0;
     for (DatanodeDetails target : targetDns) {
