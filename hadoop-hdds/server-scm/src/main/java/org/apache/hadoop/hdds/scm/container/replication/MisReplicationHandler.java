@@ -59,8 +59,8 @@ public abstract class MisReplicationHandler implements
   private final ReplicationManager replicationManager;
 
   public MisReplicationHandler(
-          final PlacementPolicy<ContainerReplica> containerPlacement,
-          final ConfigurationSource conf, ReplicationManager replicationManager) {
+      final PlacementPolicy<ContainerReplica> containerPlacement,
+      final ConfigurationSource conf, ReplicationManager replicationManager) {
     this.containerPlacement = containerPlacement;
     this.currentContainerSize = (long) conf.getStorageSize(
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
