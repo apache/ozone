@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,9 +114,6 @@ public abstract class MisReplicationHandler implements
             == HddsProtos.NodeOperationalState.IN_SERVICE)
         .collect(Collectors.toSet());
   }
-
-  protected abstract ReplicateContainerCommand updateReplicateCommand(
-          ReplicateContainerCommand command, ContainerReplica replica);
 
   protected abstract int sendReplicateCommands(
       ContainerInfo containerInfo,

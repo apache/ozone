@@ -57,16 +57,6 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand updateReplicateCommand(
-          ReplicateContainerCommand command, ContainerReplica replica) {
-    // For EC containers, we need to track the replica index which is
-    // to be replicated, so add it to the command.
-    command.setReplicaIndex(replica.getReplicaIndex());
-    return command;
-  }
-
-
-  @Override
   protected int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
@@ -89,7 +79,9 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
       } else {
         ReplicateContainerCommand cmd = ReplicateContainerCommand
             .fromSources(containerID, Collections.singletonList(source));
-        updateReplicateCommand(cmd, replica);
+        // For EC containers, we need to track the replica index which is
+        // to be replicated, so add it to the command.
+        cmd.setReplicaIndex(replica.getReplicaIndex());
         replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
       }
       commandsSent++;

@@ -60,12 +60,6 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand updateReplicateCommand(
-          ReplicateContainerCommand command, ContainerReplica replica) {
-    return command;
-  }
-
-  @Override
   protected int sendReplicateCommands(
       ContainerInfo containerInfo,
       Set<ContainerReplica> replicasToBeReplicated,
