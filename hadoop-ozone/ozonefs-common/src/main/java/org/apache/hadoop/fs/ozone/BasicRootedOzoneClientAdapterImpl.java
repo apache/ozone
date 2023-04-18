@@ -1282,4 +1282,13 @@ public class BasicRootedOzoneClientAdapterImpl
             ofsPath.getBucketName(),
             snapshotName);
   }
+
+  public boolean recoverLease(final Path f) throws IOException {
+    OFSPath ofsPath = new OFSPath(f, config);
+
+    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
+            volume.getName(), bucket.getName(), ofsPath.getKeyName());
+  }
 }

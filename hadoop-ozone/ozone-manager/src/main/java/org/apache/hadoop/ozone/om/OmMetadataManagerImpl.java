@@ -709,7 +709,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Stop metadata manager.
    */
   @Override
-  public void stop() throws Exception {
+  public void stop() throws IOException {
     if (store != null) {
       store.close();
       store = null;
@@ -1544,7 +1544,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  private OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
+  public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
                                        OmSnapshotManager snapshotManager)
       throws IOException {
 
@@ -1848,6 +1848,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String getOzoneDeletePathDirKey(String ozoneDeletePath) {
+    return ozoneDeletePath.substring(0,
+        ozoneDeletePath.lastIndexOf(OM_KEY_PREFIX));
+  }
+
+  @Override
   public String getOpenFileName(long volumeId, long bucketId,
                                 long parentID, String fileName,
                                 long id) {
@@ -1869,7 +1875,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
-
   @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,
