@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -72,6 +73,7 @@ public abstract class TestMisReplicationHandler {
   protected void setup(ReplicationConfig repConfig)
       throws NodeNotFoundException, CommandTargetOverloadedException,
       NotLeaderException {
+    conf = SCMTestUtils.getConf();
 
     replicationManager = Mockito.mock(ReplicationManager.class);
     Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
@@ -80,6 +82,10 @@ public abstract class TestMisReplicationHandler {
           return new NodeStatus(dd.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY, 0);
         });
+    ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(rmConf);
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendDatanodeCommand(
@@ -87,7 +93,6 @@ public abstract class TestMisReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
         replicationManager, commandsSent);
 
-    conf = SCMTestUtils.getConf();
     container = ReplicationTestUtil
             .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     NodeSchema[] schemas =
@@ -162,6 +167,11 @@ public abstract class TestMisReplicationHandler {
                       return false;
                     }));
 
+    Set<DatanodeDetails> sourceDns = sources.entrySet().stream()
+        .filter(Map.Entry::getValue)
+        .map(Map.Entry::getKey)
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toSet());
     Set<ContainerReplica> copy = sources.entrySet().stream()
             .filter(Map.Entry::getValue).limit(misreplicationCount)
             .map(Map.Entry::getKey).collect(Collectors.toSet());
@@ -187,7 +197,7 @@ public abstract class TestMisReplicationHandler {
                 return targetNodes;
               });
     }
-    Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
+    Map<DatanodeDetails, Integer> replicaIndexMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
     try {
@@ -204,11 +214,15 @@ public abstract class TestMisReplicationHandler {
             container.getContainerID());
         DatanodeDetails replicateSrcDn = pair.getKey();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
-        Assertions.assertTrue(copyReplicaIdxMap.containsKey(replicateSrcDn));
+        Assertions.assertTrue(sourceDns.contains(replicateSrcDn));
         Assertions.assertTrue(targetNodes.contains(target));
-        Assertions.assertEquals(copyReplicaIdxMap.get(replicateSrcDn),
-            replicateContainerCommand.getReplicaIndex());
+        int replicaIndex = replicateContainerCommand.getReplicaIndex();
+        assertReplicaIndex(replicaIndexMap, replicateSrcDn, replicaIndex);
       }
     }
   }
+
+  protected abstract void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex);
 }
