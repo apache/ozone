@@ -34,9 +34,11 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -68,10 +70,10 @@ public class TestSnapshotDeletingService {
   private static boolean omRatisEnabled = true;
   private static final String CONTENT = "testContent";
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneManager om;
-  private static OzoneBucket bucket1;
-  private static OzoneClient client;
+  private MiniOzoneCluster cluster;
+  private OzoneManager om;
+  private OzoneBucket bucket1;
+  private OzoneClient client;
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME_ONE = "bucket1";
   private static final String BUCKET_NAME_TWO = "bucket2";
@@ -188,6 +190,141 @@ public class TestSnapshotDeletingService {
     verifySnapshotChain(delSnapInfo, null);
   }
 
+  @Test
+  public void testSnapshotWithFSO() throws Exception {
+    Table<String, OmDirectoryInfo> dirTable =
+        om.getMetadataManager().getDirectoryTable();
+    Table<String, OmKeyInfo> keyTable =
+        om.getMetadataManager().getFileTable();
+    Table<String, RepeatedOmKeyInfo> deletedTable =
+        om.getMetadataManager().getDeletedTable();
+    Table<String, OmKeyInfo>  deletedDirTable =
+        om.getMetadataManager().getDeletedDirTable();
+    Table<String, String> renamedKeyTable =
+        om.getMetadataManager().getSnapshotRenamedKeyTable();
+    DirectoryDeletingService dirDeletingService = (DirectoryDeletingService)
+        om.getKeyManager().getDirDeletingService();
+    // TODO: [SNAPSHOT] Enable after HDDS-8064.
+    dirDeletingService.suspend();
+
+    BucketArgs bucketArgs = new BucketArgs.Builder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+
+    OzoneBucket bucket2 = TestDataUtil.createBucket(
+        client, VOLUME_NAME, bucketArgs, BUCKET_NAME_TWO);
+
+    // Create 10 keys
+    for (int i = 1; i <= 10; i++) {
+      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
+          ReplicationType.RATIS, CONTENT);
+    }
+
+    // Create Directory and Sub
+    for (int i = 1; i <= 3; i++) {
+      String parent = "parent" + i;
+      client.getProxy().createDirectory(VOLUME_NAME,
+          BUCKET_NAME_TWO, parent);
+      for (int j = 1; j <= 3; j++) {
+        String childFile = "/childFile" + j;
+        String childDir = "/childDir" + j;
+        client.getProxy().createDirectory(VOLUME_NAME,
+            BUCKET_NAME_TWO, parent + childDir);
+        TestDataUtil.createKey(bucket2, parent + childFile,
+            ReplicationFactor.THREE, ReplicationType.RATIS, CONTENT);
+      }
+    }
+
+    // Total 12 dirs, 19 keys.
+    assertTableRowCount(dirTable, 12);
+    assertTableRowCount(keyTable, 19);
+    assertTableRowCount(deletedDirTable, 0);
+
+    // Create Snapshot1
+    client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+        "snap1");
+
+    // Delete 5 Keys
+    for (int i = 1; i <= 5; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
+          "key" + i, false);
+    }
+    // Rename Keys 3 keys
+    for (int i = 6; i <= 8; i++) {
+      client.getProxy().renameKey(VOLUME_NAME, BUCKET_NAME_TWO, "key" + i,
+          "renamedKey" + i);
+    }
+    // Delete 2 Dirs
+    for (int i = 1; i <= 2; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO, "/parent" + i,
+          true);
+    }
+
+    assertTableRowCount(renamedKeyTable, 3);
+    // Delete Renamed Keys
+    for (int i = 6; i <= 8; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
+          "renamedKey" + i, false);
+    }
+
+    assertTableRowCount(deletedTable, 8);
+    assertTableRowCount(deletedDirTable, 2);
+    assertTableRowCount(dirTable, 10);
+    assertTableRowCount(renamedKeyTable, 3);
+
+    // Create Snapshot2
+    client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+        "snap2");
+
+    // Once snapshot is taken renamedTable, deletedTable should be cleaned
+    assertTableRowCount(renamedKeyTable, 0);
+    assertTableRowCount(deletedTable, 0);
+    // TODO: [SNAPSHOT] Once HDDS-8064 is done, This should be
+    // zero. As there shouldn't be directory expansion happening.
+    assertTableRowCount(deletedDirTable, 2);
+
+    // Delete 2 more keys
+    for (int i = 9; i <= 10; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
+          "key" + i, false);
+    }
+
+    assertTableRowCount(deletedTable, 2);
+
+    // Create Snapshot3
+    client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+        "snap3");
+
+    assertTableRowCount(renamedKeyTable, 0);
+    assertTableRowCount(deletedDirTable, 2);
+    assertTableRowCount(deletedTable, 0);
+    assertTableRowCount(keyTable, 9);
+    SnapshotInfo deletedSnap = om.getMetadataManager()
+        .getSnapshotInfoTable().get("/vol1/bucket2/snap2");
+
+    client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+        "snap2");
+
+    // Once all the tables are moved, the snapshot is deleted
+    assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
+
+    verifySnapshotChain(deletedSnap, "/vol1/bucket2/snap3");
+    OmSnapshot snap3 = (OmSnapshot) om.getOmSnapshotManager()
+        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+            getSnapshotPrefix("snap3"));
+
+    Table<String, OmKeyInfo> snapDeletedDirTable =
+        snap3.getMetadataManager().getDeletedDirTable();
+    Table<String, String> snapRenamedTable =
+        snap3.getMetadataManager().getSnapshotRenamedKeyTable();
+    Table<String, RepeatedOmKeyInfo> snapDeletedTable =
+        snap3.getMetadataManager().getDeletedTable();
+
+    assertTableRowCount(snapRenamedTable, 3);
+    assertTableRowCount(snapDeletedDirTable, 2);
+    // All the keys deleted before snapshot2 is moved to snap3
+    assertTableRowCount(snapDeletedTable, 10);
+  }
 
   /*
       Flow
@@ -279,7 +416,7 @@ public class TestSnapshotDeletingService {
       } catch (IOException e) {
         LOG.error("Error getting snapInfo.");
       }
-      return null;
+      return false;
     }, 100, 10000);
 
     if (nextSnapshot != null) {
@@ -322,7 +459,7 @@ public class TestSnapshotDeletingService {
     } catch (IOException ex) {
       fail("Snapshot doesn't exist: " + ex);
     }
-    return info.getSnapshotStatus() == snapshotStatus;
+    return info != null && info.getSnapshotStatus() == snapshotStatus;
   }
 }
 

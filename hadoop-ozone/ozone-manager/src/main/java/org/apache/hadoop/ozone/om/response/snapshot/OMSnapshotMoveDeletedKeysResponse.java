@@ -99,7 +99,17 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
              fromSnapshotStore.initBatchOperation()) {
       processReclaimKeys(fromSnapshotBatchOp,
           fromSnapshot.getMetadataManager());
+      deleteDirsFromSnapshot(fromSnapshotBatchOp);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
+    }
+  }
+
+  private void deleteDirsFromSnapshot(BatchOperation batchOp)
+      throws IOException {
+    for (String movedDirsKey : movedDirs) {
+      // Delete dirs from current snapshot that are moved to next snapshot.
+      fromSnapshot.getMetadataManager().getDeletedDirTable()
+          .deleteWithBatch(batchOp, movedDirsKey);
     }
   }
 
@@ -129,12 +139,12 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     for (String movedDirsKey : movedDirs) {
       OmKeyInfo keyInfo = fromSnapshot.getMetadataManager().getDeletedDirTable()
           .get(movedDirsKey);
+      if (keyInfo == null) {
+        continue;
+      }
       // Move deleted dirs to next snapshot or active DB
       omMetadataManager.getDeletedDirTable().putWithBatch(
           batchOp, movedDirsKey, keyInfo);
-      // Delete dirs from current snapshot that are moved to next snapshot.
-      fromSnapshot.getMetadataManager().getDeletedDirTable()
-          .deleteWithBatch(batchOp, movedDirsKey);
     }
   }
 

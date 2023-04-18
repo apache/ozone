@@ -583,6 +583,22 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
+  /**
+   * Suspend the service.
+   */
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
+  }
+
+  /**
+   * Resume the service if suspended.
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
+  }
+
   public long getSuccessfulRunCount() {
     return successRunCount.get();
   }
