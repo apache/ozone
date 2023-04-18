@@ -267,40 +267,40 @@ public class TestS3GetSecretRequest {
     String userPrincipalId = USER_ALICE;
 
     S3GetSecretRequest s3GetSecretRequest =
+        new S3GetSecretRequest(
             new S3GetSecretRequest(
-                    new S3GetSecretRequest(
-                            s3GetSecretRequest(userPrincipalId)
-                    ).preExecute(ozoneManager)
-            );
+                s3GetSecretRequest(userPrincipalId)
+            ).preExecute(ozoneManager)
+        );
     // Run validateAndUpdateCache for the first time
     OMClientResponse omClientResponse1 =
-            s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-                    1, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
+            1, ozoneManagerDoubleBufferHelper);
     // Check response type and cast
     Assert.assertTrue(omClientResponse1 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse1 =
-            (S3GetSecretResponse) omClientResponse1;
+        (S3GetSecretResponse) omClientResponse1;
     // Secret is returned the first time
     final S3SecretValue s3SecretValue1 =
-            s3GetSecretResponse1.getS3SecretValue();
+        s3GetSecretResponse1.getS3SecretValue();
     Assert.assertEquals(userPrincipalId, s3SecretValue1.getKerberosID());
     final String awsSecret1 = s3SecretValue1.getAwsSecret();
     Assert.assertNotNull(awsSecret1);
 
     final GetS3SecretResponse getS3SecretResponse1 =
-            s3GetSecretResponse1.getOMResponse().getGetS3SecretResponse();
+        s3GetSecretResponse1.getOMResponse().getGetS3SecretResponse();
     // The secret inside should be the same.
     final S3Secret s3Secret2 = getS3SecretResponse1.getS3Secret();
     Assert.assertEquals(userPrincipalId, s3Secret2.getKerberosID());
 
     // Run validateAndUpdateCache for the second time
     OMClientResponse omClientResponse2 =
-            s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-                    2, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
+            2, ozoneManagerDoubleBufferHelper);
     // Check response type and cast
     Assert.assertTrue(omClientResponse2 instanceof S3GetSecretResponse);
     final S3GetSecretResponse s3GetSecretResponse2 =
-            (S3GetSecretResponse) omClientResponse2;
+        (S3GetSecretResponse) omClientResponse2;
     // no secret is returned as it is the second time
     Assert.assertNull(s3GetSecretResponse2.getS3SecretValue());
   }
@@ -447,7 +447,7 @@ public class TestS3GetSecretRequest {
       Assert.assertNotNull(awsSecret1);
 
       final GetS3SecretResponse getS3SecretResponse =
-              s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
+          s3GetSecretResponse.getOMResponse().getGetS3SecretResponse();
       // The secret inside should be the same.
       final S3Secret s3Secret = getS3SecretResponse.getS3Secret();
       Assert.assertEquals(userPrincipalId, s3Secret.getKerberosID());
