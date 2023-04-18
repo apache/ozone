@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -73,6 +74,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  * Test for Snapshot feature with ACL.
  */
 @Timeout(value = 300)
+@Flaky("HDDS-8433")
 public class TestOzoneManagerSnapshotAcl {
 
   private static final String ADMIN_USER = "om";
