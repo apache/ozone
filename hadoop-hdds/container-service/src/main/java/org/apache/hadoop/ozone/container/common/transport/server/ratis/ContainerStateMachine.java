@@ -540,8 +540,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               write.getChunkData().getChunkName());
         }
         raftFuture.complete(r::toByteString);
-        metrics.recordWriteStateMachineCompletion(
-            Time.monotonicNow() - startTime);
+        metrics.recordWriteStateMachineNsCompletion(
+            Time.monotonicNowNanos() - startTime);
       }
 
       writeChunkFutureMap.remove(entryIndex);
@@ -621,7 +621,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public CompletableFuture<Message> write(LogEntryProto entry) {
     try {
       metrics.incNumWriteStateMachineOps();
-      long writeStateMachineStartTime = Time.monotonicNow();
+      long writeStateMachineStartTime = Time.monotonicNowNanos();
       ContainerCommandRequestProto requestProto =
           getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
@@ -878,7 +878,7 @@ public class ContainerStateMachine extends BaseStateMachine {
           new DispatcherContext.Builder().setTerm(trx.getLogEntry().getTerm())
               .setLogIndex(index);
 
-      long applyTxnStartTime = Time.monotonicNow();
+      long applyTxnStartTime = Time.monotonicNowNanos();
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
@@ -914,7 +914,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
-          metrics.incPipelineLatency(cmdType,
+          metrics.incPipelineLatencyMs(cmdType,
               (Time.monotonicNowNanos() - startTime) / 1000000L);
         }
         // ignore close container exception while marking the stateMachine
@@ -966,8 +966,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               + "{} exception {}", gid, requestProto.getCmdType(), index, t);
         }
         applyTransactionSemaphore.release();
-        metrics.recordApplyTransactionCompletion(
-            Time.monotonicNow() - applyTxnStartTime);
+        metrics.recordApplyTransactionNsCompletion(
+            Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;
     } catch (InterruptedException e) {

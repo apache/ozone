@@ -83,7 +83,7 @@ public class ContainerMetrics {
 
       for (int j = 0; j < len; j++) {
         int interval = intervals[j];
-        String quantileName = ContainerProtos.Type.forNumber(i + 1) + "Millis"
+        String quantileName = ContainerProtos.Type.forNumber(i + 1) + "Nanos"
             + interval + "s";
         opsLatQuantiles[i][j] = registry.newQuantiles(quantileName,
             "latency of Container ops", "ops", "latency", interval);

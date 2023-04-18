@@ -46,8 +46,15 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numBytesWrittenCount;
   private @Metric MutableCounterLong numBytesCommittedCount;
 
+  @Deprecated
+  //Use {@link transactionLatencyMS} instead
   private @Metric MutableRate transactionLatency;
+  @Deprecated
+  //Use {@link opsLatencyMS} instead
   private MutableRate[] opsLatency;
+  private @Metric MutableRate transactionLatencyMS;
+  private MutableRate[] opsLatencyMS;
+
   private MetricsRegistry registry = null;
 
   // Failure Metrics
@@ -62,16 +69,26 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numDataCacheMiss;
   private @Metric MutableCounterLong numDataCacheHit;
 
+  @Deprecated
+  //Use {@link applyTransactionNs} instead
   private @Metric MutableRate applyTransaction;
+  @Deprecated
+  //Use {@link writeStateMachineDataNs} instead
   private @Metric MutableRate writeStateMachineData;
+  private @Metric MutableRate applyTransactionNs;
+  private @Metric MutableRate writeStateMachineDataNs;
 
   public CSMMetrics() {
     int numCmdTypes = ContainerProtos.Type.values().length;
     this.opsLatency = new MutableRate[numCmdTypes];
+    this.opsLatencyMS = new MutableRate[numCmdTypes];
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (int i = 0; i < numCmdTypes; i++) {
       opsLatency[i] = registry.newRate(
           ContainerProtos.Type.forNumber(i + 1).toString(),
+          ContainerProtos.Type.forNumber(i + 1) + " op");
+      opsLatencyMS[i] = registry.newRate(
+          ContainerProtos.Type.forNumber(i + 1).toString() + "Ms",
           ContainerProtos.Type.forNumber(i + 1) + " op");
     }
   }
@@ -195,10 +212,12 @@ public class CSMMetrics {
     return applyTransaction;
   }
 
-  public void incPipelineLatency(ContainerProtos.Type type,
+  public void incPipelineLatencyMs(ContainerProtos.Type type,
       long latencyMillis) {
     opsLatency[type.ordinal()].add(latencyMillis);
     transactionLatency.add(latencyMillis);
+    opsLatencyMS[type.ordinal()].add(latencyMillis);
+    transactionLatencyMS.add(latencyMillis);
   }
 
   public void incNumStartTransactionVerifyFailures() {
@@ -209,12 +228,14 @@ public class CSMMetrics {
     numContainerNotOpenVerifyFailures.incr();
   }
 
-  public void recordApplyTransactionCompletion(long latencyMillis) {
-    applyTransaction.add(latencyMillis);
+  public void recordApplyTransactionNsCompletion(long latencyNanos) {
+    applyTransactionNs.add(latencyNanos);
+    applyTransaction.add(latencyNanos);
   }
 
-  public void recordWriteStateMachineCompletion(long latencyMillis) {
-    writeStateMachineData.add(latencyMillis);
+  public void recordWriteStateMachineNsCompletion(long latencyNanos) {
+    writeStateMachineDataNs.add(latencyNanos);
+    writeStateMachineData.add(latencyNanos);
   }
 
   public void incNumDataCacheMiss() {
