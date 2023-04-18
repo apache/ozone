@@ -75,6 +75,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,8 +215,7 @@ public class TestOMKeyRequest {
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
-    when(ozoneManager.getOmSnapshotManager())
-        .thenReturn(omSnapshotManager);
+    doReturn(omSnapshotManager).when(ozoneManager).getOmSnapshotManager();
   }
 
   @NotNull
