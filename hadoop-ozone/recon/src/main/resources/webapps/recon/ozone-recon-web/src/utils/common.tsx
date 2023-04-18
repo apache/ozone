@@ -38,7 +38,6 @@ export const showDataFetchError = (error: string) => {
   showErrorNotification(title, error);
 };
 
-// TODO: Delete duplicate in diskUsage.tsx
 export const byteToSize = (bytes: number, decimals: number) => {
   if (bytes === 0) {
     return '0 Bytes';

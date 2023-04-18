@@ -22,7 +22,7 @@ import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
-import {showDataFetchError} from 'utils/common';
+import {byteToSize, showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
 
@@ -73,20 +73,6 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       displayLimit: DEFAULT_DISPLAY_LIMIT
     };
   }
-
-  byteToSize = (bytes, decimals) => {
-    if (bytes === 0) {
-      return '0 Bytes';
-    }
-
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
-  };
 
   handleChange = e => {
     this.setState({inputPath: e.target.value, showPanel: false});
@@ -161,7 +147,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         pathLabels = [subpathName];
         values = [0.1];
         percentage = [100.00];
-        sizeStr = [this.byteToSize(duResponse.size, 1)];
+        sizeStr = [byteToSize(duResponse.size, 1)];
       }
       else {
         pathLabels = subpaths.map(subpath => {
@@ -182,7 +168,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         });
 
         sizeStr = subpaths.map(subpath => {
-          return this.byteToSize(subpath.size, 1);
+          return byteToSize(subpath.size, 1);
         });
       }
     
@@ -266,9 +252,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
         axios.get(keyEndpoint).then(response => {
           keys.push('File Size');
-          values.push(this.byteToSize(response.data.size, 3));
+          values.push(byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
-          values.push(this.byteToSize(response.data.sizeWithReplica, 3));
+          values.push(byteToSize(response.data.sizeWithReplica, 3));
           console.log(values);
 
           this.setState({
@@ -328,7 +314,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
         keys.push('Data Size');
-        values.push(this.byteToSize(summaryResponse.objectInfo.dataSize, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.dataSize, 3));
       }
 
       if (summaryResponse.objectInfo.encInfo && summaryResponse.objectInfo.encInfo !== -1) {
@@ -363,12 +349,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.quotaInBytes && summaryResponse.objectInfo.quotaInBytes !== -1) {
         keys.push('Quota In Bytes');
-        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
       }
 
       if (summaryResponse.objectInfo.quotaInNamespace && summaryResponse.objectInfo.quotaInNamespace !== -1) {
         keys.push('Quota In Namespace');
-        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
       }
 
       if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationFactor && summaryResponse.objectInfo.replicationConfig.replicationFactor !== -1) {
@@ -453,11 +439,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       // In case the object's quota isn't set
       if (quotaResponse.allowed !== -1) {
         keys.push('Quota Allowed');
-        values.push(this.byteToSize(quotaResponse.allowed, 3));
+        values.push(byteToSize(quotaResponse.allowed, 3));
       }
 
       keys.push('Quota Used');
-      values.push(this.byteToSize(quotaResponse.used, 3));
+      values.push(byteToSize(quotaResponse.used, 3));
       this.setState({
         showPanel: true,
         panelKeys: keys,
@@ -543,7 +529,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                             size: 15
                           },
                           showlegend: true,
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
                         }
                       }
                       onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
