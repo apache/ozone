@@ -137,6 +137,7 @@ public class TestOMKeyRequest {
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.isLeaderReady()).thenReturn(false);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
@@ -212,7 +213,6 @@ public class TestOMKeyRequest {
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
-    when(ozoneManager.isLeaderReady()).thenReturn(false);
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager())
         .thenReturn(omSnapshotManager);
