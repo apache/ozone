@@ -808,7 +808,8 @@ public class TestOzoneTenantShell {
     // Get secret should still give the previous secret key
     executeHA(tenantShell, new String[] {
         "user", "getsecret", tenantName + "$alice"});
-    checkOutput(err, "Secret for 'tenant-test-set-secret$alice' already exists\n", true);
+    checkOutput(err, "Secret for 'tenant-test-set-secret$alice' " +
+        "already exists\n", true);
 
     // Set secret as alice should succeed
     final UserGroupInformation ugiAlice = UserGroupInformation
