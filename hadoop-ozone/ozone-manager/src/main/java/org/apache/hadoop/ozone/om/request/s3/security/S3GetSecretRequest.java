@@ -169,11 +169,8 @@ public class S3GetSecretRequest extends OMClientRequest {
               }
             } else {
               // Found in S3SecretTable. No secret returned.
-              awsSecret.set(s3SecretValue.getAwsSecret());
-              return new S3GetSecretResponse(null,
-                      ozoneManager.getS3SecretManager(),
-                      createErrorOMResponse(omResponse, new
-                              OMException(OMException.ResultCodes.INVALID_REQUEST)));
+              throw new OMException("Secret for '" + accessId + "' already exists",
+                  OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS);
             }
 
             // Throw ACCESS_ID_NOT_FOUND to the client if accessId doesn't exist

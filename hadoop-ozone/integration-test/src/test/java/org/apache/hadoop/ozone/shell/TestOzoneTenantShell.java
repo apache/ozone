@@ -357,18 +357,6 @@ public class TestOzoneTenantShell {
     stream.reset();
   }
 
-  private void checkNotOutput(ByteArrayOutputStream stream, String stringToMatch,
-                           boolean exactMatch) throws IOException {
-    stream.flush();
-    final String str = stream.toString(DEFAULT_ENCODING);
-    if (exactMatch) {
-      Assert.assertEquals(stringToMatch, str);
-    } else {
-      Assert.assertTrue(str, str.contains(stringToMatch));
-    }
-    stream.reset();
-  }
-
   private void checkOutput(String str, String stringToMatch,
                            boolean exactMatch) {
     if (exactMatch) {
@@ -508,10 +496,10 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Assigned 'bob' to 'finance' with accessId"
         + " 'finance$bob'.\n", true);
 
-    // Try user getsecret again after assignment, should succeed
+    // Try user getsecret again after assignment, should fail
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
-    checkOutput(err, "\n", true);
+    checkOutput(err, "Secret for 'finance$bob' already exists\n", true);
 
     executeHA(tenantShell, new String[] {
         "--verbose", "user", "assign", "bob", "--tenant=research"});
@@ -820,7 +808,7 @@ public class TestOzoneTenantShell {
     // Get secret should still give the previous secret key
     executeHA(tenantShell, new String[] {
         "user", "getsecret", tenantName + "$alice"});
-    checkOutput(err, "\n", true);
+    checkOutput(err, "Secret for 'tenant-test-set-secret$alice' already exists\n", true);
 
     // Set secret as alice should succeed
     final UserGroupInformation ugiAlice = UserGroupInformation
