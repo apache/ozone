@@ -56,7 +56,8 @@ public class RootEntityHandler extends EntityHandler {
           throws IOException {
 
     List<OmVolumeArgs> volumes = getOmMetadataManager().listVolumes();
-    List<OmBucketInfo> allBuckets = getOmMetadataManager().listBucketsUnderVolume(null);
+    List<OmBucketInfo> allBuckets = getOmMetadataManager().
+        listBucketsUnderVolume(null);
     int totalNumDir = 0;
     long totalNumKey = 0L;
     for (OmBucketInfo bucket : allBuckets) {

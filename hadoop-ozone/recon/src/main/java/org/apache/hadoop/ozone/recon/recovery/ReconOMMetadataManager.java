@@ -25,8 +25,6 @@ import java.util.List;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
-import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 
 /**
  * Interface for the OM Metadata Manager + DB store maintained by
