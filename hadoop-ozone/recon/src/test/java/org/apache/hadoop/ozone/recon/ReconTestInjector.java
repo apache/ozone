@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -226,6 +227,7 @@ public class ReconTestInjector {
         "0.0.0.0:0");
     configuration.set(OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
         "http://localhost:6666");
+    configuration.set(OZONE_SOLR_ADDRESS_KEY, "localhost:8995");
     return configuration;
   }
 

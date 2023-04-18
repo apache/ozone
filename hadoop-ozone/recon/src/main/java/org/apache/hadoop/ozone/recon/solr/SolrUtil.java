@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.api.types.LastXUnit;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
 import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -412,7 +413,7 @@ public class SolrUtil {
             omMetadataManager, reconSCM, path);
     if (null != entityHandler) {
       DUResponse duResponse = entityHandler.getDuResponse(false, false);
-      if (null != duResponse) {
+      if (null != duResponse && duResponse.getStatus() == ResponseStatus.OK) {
         return duResponse.getSize();
       }
     }
