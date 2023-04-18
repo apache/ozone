@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
 import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 
@@ -53,14 +55,23 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Return all volumes in the file system.
-   * @return all the volumes from the OM DB
+   * @return all the volumes from the OM DB.
    */
-  List<VolumeMetadata> getAllVolumes() throws IOException;
+  List<OmVolumeArgs> listVolumes() throws IOException;
+
+  /**
+   * Check if volume exists in the OM table.
+   * @param volName volume name without any protocol prefix.
+   * @return true if volume exists, otherwise false.
+   * @throws IOException IOE
+   */
+  boolean volumeExists(String volName) throws IOException;
 
   /**
    * List all buckets under a volume.
-   * @return buckets under volume or all buckets if volume is null
+   * @param volumeName volume name without protocol prefix.
+   * @return buckets under volume or all buckets if volume is null.
    */
-  List<BucketMetadata> listBucketsUnderVolume(
+  List<OmBucketInfo> listBucketsUnderVolume(
       String volumeName) throws IOException;
 }

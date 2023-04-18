@@ -18,11 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -35,8 +31,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import java.io.IOException;
 
-import java.util.List;
-import java.util.ArrayList;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -136,7 +130,7 @@ public abstract class EntityHandler {
               omMetadataManager, reconSCM, null, path);
     } else if (names.length == 1) { // volume level check
       String volName = names[0];
-      if (!volumeExists(omMetadataManager, volName)) {
+      if (!omMetadataManager.volumeExists(volName)) {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
                 omMetadataManager, reconSCM, null, path);
       }
@@ -171,7 +165,7 @@ public abstract class EntityHandler {
 
       // check if either volume or bucket doesn't exist
       if (bucketHandler == null
-          || !volumeExists(omMetadataManager, volName)
+          || !omMetadataManager.volumeExists(volName)
           || !bucketHandler.bucketExists(volName, bucketName)) {
         return EntityType.UNKNOWN.create(reconNamespaceSummaryManager,
                 omMetadataManager, reconSCM, null, path);
@@ -215,80 +209,6 @@ public abstract class EntityHandler {
       totalCnt += getTotalDirCount(subdir);
     }
     return totalCnt;
-  }
-
-  /**
-   * Return all volumes in the file system.
-   * This method can be optimized by using username as a filter.
-   * @return a list of volume names under the system
-   */
-  List<OmVolumeArgs> listVolumes() throws IOException {
-    List<OmVolumeArgs> result = new ArrayList<>();
-    Table<String, OmVolumeArgs> volumeTable =
-        omMetadataManager.getVolumeTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-        iterator = volumeTable.iterator()) {
-
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
-
-        OmVolumeArgs omVolumeArgs = kv.getValue();
-        if (omVolumeArgs != null) {
-          result.add(omVolumeArgs);
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
-   * List all buckets under a volume, if volume name is null, return all buckets
-   * under the system.
-   * @param volumeName volume name
-   * @return a list of buckets
-   * @throws IOException IOE
-   */
-  List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
-      throws IOException {
-    List<OmBucketInfo> result = new ArrayList<>();
-    // if volume name is null, seek prefix is an empty string
-    String seekPrefix = "";
-
-    Table<String, OmBucketInfo> bucketTable =
-        omMetadataManager.getBucketTable();
-
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-        iterator = bucketTable.iterator()) {
-
-      if (volumeName != null) {
-        if (!volumeExists(omMetadataManager, volumeName)) {
-          return result;
-        }
-        seekPrefix = omMetadataManager.getVolumeKey(volumeName + OM_KEY_PREFIX);
-      }
-
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
-
-        String key = kv.getKey();
-        OmBucketInfo omBucketInfo = kv.getValue();
-
-        if (omBucketInfo != null) {
-          // We should return only the keys, whose keys match with
-          // the seek prefix
-          if (key.startsWith(seekPrefix)) {
-            result.add(omBucketInfo);
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  static boolean volumeExists(ReconOMMetadataManager omMetadataManager,
-                              String volName) throws IOException {
-    String volDBKey = omMetadataManager.getVolumeKey(volName);
-    return omMetadataManager.getVolumeTable().getSkipCache(volDBKey) != null;
   }
 
   /**

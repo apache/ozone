@@ -25,10 +25,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -38,16 +36,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
-import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
-import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -164,9 +158,8 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    * @return a list of volume names under the system
    */
   @Override
-  public List<VolumeMetadata> getAllVolumes() throws IOException {
-    // TODO: Maybe reuse the listVolumes from OmMetadataManager
-    List<VolumeMetadata> result = new ArrayList<>();
+  public List<OmVolumeArgs> listVolumes() throws IOException {
+    List<OmVolumeArgs> result = new ArrayList<>();
     Table<String, OmVolumeArgs> volumeTable = getVolumeTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
              iterator = volumeTable.iterator()) {
@@ -176,71 +169,29 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
         OmVolumeArgs omVolumeArgs = kv.getValue();
         if (omVolumeArgs != null) {
-          result.add(toVolumeMetadata(omVolumeArgs));
+          result.add(omVolumeArgs);
         }
       }
     }
     return result;
   }
 
-  private boolean volumeExists(String volName) throws IOException {
+  @Override
+  public boolean volumeExists(String volName) throws IOException {
     String volDBKey = getVolumeKey(volName);
     return getVolumeTable().getSkipCache(volDBKey) != null;
-  }
-
-  private VolumeMetadata toVolumeMetadata(OmVolumeArgs omVolumeArgs) {
-    if (omVolumeArgs == null) {
-      return null;
-    }
-
-    VolumeMetadata.Builder builder = VolumeMetadata.newBuilder();
-
-    List<AclMetadata> acls = new ArrayList<>();
-    if (omVolumeArgs.getAcls() != null) {
-      acls = omVolumeArgs.getAcls().stream()
-          .map(this::toAclMetadata).collect(Collectors.toList());
-    }
-
-    return builder.withVolume(omVolumeArgs.getVolume())
-        .withOwner(omVolumeArgs.getOwnerName())
-        .withAdmin(omVolumeArgs.getAdminName())
-        .withCreationTime(Instant.ofEpochMilli(omVolumeArgs.getCreationTime()))
-        .withModificationTime(
-            Instant.ofEpochMilli(omVolumeArgs.getModificationTime()))
-        .withQuotaInBytes(omVolumeArgs.getQuotaInBytes())
-        .withQuotaInNamespace(
-            omVolumeArgs.getQuotaInNamespace())
-        .withUsedNamespace(omVolumeArgs.getUsedNamespace())
-        .withAcls(acls)
-        .build();
-  }
-
-  private AclMetadata toAclMetadata(OzoneAcl ozoneAcl) {
-    if (ozoneAcl == null) {
-      return null;
-    }
-
-    AclMetadata.Builder builder = AclMetadata.newBuilder();
-
-    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
-        .withName(ozoneAcl.getName())
-        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
-        .withAclList(ozoneAcl.getAclList().stream().map(Enum::toString)
-            .map(String::toUpperCase)
-            .collect(Collectors.toList()))
-        .build();
   }
 
   /**
    * List all buckets under a volume, if volume name is null, return all buckets
    * under the system.
-   * @param volumeName volume name
+   * @param volumeName volume name without protocol prefix
    * @return buckets under volume or all buckets if volume is null
    * @throws IOException IOE
    */
-  public List<BucketMetadata> listBucketsUnderVolume(final String volumeName)
+  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
       throws IOException {
-    List<BucketMetadata> result = new ArrayList<>();
+    List<OmBucketInfo> result = new ArrayList<>();
     // if volume name is null, seek prefix is an empty string
     String seekPrefix = "";
 
@@ -266,52 +217,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           // We should return only the keys, whose keys match with the seek
           // prefix
           if (key.startsWith(seekPrefix)) {
-            result.add(toBucketMetadata(omBucketInfo));
+            result.add(omBucketInfo);
           }
         }
       }
     }
     return result;
-  }
-
-  private BucketMetadata toBucketMetadata(OmBucketInfo omBucketInfo) {
-    if (omBucketInfo == null) {
-      return null;
-    }
-
-    BucketMetadata.Builder builder = BucketMetadata.newBuilder();
-
-    List<AclMetadata> acls = new ArrayList<>();
-    if (omBucketInfo.getAcls() != null) {
-      acls = omBucketInfo.getAcls().stream()
-          .map(this::toAclMetadata).collect(Collectors.toList());
-    }
-
-    builder.withVolumeName(omBucketInfo.getVolumeName())
-        .withBucketName(omBucketInfo.getBucketName())
-        .withAcls(acls)
-        .withVersionEnabled(omBucketInfo.getIsVersionEnabled())
-        .withStorageType(omBucketInfo.getStorageType().toString().toUpperCase())
-        .withCreationTime(
-            Instant.ofEpochMilli(omBucketInfo.getCreationTime()))
-        .withModificationTime(
-            Instant.ofEpochMilli(omBucketInfo.getModificationTime()))
-        .withUsedBytes(omBucketInfo.getUsedBytes())
-        .withUsedNamespace(omBucketInfo.getUsedNamespace())
-        .withQuotaInBytes(omBucketInfo.getQuotaInBytes())
-        .withQuotaInNamespace(omBucketInfo.getQuotaInNamespace())
-        .withBucketLayout(
-            omBucketInfo.getBucketLayout().toString().toUpperCase())
-        .withOwner(omBucketInfo.getOwner());
-
-    if (omBucketInfo.getSourceVolume() != null) {
-      builder.withSourceVolume(omBucketInfo.getSourceVolume());
-    }
-
-    if (omBucketInfo.getSourceBucket() != null) {
-      builder.withSourceBucket(omBucketInfo.getSourceBucket());
-    }
-
-    return builder.build();
   }
 }

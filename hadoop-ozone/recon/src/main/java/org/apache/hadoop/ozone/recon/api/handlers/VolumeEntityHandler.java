@@ -53,7 +53,8 @@ public class VolumeEntityHandler extends EntityHandler {
           throws IOException {
 
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(names[0]);
     int totalDir = 0;
     long totalKey = 0L;
 
@@ -97,7 +98,8 @@ public class VolumeEntityHandler extends EntityHandler {
     duResponse.setPath(getNormalizedPath());
     String[] names = getNames();
     String volName = names[0];
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(volName);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(volName);
     duResponse.setCount(buckets.size());
 
     // List of DiskUsage data for all buckets
@@ -138,7 +140,8 @@ public class VolumeEntityHandler extends EntityHandler {
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(names[0]);
     String volKey = getOmMetadataManager().getVolumeKey(names[0]);
     OmVolumeArgs volumeArgs =
             getOmMetadataManager().getVolumeTable().getSkipCache(volKey);
@@ -161,7 +164,8 @@ public class VolumeEntityHandler extends EntityHandler {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(names[0]);
     int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_BINS];
 
     // accumulate file size distribution arrays from all buckets under volume
