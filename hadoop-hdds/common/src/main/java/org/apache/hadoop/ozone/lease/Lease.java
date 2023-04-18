@@ -186,7 +186,6 @@ public class Lease<T> {
    * Expires/Invalidates the lease.
    */
   synchronized void invalidate() {
-    callbacks = null;
     expired = true;
   }
 
