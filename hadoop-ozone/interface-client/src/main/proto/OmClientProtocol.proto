@@ -139,6 +139,15 @@ enum Type {
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
+  TestUnknownCommand = 124;
+  SetSafeMode = 125;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
 }
 
 message OMRequest {
@@ -259,9 +268,10 @@ message OMRequest {
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
-
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
+  // skip TestUnknownCommand
+  optional SetSafeModeRequest               SetSafeModeRequest             = 125;
 }
 
 message OMResponse {
@@ -374,9 +384,9 @@ message OMResponse {
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
-
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 125;
 }
 
 enum Status {
@@ -1952,6 +1962,14 @@ message SetTimesRequest {
 }
 
 message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
 }
 
 /**

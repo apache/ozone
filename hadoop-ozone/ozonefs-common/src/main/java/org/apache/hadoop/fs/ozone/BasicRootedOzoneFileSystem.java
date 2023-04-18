@@ -1543,18 +1543,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return adapter.getSnapshotDiffReport(snapshotDir, fromSnapshot, toSnapshot);
   }
 
-
-  /**
-   * Start the lease recovery of a file.
-   *
-   * @param f a file
-   * @return true if the file is already closed
-   * @throws IOException if an error occurs
-   */
-  public boolean recoverLease(final Path f) throws IOException {
-    return adapterImpl.recoverLease(f);
-  }
-
   @Override
   public void setTimes(Path f, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
