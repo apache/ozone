@@ -959,11 +959,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Check dirTable as well in case of FSO bucket.
     if (bucketLayout.isFileSystemOptimized()) {
       // First check in dirTable cache
-      if (isKeyPresentInTableCache(keyPrefix, dirTable)) {
+      if (isKeyPresentInDirTableCache(keyPrefix, dirTable)) {
         return false;
       }
       // Check in the table
-      return !isKeyPresentInTable(keyPrefix, dirTable);
+      return !isKeyPresentInDirectoryTable(keyPrefix, dirTable);
     }
     return true;
   }
@@ -1041,6 +1041,85 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     return false;
   }
+  
+    
+  /**
+   * Checks if a key starting with a given keyPrefix exists 
+   * in the directory table cache.
+   *
+   * @param keyPrefix - key prefix to be searched.
+   * @param table     - table to be searched.
+   * @return true if the key is present in the cache.
+   */
+
+  private boolean isKeyPresentInDirTableCache(String keyPrefix,
+                                           Table table) {
+    Iterator<Map.Entry<CacheKey<String>,
+        CacheValue<OmDirectoryInfo>>> iterator = table.cacheIterator();
+    while (iterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
+              iterator.next();
+      String key = entry.getKey().getCacheKey();
+      OmDirectoryInfo omDirectoryInfo = entry.getValue().getCacheValue();
+      // Making sure that entry is not for delete key request.
+      if (key.startsWith(keyPrefix) && omDirectoryInfo != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  /**
+   * Checks if a key starts with the given prefix is present
+   * in the directory table.
+   * @param keyPrefix - Prefix to check for
+   * @param table     - Table to check in
+   * @return true if the key is present in the table
+   * @throws IOException
+   */
+  private boolean isKeyPresentInDirectoryTable(String keyPrefix,
+                                      Table<String, OmDirectoryInfo> table)
+          throws IOException {
+    try (TableIterator<String, ? extends KeyValue<String, OmDirectoryInfo>>
+                 keyIter = table.iterator()) {
+      KeyValue<String, OmDirectoryInfo> kv = keyIter.seek(keyPrefix);
+
+      // Iterate through all the entries in the table which start with
+      // the current bucket's prefix.
+      while (kv != null && kv.getKey().startsWith(keyPrefix)) {
+        // Check the entry in db is not marked for delete. This can happen
+        // while entry is marked for delete, but it is not flushed to DB.
+        CacheValue<OmDirectoryInfo> cacheValue =
+                table.getCacheValue(new CacheKey(kv.getKey()));
+
+        // Case 1: We found an entry, but no cache entry.
+        if (cacheValue == null) {
+          // we found at least one key with this prefix.
+          return true;
+        }
+
+        // Case 2a:
+        // We found a cache entry and cache value is not null.
+        if (cacheValue.getCacheValue() != null) {
+          return true;
+        }
+
+        // Case 2b:
+        // Cache entry is present but cache value is null, hence this key is
+        // marked for deletion.
+        // However, we still need to iterate through the rest of the prefix
+        // range to check for other keys with the same prefix that might still
+        // be present.
+        if (!keyIter.hasNext()) {
+          break;
+        }
+        kv = keyIter.next();
+      }
+    }
+    return false;
+  }
+
 
   /**
    * {@inheritDoc}
