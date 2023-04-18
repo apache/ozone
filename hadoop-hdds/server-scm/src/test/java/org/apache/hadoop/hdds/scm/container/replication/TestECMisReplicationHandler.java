@@ -39,6 +39,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Collections.singletonList;
@@ -210,6 +211,14 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new ECMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
+  }
+
+  @Override
+  protected void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex) {
+    Assertions.assertEquals(
+        expectedReplicaIndexes.get(sourceDatanode), actualReplicaIndex);
   }
 }
