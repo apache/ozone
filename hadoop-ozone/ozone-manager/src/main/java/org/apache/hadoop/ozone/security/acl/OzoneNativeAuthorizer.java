@@ -116,6 +116,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
+
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
