@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -241,28 +240,9 @@ public class RatisUnderReplicationHandler
             .collect(Collectors.toList());
     excludeList.addAll(pendingReplication);
 
-    /*
-    Ensure that target datanodes have enough space to hold a complete
-    container.
-    */
-    final long dataSizeRequired =
-        Math.max(replicaCount.getContainer().getUsedBytes(),
-            currentContainerSize);
-    int requiredNodes = replicaCount.additionalReplicaNeeded();
-    while (requiredNodes > 0) {
-      try {
-        return placementPolicy.chooseDatanodes(excludeList, null,
-            requiredNodes, 0, dataSizeRequired);
-      } catch (IOException e) {
-        LOG.debug("Placement policy was not able to return {} nodes. ",
-            requiredNodes, e);
-        requiredNodes--;
-      }
-    }
-    throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Datasize Required: %d",
-        placementPolicy.getClass(), requiredNodes, dataSizeRequired),
-        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
+        replicaCount.additionalReplicaNeeded(), null, excludeList,
+        currentContainerSize, replicaCount.getContainer());
   }
 
   private int sendReplicationCommands(

@@ -182,6 +182,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         waitForDirToExist(path);
         snapshotPaths.add(path);
       }
+    } finally {
+      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }
