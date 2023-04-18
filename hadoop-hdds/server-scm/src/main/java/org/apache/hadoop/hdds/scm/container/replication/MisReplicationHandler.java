@@ -53,13 +53,13 @@ public abstract class MisReplicationHandler implements
 
   public static final Logger LOG =
           LoggerFactory.getLogger(MisReplicationHandler.class);
-  private final PlacementPolicy<ContainerReplica> containerPlacement;
+  private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
   private boolean push;
 
   public MisReplicationHandler(
-          final PlacementPolicy<ContainerReplica> containerPlacement,
+          final PlacementPolicy containerPlacement,
           final ConfigurationSource conf, ReplicationManager replicationManager,
       final boolean push) {
     this.containerPlacement = containerPlacement;

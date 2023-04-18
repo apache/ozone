@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -193,10 +194,12 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
+    List<DatanodeDetails> targetDatanodes = singletonList(
+        availableReplicas.iterator().next().getDatanodeDetails());
     Mockito.when(placementPolicy.chooseDatanodes(
             any(), any(), any(),
             Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
-        .thenReturn(singletonList(availableReplicas.iterator().next()));
+        .thenReturn(targetDatanodes);
     assertThrows(InsufficientDatanodesException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),
             0, 2, 1));
