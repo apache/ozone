@@ -205,6 +205,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.volume.utilisation.limit</name>
+    <value>0.9f</value>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      This determines the threshold to be used for closing containers
+      When the volume used percentage reaches this threshold,
+      containers that reside on this volume will be closed.
+      percentage in float notation (X.Yf), with 1.0f meaning 100%.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>

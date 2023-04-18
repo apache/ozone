@@ -62,6 +62,11 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
+  public static final String HDDS_DATANODE_VOLUME_UTILISATION_LIMIT =
+      "hdds.datanode.volume.utilisation.limit";
+  public static final float HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT =
+      0.9f;
+
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for

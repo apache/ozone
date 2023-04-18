@@ -159,6 +159,60 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testContainerCloseActionWhenVolumeFull() throws IOException {
+    String testDir = GenericTestUtils.getTempPath(
+        TestHddsDispatcher.class.getSimpleName());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
+    DatanodeDetails dd = randomDatanodeDetails();
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    try {
+      UUID scmId = UUID.randomUUID();
+      ContainerSet containerSet = new ContainerSet(1000);
+
+      DatanodeStateMachine stateMachine = Mockito.mock(
+          DatanodeStateMachine.class);
+      StateContext context = Mockito.mock(StateContext.class);
+      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
+      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          layout,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          dd.getUuidString());
+      Container container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          scmId.toString());
+      containerSet.addContainer(container);
+      Mockito.when(containerData.getVolume().getCapacity()).thenReturn((long) StorageUnit.GB.toBytes(2));
+      Mockito.when(containerData.getVolume().getAvailable()).thenReturn((long) StorageUnit.GB.toBytes(1.9));
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      Map<ContainerType, Handler> handlers = Maps.newHashMap();
+      for (ContainerType containerType : ContainerType.values()) {
+        handlers.put(containerType,
+            Handler.getHandlerForContainerType(containerType, conf,
+                context.getParent().getDatanodeDetails().getUuidString(),
+                containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
+      }
+      HddsDispatcher hddsDispatcher = new HddsDispatcher(
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
+      hddsDispatcher.setClusterId(scmId.toString());
+      ContainerCommandResponseProto responseOne = hddsDispatcher
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+          responseOne.getResult());
+      verify(context, times(1))
+          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
+    } finally {
+      volumeSet.shutdown();
+      ContainerMetrics.remove();
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+
+  }
+
+  @Test
   public void testCreateContainerWithWriteChunk() throws IOException {
     String testDir =
         GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());

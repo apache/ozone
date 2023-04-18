@@ -556,11 +556,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     boolean isOpen = Optional.ofNullable(container)
         .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
         .orElse(Boolean.FALSE);
+    float volumeUtilisationThreshold =
+        conf.getFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT,
+            HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT);
     if (isOpen) {
       ContainerData containerData = container.getContainerData();
       double containerUsedPercentage =
           1.0f * containerData.getBytesUsed() / containerData.getMaxSize();
-      return containerUsedPercentage >= containerCloseThreshold;
+      double volumeUsedPercentage = 1.0f * containerData.getVolume()
+          .getUsedSpace() / containerData.getVolume().getCapacity();
+      return (containerUsedPercentage >= containerCloseThreshold) ||
+          (volumeUsedPercentage >= volumeUtilisationThreshold);
     } else {
       return false;
     }
