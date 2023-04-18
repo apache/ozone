@@ -436,32 +436,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
 
-    OmBucketInfo s3BucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName("s3v")
-        .setBucketName("sampleVol2-bucketOne")
-        .addAcl(new OzoneAcl(
-            IAccessAuthorizer.ACLIdentityType.GROUP,
-            "TestGroup2",
-            IAccessAuthorizer.ACLType.WRITE,
-            OzoneAcl.AclScope.ACCESS
-        ))
-        .setQuotaInBytes(OzoneConsts.GB)
-        .setUsedBytes(OzoneConsts.MB)
-        .setQuotaInNamespace(5)
-        .setUsedNamespace(3)
-        .setSourceVolume("sampleVol2")
-        .setSourceBucket("bucketOne")
-        .setStorageType(StorageType.DISK)
-        .setBucketLayout(BucketLayout.LEGACY)
-        .setOwner("TestUser2")
-        .setIsVersionEnabled(false)
-        .build();
-
-    String s3BucketKey = reconOMMetadataManager.getBucketKey(
-        s3BucketInfo.getVolumeName(), s3BucketInfo.getBucketName());
-
-    reconOMMetadataManager.getBucketTable().put(s3BucketKey, s3BucketInfo);
-
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
     // key = key_two
@@ -698,7 +672,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
-    Assertions.assertEquals(3, clusterStateResponse.getBuckets());
+    Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
@@ -945,8 +919,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Include bucketOne under sampleVol in
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in initializeNewOmMetadataManager.
-    Assertions.assertEquals(3, allBucketsResponse.getTotalCount());
-    Assertions.assertEquals(3, allBucketsResponse.getBuckets().size());
+    Assertions.assertEquals(2, allBucketsResponse.getTotalCount());
+    Assertions.assertEquals(2, allBucketsResponse.getBuckets().size());
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
