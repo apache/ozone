@@ -69,6 +69,9 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   private static final int NUM_OPEN_CONTAINERS = 3;
   private static final int NUM_DELETED_CONTAINERS = 4;
   private static final int NUM_CLOSED_CONTAINERS = 3;
+  private static final int NUM_QUASI_CLOSED_CONTAINERS = 5;
+  private static final int NUM_CLOSING_CONTAINERS = 6;
+  private static final int NUM_DELETING_CONTAINERS = 7;
 
 
   @BeforeEach
@@ -117,6 +120,12 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
         HddsProtos.LifeCycleState.DELETED);
     putContainerInfos(NUM_CLOSED_CONTAINERS,
         HddsProtos.LifeCycleState.CLOSED);
+    putContainerInfos(NUM_CLOSING_CONTAINERS,
+        HddsProtos.LifeCycleState.CLOSING);
+    putContainerInfos(NUM_QUASI_CLOSED_CONTAINERS,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    putContainerInfos(NUM_DELETING_CONTAINERS,
+        HddsProtos.LifeCycleState.DELETING);
 
     // Get the cluster state using the ClusterStateEndpoint
     Response response1 = clusterStateEndpoint.getClusterState();
@@ -124,8 +133,14 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
         (ClusterStateResponse) response1.getEntity();
 
     // Calculate expected counts
-    int expectedTotalContainers = NUM_OPEN_CONTAINERS + NUM_CLOSED_CONTAINERS;
+    int expectedTotalContainers = NUM_OPEN_CONTAINERS + NUM_CLOSED_CONTAINERS
+        + NUM_CLOSING_CONTAINERS + NUM_QUASI_CLOSED_CONTAINERS
+        + NUM_DELETING_CONTAINERS;
     int expectedOpenContainers = NUM_OPEN_CONTAINERS;
+    int expectedClosingContainers = NUM_CLOSING_CONTAINERS;
+    int expectedQuasiClosedContainers = NUM_QUASI_CLOSED_CONTAINERS;
+    int expectedClosedContainers = NUM_CLOSED_CONTAINERS;
+    int expectedDeletingContainers = NUM_DELETING_CONTAINERS;
     int expectedDeletedContainers = NUM_DELETED_CONTAINERS;
 
     // Verify counts using assertions
@@ -133,6 +148,14 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
         clusterStateResponse1.getContainers());
     Assertions.assertEquals(expectedOpenContainers,
         clusterStateResponse1.getOpenContainers());
+    Assertions.assertEquals(expectedClosingContainers,
+        clusterStateResponse1.getClosingContainers());
+    Assertions.assertEquals(expectedQuasiClosedContainers,
+        clusterStateResponse1.getQuasiClosedContainers());
+    Assertions.assertEquals(expectedClosedContainers,
+        clusterStateResponse1.getClosedContainers());
+    Assertions.assertEquals(expectedDeletingContainers,
+        clusterStateResponse1.getDeletingContainers());
     Assertions.assertEquals(expectedDeletedContainers,
         clusterStateResponse1.getDeletedContainers());
   }

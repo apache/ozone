@@ -41,6 +41,7 @@ interface IClusterStateResponse {
   buckets: number;
   keys: number;
   openContainers: number;
+  deletingContainers: number;
 }
 
 interface IOverviewState {
@@ -58,6 +59,10 @@ interface IOverviewState {
   lastUpdatedOMDBFull: number;
   omStatus: string;
   openContainers: number;
+  closingContainers: number,
+  quasiClosedContainers: number,
+  closedContainers: number,
+  deletingContainers: number;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -84,7 +89,11 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       lastUpdatedOMDBDelta: 0,
       lastUpdatedOMDBFull: 0,
       omStatus: '',
-      openContainers: 0
+      openContainers: 0,
+      closingContainers: 0,
+      quasiClosedContainers:0,
+      closedContainers:0, 
+      deletingContainers: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -115,6 +124,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         openContainers: clusterState.openContainers,
+        closingContainers: clusterState.closingContainers,
+        quasiClosedContainers: clusterState.quasiClosedContainers,
+        closedContainers: clusterState.closedContainers,
+        deletingContainers: clusterState.deletingContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
@@ -158,7 +171,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers } = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, 
+      openContainers, closingContainers, quasiClosedContainers, closedContainers,deletingContainers } = this.state;
       
     const datanodesElement = (
       <span>
@@ -168,6 +182,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
     const duLink = '/DiskUsage';
+    const transitionalContainers = closingContainers + quasiClosedContainers + closedContainers + deletingContainers;
+    const containersElementTitle = missingContainersCount > 0 ? "Containers" : "Containers(Open/Transition)"
     const containersElement = missingContainersCount > 0 ? (
       <span>
         <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
@@ -179,7 +195,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       <div>
           <span>{containers.toString()}   </span>
         <Tooltip placement='bottom' title='Number of open containers'>
-          <span>({openContainers})</span>
+          <span>({openContainers}/{transitionalContainers})</span>
         </Tooltip>
       </div>
     const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
@@ -212,7 +228,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard
-              loading={loading} title='Containers' data={containersElement}
+              loading={loading} title={containersElementTitle} data={containersElement}
               icon='container'
               error={missingContainersCount > 0} linkToUrl={containersLink}/>
           </Col>

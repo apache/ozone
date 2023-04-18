@@ -109,6 +109,22 @@ public class ClusterStateEndpoint {
         this.containerManager.getContainerStateCount(
             HddsProtos.LifeCycleState.OPEN));
 
+    containerStateCounts.setClosingContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.CLOSING));
+
+    containerStateCounts.setQuasiClosedContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.QUASI_CLOSED));
+
+    containerStateCounts.setClosedContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.CLOSED));
+
+    containerStateCounts.setDeletingContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.DELETING));
+
     containerStateCounts.setDeletedContainersCount(
         this.containerManager.getContainerStateCount(
             HddsProtos.LifeCycleState.DELETED));
@@ -180,6 +196,12 @@ public class ClusterStateEndpoint {
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
+        .setClosingContainers(containerStateCounts.getClosingContainersCount())
+        .setQuasiClosedContainers(
+            containerStateCounts.getQuasiClosedContainersCount())
+        .setClosedContainers(containerStateCounts.getClosedContainersCount())
+        .setDeletingContainers(
+            containerStateCounts.getDeletingContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
         .build();
     return Response.ok(response).build();

@@ -26,6 +26,10 @@ public class ContainerStateCounts {
   private int totalContainerCount;
   private int missingContainerCount;
   private int openContainersCount;
+  private int closingContainersCount;
+  private int quasiClosedContainersCount;
+  private int closedContainersCount;
+  private int deletingContainersCount;
   private int deletedContainersCount;
 
   public int getTotalContainerCount() {
@@ -50,6 +54,38 @@ public class ContainerStateCounts {
 
   public void setOpenContainersCount(int openContainersCount) {
     this.openContainersCount = openContainersCount;
+  }
+
+  public int getClosingContainersCount() {
+    return closingContainersCount;
+  }
+
+  public void setClosingContainersCount(int closingContainersCount) {
+    this.closingContainersCount = closingContainersCount;
+  }
+
+  public int getQuasiClosedContainersCount() {
+    return quasiClosedContainersCount;
+  }
+
+  public void setQuasiClosedContainersCount(int quasiClosedContainersCount) {
+    this.quasiClosedContainersCount = quasiClosedContainersCount;
+  }
+
+  public int getClosedContainersCount() {
+    return closedContainersCount;
+  }
+
+  public void setClosedContainersCount(int closedContainersCount) {
+    this.closedContainersCount = closedContainersCount;
+  }
+
+  public int getDeletingContainersCount() {
+    return deletingContainersCount;
+  }
+
+  public void setDeletingContainersCount(int deletingContainersCount) {
+    this.deletingContainersCount = deletingContainersCount;
   }
 
   public int getDeletedContainersCount() {

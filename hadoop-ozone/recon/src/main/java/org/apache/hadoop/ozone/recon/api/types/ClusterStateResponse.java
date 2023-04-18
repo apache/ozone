@@ -67,6 +67,30 @@ public final class ClusterStateResponse {
   private int openContainers;
 
   /**
+   * Total count of closing containers in the cluster.
+   */
+  @JsonProperty("closingContainers")
+  private int closingContainers;
+
+  /**
+   * Total count of quasi closed containers in the cluster.
+   */
+  @JsonProperty("quasiClosedContainers")
+  private int quasiClosedContainers;
+
+  /**
+   * Total count of closed containers.
+   */
+  @JsonProperty("closedContainers")
+  private int closedContainers;
+
+  /**
+   * Total count of deleting containers.
+   */
+  @JsonProperty("deletingContainers")
+  private int deletingContainers;
+
+  /**
    * Total count of deleted containers in the cluster.
    */
   @JsonProperty("deletedContainers")
@@ -124,6 +148,10 @@ public final class ClusterStateResponse {
     this.openContainers = b.openContainers;
     this.deletedKeys = b.deletedKeys;
     this.deletedDirs = b.deletedDirs;
+    this.closingContainers = b.closingContainers;
+    this.quasiClosedContainers = b.quasiClosedContainers;
+    this.closedContainers = b.closedContainers;
+    this.deletingContainers = b.deletingContainers;
     this.deletedContainers = b.deletedContainers;
   }
 
@@ -139,6 +167,10 @@ public final class ClusterStateResponse {
     private int containers;
     private int missingContainers;
     private int openContainers;
+    private int closingContainers;
+    private int quasiClosedContainers;
+    private int closedContainers;
+    private int deletingContainers;
     private int deletedContainers;
     private long volumes;
     private long buckets;
@@ -151,6 +183,10 @@ public final class ClusterStateResponse {
       this.containers = 0;
       this.missingContainers = 0;
       this.openContainers = 0;
+      this.closingContainers = 0;
+      this.quasiClosedContainers = 0;
+      this.closedContainers = 0;
+      this.deletingContainers = 0;
       this.deletedContainers = 0;
       this.volumes = 0;
       this.buckets = 0;
@@ -194,6 +230,25 @@ public final class ClusterStateResponse {
 
     public Builder setOpenContainers(int openContainers) {
       this.openContainers = openContainers;
+      return this;
+    }
+
+    public Builder setClosingContainers(int closingContainers) {
+      this.closingContainers = closingContainers;
+      return this;
+    }
+
+    public Builder setQuasiClosedContainers(int quasiClosedContainers) {
+      this.quasiClosedContainers = quasiClosedContainers;
+      return this;
+    }
+    public Builder setClosedContainers(int closedContainers) {
+      this.closedContainers = closedContainers;
+      return this;
+    }
+
+    public Builder setDeletingContainers(int deletingContainers) {
+      this.deletingContainers = deletingContainers;
       return this;
     }
 
@@ -262,6 +317,22 @@ public final class ClusterStateResponse {
 
   public int getOpenContainers() {
     return openContainers;
+  }
+
+  public int getClosingContainers() {
+    return closingContainers;
+  }
+
+  public int getQuasiClosedContainers() {
+    return quasiClosedContainers;
+  }
+
+  public int getClosedContainers() {
+    return closedContainers;
+  }
+
+  public int getDeletingContainers() {
+    return deletingContainers;
   }
 
   public int getDeletedContainers() {
