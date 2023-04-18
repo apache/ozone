@@ -97,22 +97,26 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     }
 
     boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
+
+    boolean isSuperReadAdmin = isAdmin(ozSuperReadAdmins,
+        context.getClientUgi());
+
+    // bypass read checks for super read users
+    if (isSuperReadAdmin && (context.getAclRights() == ACLType.READ
+        || context.getAclRights() == ACLType.READ_ACL
+        || context.getAclRights() == ACLType.LIST)) {
+      return true;
+    }
+
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
     if (isListAllVolume) {
-      return getAllowListAllVolumes()
-          || isAdmin(ozSuperReadAdmins, context.getClientUgi());
+      return getAllowListAllVolumes();
     }
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
 
-    // bypass only read checks for super read
-    if (isAdmin(ozSuperReadAdmins, context.getClientUgi())
-        && parentAclRight == ACLType.READ) {
-      return true;
-    }
-    
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
@@ -228,7 +232,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   }
 
   private boolean isAdmin(OzoneAdmins pOzAdmins,
-                      UserGroupInformation callerUgi) {
+      UserGroupInformation callerUgi) {
     Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
 
     if (pOzAdmins == null) {

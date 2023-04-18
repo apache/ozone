@@ -1636,7 +1636,7 @@
   </property>
 
   <property>
-    <name>ozone.super.read.usernames</name>
+    <name>ozone.readonly.administrators</name>
     <value/>
     <description>
       Ozone super read users delimited by the comma.
@@ -1645,7 +1645,7 @@
   </property>
 
   <property>
-    <name>ozone.super.read.groups</name>
+    <name>ozone.readonly.administrators.groups</name>
     <value/>
     <description>
       Ozone super read groups delimited by the comma.
