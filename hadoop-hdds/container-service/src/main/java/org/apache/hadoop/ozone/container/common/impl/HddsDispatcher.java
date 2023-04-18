@@ -563,8 +563,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       ContainerData containerData = container.getContainerData();
       double containerUsedPercentage =
           1.0f * containerData.getBytesUsed() / containerData.getMaxSize();
-      double volumeUsedPercentage = 1.0f * containerData.getVolume()
-          .getUsedSpace() / containerData.getVolume().getCapacity();
+      float volumeUsed = containerData.getVolume().getUsedSpace();
+      float volumeCapacity = containerData.getVolume().getCapacity();
+      double volumeUsedPercentage = (volumeUsed / volumeCapacity);
       return (containerUsedPercentage >= containerCloseThreshold) ||
           (volumeUsedPercentage >= volumeUtilisationThreshold);
     } else {

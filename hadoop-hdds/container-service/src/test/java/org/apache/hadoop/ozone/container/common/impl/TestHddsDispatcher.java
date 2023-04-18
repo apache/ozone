@@ -22,8 +22,12 @@ import com.google.common.collect.Maps;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
@@ -50,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -68,8 +73,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+import java.time.Duration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
+import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.junit.Assert.assertTrue;
@@ -163,11 +173,22 @@ public class TestHddsDispatcher {
     String testDir = GenericTestUtils.getTempPath(
         TestHddsDispatcher.class.getSimpleName());
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_DATANODE_DIR_KEY, testDir);
-    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir);
+    conf.setFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT, 0.8f);
     DatanodeDetails dd = randomDatanodeDetails();
-    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf,
-        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+
+    HddsVolume.Builder volumeBuilder =
+        new HddsVolume.Builder(testDir).datanodeUuid(dd.getUuidString())
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+    // state of cluster : used/capacity > 0.8 ,datanode volume utilisation
+    // threshold reached.
+    SpaceUsageSource spaceUsage = fixed(500, 90, 410);
+
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(volumeBuilder.build()));
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet(1000);
@@ -177,16 +198,15 @@ public class TestHddsDispatcher {
       StateContext context = Mockito.mock(StateContext.class);
       Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
       Mockito.when(context.getParent()).thenReturn(stateMachine);
+      // create a 50 byte container
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
           layout,
-          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+           50, UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
           scmId.toString());
       containerSet.addContainer(container);
-      Mockito.when(containerData.getVolume().getCapacity()).thenReturn((long) StorageUnit.GB.toBytes(2));
-      Mockito.when(containerData.getVolume().getAvailable()).thenReturn((long) StorageUnit.GB.toBytes(1.9));
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
@@ -198,10 +218,10 @@ public class TestHddsDispatcher {
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
-      ContainerCommandResponseProto responseOne = hddsDispatcher
+      ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
-          responseOne.getResult());
+          response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
     } finally {
@@ -209,7 +229,6 @@ public class TestHddsDispatcher {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
-
   }
 
   @Test
