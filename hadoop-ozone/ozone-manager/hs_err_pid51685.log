@@ -1,0 +1,69 @@
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x000000013bf03448, pid=51685, tid=7939
+#
+# JRE version: Java(TM) SE Runtime Environment (12.0.2+10) (build 12.0.2+10)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (12.0.2+10, mixed mode, sharing, tiered, compressed oops, g1 gc, bsd-amd64)
+# Problematic frame:
+# C  [librocksdbjni348506433143013631.jnilib+0x362448]  _ZNK7rocksdb14OptionTypeInfo8ValidateERKNS_9DBOptionsERKNS_19ColumnFamilyOptionsERKNSt3__112basic_stringIcNS7_11char_traitsIcEENS7_9allocatorIcEEEEPKv+0x5398
+#
+# Core dump will be written. Default location: /cores/core.51685
+#
+# If you would like to submit a bug report, please visit:
+#   http://bugreport.java.com/bugreport/crash.jsp
+# The crash happened outside the Java Virtual Machine in native code.
+# See problematic frame for where to report the bug.
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: -Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -javaagent:/Users/didi/.m2/repository/org/jacoco/org.jacoco.agent/0.8.5/org.jacoco.agent-0.8.5-runtime.jar=destfile=/Users/didi/IdeaProjects/apache/ozone/hadoop-ozone/ozone-manager/target/jacoco.exec,includes=org.apache.hadoop.hdds.*:org.apache.hadoop.ozone.*:org.apache.hadoop.fs.ozone.* /Users/didi/IdeaProjects/apache/ozone/hadoop-ozone/ozone-manager/target/surefire/surefirebooter9939716934978350471.jar /Users/didi/IdeaProjects/apache/ozone/hadoop-ozone/ozone-manager/target/surefire 2023-04-18T09-49-30_067-jvmRun1 surefire6470241233674246068tmp surefire_012918177266747675547tmp
+
+Host: MacBookPro17,1 x86_64 2400 MHz, 8 cores, 8G, Darwin 20.3.0
+Time: Tue Apr 18 09:57:56 2023 CST elapsed time: 28 seconds (0d 0h 0m 28s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x00007fc590008800):  JavaThread "main" [_thread_in_native, id=7939, stack(0x000000030e188000,0x000000030e288000)]
+
+Stack: [0x000000030e188000,0x000000030e288000],  sp=0x000000030e281c10,  free space=999k
+Native frames: (J=compiled Java code, A=aot compiled Java code, j=interpreted, Vv=VM code, C=native code)
+C  [librocksdbjni348506433143013631.jnilib+0x362448]  _ZNK7rocksdb14OptionTypeInfo8ValidateERKNS_9DBOptionsERKNS_19ColumnFamilyOptionsERKNSt3__112basic_stringIcNS7_11char_traitsIcEENS7_9allocatorIcEEEEPKv+0x5398
+C  [librocksdbjni348506433143013631.jnilib+0x35a555]  _ZN7rocksdb14OptionTypeInfo4FindERKNSt3__112basic_stringIcNS1_11char_traitsIcEENS1_9allocatorIcEEEERKNS1_13unordered_mapIS7_S0_NS1_4hashIS7_EENS1_8equal_toIS7_EENS5_INS1_4pairIS8_S0_EEEEEEPS7_+0x25
+C  [librocksdbjni348506433143013631.jnilib+0x333db0]  _ZN7rocksdb18ConfigurableHelper20ConfigureSomeOptionsERKNS_13ConfigOptionsERNS_12ConfigurableERKNSt3__113unordered_mapINS6_12basic_stringIcNS6_11char_traitsIcEENS6_9allocatorIcEEEENS_14OptionTypeInfoENS6_4hashISD_EENS6_8equal_toISD_EENSB_INS6_4pairIKSD_SE_EEEEEEPNS7_ISD_SD_SG_SI_NSB_INSJ_ISK_SD_EEEEEEPv+0x180
+C  [librocksdbjni348506433143013631.jnilib+0x33318d]  _ZN7rocksdb18ConfigurableHelper16ConfigureOptionsERKNS_13ConfigOptionsERNS_12ConfigurableERKNSt3__113unordered_mapINS6_12basic_stringIcNS6_11char_traitsIcEENS6_9allocatorIcEEEESD_NS6_4hashISD_EENS6_8equal_toISD_EENSB_INS6_4pairIKSD_SD_EEEEEEPSM_+0x9d
+C  [librocksdbjni348506433143013631.jnilib+0x332cf9]  _ZN7rocksdb12Configurable16ConfigureOptionsERKNS_13ConfigOptionsERKNSt3__113unordered_mapINS4_12basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEESB_NS4_4hashISB_EENS4_8equal_toISB_EENS9_INS4_4pairIKSB_SB_EEEEEEPSK_+0x189
+C  [librocksdbjni348506433143013631.jnilib+0x332b42]  _ZN7rocksdb12Configurable16ConfigureFromMapERKNS_13ConfigOptionsERKNSt3__113unordered_mapINS4_12basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEESB_NS4_4hashISB_EENS4_8equal_toISB_EENS9_INS4_4pairIKSB_SB_EEEEEE+0x12
+C  [librocksdbjni348506433143013631.jnilib+0x369781]  _ZN7rocksdb20RocksDBOptionsParser10EndSectionERKNS_13ConfigOptionsENS_13OptionSectionERKNSt3__112basic_stringIcNS5_11char_traitsIcEENS5_9allocatorIcEEEESD_RKNS5_13unordered_mapISB_SB_NS5_4hashISB_EENS5_8equal_toISB_EENS9_INS5_4pairISC_SB_EEEEEE+0x5c1
+C  [librocksdbjni348506433143013631.jnilib+0x368093]  _ZN7rocksdb20RocksDBOptionsParser5ParseERKNS_13ConfigOptionsERKNSt3__112basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEEPNS_10FileSystemE+0x3f3
+C  [librocksdbjni348506433143013631.jnilib+0x36602d]  _ZN7rocksdb20RocksDBOptionsParser28VerifyRocksDBOptionsFromFileERKNS_13ConfigOptionsERKNS_9DBOptionsERKNSt3__16vectorINS7_12basic_stringIcNS7_11char_traitsIcEENS7_9allocatorIcEEEENSC_ISE_EEEERKNS8_INS_19ColumnFamilyOptionsENSC_ISJ_EEEERKSE_PNS_10FileSystemE+0xbd
+C  [librocksdbjni348506433143013631.jnilib+0x3656fe]  _ZN7rocksdb21PersistRocksDBOptionsERKNS_13ConfigOptionsERKNS_9DBOptionsERKNSt3__16vectorINS6_12basic_stringIcNS6_11char_traitsIcEENS6_9allocatorIcEEEENSB_ISD_EEEERKNS7_INS_19ColumnFamilyOptionsENSB_ISI_EEEERKSD_PNS_10FileSystemE+0x1a0e
+C  [librocksdbjni348506433143013631.jnilib+0x363c6e]  _ZN7rocksdb21PersistRocksDBOptionsERKNS_9DBOptionsERKNSt3__16vectorINS3_12basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEENS8_ISA_EEEERKNS4_INS_19ColumnFamilyOptionsENS8_ISF_EEEERKSA_PNS_10FileSystemE+0x6e
+C  [librocksdbjni348506433143013631.jnilib+0x110c73]  _ZN7rocksdb6DBImpl16WriteOptionsFileEbb+0xc73
+C  [librocksdbjni348506433143013631.jnilib+0x11c57a]  _ZN7rocksdb6DBImpl18CreateColumnFamilyERKNS_19ColumnFamilyOptionsERKNSt3__112basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEEPPNS_18ColumnFamilyHandleE+0x3a
+C  [librocksdbjni348506433143013631.jnilib+0x17b8df]  _ZN7rocksdb6DBImpl4OpenERKNS_9DBOptionsERKNSt3__112basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEERKNS4_6vectorINS_22ColumnFamilyDescriptorENS8_ISE_EEEEPNSD_IPNS_18ColumnFamilyHandleENS8_ISK_EEEEPPNS_2DBEbb+0x205f
+C  [librocksdbjni348506433143013631.jnilib+0x179872]  _ZN7rocksdb2DB4OpenERKNS_9DBOptionsERKNSt3__112basic_stringIcNS4_11char_traitsIcEENS4_9allocatorIcEEEERKNS4_6vectorINS_22ColumnFamilyDescriptorENS8_ISE_EEEEPNSD_IPNS_18ColumnFamilyHandleENS8_ISK_EEEEPPS0_+0x12
+C  [librocksdbjni348506433143013631.jnilib+0x2d665]  Java_org_rocksdb_RocksDB_version+0x1185
+C  [librocksdbjni348506433143013631.jnilib+0x1fa4b]  _Z19rocksdb_open_helperP7JNIEnv_lP8_jstringP13_jobjectArrayP11_jlongArrayNSt3__18functionIFN7rocksdb6StatusERKNS9_9DBOptionsERKNS7_12basic_stringIcNS7_11char_traitsIcEENS7_9allocatorIcEEEERKNS7_6vectorINS9_22ColumnFamilyDescriptorENSH_ISN_EEEEPNSM_IPNS9_18ColumnFamilyHandleENSH_IST_EEEEPPNS9_2DBEEEE+0x2cb
+C  [librocksdbjni348506433143013631.jnilib+0x2018f]  Java_org_rocksdb_RocksDB_open__JLjava_lang_String_2_3_3B_3J+0x4f
+j  org.rocksdb.RocksDB.open(JLjava/lang/String;[[B[J)[J+0
+j  org.rocksdb.RocksDB.open(Lorg/rocksdb/DBOptions;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Lorg/rocksdb/RocksDB;+86
+j  org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB.open(Lorg/rocksdb/DBOptions;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Lorg/apache/hadoop/hdds/utils/db/managed/ManagedRocksDB;+18
+j  org.apache.hadoop.hdds.utils.db.RocksDatabase.open(Ljava/io/File;Lorg/apache/hadoop/hdds/utils/db/managed/ManagedDBOptions;Lorg/apache/hadoop/hdds/utils/db/managed/ManagedWriteOptions;Ljava/util/Set;Z)Lorg/apache/hadoop/hdds/utils/db/RocksDatabase;+154
+j  org.apache.hadoop.hdds.utils.db.RDBStore.<init>(Ljava/io/File;Lorg/apache/hadoop/hdds/utils/db/managed/ManagedDBOptions;Lorg/apache/hadoop/hdds/utils/db/managed/ManagedWriteOptions;Ljava/util/Set;Lorg/apache/hadoop/hdds/utils/db/CodecRegistry;ZILjava/lang/String;ZJJJZ)V+247
+j  org.apache.hadoop.hdds.utils.db.DBStoreBuilder.build()Lorg/apache/hadoop/hdds/utils/db/DBStore;+228
+j  org.apache.hadoop.ozone.om.OmMetadataManagerImpl.loadDB(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;Ljava/io/File;Ljava/lang/String;ZLjava/util/Optional;Z)Lorg/apache/hadoop/hdds/utils/db/DBStore;+167
+j  org.apache.hadoop.ozone.om.OmMetadataManagerImpl.loadDB(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;Ljava/io/File;)Lorg/apache/hadoop/hdds/utils/db/DBStore;+24
+j  org.apache.hadoop.ozone.om.OmMetadataManagerImpl.start(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;)V+156
+j  org.apache.hadoop.ozone.om.OmMetadataManagerImpl.<init>(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;)V+135
+j  org.apache.hadoop.ozone.om.OzoneManager.instantiateServices(Z)V+12
+j  org.apache.hadoop.ozone.om.OzoneManager.<init>(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;Lorg/apache/hadoop/ozone/om/OzoneManager$StartupOption;)V+1662
+j  org.apache.hadoop.ozone.om.OzoneManager.createOm(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;Lorg/apache/hadoop/ozone/om/OzoneManager$StartupOption;)Lorg/apache/hadoop/ozone/om/OzoneManager;+10
+j  org.apache.hadoop.ozone.om.OmTestManagers.<init>(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;Lorg/apache/hadoop/hdds/scm/protocol/ScmBlockLocationProtocol;Lorg/apache/hadoop/hdds/scm/protocol/StorageContainerLocationProtocol;)V+175
+j  org.apache.hadoop.ozone.om.OmTestManagers.<init>(Lorg/apache/hadoop/hdds/conf/OzoneConfiguration;)V+8
+j  org.apache.hadoop.ozone.security.acl.TestOzoneNativeAuthorizer.setup()V+82
+v  ~StubRoutines::call_stub
+V  [libjvm.dylib+0x392641]  _ZN9JavaCalls11call_helperEP9JavaValueRK12methodHandleP17JavaCallArgumentsP6Thread+0x285
+V  [libjvm.dylib+0x6384dd]  _ZL6invokeP13InstanceKlassRK12methodHandle6Handleb14objArrayHandle9BasicTypeS5_bP6Thread+0x4e6
+V  [libjvm.dylib+0x637fad]  _ZN10Reflection13invoke_methodEP7oopDesc6Handle14objArrayHandleP6Thread+0xf5

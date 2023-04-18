@@ -98,19 +98,20 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
     boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
 
-    boolean isSuperReadAdmin = isAdmin(ozSuperReadAdmins, context.getClientUgi());
+    boolean isSuperReadAdmin = isAdmin(ozSuperReadAdmins,
+        context.getClientUgi());
+
+    // bypass read checks for super read users
+    if (isSuperReadAdmin && (context.getAclRights() == ACLType.READ
+        || context.getAclRights() == ACLType.READ_ACL
+        || context.getAclRights() == ACLType.LIST)) {
+      return true;
+    }
 
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
     if (isListAllVolume) {
-      return getAllowListAllVolumes()
-          || isSuperReadAdmin;
-    }
-
-    if (context.getAclRights() == ACLType.READ
-        || context.getAclRights() == ACLType.READ_ACL
-        || context.getAclRights() == ACLType.LIST) {
-      return isSuperReadAdmin;
+      return getAllowListAllVolumes();
     }
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
