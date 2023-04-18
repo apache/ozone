@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -38,6 +39,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Collections.singletonList;
@@ -208,5 +210,13 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
           ReplicationManager replicationManager) {
     return new ECMisReplicationHandler(placementPolicy, conf,
         replicationManager);
+  }
+
+  @Override
+  protected void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex) {
+    Assertions.assertEquals(
+        expectedReplicaIndexes.get(sourceDatanode), actualReplicaIndex);
   }
 }
