@@ -41,8 +41,7 @@ public class S3SecretGenerateEndpoint extends S3SecretEndpointBase {
     return Response.ok(s3SecretResponse).build();
   }
 
-
-  protected S3SecretValue generateS3Secret() throws IOException {
+  private S3SecretValue generateS3Secret() throws IOException {
     return getClient().getObjectStore().getS3Secret(shortNameFromRequest());
   }
 }

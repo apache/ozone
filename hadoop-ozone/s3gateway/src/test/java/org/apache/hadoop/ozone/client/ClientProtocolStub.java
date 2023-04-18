@@ -19,6 +19,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -60,6 +61,8 @@ import java.util.Map;
  * ClientProtocol implementation with in-memory state.
  */
 public class ClientProtocolStub implements ClientProtocol {
+  private static final String STUB_KERBEROS_ID = "stub_kerberos_id";
+  private static final String STUB_SECRET = "stub_secret";
   private final ObjectStoreStub objectStoreStub;
 
   public ClientProtocolStub(ObjectStoreStub objectStoreStub) {
@@ -364,8 +367,9 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return null;
+    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override

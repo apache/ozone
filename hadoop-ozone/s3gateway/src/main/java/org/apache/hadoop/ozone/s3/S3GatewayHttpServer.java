@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,8 +56,8 @@ public class S3GatewayHttpServer extends BaseHttpServer {
    */
   public static final int FILTER_PRIORITY_DO_AFTER = 50;
 
-  public S3GatewayHttpServer(MutableConfigurationSource conf,
-                             String name) throws IOException {
+  public S3GatewayHttpServer(MutableConfigurationSource conf, String name)
+      throws IOException {
     super(conf, name);
     addServlet("icon", "/favicon.ico", IconServlet.class);
     addSecretAuthentication(conf);
@@ -75,12 +76,12 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
         String principalInConf =
             conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
-        if (principalInConf != null && !principalInConf.isEmpty()) {
+        if (Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
               principalInConf, conf.get(OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY)));
         }
         String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
-        if (httpKeytab != null && !httpKeytab.isEmpty()) {
+        if (Strings.isNullOrEmpty(httpKeytab)) {
           params.put("kerberos.keytab", httpKeytab);
         }
         params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -987,6 +988,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     GetS3SecretRequest request = GetS3SecretRequest.newBuilder()
         .setKerberosID(kerberosID)
