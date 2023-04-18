@@ -28,6 +28,17 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE =
+      "ozone.om.snapshot.sst_dumptool.pool.size";
+  public static final int
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
+      "ozone.om.snapshot.sst_dumptool.buffer.size";
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT = "8KB";
+
   /**
    * Never constructed.
    */
