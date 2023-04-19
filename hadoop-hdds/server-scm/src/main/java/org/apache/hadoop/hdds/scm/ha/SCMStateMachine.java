@@ -252,6 +252,7 @@ public class SCMStateMachine extends BaseStateMachine {
           try {
             secretKeys =
                 scm.getScmHAManager().getSecretKeysFromLeader(leaderNodeId);
+            LOG.info("Got secret keys from leaders {}", secretKeys);
           } catch (IOException ex) {
             LOG.error("Failed to get secret keys from SCM leader {}",
                 leaderNodeId, ex);
