@@ -43,7 +43,7 @@ public class TestDecommissionScmSubcommand {
 
   @Test
   public void testDecommissionScmInputParams() throws Exception {
-    // requires String <clusterId> and String <nodeId>
+    // requires String <nodeId>
     DecommissionScmSubcommand cmd = new DecommissionScmSubcommand();
     ScmClient client = mock(ScmClient.class);
     OzoneAdmin admin = new OzoneAdmin();
@@ -56,21 +56,14 @@ public class TestDecommissionScmSubcommand {
           "Usage: ozone admin scm decommission"));
     }
 
-    // now give required String <clusterId> and String <nodeId>
+    // now give required String <nodeId>
     CommandLine c1 = new CommandLine(cmd);
     String scmId = UUID.randomUUID().toString();
-    c1.parseArgs("--clusterid=CID-" + UUID.randomUUID(),
-        "--nodeid=" + scmId);
-    RemoveScmResponseProto removeScmResponse =
-        RemoveScmResponseProto.newBuilder()
-        .setScmId(scmId)
-        .setSuccess(true)
-        .build();
+    c1.parseArgs("--nodeid=" + scmId);
 
     DecommissionScmResponseProto response =
         DecommissionScmResponseProto.newBuilder()
-            .setRemoveScmError("")
-            .setRemoveScmResponse(removeScmResponse)
+            .setSuccess(true)
             .build();
 
     Mockito.when(client.decommissionScm(any()))
@@ -81,30 +74,24 @@ public class TestDecommissionScmSubcommand {
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
       assertTrue(capture.getOutput().contains(
-          "CID-"));
+          scmId));
     }
   }
 
   @Test
   public void testDecommissionScmScmRemoveErrors() throws Exception {
-    // requires String <clusterId> and String <nodeId>
+    // requires String <nodeId>
     DecommissionScmSubcommand cmd = new DecommissionScmSubcommand();
     ScmClient client = mock(ScmClient.class);
 
     CommandLine c1 = new CommandLine(cmd);
     String scmId = UUID.randomUUID().toString();
-    c1.parseArgs("--clusterid=CID-" + UUID.randomUUID(),
-        "--nodeid=" + scmId);
-    RemoveScmResponseProto removeScmResponse =
-        RemoveScmResponseProto.newBuilder()
-        .setScmId(scmId)
-        .setSuccess(false)
-        .build();
+    c1.parseArgs("--nodeid=" + scmId);
 
     DecommissionScmResponseProto response =
         DecommissionScmResponseProto.newBuilder()
-            .setRemoveScmResponse(removeScmResponse)
-            .setRemoveScmError("Removal of primordial node is not supported")
+            .setSuccess(false)
+            .setErrorMsg("Removal of primordial node is not supported")
             .build();
 
     Mockito.when(client.decommissionScm(any()))

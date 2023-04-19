@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -36,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 
 import java.io.File;
-import java.util.UUID;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -77,27 +75,21 @@ public class TestSCMClientProtocolServer {
    * Tests decommissioning of scm.
    */
   @Test
-  public void testScmDecommissionScmRemoveErrors() throws Exception {
+  public void testScmDecommissionRemoveScmErrors() throws Exception {
     String scmId = scm.getScmId();
-    String clusterId = "CID-" + UUID.randomUUID();
     String err = "Cannot remove current leader.";
-
-    RemoveScmRequestProto removeScmRequest =
-        RemoveScmRequestProto.newBuilder()
-            .setScmId(scmId)
-            .setClusterId(clusterId)
-            .setRatisAddr("localhost") // ratis addr not avail in utils scm
-            .build();
 
     DecommissionScmRequestProto request =
         DecommissionScmRequestProto.newBuilder()
-            .setRemoveScmRequest(removeScmRequest)
+            .setScmId(scmId)
             .build();
 
     DecommissionScmResponseProto resp =
         service.decommissionScm(request);
 
-    assertTrue(resp.getRemoveScmError()
+    // should have optional error message set in response
+    assertTrue(resp.hasErrorMsg());
+    assertTrue(resp.getErrorMsg()
         .equals(err));
   }
 }

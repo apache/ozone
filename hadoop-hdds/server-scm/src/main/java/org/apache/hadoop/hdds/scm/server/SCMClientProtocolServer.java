@@ -38,10 +38,9 @@ import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -1331,36 +1330,21 @@ public class SCMClientProtocolServer implements
 
   @Override
   public DecommissionScmResponseProto decommissionScm(
-      RemoveSCMRequest removeScm) {
-    String removeScmError = "";
-    Builder removeScmResponseBuilder =
-        RemoveScmResponseProto.newBuilder()
-            .setScmId(removeScm.getScmId());
-
-    RemoveSCMRequest removeScmRequest = removeScm;
-
-    // set ratis address in server if not supplied by scm client
-    if (removeScm.getRatisAddr().equals("")) {
-      removeScmRequest = new RemoveSCMRequest(
-          removeScm.getClusterId(),
-          removeScm.getScmId(),
-          "localhost:" + scm.getScmHAManager().getRatisServer()
-              .getDivision().getRaftServer().getServerRpc()
-              .getInetSocketAddress().getPort());
-    }
+      String scmId) {
+    // TODO: update to use modified scm.removePeerFromHARing, HDDS-8452
+    RemoveSCMRequest removeScmRequest = new RemoveSCMRequest(
+        scm.getClusterId(), scmId, "");
+    Builder decommissionScmResponseBuilder =
+        DecommissionScmResponseProto.newBuilder();
 
     try {
-      removeScmResponseBuilder
+      decommissionScmResponseBuilder
           .setSuccess(scm.removePeerFromHARing(removeScmRequest));
     } catch (IOException ex) {
-      removeScmResponseBuilder
-          .setSuccess(false);
-      removeScmError = ex.getMessage();
+      decommissionScmResponseBuilder
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage());
     }
-
-    return DecommissionScmResponseProto.newBuilder()
-        .setRemoveScmResponse(removeScmResponseBuilder.build())
-        .setRemoveScmError(removeScmError)
-        .build();
+    return decommissionScmResponseBuilder.build();
   }
 }

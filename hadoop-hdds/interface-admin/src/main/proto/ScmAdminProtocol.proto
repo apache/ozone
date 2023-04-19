@@ -577,12 +577,12 @@ message ContainerBalancerStatusResponseProto {
 }
 
 message DecommissionScmRequestProto {
-  required hadoop.hdds.RemoveScmRequestProto removeScmRequest = 1;
+  required string scmId = 1;
 }
 
 message DecommissionScmResponseProto {
-  required hadoop.hdds.RemoveScmResponseProto removeScmResponse = 1;
-  required string removeScmError = 2;
+  required bool success = 1;
+  optional string errorMsg = 2;
 }
 
 /**
