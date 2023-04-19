@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -91,7 +92,7 @@ public abstract class TestMisReplicationHandler {
     ReplicationTestUtil.mockRMSendDatanodeCommand(
         replicationManager, commandsSent);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent);
+        replicationManager, commandsSent, new AtomicBoolean(false));
 
     container = ReplicationTestUtil
             .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
