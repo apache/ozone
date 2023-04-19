@@ -290,9 +290,6 @@ public class TestOmDBInsightEndPoint {
 
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
-    RepeatedOmKeyInfo repeatedOmKeyInfoCopy1 =
-        reconOMMetadataManager.getDeletedTable()
-            .get("/sampleVol/bucketOne/key_one");
     Assertions.assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
 
