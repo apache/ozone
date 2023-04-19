@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -34,16 +35,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointManager;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -107,9 +108,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
@@ -328,13 +330,48 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     this.omEpoch = 0;
   }
 
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    Path path = checkpoint.getCheckpointLocation();
+    Path parent = path.getParent();
+    if (parent == null) {
+      throw new IllegalStateException("DB checkpoint parent path should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    File dir = parent.toFile();
+    Path name = path.getFileName();
+    if (name == null) {
+      throw new IllegalStateException("DB checkpoint dir name should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    return new OmMetadataManagerImpl(conf, dir, name.toString());
+  }
+
+  /**
+   * Metadata constructor for checkpoints.
+   *
+   * @param conf - Ozone conf.
+   * @param dir - Checkpoint parent directory.
+   * @param name - Checkpoint directory name.
+   * @throws IOException
+   */
+  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+      throws IOException {
+    lock = new OmReadOnlyLock();
+    omEpoch = 0;
+    setStore(loadDB(conf, dir, name, true,
+        java.util.Optional.of(Boolean.TRUE)));
+    initializeOmTables(false);
+  }
+
+
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
     String snapshotDir = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
     File metaDir = new File(snapshotDir);
     String dbName = OM_DB_NAME + snapshotDirName;
     // The check is only to prevent every snapshot read to perform a disk IO
@@ -342,10 +379,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // it is most likely DB entries will get flushed in this wait time.
     if (isSnapshotInCache) {
       File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
-      RDBCheckpointManager.waitForCheckpointDirectoryExist(checkpoint);
+      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
     }
-    setStore(loadDB(conf, metaDir, dbName, true,
-            java.util.Optional.of(Boolean.TRUE)));
+    setStore(loadDB(conf, metaDir, dbName, false,
+            java.util.Optional.of(Boolean.TRUE), false));
     initializeOmTables(false);
   }
 
@@ -483,7 +520,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty());
+            java.util.Optional.empty(), true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -491,6 +528,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                java.util.Optional<Boolean>
                                        disableAutoCompaction)
           throws IOException {
+    return loadDB(configuration, metaDir, dbName, readOnly,
+        disableAutoCompaction, true);
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+                               String dbName, boolean readOnly,
+                               java.util.Optional<Boolean>
+                                   disableAutoCompaction,
+                               boolean createCheckpointDirs)
+      throws IOException {
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
@@ -500,7 +547,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
-        .setEnableCompactionLog(true);
+        .setEnableCompactionLog(true)
+        .setCreateCheckpointDirs(createCheckpointDirs);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
@@ -661,7 +709,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Stop metadata manager.
    */
   @Override
-  public void stop() throws Exception {
+  public void stop() throws IOException {
     if (store != null) {
       store.close();
       store = null;
@@ -1395,9 +1443,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
   }
 
-  @Override
-  public List<BlockGroup> getPendingDeletionKeys(final int keyCount)
-      throws IOException {
+  /**
+   * Returns a list of pending deletion key info up to the limit.
+   * Each entry is a {@link BlockGroup}, which contains the info about the key
+   * name and all its associated block IDs.
+   *
+   * @param keyCount max number of keys to return.
+   * @param omSnapshotManager SnapshotManager
+   * @return a list of {@link BlockGroup} represent keys and blocks.
+   * @throws IOException
+   */
+  public List<BlockGroup> getPendingDeletionKeys(final int keyCount,
+      OmSnapshotManager omSnapshotManager) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              keyIter = getDeletedTable().iterator()) {
@@ -1405,6 +1462,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (keyIter.hasNext() && currentCount < keyCount) {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
+          List<BlockGroup> blockGroupList = Lists.newArrayList();
+          // Get volume name and bucket name
+          String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
+          // Get the latest snapshot in snapshot path.
+          OmSnapshot latestSnapshot = getLatestSnapshot(keySplit[1],
+              keySplit[2], omSnapshotManager);
+          String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
+          OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
+
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
@@ -1423,6 +1489,37 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             //  4. Further optimization: Skip all snapshotted keys altogether
             //  e.g. by prefixing all unreclaimable keys, then calling seek
 
+            if (latestSnapshot != null) {
+              Table<String, OmKeyInfo> prevKeyTable =
+                  latestSnapshot.getMetadataManager().getKeyTable(
+                      bucketInfo.getBucketLayout());
+              String prevDbKey;
+              if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+                long volumeId = getVolumeId(info.getVolumeName());
+                prevDbKey = getOzonePathKey(volumeId,
+                    bucketInfo.getObjectID(),
+                    info.getParentObjectID(),
+                    info.getKeyName());
+              } else {
+                prevDbKey = getOzoneKey(info.getVolumeName(),
+                    info.getBucketName(),
+                    info.getKeyName());
+              }
+
+              OmKeyInfo omKeyInfo = prevKeyTable.get(prevDbKey);
+              if (omKeyInfo != null &&
+                  info.getObjectID() == omKeyInfo.getObjectID()) {
+                // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
+                //  active DB's deletedTable if any one of the keys in
+                //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
+                //  Might need to refactor OMKeyDeleteRequest first to take
+                //  actual reclaimed key objectIDs as input
+                //  in order to avoid any race condition.
+                blockGroupList.clear();
+                break;
+              }
+            }
+
             // Add all blocks from all versions of the key to the deletion list
             for (OmKeyLocationInfoGroup keyLocations :
                 info.getKeyLocationVersions()) {
@@ -1433,14 +1530,38 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                   .setKeyName(kv.getKey())
                   .addAllBlockIDs(item)
                   .build();
-              keyBlocksList.add(keyBlocks);
+              blockGroupList.add(keyBlocks);
             }
             currentCount++;
           }
+          keyBlocksList.addAll(blockGroupList);
         }
       }
     }
     return keyBlocksList;
+  }
+
+  /**
+   * Get the latest OmSnapshot for a snapshot path.
+   */
+  public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
+                                       OmSnapshotManager snapshotManager)
+      throws IOException {
+
+    String latestPathSnapshot =
+        snapshotChainManager.getLatestPathSnapshot(volumeName
+            + OM_KEY_PREFIX + bucketName);
+    String snapTableKey = latestPathSnapshot != null ?
+        snapshotChainManager.getTableKey(latestPathSnapshot) : null;
+    SnapshotInfo snapInfo = snapTableKey != null ?
+        getSnapshotInfoTable().get(snapTableKey) : null;
+
+    OmSnapshot omSnapshot = null;
+    if (snapInfo != null) {
+      omSnapshot = (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
+              bucketName, getSnapshotPrefix(snapInfo.getName()));
+    }
+    return omSnapshot;
   }
 
   @Override
@@ -1601,13 +1722,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public void put(String kerberosId, S3SecretValue secretValue, long txId) {
     s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
-        new CacheValue<>(Optional.of(secretValue), txId));
+        CacheValue.get(txId, secretValue));
   }
 
   @Override
   public void invalidate(String id, long txId) {
     s3SecretTable.addCacheEntry(new CacheKey<>(id),
-        new CacheValue<>(Optional.absent(), txId));
+        CacheValue.get(txId));
   }
 
   @Override
@@ -1727,6 +1848,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String getOzoneDeletePathDirKey(String ozoneDeletePath) {
+    return ozoneDeletePath.substring(0,
+        ozoneDeletePath.lastIndexOf(OM_KEY_PREFIX));
+  }
+
+  @Override
   public String getOpenFileName(long volumeId, long bucketId,
                                 long parentID, String fileName,
                                 long id) {
@@ -1748,7 +1875,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
-
   @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,
@@ -1786,5 +1912,31 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           BUCKET_NOT_FOUND);
     }
     return omBucketInfo.getObjectID();
+  }
+
+  @Override
+  public List<BlockGroup> getBlocksForKeyDelete(String deletedKey)
+      throws IOException {
+    RepeatedOmKeyInfo omKeyInfo = getDeletedTable().get(deletedKey);
+    if (omKeyInfo == null) {
+      return null;
+    }
+
+    List<BlockGroup> result = new ArrayList<>();
+    // Add all blocks from all versions of the key to the deletion list
+    for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
+      for (OmKeyLocationInfoGroup keyLocations :
+          info.getKeyLocationVersions()) {
+        List<BlockID> item = keyLocations.getLocationList().stream()
+            .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+            .collect(Collectors.toList());
+        BlockGroup keyBlocks = BlockGroup.newBuilder()
+            .setKeyName(deletedKey)
+            .addAllBlockIDs(item)
+            .build();
+        result.add(keyBlocks);
+      }
+    }
+    return result;
   }
 }

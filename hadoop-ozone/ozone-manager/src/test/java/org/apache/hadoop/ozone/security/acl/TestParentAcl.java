@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,6 +48,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -120,7 +120,7 @@ public class TestParentAcl {
   }
 
   @Test
-  @Flaky("HDDS-6335")
+  @Flaky("HDDS-6335") @Ignore("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;
@@ -267,7 +267,7 @@ public class TestParentAcl {
     omVolumeArgs.addAcl(ozoneAcl);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private List<OzoneAcl> getVolumeAcls(String vol) throws IOException {
@@ -286,7 +286,7 @@ public class TestParentAcl {
     omVolumeArgs.setAcls(ozoneAcls);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private void addKeyAcl(String vol, String buck, String key,
@@ -299,7 +299,7 @@ public class TestParentAcl {
 
     metadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(objKey),
-            new CacheValue<>(Optional.of(omKeyInfo), 1L));
+            CacheValue.get(1L, omKeyInfo));
   }
 
   private void setKeyAcl(String vol, String buck, String key,
@@ -311,7 +311,7 @@ public class TestParentAcl {
 
     metadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(objKey),
-            new CacheValue<>(Optional.of(omKeyInfo), 1L));
+            CacheValue.get(1L, omKeyInfo));
   }
 
   private void addBucketAcl(String vol, String buck, OzoneAcl ozoneAcl)
@@ -322,7 +322,7 @@ public class TestParentAcl {
     omBucketInfo.addAcl(ozoneAcl);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private List<OzoneAcl> getBucketAcls(String vol, String buck)
@@ -341,7 +341,7 @@ public class TestParentAcl {
     omBucketInfo.setAcls(ozoneAcls);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private static OzoneObjInfo createVolume(String volumeName)

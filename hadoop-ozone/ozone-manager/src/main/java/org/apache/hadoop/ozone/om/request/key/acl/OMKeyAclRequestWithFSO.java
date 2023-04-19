@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -121,12 +120,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         Table<String, OmDirectoryInfo> dirTable =
             omMetadataManager.getDirectoryTable();
         dirTable.addCacheEntry(new CacheKey<>(dbKey),
-            new CacheValue<>(Optional.of(OMFileRequest.
-                getDirectoryInfo(omKeyInfo)), trxnLogIndex));
+            CacheValue.get(trxnLogIndex,
+                OMFileRequest.getDirectoryInfo(omKeyInfo)));
       } else {
         omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);

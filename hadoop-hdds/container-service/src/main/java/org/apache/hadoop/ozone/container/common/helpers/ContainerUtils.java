@@ -141,7 +141,8 @@ public final class ContainerUtils {
    * @throws IOException when read/write error occurs
    */
   public static synchronized void writeDatanodeDetailsTo(
-      DatanodeDetails datanodeDetails, File path) throws IOException {
+      DatanodeDetails datanodeDetails, File path, ConfigurationSource conf)
+      throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
         throw new IOException("Unable to overwrite the datanode ID file.");
@@ -152,7 +153,7 @@ public final class ContainerUtils {
         throw new IOException("Unable to create datanode ID directories.");
       }
     }
-    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path);
+    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
   }
 
   /**

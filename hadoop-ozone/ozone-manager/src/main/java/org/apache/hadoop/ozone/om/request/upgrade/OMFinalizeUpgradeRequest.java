@@ -43,7 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import com.google.common.base.Optional;
 
 /**
  * Handles finalizeUpgrade request.
@@ -95,8 +94,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(LAYOUT_VERSION_KEY),
-          new CacheValue<>(Optional.of(String.valueOf(lV)),
-              transactionLogIndex));
+          CacheValue.get(transactionLogIndex, String.valueOf(lV)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

@@ -31,6 +31,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
@@ -369,6 +370,68 @@ public class TestKeyDeletingService {
       // Delete the key
       writeClient.deleteKey(keyArg);
     }
+  }
+
+  @Test
+  public void checkDeletedTableCleanUpForSnapshot()
+      throws Exception {
+    OzoneConfiguration conf = createConfAndInitValues();
+    OmTestManagers omTestManagers
+        = new OmTestManagers(conf);
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    writeClient = omTestManagers.getWriteClient();
+    om = omTestManagers.getOzoneManager();
+    OMMetadataManager metadataManager = omTestManagers.getMetadataManager();
+
+    String volumeName = String.format("volume%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String bucketName1 = String.format("bucket%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String bucketName2 = String.format("bucket%s",
+        RandomStringUtils.randomAlphanumeric(5));
+    String keyName = String.format("key%s",
+        RandomStringUtils.randomAlphanumeric(5));
+
+    // Create Volume and Buckets
+    createVolumeAndBucket(keyManager, volumeName, bucketName1, false);
+    createVolumeAndBucket(keyManager, volumeName, bucketName2, false);
+
+    // Create the keys
+    OmKeyArgs key1 = createAndCommitKey(keyManager, volumeName, bucketName1,
+        keyName, 3);
+    OmKeyArgs key2 = createAndCommitKey(keyManager, volumeName, bucketName2,
+        keyName, 3);
+
+    // Create snapshot
+    String snapName = "snap1";
+    writeClient.createSnapshot(volumeName, bucketName1, snapName);
+
+    // Delete the key
+    writeClient.deleteKey(key1);
+    writeClient.deleteKey(key2);
+
+    // Run KeyDeletingService
+    KeyDeletingService keyDeletingService =
+        (KeyDeletingService) keyManager.getDeletingService();
+    GenericTestUtils.waitFor(
+        () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
+        1000, 10000);
+    Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
+    Assert.assertEquals(0,
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
+
+    // deletedTable should have deleted key of the snapshot bucket
+    Assert.assertFalse(metadataManager.getDeletedTable().isEmpty());
+    String ozoneKey1 =
+        metadataManager.getOzoneKey(volumeName, bucketName1, keyName);
+    String ozoneKey2 =
+        metadataManager.getOzoneKey(volumeName, bucketName2, keyName);
+
+    // key1 belongs to snapshot, so it should not be deleted when
+    // KeyDeletingService runs. But key2 can be reclaimed as it doesn't
+    // belong to any snapshot scope.
+    Assert.assertTrue(metadataManager.getDeletedTable().isExist(ozoneKey1));
+    Assert.assertFalse(metadataManager.getDeletedTable().isExist(ozoneKey2));
   }
 
   private void createVolumeAndBucket(KeyManager keyManager, String volumeName,

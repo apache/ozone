@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.cache.LoadingCache;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,29 +30,47 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.NativeConstants;
+import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
+import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob.SnapshotDiffJobCodec;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.util.ClosableIterator;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -63,12 +83,20 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.SynchronousQueue;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 
 /**
  * Class to generate snapshot diff.
  */
-public class SnapshotDiffManager {
+public class SnapshotDiffManager implements AutoCloseable {
   private static final Logger LOG =
           LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String DELIMITER = "-";
@@ -80,10 +108,17 @@ public class SnapshotDiffManager {
   private static final String CREATE_DIFF_TABLE_SUFFIX = "-create-diff";
   private static final String MODIFY_DIFF_TABLE_SUFFIX = "-modify-diff";
 
-  private final RocksDBCheckpointDiffer differ;
   private final ManagedRocksDB db;
+  private final RocksDBCheckpointDiffer differ;
+  private final OzoneManager ozoneManager;
+  private final LoadingCache<String, OmSnapshot> snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
+
+  // TODO: [SNAPSHOT] Use different wait time based of job status.
+  private static final Duration DEFAULT_WAIT_TIME = Duration.ofSeconds(1);
+  // TODO: [SNAPSHOT] Move this to config file.
+  private static final int DEFAULT_THREAD_POOL_SIZE = 10;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -98,20 +133,24 @@ public class SnapshotDiffManager {
    * done. This table is used to make sure that there is only single job for
    * similar type of request at any point of time.
    */
-  private final PersistentMap<String, String> snapDiffJobTable;
+  private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
+  private final ExecutorService executorService;
 
-  private final OzoneConfiguration configuration;
+  private boolean isNativeRocksToolsLoaded;
 
+  private ManagedSSTDumpTool sstDumpTool;
 
   public SnapshotDiffManager(ManagedRocksDB db,
                              RocksDBCheckpointDiffer differ,
-                             OzoneConfiguration configuration,
+                             OzoneManager ozoneManager,
+                             LoadingCache<String, OmSnapshot> snapshotCache,
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions) {
     this.db = db;
     this.differ = differ;
-    this.configuration = configuration;
+    this.ozoneManager = ozoneManager;
+    this.snapshotCache = snapshotCache;
     this.familyOptions = familyOptions;
     this.codecRegistry = new CodecRegistry();
 
@@ -120,18 +159,62 @@ public class SnapshotDiffManager {
     // DiffReportEntry codec for Diff Report.
     this.codecRegistry.addCodec(DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
+    this.codecRegistry.addCodec(SnapshotDiffJob.class,
+        new SnapshotDiffJobCodec());
 
     this.snapDiffJobTable = new RocksDbPersistentMap<>(db,
         snapDiffJobCfh,
         codecRegistry,
         String.class,
-        String.class);
+        SnapshotDiffJob.class);
 
     this.snapDiffReportTable = new RocksDbPersistentMap<>(db,
         snapDiffReportCfh,
         codecRegistry,
         byte[].class,
         byte[].class);
+
+    this.executorService = new ThreadPoolExecutor(DEFAULT_THREAD_POOL_SIZE,
+        DEFAULT_THREAD_POOL_SIZE,
+        0,
+        TimeUnit.SECONDS,
+        new ArrayBlockingQueue<>(DEFAULT_THREAD_POOL_SIZE),
+        new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+
+    // TODO: [SNAPSHOT] Load jobs only if it is leader node.
+    //  It could a event-triggered form OM when node is leader and up.
+    this.loadJobsOnStartUp();
+    isNativeRocksToolsLoaded = NativeLibraryLoader.getInstance()
+            .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+    if (isNativeRocksToolsLoaded) {
+      isNativeRocksToolsLoaded = initSSTDumpTool(
+          ozoneManager.getConfiguration());
+    }
+  }
+
+  private boolean initSSTDumpTool(OzoneConfiguration conf) {
+    try {
+      int threadPoolSize = conf.getInt(
+              OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
+              OMConfigKeys
+                  .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
+      int bufferSize = (int) conf.getStorageSize(
+          OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE,
+          OMConfigKeys
+              .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
+              StorageUnit.BYTES);
+      ExecutorService execService = new ThreadPoolExecutor(0,
+              threadPoolSize, 60, TimeUnit.SECONDS,
+              new SynchronousQueue<>(), new ThreadFactoryBuilder()
+              .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
+              .build(),
+              new ThreadPoolExecutor.DiscardPolicy());
+      sstDumpTool = new ManagedSSTDumpTool(execService, bufferSize);
+    } catch (NativeLibraryNotLoadedException e) {
+      return false;
+    }
+    return true;
   }
 
   private Map<String, String> getTablePrefixes(
@@ -171,32 +254,62 @@ public class SnapshotDiffManager {
         getTablePrefixes(snapshotOMMM, volumeName, bucketName));
   }
 
+  private Set<String> getSSTFileListForSnapshot(OmSnapshot snapshot,
+          List<String> tablesToLookUp) throws RocksDBException {
+    return RdbUtil.getSSTFilesForComparison(snapshot
+        .getMetadataManager().getStore().getDbLocation()
+        .getPath(), tablesToLookUp);
+  }
+
   @SuppressWarnings("parameternumber")
-  public SnapshotDiffReport getSnapshotDiffReport(final String volume,
-                                                  final String bucket,
-                                                  final OmSnapshot fromSnapshot,
-                                                  final OmSnapshot toSnapshot,
-                                                  final SnapshotInfo fsInfo,
-                                                  final SnapshotInfo tsInfo,
-                                                  final int index,
-                                                  final int pageSize,
-                                                  final boolean forceFullDiff)
-      throws IOException, RocksDBException {
-    String diffJobKey = fsInfo.getSnapshotID() + DELIMITER +
+  public SnapshotDiffResponse getSnapshotDiffReport(
+      final String volume,
+      final String bucket,
+      final OmSnapshot fromSnapshot,
+      final OmSnapshot toSnapshot,
+      final SnapshotInfo fsInfo,
+      final SnapshotInfo tsInfo,
+      final int index,
+      final int pageSize,
+      final boolean forceFullDiff
+  ) throws IOException {
+    String snapDiffJobKey = fsInfo.getSnapshotID() + DELIMITER +
         tsInfo.getSnapshotID();
 
-    Pair<String, Boolean> jobIdToJobExist = getOrCreateJobId(diffJobKey);
-    String jobId = jobIdToJobExist.getLeft();
-    boolean jobExist = jobIdToJobExist.getRight();
+    SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
+        volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
+        forceFullDiff);
 
-    // If snapshot diff doesn't exist, we generate the diff report first
-    // and add it to the table for future requests.
-    // This needs to be updated to queuing and job status base.
-    if (!jobExist) {
-      generateSnapshotDiffReport(jobId, volume, bucket, fromSnapshot,
-          toSnapshot, fsInfo, tsInfo, forceFullDiff);
+    switch (snapDiffJob.getStatus()) {
+    case QUEUED:
+      return submitSnapDiffJob(snapDiffJobKey, volume, bucket, fromSnapshot,
+          toSnapshot, fsInfo, tsInfo, index, pageSize, forceFullDiff);
+    case IN_PROGRESS:
+      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+          null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+    case FAILED:
+      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+          null), FAILED, DEFAULT_WAIT_TIME.toMillis());
+    case DONE:
+      SnapshotDiffReport report = createPageResponse(snapDiffJob.getJobId(),
+          volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
+      return new SnapshotDiffResponse(report, DONE, 0L);
+    default:
+      throw new IllegalStateException("Unknown snapshot job status: " +
+          snapDiffJob.getStatus());
     }
+  }
 
+  private SnapshotDiffReport createPageResponse(final String jobId,
+                                                final String volume,
+                                                final String bucket,
+                                                final OmSnapshot fromSnapshot,
+                                                final OmSnapshot toSnapshot,
+                                                final int index,
+                                                final int pageSize)
+      throws IOException {
     List<DiffReportEntry> diffReportList = new ArrayList<>();
 
     boolean hasMoreEntries = true;
@@ -218,37 +331,135 @@ public class SnapshotDiffManager {
         toSnapshot.getName(), diffReportList, tokenString);
   }
 
-  /**
-   * Return the jobId from the table if it exists otherwise create a new one,
-   * add to the table and return that.
-   */
-  private synchronized Pair<String, Boolean> getOrCreateJobId(
-      String diffJobKey) {
-    String jobId = snapDiffJobTable.get(diffJobKey);
+  @SuppressWarnings("parameternumber")
+  private synchronized SnapshotDiffResponse submitSnapDiffJob(
+      final String jobKey,
+      final String volume,
+      final String bucket,
+      final OmSnapshot fromSnapshot,
+      final OmSnapshot toSnapshot,
+      final SnapshotInfo fsInfo,
+      final SnapshotInfo tsInfo,
+      final int index,
+      final int pageSize,
+      final boolean forceFullDiff
+  ) throws IOException {
 
-    if (jobId != null) {
-      return Pair.of(jobId, true);
-    } else {
-      jobId = UUID.randomUUID().toString();
-      snapDiffJobTable.put(diffJobKey, jobId);
-      return Pair.of(jobId, false);
+    SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
+
+    // This is only possible if another thread tired to submit the request,
+    // and it got rejected. In this scenario, return the Rejected job status
+    // with wait time.
+    if (snapDiffJob == null) {
+      LOG.info("Snap diff job has been removed for for volume: {}, " +
+          "bucket: {}, fromSnapshot: {} and toSnapshot: {}.",
+          volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
+      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+          null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
     }
+
+    // Check again that request is still in queued status. If it is not queued,
+    // return the response accordingly for early return.
+    if (snapDiffJob.getStatus() != QUEUED) {
+      // Same request is submitted by another thread and already completed.
+      if (snapDiffJob.getStatus() == DONE) {
+        SnapshotDiffReport report = createPageResponse(snapDiffJob.getJobId(),
+            volume, bucket, fromSnapshot, toSnapshot, index, pageSize);
+        return new SnapshotDiffResponse(report, DONE, 0L);
+      } else {
+        // Otherwise, return the same status as in DB with wait time.
+        return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+            fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+            null), snapDiffJob.getStatus(), DEFAULT_WAIT_TIME.toMillis());
+      }
+    }
+
+    return submitSnapDiffJob(jobKey, snapDiffJob.getJobId(), volume, bucket,
+        fromSnapshot, toSnapshot, fsInfo, tsInfo, forceFullDiff);
   }
 
   @SuppressWarnings("parameternumber")
-  private void generateSnapshotDiffReport(final String jobId,
+  private synchronized SnapshotDiffResponse submitSnapDiffJob(
+      final String jobKey,
+      final String jobId,
+      final String volume,
+      final String bucket,
+      final OmSnapshot fromSnapshot,
+      final OmSnapshot toSnapshot,
+      final SnapshotInfo fsInfo,
+      final SnapshotInfo tsInfo,
+      final boolean forceFullDiff
+  ) {
+
+    LOG.info("Submitting snap diff report generation request for" +
+            " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+        volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
+
+    // Submit the request to the executor if job is still in queued status.
+    // If executor cannot take any more job, remove the job form DB and return
+    // the Rejected Job status with wait time.
+    try {
+      executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
+          volume, bucket, fromSnapshot, toSnapshot, fsInfo, tsInfo,
+          forceFullDiff));
+      updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
+      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+          null),
+          IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+    } catch (RejectedExecutionException exception) {
+      // Remove the entry from job table so that client can retry.
+      // If entry is not removed, client has to wait till cleanup service
+      // removes the entry even tho there are resources to execute the request
+      // before the cleanup kicks in.
+      snapDiffJobTable.remove(jobKey);
+      LOG.info("Exceeded the snapDiff parallel requests progressing " +
+          "limit. Please retry after {}.", DEFAULT_WAIT_TIME);
+      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+          null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+    }
+  }
+
+  /**
+   * Check if there is an existing request for the same `fromSnapshot` and
+   * `toSnapshot`. If yes, then return that response otherwise adds a new entry
+   * to the table for the future requests and returns that.
+   */
+  private synchronized SnapshotDiffJob getSnapDiffReportStatus(
+      String snapDiffJobKey,
+      String volume,
+      String bucket,
+      String fromSnapshot,
+      String toSnapshot,
+      boolean forceFullDiff
+  ) {
+    SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(snapDiffJobKey);
+
+    if (snapDiffJob == null) {
+      String jobId = UUID.randomUUID().toString();
+      snapDiffJob = new SnapshotDiffJob(jobId, QUEUED, volume, bucket,
+          fromSnapshot, toSnapshot, forceFullDiff);
+      snapDiffJobTable.put(snapDiffJobKey, snapDiffJob);
+    }
+
+    return snapDiffJob;
+  }
+
+  @SuppressWarnings("parameternumber")
+  private void generateSnapshotDiffReport(final String jobKey,
+                                          final String jobId,
                                           final String volume,
                                           final String bucket,
                                           final OmSnapshot fromSnapshot,
                                           final OmSnapshot toSnapshot,
                                           final SnapshotInfo fsInfo,
                                           final SnapshotInfo tsInfo,
-                                          final boolean forceFullDiff)
-      throws RocksDBException {
+                                          final boolean forceFullDiff) {
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
     ColumnFamilyHandle objectIDsColumnFamily = null;
-
     try {
       // JobId is prepended to column families name to make them unique
       // for request.
@@ -258,8 +469,6 @@ public class SnapshotDiffManager {
           createColumnFamily(jobId + TO_SNAP_TABLE_SUFFIX);
       objectIDsColumnFamily =
           createColumnFamily(jobId + UNIQUE_IDS_TABLE_SUFFIX);
-      // ReportId is prepended to column families name to make them unique
-      // for request.
 
       // ObjectId to keyName map to keep key info for fromSnapshot.
       // objectIdToKeyNameMap is used to identify what keys were touched
@@ -270,36 +479,25 @@ public class SnapshotDiffManager {
       // Note: Store objectId and keyName as byte array to reduce unnecessary
       // serialization and deserialization.
       final PersistentMap<byte[], byte[]> objectIdToKeyNameMapForFromSnapshot =
-          new RocksDbPersistentMap<>(db,
-              fromSnapshotColumnFamily,
-              codecRegistry,
-              byte[].class,
-              byte[].class);
-
+          new RocksDbPersistentMap<>(db, fromSnapshotColumnFamily,
+              codecRegistry, byte[].class, byte[].class);
       // ObjectId to keyName map to keep key info for toSnapshot.
       final PersistentMap<byte[], byte[]> objectIdToKeyNameMapForToSnapshot =
-          new RocksDbPersistentMap<>(db,
-              toSnapshotColumnFamily,
-              codecRegistry,
-              byte[].class,
-              byte[].class);
-
+          new RocksDbPersistentMap<>(db, toSnapshotColumnFamily, codecRegistry,
+              byte[].class, byte[].class);
       // Set of unique objectId between fromSnapshot and toSnapshot.
       final PersistentSet<byte[]> objectIDsToCheckMap =
-          new RocksDbPersistentSet<>(db,
-              objectIDsColumnFamily,
-              codecRegistry,
+          new RocksDbPersistentSet<>(db, objectIDsColumnFamily, codecRegistry,
               byte[].class);
 
       final BucketLayout bucketLayout = getBucketLayout(volume, bucket,
           fromSnapshot.getMetadataManager());
-
       final Table<String, OmKeyInfo> fsKeyTable =
           fromSnapshot.getMetadataManager().getKeyTable(bucketLayout);
       final Table<String, OmKeyInfo> tsKeyTable =
           toSnapshot.getMetadataManager().getKeyTable(bucketLayout);
 
-      boolean useFullDiff = configuration.getBoolean(
+      boolean useFullDiff = ozoneManager.getConfiguration().getBoolean(
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
           OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
       if (forceFullDiff) {
@@ -308,80 +506,119 @@ public class SnapshotDiffManager {
 
       Map<String, String> tablePrefixes =
           getTablePrefixes(toSnapshot.getMetadataManager(), volume, bucket);
-
-      final Set<String> deltaFilesForKeyOrFileTable =
-          getDeltaFiles(fromSnapshot, toSnapshot,
-              Collections.singletonList(fsKeyTable.getName()), fsInfo, tsInfo,
+      List<String> tablesToLookUp =
+              Collections.singletonList(fsKeyTable.getName());
+      final Set<String> deltaFilesForKeyOrFileTable = getDeltaFiles(
+              fromSnapshot, toSnapshot, tablesToLookUp, fsInfo, tsInfo,
               useFullDiff, tablePrefixes);
 
-      addToObjectIdMap(fsKeyTable,
-          tsKeyTable,
-          deltaFilesForKeyOrFileTable,
-          objectIdToKeyNameMapForFromSnapshot,
-          objectIdToKeyNameMapForToSnapshot,
-          objectIDsToCheckMap,
-          tablePrefixes);
+      // Workaround to handle deletes if native rockstools for reading
+      // tombstone is not loaded.
+      // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
+      if (!isNativeRocksToolsLoaded) {
+        deltaFilesForKeyOrFileTable.addAll(getSSTFileListForSnapshot(
+                fromSnapshot, tablesToLookUp));
+      }
+      try {
+        addToObjectIdMap(fsKeyTable, tsKeyTable,
+            Pair.of(isNativeRocksToolsLoaded, deltaFilesForKeyOrFileTable),
+            objectIdToKeyNameMapForFromSnapshot,
+            objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+            tablePrefixes);
+      } catch (NativeLibraryNotLoadedException e) {
+        // Workaround to handle deletes if use of native rockstools for reading
+        // tombstone fails.
+        // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
+        deltaFilesForKeyOrFileTable.addAll(getSSTFileListForSnapshot(
+                fromSnapshot, tablesToLookUp));
+        try {
+          addToObjectIdMap(fsKeyTable, tsKeyTable,
+              Pair.of(false, deltaFilesForKeyOrFileTable),
+              objectIdToKeyNameMapForFromSnapshot,
+              objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+              tablePrefixes);
+        } catch (NativeLibraryNotLoadedException ex) {
+          // This code should be never executed.
+          throw new IllegalStateException(ex);
+        }
+      }
 
       if (bucketLayout.isFileSystemOptimized()) {
         final Table<String, OmDirectoryInfo> fsDirTable =
             fromSnapshot.getMetadataManager().getDirectoryTable();
         final Table<String, OmDirectoryInfo> tsDirTable =
             toSnapshot.getMetadataManager().getDirectoryTable();
+        tablesToLookUp = Collections.singletonList(fsDirTable.getName());
         final Set<String> deltaFilesForDirTable =
-            getDeltaFiles(fromSnapshot, toSnapshot,
-                Collections.singletonList(fsDirTable.getName()), fsInfo, tsInfo,
-                useFullDiff, tablePrefixes);
-        addToObjectIdMap(fsDirTable,
-            tsDirTable,
-            deltaFilesForDirTable,
-            objectIdToKeyNameMapForFromSnapshot,
-            objectIdToKeyNameMapForToSnapshot,
-            objectIDsToCheckMap,
-            tablePrefixes);
+            getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookUp, fsInfo,
+                    tsInfo, useFullDiff, tablePrefixes);
+        if (!isNativeRocksToolsLoaded) {
+          deltaFilesForDirTable.addAll(getSSTFileListForSnapshot(
+                  fromSnapshot, tablesToLookUp));
+        }
+        try {
+          addToObjectIdMap(fsDirTable, tsDirTable,
+              Pair.of(isNativeRocksToolsLoaded, deltaFilesForDirTable),
+              objectIdToKeyNameMapForFromSnapshot,
+              objectIdToKeyNameMapForToSnapshot,
+              objectIDsToCheckMap,
+              tablePrefixes);
+        } catch (NativeLibraryNotLoadedException e) {
+          try {
+            // Workaround to handle deletes if use of native rockstools for
+            // reading tombstone fails.
+            // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
+            deltaFilesForDirTable.addAll(getSSTFileListForSnapshot(
+                    fromSnapshot, tablesToLookUp));
+            addToObjectIdMap(fsDirTable, tsDirTable,
+                Pair.of(false, deltaFilesForDirTable),
+                objectIdToKeyNameMapForFromSnapshot,
+                objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+                tablePrefixes);
+          } catch (NativeLibraryNotLoadedException ex) {
+            // This code should be never executed.
+            throw new IllegalStateException(ex);
+          }
+        }
       }
-
-      generateDiffReport(jobId,
-          objectIDsToCheckMap,
+      generateDiffReport(jobId, objectIDsToCheckMap,
           objectIdToKeyNameMapForFromSnapshot,
           objectIdToKeyNameMapForToSnapshot);
+      updateJobStatus(jobKey, IN_PROGRESS, DONE);
     } catch (IOException | RocksDBException exception) {
+      updateJobStatus(jobKey, IN_PROGRESS, FAILED);
       // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw new RuntimeException(exception.getCause());
     } finally {
       // Clean up: drop the intermediate column family and close them.
-      if (fromSnapshotColumnFamily != null) {
-        db.get().dropColumnFamily(fromSnapshotColumnFamily);
-        fromSnapshotColumnFamily.close();
-      }
-      if (toSnapshotColumnFamily != null) {
-        db.get().dropColumnFamily(toSnapshotColumnFamily);
-        toSnapshotColumnFamily.close();
-      }
-      if (objectIDsColumnFamily != null) {
-        db.get().dropColumnFamily(objectIDsColumnFamily);
-        objectIDsColumnFamily.close();
-      }
+      dropAndCloseColumnFamilyHandle(fromSnapshotColumnFamily);
+      dropAndCloseColumnFamilyHandle(toSnapshotColumnFamily);
+      dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
     }
   }
 
   private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
                                 Table<String, ? extends WithObjectID> tsTable,
-                                Set<String> deltaFiles,
+                                Pair<Boolean, Set<String>>
+                                    isNativeRocksToolsLoadedDeltaFilesPair,
                                 PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
                                 PersistentMap<byte[], byte[]> newObjIdToKeyMap,
                                 PersistentSet<byte[]> objectIDsToCheck,
                                 Map<String, String> tablePrefixes)
-      throws IOException {
+      throws IOException, NativeLibraryNotLoadedException {
 
+    Set<String> deltaFiles = isNativeRocksToolsLoadedDeltaFilesPair.getRight();
     if (deltaFiles.isEmpty()) {
       return;
     }
-
+    boolean nativeRocksToolsLoaded =
+        isNativeRocksToolsLoadedDeltaFilesPair.getLeft();
     boolean isDirectoryTable =
         fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
-
-    try (Stream<String> keysToCheck = new ManagedSstFileReader(deltaFiles)
-            .getKeyStream()) {
+    ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
+    try (Stream<String> keysToCheck = nativeRocksToolsLoaded
+                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool)
+                 : sstFileReader.getKeyStream()) {
       keysToCheck.forEach(key -> {
         try {
           final WithObjectID oldKey = fsTable.get(key);
@@ -417,7 +654,7 @@ public class SnapshotDiffManager {
   }
 
   private String getKeyOrDirectoryName(boolean isDirectory,
-      WithObjectID object) {
+                                       WithObjectID object) {
     if (isDirectory) {
       OmDirectoryInfo directoryInfo = (OmDirectoryInfo) object;
       return directoryInfo.getName();
@@ -451,19 +688,6 @@ public class SnapshotDiffManager {
       List<String> sstDiffList =
           differ.getSSTDiffListWithFullPath(toDSI, fromDSI);
       deltaFiles.addAll(sstDiffList);
-
-      // TODO: [SNAPSHOT] Remove the workaround below when the SnapDiff logic
-      //  can read tombstones in SST files.
-      // Workaround: Append "From DB" SST files to the deltaFiles list so that
-      //  the current SnapDiff logic correctly handles deleted keys.
-      if (!deltaFiles.isEmpty()) {
-        Set<String> fromSnapshotFiles = RdbUtil.getSSTFilesForComparison(
-            fromSnapshot.getMetadataManager()
-                .getStore().getDbLocation().getPath(),
-            tablesToLookUp);
-        deltaFiles.addAll(fromSnapshotFiles);
-      }
-      // End of Workaround
     }
 
     if (useFullDiff || deltaFiles.isEmpty()) {
@@ -498,15 +722,13 @@ public class SnapshotDiffManager {
       final PersistentSet<byte[]> objectIDsToCheck,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap
-  ) throws RocksDBException {
-
+  ) throws IOException {
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
     ColumnFamilyHandle createDiffColumnFamily = null;
     ColumnFamilyHandle modifyDiffColumnFamily = null;
 
-    // RequestId is prepended to column family name to make it unique
-    // for request.
+    // JobId is prepended to column family name to make it unique for request.
     try {
       deleteDiffColumnFamily =
           createColumnFamily(jobId + DELETE_DIFF_TABLE_SUFFIX);
@@ -615,26 +837,15 @@ public class SnapshotDiffManager {
       index = addToReport(jobId, index, renameDiffs);
       index = addToReport(jobId, index, createDiffs);
       addToReport(jobId, index, modifyDiffs);
-    } catch (IOException e) {
+    } catch (RocksDBException | IOException e) {
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e);
     } finally {
-      if (deleteDiffColumnFamily != null) {
-        db.get().dropColumnFamily(deleteDiffColumnFamily);
-        deleteDiffColumnFamily.close();
-      }
-      if (renameDiffColumnFamily != null) {
-        db.get().dropColumnFamily(renameDiffColumnFamily);
-        renameDiffColumnFamily.close();
-      }
-      if (createDiffColumnFamily != null) {
-        db.get().dropColumnFamily(createDiffColumnFamily);
-        createDiffColumnFamily.close();
-      }
-      if (modifyDiffColumnFamily != null) {
-        db.get().dropColumnFamily(modifyDiffColumnFamily);
-        modifyDiffColumnFamily.close();
-      }
+
+      dropAndCloseColumnFamilyHandle(deleteDiffColumnFamily);
+      dropAndCloseColumnFamilyHandle(renameDiffColumnFamily);
+      dropAndCloseColumnFamilyHandle(createDiffColumnFamily);
+      dropAndCloseColumnFamilyHandle(modifyDiffColumnFamily);
     }
   }
 
@@ -669,6 +880,35 @@ public class SnapshotDiffManager {
       }
     }
     return index;
+  }
+
+  private void dropAndCloseColumnFamilyHandle(
+      final ColumnFamilyHandle columnFamilyHandle) {
+
+    if (columnFamilyHandle == null) {
+      return;
+    }
+
+    try {
+      db.get().dropColumnFamily(columnFamilyHandle);
+    } catch (RocksDBException exception) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
+    }
+    columnFamilyHandle.close();
+  }
+
+  private synchronized void updateJobStatus(String jobKey,
+                                            JobStatus oldStatus,
+                                            JobStatus newStatus) {
+    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    if (snapshotDiffJob.getStatus() != oldStatus) {
+      throw new IllegalStateException("Invalid job status. Current job " +
+          "status is '" + snapshotDiffJob.getStatus() + "', while '" +
+          oldStatus + "' is expected.");
+    }
+    snapshotDiffJob.setStatus(newStatus);
+    snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
   private BucketLayout getBucketLayout(final String volume,
@@ -707,5 +947,74 @@ public class SnapshotDiffManager {
       volumeBucketDbPrefix = tablePrefixes.get(OmMetadataManagerImpl.KEY_TABLE);
     }
     return key.startsWith(volumeBucketDbPrefix);
+  }
+
+  /**
+   * Loads the jobs which are in_progress and submits them to executor to start
+   * processing.
+   * This is needed to load previously running (in_progress) jobs to the
+   * executor on service start up when OM restarts. If not done, these jobs
+   * will never be completed if OM crashes when jobs were running.
+   * Don't need to load queued jobs because responses for queued jobs were never
+   * returned to client. In short, we don't return queued job status to client.
+   * When client re-submits previously queued job, workflow will pick it and
+   * execute it.
+   */
+  private void loadJobsOnStartUp() {
+
+    try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
+             snapDiffJobTable.iterator()) {
+      while (iterator.hasNext()) {
+        Map.Entry<String, SnapshotDiffJob> next = iterator.next();
+        String jobKey = next.getKey();
+        SnapshotDiffJob snapshotDiffJob = next.getValue();
+        if (snapshotDiffJob.getStatus() == IN_PROGRESS) {
+          loadJobOnStartUp(jobKey,
+              snapshotDiffJob.getJobId(),
+              snapshotDiffJob.getVolume(),
+              snapshotDiffJob.getBucket(),
+              snapshotDiffJob.getFromSnapshot(),
+              snapshotDiffJob.getToSnapshot(),
+              snapshotDiffJob.isForceFullDiff());
+        }
+      }
+    } catch (IOException e) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(e.getCause());
+    }
+  }
+
+  private synchronized void loadJobOnStartUp(final String jobKey,
+                                             final String jobId,
+                                             final String volume,
+                                             final String bucket,
+                                             final String fromSnapshot,
+                                             final String toSnapshot,
+                                             final boolean forceFullDiff)
+      throws IOException {
+
+    SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
+        volume, bucket, fromSnapshot);
+    SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
+        volume, bucket, toSnapshot);
+
+    String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
+    String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
+    try {
+      submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
+          snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);
+    } catch (ExecutionException e) {
+      throw new IOException(e.getCause());
+    }
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (familyOptions != null) {
+      familyOptions.close();
+    }
+    if (executorService != null) {
+      executorService.shutdown();
+    }
   }
 }

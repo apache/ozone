@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -541,6 +542,12 @@ public final class Pipeline {
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
+      if (nodesInOrder != null) {
+        // nodesInOrder may belong to another pipeline, avoid overwriting it
+        nodesInOrder = new LinkedList<>(nodesInOrder);
+        // drop nodes no longer part of the pipeline
+        nodesInOrder.retainAll(nodes);
+      }
       return this;
     }
 

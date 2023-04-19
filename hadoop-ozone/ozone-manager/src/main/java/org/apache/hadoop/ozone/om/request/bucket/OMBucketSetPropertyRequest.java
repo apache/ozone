@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.bucket;
 import java.io.IOException;
 import java.util.List;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -231,7 +230,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().build());
