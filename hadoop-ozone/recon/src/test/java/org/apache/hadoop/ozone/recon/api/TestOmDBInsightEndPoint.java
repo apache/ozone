@@ -74,7 +74,6 @@ public class TestOmDBInsightEndPoint {
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
-  private ReconContainerManager reconContainerManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
@@ -108,8 +107,6 @@ public class TestOmDBInsightEndPoint {
         OMDBInsightEndpoint.class);
     ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    reconContainerManager = (ReconContainerManager)
-        ozoneStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
         ozoneStorageContainerManager.getPipelineManager();
     pipeline = getRandomPipeline();
