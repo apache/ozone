@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
  */
 @Path("/om")
 @Produces(MediaType.APPLICATION_JSON)
+@AdminOnly
 public class OMEndpoint {
 
   private static final Logger LOG =

@@ -491,7 +491,7 @@ Returns a summary of the current state of the Ozone cluster.
      }
 ```
 
-## Volumes
+## Volumes (admin only)
 
 ### GET /api/v1/om/volumes
 
@@ -533,7 +533,7 @@ Returns all the volumes in the cluster.
      }
 ```
 
-## Buckets
+## Buckets (admin only)
 
 ### GET /api/v1/om/buckets
 

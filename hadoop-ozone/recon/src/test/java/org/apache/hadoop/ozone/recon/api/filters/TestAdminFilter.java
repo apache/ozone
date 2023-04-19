@@ -77,7 +77,6 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
     nonAdminEndpoints.add(TriggerDBSyncEndpoint.class);
-    nonAdminEndpoints.add(OMEndpoint.class);
 
     Assertions.assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
 
