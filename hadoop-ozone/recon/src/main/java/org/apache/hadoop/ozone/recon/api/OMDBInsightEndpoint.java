@@ -65,7 +65,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  * 5. Amount of data mapped to pending delete keys in legacy/OBS buckets and
  * pending delete files in FSO buckets.
  */
-@Path("/omdbinsight")
+@Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
 public class OMDBInsightEndpoint {
@@ -137,7 +137,7 @@ public class OMDBInsightEndpoint {
    * }
    */
   @GET
-  @Path("/keys/open")
+  @Path("/open")
   public Response getOpenKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
@@ -265,7 +265,7 @@ public class OMDBInsightEndpoint {
    * }
    */
   @GET
-  @Path("/keys/deletePending")
+  @Path("/deletePending")
   public Response getDeletedKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
@@ -413,7 +413,7 @@ public class OMDBInsightEndpoint {
   /** This method retrieves set of keys/files/dirs which are mapped to
    * containers in DELETED state in SCM. */
   @GET
-  @Path("/containers/mismatch/keys")
+  @Path("/containers/mismatch")
   public Response getDeletedContainerKeysInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,

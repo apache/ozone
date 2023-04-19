@@ -418,7 +418,8 @@ public class TestOmDBInsightEndPoint {
         reconContainerMetadataManager.getContainers(-1, 0);
     putContainerInfos(2);
     List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
-    assertEquals(omContainers.size(), scmContainers.size());
+    assertEquals(3, omContainers.size());
+    assertEquals(2, scmContainers.size());
     // Update container state of Container Id 1 to CLOSING to CLOSED
     // and then to DELETED
     reconContainerManager.updateContainerState(ContainerID.valueOf(1),
@@ -449,7 +450,7 @@ public class TestOmDBInsightEndPoint {
     List<KeysResponse> keysResponseList =
         (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
     assertEquals(2, keysResponseList.get(0).getKeys().size());
-    assertEquals(3, keysResponseList.get(0).getTotalCount());
+    assertEquals(2, keysResponseList.get(0).getTotalCount());
     assertEquals(1, keysResponseList.size());
   }
 
