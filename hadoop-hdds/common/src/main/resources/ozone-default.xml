@@ -2590,6 +2590,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.transport.class</name>
+    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Enable Ozone Manager S3G Grpc channel.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.http.enabled</name>
     <value>true</value>
     <tag>RECON, MANAGEMENT</tag>
