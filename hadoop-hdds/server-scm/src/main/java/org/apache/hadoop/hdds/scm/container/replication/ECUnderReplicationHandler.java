@@ -395,8 +395,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             commandsSent++;
           } catch (CommandTargetOverloadedException e) {
             LOG.debug("Unable to send Replicate command for container {}" +
-                " because the source node {} is overloaded.",
-                container.getContainerID(), sourceReplica.getDatanodeDetails());
+                " index {} because the source node {} is overloaded.",
+                container.getContainerID(), sourceReplica.getReplicaIndex(),
+                sourceReplica.getDatanodeDetails());
             overloadedException = e;
           }
         }
@@ -479,8 +480,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         additionalMaintenanceCopiesNeeded -= 1;
       } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to send Replicate command for container {}" +
-            " because the source node {} is overloaded.",
-            container.getContainerID(), sourceReplica.getDatanodeDetails());
+            " index {} because the source node {} is overloaded.",
+            container.getContainerID(), sourceReplica.getReplicaIndex(),
+            sourceReplica.getDatanodeDetails());
         overloadedException = e;
       }
     }
