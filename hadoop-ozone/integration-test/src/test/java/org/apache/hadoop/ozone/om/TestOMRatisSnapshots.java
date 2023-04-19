@@ -676,8 +676,8 @@ public class TestOMRatisSnapshots {
   private void assertLogCapture(GenericTestUtils.LogCapturer logCapture,
                               String msg)
       throws InterruptedException, TimeoutException {
-      GenericTestUtils.waitFor(() -> {
-          return logCapture.getOutput().contains(msg);
+    GenericTestUtils.waitFor(() -> {
+        return logCapture.getOutput().contains(msg);
       }, 100, 5000);
   }
 
