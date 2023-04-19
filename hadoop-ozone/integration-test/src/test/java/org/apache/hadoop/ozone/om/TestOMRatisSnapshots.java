@@ -676,8 +676,8 @@ public class TestOMRatisSnapshots {
                               String msg)
       throws InterruptedException, TimeoutException {
     GenericTestUtils.waitFor(() -> {
-        return logCapture.getOutput().contains(msg);
-      }, 100, 5000);
+      return logCapture.getOutput().contains(msg);
+    }, 100, 5000);
   }
 
   private static class DummyExitManager extends ExitManager {
