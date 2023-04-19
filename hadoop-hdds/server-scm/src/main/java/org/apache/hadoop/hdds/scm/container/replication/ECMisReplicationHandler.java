@@ -18,13 +18,16 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -35,9 +38,8 @@ import java.util.Set;
 public class ECMisReplicationHandler extends MisReplicationHandler {
   public ECMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, ReplicationManager replicationManager,
-          boolean push) {
-    super(containerPlacement, conf, replicationManager, push);
+          ConfigurationSource conf, ReplicationManager replicationManager) {
+    super(containerPlacement, conf, replicationManager);
   }
 
   @Override
@@ -55,13 +57,36 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand updateReplicateCommand(
-          ReplicateContainerCommand command, ContainerReplica replica) {
-    // For EC containers, we need to track the replica index which is
-    // to be replicated, so add it to the command.
-    command.setReplicaIndex(replica.getReplicaIndex());
-    return command;
+  protected int sendReplicateCommands(
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    ReplicationManager replicationManager = getReplicationManager();
+    int commandsSent = 0;
+    int datanodeIdx = 0;
+    for (ContainerReplica replica : replicasToBeReplicated) {
+      if (datanodeIdx == targetDns.size()) {
+        break;
+      }
+      long containerID = containerInfo.getContainerID();
+      DatanodeDetails source = replica.getDatanodeDetails();
+      DatanodeDetails target = targetDns.get(datanodeIdx);
+      if (replicationManager.getConfig().isPush()) {
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            Collections.singletonList(source), target,
+            replica.getReplicaIndex());
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, Collections.singletonList(source));
+        // For EC containers, we need to track the replica index which is
+        // to be replicated, so add it to the command.
+        cmd.setReplicaIndex(replica.getReplicaIndex());
+        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+      }
+      commandsSent++;
+      datanodeIdx += 1;
+    }
+    return commandsSent;
   }
-
-
 }

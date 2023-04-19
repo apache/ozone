@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -149,6 +150,8 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.lease.LeaseManager;
+import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
@@ -215,6 +218,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * SCM metrics.
    */
   private static SCMMetrics metrics;
+  private SCMHAMetrics scmHAMetrics;
 
   /*
    * RPC Endpoints exposed by SCM.
@@ -236,6 +240,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private WritableContainerFactory writableContainerFactory;
   private FinalizationManager finalizationManager;
   private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private LeaseManager<Object> leaseManager;
 
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
@@ -423,9 +428,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
 
   private void initializeEventHandlers() {
+    long timeDuration = configuration.getTimeDuration(
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+        OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+            .getDuration(), TimeUnit.MILLISECONDS);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            leaseManager, timeDuration);
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
     PipelineReportHandler pipelineReportHandler =
@@ -613,6 +623,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmHAManager = configurator.getSCMHAManager();
     } else {
       scmHAManager = new SCMHAManagerImpl(conf, this);
+    }
+
+    if (configurator.getLeaseManager() != null) {
+      leaseManager = configurator.getLeaseManager();
+    } else {
+      long timeDuration = conf.getTimeDuration(
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION,
+          OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT
+              .getDuration(), TimeUnit.MILLISECONDS);
+      leaseManager = new LeaseManager<>("Lease Manager", timeDuration);
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
@@ -818,7 +838,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       scmCertificateServer = new DefaultCAServer(subject,
           scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          certificateStore, new DefaultProfile(),
+          certificateStore, new DefaultCAProfile(),
           scmCertificateClient.getComponentName());
       // INTERMEDIARY_CA which issues certs to DN and OM.
       scmCertificateServer.init(new SecurityConfig(configuration),
@@ -854,8 +874,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
-        scmCertificateClient != null ?
-            scmCertificateClient.getCACertificate() : null, this);
+        scmCertificateClient == null ? null :
+            scmCertificateClient.getRootCACertificate() != null ?
+            scmCertificateClient.getRootCACertificate() :
+            scmCertificateClient.getCACertificate(), this);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
@@ -1103,6 +1125,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               + "{}, self id {} " + "Ignoring it.", primordialSCM, selfNodeId);
       return true;
     }
+
+    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
+
     final String persistedClusterId = scmStorageConfig.getClusterID();
     StorageState state = scmStorageConfig.getState();
     if (state == StorageState.INITIALIZED && conf
@@ -1119,7 +1144,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       return true;
     }
 
-    loginAsSCMUserIfSecurityEnabled(scmhaNodeDetails, conf);
     // The node here will try to fetch the cluster id from any of existing
     // running SCM instances.
     OzoneConfiguration config =
@@ -1479,6 +1503,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmBlockManager.start();
+    leaseManager.start();
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
@@ -1494,6 +1519,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     setStartTime();
+
+    // At this point leader is not known
+    scmHAMetricsUpdate(null);
   }
 
   /** Persist SCM certs to DB on bootstrap scm nodes.
@@ -1640,6 +1668,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("SCM HA Manager stop failed", ex);
     }
 
+    if (scmHAMetrics != null) {
+      SCMHAMetrics.unRegister();
+    }
+
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
@@ -1649,6 +1681,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmSafeModeManager.stop();
     serviceManager.stop();
+    try {
+      leaseManager.shutdown();
+    } catch (LeaseManagerNotRunningException ex) {
+      LOG.debug("Lease manager not running, ignore");
+    }
     RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
 
     if (scmCertificateClient != null) {
@@ -1968,6 +2005,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmHANodeDetails.getLocalNodeDetails().getNodeId();
   }
 
+  @VisibleForTesting
+  public SCMHAMetrics getScmHAMetrics() {
+    return scmHAMetrics;
+  }
+
   private void startSecretManagerIfNecessary() {
     boolean shouldRun = securityConfig.isSecurityEnabled()
         && securityConfig.isContainerTokenEnabled()
@@ -2126,5 +2168,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // TODO: Remove the certificate from certificate store.
     return scmHAManager.removeSCM(request);
 
+  }
+
+  public void scmHAMetricsUpdate(String leaderId) {
+    // unregister, in case metrics already exist
+    // so that the metric tags will get updated.
+    SCMHAMetrics.unRegister();
+
+    scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 }
