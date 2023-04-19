@@ -18,35 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -55,10 +26,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -72,8 +46,8 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -83,7 +57,6 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
@@ -91,6 +64,35 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for container endpoint.
@@ -106,6 +108,7 @@ public class TestContainerEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
+  private ContainerStateManager containerStateManager;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ContainerID containerID = ContainerID.valueOf(1L);
@@ -150,7 +153,7 @@ public class TestContainerEndpoint {
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
-
+    containerStateManager = reconContainerManager.getContainerStateManager();
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
@@ -761,5 +764,125 @@ public class TestContainerEndpoint {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  private void updateContainerStateToDeleted(long containerId)
+      throws IOException, InvalidStateTransitionException, TimeoutException {
+    reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(containerId),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(containerId),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+  }
+
+  @Test
+  public void testGetDeletedContainerKeysInfo() throws Exception {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(2, omContainers.size());
+    assertEquals(2, scmContainers.size());
+    // Update container state of Container Id 1 to CLOSING to CLOSED
+    // and then to DELETED
+    reconContainerManager.updateContainerState(ContainerID.valueOf(1),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(1),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(1),
+            HddsProtos.LifeCycleEvent.DELETE);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
+    Assert.assertEquals(1, containerIDs.size());
+
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(1),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(1, containerIDs.size());
+
+    List<ContainerInfo> deletedSCMContainers =
+        reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response deletedContainerKeysInfo =
+        containerEndpoint.getDeletedContainerKeysInfo(-1, "");
+    assertNotNull(deletedContainerKeysInfo);
+    List<KeysResponse> keysResponseList =
+        (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
+    assertEquals(2, keysResponseList.get(0).getKeys().size());
+    assertEquals(3, keysResponseList.get(0).getTotalCount());
+    assertEquals(1, keysResponseList.size());
+  }
+
+  @Test
+  public void testGetDeletedContainerKeysInfoLimitParam() throws Exception {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 1 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(1);
+
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(1, containerIDs.size());
+
+    List<ContainerInfo> deletedSCMContainers =
+        reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response deletedContainerKeysInfo =
+        containerEndpoint.getDeletedContainerKeysInfo(1, "");
+    assertNotNull(deletedContainerKeysInfo);
+    List<KeysResponse> keysResponseList =
+        (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
+    assertEquals(1, keysResponseList.get(0).getKeys().size());
+    assertEquals(3, keysResponseList.get(0).getTotalCount());
+    assertEquals(1, keysResponseList.size());
+  }
+
+  @Test
+  public void testGetDeletedContainerKeysInfoPrevKeyParam() throws Exception {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 1 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(1);
+
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(1, containerIDs.size());
+
+    List<ContainerInfo> deletedSCMContainers =
+        reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(1, deletedSCMContainers.size());
+
+    Response deletedContainerKeysInfo =
+        containerEndpoint.getDeletedContainerKeysInfo(2,
+            "/sampleVol/bucketOne/key_one");
+    assertNotNull(deletedContainerKeysInfo);
+    List<KeysResponse> keysResponseList =
+        (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
+    assertEquals(1, keysResponseList.get(0).getKeys().size());
+    assertEquals(3, keysResponseList.get(0).getTotalCount());
+    assertEquals(1, keysResponseList.size());
+    List<String> keyList = keysResponseList.get(0).getKeys().stream()
+        .map(keyMetadata -> keyMetadata.getKey()).collect(
+            Collectors.toList());
+    assertEquals(1, keyList.size());
+    assertEquals("key_two", keyList.get(0));
   }
 }

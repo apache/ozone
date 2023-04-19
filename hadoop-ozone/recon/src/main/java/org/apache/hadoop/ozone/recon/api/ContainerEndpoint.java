@@ -17,28 +17,8 @@
  */
 package org.apache.hadoop.ozone.recon.api;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
-import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -50,20 +30,40 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+
+import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -399,5 +399,49 @@ public class ContainerEndpoint {
 
   private BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  /** This method retrieves set of keys/files/dirs which are mapped to
+   * containers in DELETED state in SCM. */
+  @GET
+  @Path("/mismatch/keys")
+  public Response getDeletedContainerKeysInfo(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
+      String prevKeyPrefix) {
+    List<KeysResponse> keysResponseList = new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(-1, 0);
+      List<ContainerInfo> deletedStateSCMContainers =
+          containerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+      List<Long> deletedStateSCMContainerIds =
+          deletedStateSCMContainers.stream()
+              .map(containerInfo -> containerInfo.getContainerID()).collect(
+                  Collectors.toList());
+
+      List<Long> omContainerIdsMappedToDeletedSCMContainers =
+          omContainers.entrySet().stream()
+              .filter(
+                  map -> deletedStateSCMContainerIds.contains(map.getKey()))
+              .map(map -> map.getKey()).collect(Collectors.toList());
+
+      omContainerIdsMappedToDeletedSCMContainers.forEach(containerId -> {
+        Response keysForContainer = getKeysForContainer(containerId, limit,
+            prevKeyPrefix);
+        KeysResponse keysResponse = (KeysResponse) keysForContainer.getEntity();
+        keysResponseList.add(keysResponse);
+      });
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(keysResponseList).build();
   }
 }
