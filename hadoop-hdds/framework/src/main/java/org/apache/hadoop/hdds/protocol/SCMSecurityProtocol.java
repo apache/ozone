@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.protocol;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
@@ -173,24 +171,4 @@ public interface SCMSecurityProtocol {
   String getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException;
 
-
-  /**
-   * Get the current SecretKey that is used for signing tokens.
-   * @return ManagedSecretKey
-   */
-  ManagedSecretKey getCurrentSecretKey() throws IOException;
-
-  /**
-   * Get a particular SecretKey by ID.
-   *
-   * @param id the id to get SecretKey.
-   * @return ManagedSecretKey.
-   */
-  ManagedSecretKey getSecretKey(UUID id) throws IOException;
-
-  /**
-   * Get all the non-expired SecretKey managed by SCM.
-   * @return list of ManagedSecretKey.
-   */
-  List<ManagedSecretKey> getAllSecretKeys() throws IOException;
 }

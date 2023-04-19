@@ -44,12 +44,16 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SingleSCMSecurityProtocolProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -514,6 +518,44 @@ public final class HddsServerUtil {
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
     return TracingUtil.createProxy(scmSecurityClient,
         SCMSecurityProtocol.class, conf);
+  }
+
+  public static SCMSecretKeyProtocolClientSideTranslatorPB
+      getScmSecretKeyClientForDatanode(ConfigurationSource conf)
+      throws IOException {
+    return new SCMSecretKeyProtocolClientSideTranslatorPB(
+        new SCMSecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SCMSecretKeyProtocolDatanodePB.class),
+        SCMSecretKeyProtocolDatanodePB.class);
+  }
+
+  public static SCMSecretKeyProtocolClientSideTranslatorPB
+      getScmSecretKeyClientForOm(ConfigurationSource conf)
+      throws IOException {
+    return new SCMSecretKeyProtocolClientSideTranslatorPB(
+        new SCMSecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SCMSecretKeyProtocolOmPB.class),
+        SCMSecretKeyProtocolOmPB.class);
+  }
+
+  public static SCMSecretKeyProtocolClientSideTranslatorPB
+      getScmSecretKeyClientForDatanode(ConfigurationSource conf,
+      UserGroupInformation ugi) {
+    return new SCMSecretKeyProtocolClientSideTranslatorPB(
+        new SCMSecretKeyProtocolFailoverProxyProvider(conf, ugi,
+            SCMSecretKeyProtocolDatanodePB.class),
+        SCMSecretKeyProtocolDatanodePB.class);
+  }
+
+  public static SCMSecretKeyProtocolClientSideTranslatorPB
+      getScmSecretKeyClientForOm(ConfigurationSource conf,
+      UserGroupInformation ugi) {
+    return new SCMSecretKeyProtocolClientSideTranslatorPB(
+        new SCMSecretKeyProtocolFailoverProxyProvider(conf, ugi,
+            SCMSecretKeyProtocolOmPB.class),
+        SCMSecretKeyProtocolOmPB.class);
   }
 
   /**
