@@ -70,6 +70,7 @@ public abstract class TestMisReplicationHandler {
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private AtomicBoolean throwThrottledException = new AtomicBoolean(false);
 
   protected void setup(ReplicationConfig repConfig)
       throws NodeNotFoundException, CommandTargetOverloadedException,
@@ -92,7 +93,7 @@ public abstract class TestMisReplicationHandler {
     ReplicationTestUtil.mockRMSendDatanodeCommand(
         replicationManager, commandsSent);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent, new AtomicBoolean(false));
+        replicationManager, commandsSent, throwThrottledException);
 
     container = ReplicationTestUtil
             .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
@@ -103,6 +104,10 @@ public abstract class TestMisReplicationHandler {
 
   protected ReplicationManager getReplicationManager() {
     return replicationManager;
+  }
+
+  protected void setThrowThrottledException(boolean showThrow) {
+    throwThrottledException.set(showThrow);
   }
 
   static PlacementPolicy<?> mockPlacementPolicy() {
