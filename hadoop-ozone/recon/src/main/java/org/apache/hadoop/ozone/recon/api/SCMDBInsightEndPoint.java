@@ -58,7 +58,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  *     - Blocks pending deletion for open/closing containers.
  *     - Blocks pending deletion for closed containers.
  */
-@Path("/scmdbinsight")
+@Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
 public class SCMDBInsightEndPoint {
@@ -95,7 +95,7 @@ public class SCMDBInsightEndPoint {
    * @return Response of delete containers.
    */
   @GET
-  @Path("/containers/deletedContainers")
+  @Path("/deletedContainers")
   public Response getSCMDeletedContainers() {
     List<DeletedContainerInfo> deletedContainerInfoList = new ArrayList<>();
     try {
