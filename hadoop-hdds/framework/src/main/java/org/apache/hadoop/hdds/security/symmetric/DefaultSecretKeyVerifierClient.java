@@ -39,11 +39,18 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 
 /**
  * Default implementation of {@link SecretKeyVerifierClient} that fetches
- * SecretKeys remotely via {@link SCMSecurityProtocol}.
+ * SecretKeys remotely via {@link SCMSecurityProtocol} and cache them locally.
  */
 public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeyVerifierClient.class);
+  /**
+   * The multiplier to extend the secret keys cache size. For example, if
+   * SCM expects to have 7 valid secret keys at a time, it makes sense to
+   * cache up to 14 most recent secret keys (7 valid + 7 last expired) because
+   * the recent expired secret keys could be hit by long-live clients.
+   */
+  private static final int SECRET_KEY_CACHE_SIZE_MULTIPLIER = 2;
 
   private final LoadingCache<UUID, Optional<ManagedSecretKey>> cache;
 
@@ -58,8 +65,9 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
         expiryDuration.toMillis() / rotateDuration.toMillis() + 1;
     // However, we want to cache some expired keys as well, to avoid requesting
     // SCM for recently expire secret keys.
-    long cacheSize = expectedValidKeys * 2;
-    Duration cacheExpiry = expiryDuration.multipliedBy(2);
+    long cacheSize = expectedValidKeys * SECRET_KEY_CACHE_SIZE_MULTIPLIER;
+    Duration cacheExpiry = expiryDuration.multipliedBy(
+        SECRET_KEY_CACHE_SIZE_MULTIPLIER);
 
     CacheLoader<UUID, Optional<ManagedSecretKey>> loader =
         new CacheLoader<UUID, Optional<ManagedSecretKey>>() {
