@@ -22,6 +22,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
@@ -29,12 +31,20 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
@@ -113,7 +123,7 @@ public class TestKeyValueContainerMetadataInspector
     KeyValueContainer container = createClosedContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
-        createBlocks, setBlocks, setBytes);
+        createBlocks, setBlocks, setBytes, 0, 0);
   }
 
   @Test
@@ -126,7 +136,7 @@ public class TestKeyValueContainerMetadataInspector
     KeyValueContainer container = createOpenContainer(createBlocks);
     setDBBlockAndByteCounts(container.getContainerData(), setBlocks, setBytes);
     inspectThenRepairOnIncorrectContainer(container.getContainerData(),
-        createBlocks, setBlocks, setBytes);
+        createBlocks, setBlocks, setBytes, 0, 0);
   }
 
   @Test
@@ -151,6 +161,99 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
+  static class DeletedBlocksTransactionGeneratorForTesting {
+    private long txId = 100;
+    private long localId = 2000;
+
+    DeletedBlocksTransaction next(long containerId, int numBlocks) {
+      final DeletedBlocksTransaction.Builder b
+          = DeletedBlocksTransaction.newBuilder()
+          .setContainerID(containerId)
+          .setTxID(txId++)
+          .setCount(0);
+      for (int i = 0; i < numBlocks; i++) {
+        b.addLocalID(localId++);
+      }
+      return b.build();
+    }
+
+    List<DeletedBlocksTransaction> generate(
+        long containerId, List<Integer> numBlocks) {
+      final List<DeletedBlocksTransaction> transactions = new ArrayList<>();
+      for (int n : numBlocks) {
+        transactions.add(next(containerId, n));
+      }
+      return transactions;
+    }
+  }
+
+  static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
+      = new DeletedBlocksTransactionGeneratorForTesting();
+
+  @Test
+  public void testCorrectDeleteWithTransaction() throws Exception {
+    final int createBlocks = 4;
+    final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
+    final int deleteCount = 10;
+
+    final KeyValueContainer container = createClosedContainer(createBlocks);
+    final List<DeletedBlocksTransaction> deleteTransactions
+        = GENERATOR.generate(container.getContainerData().getContainerID(),
+        Arrays.asList(1, 6, 3));
+    final long numDeletedLocalIds = deleteTransactions.stream()
+        .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
+    LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
+    Assert.assertEquals(deleteCount, numDeletedLocalIds);
+
+    setDB(container.getContainerData(), createBlocks,
+        setBytes, deleteCount, deleteTransactions);
+    inspectThenRepairOnCorrectContainer(container.getContainerData());
+  }
+
+  @Test
+  public void testIncorrectDeleteWithTransaction() throws Exception {
+    final int createBlocks = 4;
+    final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
+    final int deleteCount = 10;
+
+    final KeyValueContainer container = createClosedContainer(createBlocks);
+    final List<DeletedBlocksTransaction> deleteTransactions
+        = GENERATOR.generate(container.getContainerData().getContainerID(),
+        Arrays.asList(1, 3));
+    final long numDeletedLocalIds = deleteTransactions.stream()
+        .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
+    LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
+
+    setDB(container.getContainerData(), createBlocks,
+        setBytes, deleteCount, deleteTransactions);
+    inspectThenRepairOnIncorrectContainer(container.getContainerData(),
+        createBlocks, createBlocks, setBytes,
+        deleteCount, numDeletedLocalIds);
+  }
+
+  @Test
+  public void testIncorrectDeleteWithoutTransaction() throws Exception {
+    final int createBlocks = 4;
+    final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
+    final int deleteCount = 10;
+
+    final KeyValueContainer container = createClosedContainer(createBlocks);
+    final List<DeletedBlocksTransaction> deleteTransactions
+        = Collections.emptyList();
+    final long numDeletedLocalIds = deleteTransactions.stream()
+        .mapToLong(DeletedBlocksTransaction::getLocalIDCount).sum();
+    LOG.info("deleteTransactions = {}", deleteTransactions);
+    LOG.info("numDeletedLocalIds = {}", numDeletedLocalIds);
+
+    setDB(container.getContainerData(), createBlocks,
+        setBytes, deleteCount, deleteTransactions);
+    inspectThenRepairOnIncorrectContainer(container.getContainerData(),
+        createBlocks, createBlocks, setBytes,
+        deleteCount, numDeletedLocalIds);
+  }
+
   public void inspectThenRepairOnCorrectContainer(
       KeyValueContainerData containerData) throws Exception {
     // No output for correct containers.
@@ -169,10 +272,14 @@ public class TestKeyValueContainerMetadataInspector
    * @param createdBlocks Number of blocks to create in the container.
    * @param setBlocks total block count value set in the database.
    * @param setBytes total used bytes value set in the database.
+   * @param deleteCount total deleted block count value set in the database.
+   * @param numDeletedLocalIds total number of deleted block local id count
+   *                           in the transactions
    */
   public void inspectThenRepairOnIncorrectContainer(
       KeyValueContainerData containerData, int createdBlocks, int setBlocks,
-      int setBytes) throws Exception {
+      int setBytes, int deleteCount, long numDeletedLocalIds)
+      throws Exception {
     int createdBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createdBlocks;
     int createdFiles = 0;
     switch (getChunkLayout()) {
@@ -194,24 +301,26 @@ public class TestKeyValueContainerMetadataInspector
 
     checkJsonReportForIncorrectContainer(inspectJson,
         containerState, createdBlocks, setBlocks, createdBytes, setBytes,
-        createdFiles, false);
+        createdFiles, deleteCount, numDeletedLocalIds, false);
     // Container should not have been modified in inspect mode.
-    checkDBBlockAndByteCounts(containerData, setBlocks, setBytes);
+    checkDbCounts(containerData, setBlocks, setBytes, deleteCount);
 
     // Now repair the container.
     JsonObject repairJson = runInspectorAndGetReport(containerData,
         KeyValueContainerMetadataInspector.Mode.REPAIR);
     checkJsonReportForIncorrectContainer(repairJson,
         containerState, createdBlocks, setBlocks, createdBytes, setBytes,
-        createdFiles, true);
+        createdFiles, deleteCount, numDeletedLocalIds, true);
     // Metadata keys should have been fixed.
-    checkDBBlockAndByteCounts(containerData, createdBlocks, createdBytes);
+    checkDbCounts(containerData, createdBlocks, createdBytes,
+        numDeletedLocalIds);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void checkJsonReportForIncorrectContainer(JsonObject inspectJson,
       String expectedContainerState, long createdBlocks,
       long setBlocks, long createdBytes, long setBytes, long createdFiles,
+      long setPendingDeleteCount, long createdPendingDeleteCount,
       boolean shouldRepair) {
     // Check main container properties.
     Assert.assertEquals(inspectJson.get("containerID").getAsLong(),
@@ -232,7 +341,7 @@ public class TestKeyValueContainerMetadataInspector
         jsonAggregates.get("blockCount").getAsLong());
     Assert.assertEquals(createdBytes,
         jsonAggregates.get("usedBytes").getAsLong());
-    Assert.assertEquals(0,
+    Assert.assertEquals(createdPendingDeleteCount,
         jsonAggregates.get("pendingDeleteBlocks").getAsLong());
 
     // Check chunks directory.
@@ -243,11 +352,24 @@ public class TestKeyValueContainerMetadataInspector
 
     // Check errors.
     checkJsonErrorsReport(inspectJson, "dBMetadata.#BLOCKCOUNT",
-        new JsonPrimitive(createdBlocks), new JsonPrimitive(setBlocks),
-        shouldRepair);
+        createdBlocks, setBlocks, shouldRepair);
     checkJsonErrorsReport(inspectJson, "dBMetadata.#BYTESUSED",
-        new JsonPrimitive(createdBytes), new JsonPrimitive(setBytes),
-        shouldRepair);
+        createdBytes, setBytes, shouldRepair);
+    checkJsonErrorsReport(inspectJson, "dBMetadata.#PENDINGDELETEBLOCKCOUNT",
+        createdPendingDeleteCount, setPendingDeleteCount, shouldRepair);
+  }
+
+  private void checkJsonErrorsReport(
+      JsonObject jsonReport, String propertyValue,
+      long correctExpected, long correctActual,
+      boolean correctRepair) {
+    if (correctExpected == correctActual) {
+      return;
+    }
+    checkJsonErrorsReport(jsonReport, propertyValue,
+        new JsonPrimitive(correctExpected),
+        new JsonPrimitive(correctActual),
+        correctRepair);
   }
 
   /**
@@ -290,16 +412,59 @@ public class TestKeyValueContainerMetadataInspector
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {
+    setDB(containerData, blockCount, byteCount,
+        0, Collections.emptyList());
+  }
+
+  public void setDB(KeyValueContainerData containerData,
+      long blockCount, long byteCount,
+      long dbDeleteCount, List<DeletedBlocksTransaction> deleteTransactions)
+      throws Exception {
     try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
       // Don't care about in memory state. Just change the DB values.
       metadataTable.put(containerData.getBlockCountKey(), blockCount);
       metadataTable.put(containerData.getBytesUsedKey(), byteCount);
+      metadataTable.put(containerData.getPendingDeleteBlockCountKey(),
+          dbDeleteCount);
+
+      final DatanodeStore store = db.getStore();
+      LOG.info("store {}", store.getClass().getSimpleName());
+      if (store instanceof DatanodeStoreSchemaTwoImpl) {
+        final DatanodeStoreSchemaTwoImpl s2store
+            = (DatanodeStoreSchemaTwoImpl)store;
+        final Table<Long, DeletedBlocksTransaction> delTxTable
+            = s2store.getDeleteTransactionTable();
+        try (BatchOperation batch = store.getBatchHandler()
+            .initBatchOperation()) {
+          for (DeletedBlocksTransaction t : deleteTransactions) {
+            delTxTable.putWithBatch(batch, t.getTxID(), t);
+          }
+          store.getBatchHandler().commitBatchOperation(batch);
+        }
+      } else if (store instanceof DatanodeStoreSchemaThreeImpl) {
+        final DatanodeStoreSchemaThreeImpl s3store
+            = (DatanodeStoreSchemaThreeImpl)store;
+        final Table<String, DeletedBlocksTransaction> delTxTable
+            = s3store.getDeleteTransactionTable();
+        try (BatchOperation batch = store.getBatchHandler()
+            .initBatchOperation()) {
+          for (DeletedBlocksTransaction t : deleteTransactions) {
+            final String key = containerData.getDeleteTxnKey(t.getTxID());
+            delTxTable.putWithBatch(batch, key, t);
+          }
+          store.getBatchHandler().commitBatchOperation(batch);
+        }
+      } else {
+        throw new UnsupportedOperationException(
+            "Unsupported store class " + store.getClass().getSimpleName());
+      }
     }
   }
 
-  public void checkDBBlockAndByteCounts(KeyValueContainerData containerData,
-      long expectedBlockCount, long expectedBytesUsed) throws Exception {
+  void checkDbCounts(KeyValueContainerData containerData,
+      long expectedBlockCount, long expectedBytesUsed,
+      long expectedDeletedCount) throws Exception {
     try (DBHandle db = BlockUtils.getDB(containerData, getConf())) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
@@ -308,6 +473,10 @@ public class TestKeyValueContainerMetadataInspector
 
       long blockCount = metadataTable.get(containerData.getBlockCountKey());
       Assert.assertEquals(expectedBlockCount, blockCount);
+
+      final long deleteCount = metadataTable.get(
+          containerData.getPendingDeleteBlockCountKey());
+      Assert.assertEquals(expectedDeletedCount, deleteCount);
     }
   }
 

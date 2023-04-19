@@ -696,6 +696,24 @@ public final class OMRequestTestUtils {
         .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
   }
 
+  /**
+   * Create OMRequest for set volume property request with namespace quota set.
+   * @param volumeName
+   * @param quotaInNamespace
+   * @return OMRequest
+   */
+  public static OMRequest createSetVolumePropertyRequest(
+      String volumeName, long quotaInNamespace) {
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
+            .setQuotaInNamespace(quotaInNamespace)
+            .setModificationTime(Time.now()).build();
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
+        .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
+  }
+
   public static OMRequest createVolumeAddAclRequest(String volumeName,
       OzoneAcl acl) {
     AddAclRequest.Builder addAclRequestBuilder = AddAclRequest.newBuilder();

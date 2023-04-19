@@ -382,7 +382,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
     }
     setStore(loadDB(conf, metaDir, dbName, false,
-            java.util.Optional.of(Boolean.TRUE)));
+            java.util.Optional.of(Boolean.TRUE), false));
     initializeOmTables(false);
   }
 
@@ -520,7 +520,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty());
+            java.util.Optional.empty(), true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -528,6 +528,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                java.util.Optional<Boolean>
                                        disableAutoCompaction)
           throws IOException {
+    return loadDB(configuration, metaDir, dbName, readOnly,
+        disableAutoCompaction, true);
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+                               String dbName, boolean readOnly,
+                               java.util.Optional<Boolean>
+                                   disableAutoCompaction,
+                               boolean createCheckpointDirs)
+      throws IOException {
     final int maxFSSnapshots = configuration.getInt(
         OZONE_OM_FS_SNAPSHOT_MAX_LIMIT, OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
     RocksDBConfiguration rocksDBConfiguration =
@@ -537,7 +547,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
-        .setEnableCompactionLog(true);
+        .setEnableCompactionLog(true)
+        .setCreateCheckpointDirs(createCheckpointDirs);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
     return addOMTablesAndCodecs(dbStoreBuilder).build();
@@ -698,7 +709,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Stop metadata manager.
    */
   @Override
-  public void stop() throws Exception {
+  public void stop() throws IOException {
     if (store != null) {
       store.close();
       store = null;
@@ -1533,7 +1544,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  private OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
+  public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
                                        OmSnapshotManager snapshotManager)
       throws IOException {
 
@@ -1837,6 +1848,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String getOzoneDeletePathDirKey(String ozoneDeletePath) {
+    return ozoneDeletePath.substring(0,
+        ozoneDeletePath.lastIndexOf(OM_KEY_PREFIX));
+  }
+
+  @Override
   public String getOpenFileName(long volumeId, long bucketId,
                                 long parentID, String fileName,
                                 long id) {
@@ -1858,7 +1875,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     renameKey.append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
-
   @Override
   public String getMultipartKey(long volumeId, long bucketId,
                                 long parentID, String fileName,

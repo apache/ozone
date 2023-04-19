@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -207,6 +208,25 @@ public class TestRatisUnderReplicationHandler {
     Assert.assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+  }
+
+  @Test
+  public void testInsufficientTargetsFoundBecauseOfPlacementPolicy() {
+    policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(
+        nodeManager, conf, 2);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    // Only one replica is available, so we need to create 2 new ones.
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0);
+
+    Assert.assertThrows(InsufficientDatanodesException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // One command should be sent to the replication manager as we could only
+    // fine one node rather than two.
+    Assert.assertEquals(1, commandsSent.size());
   }
 
   @Test

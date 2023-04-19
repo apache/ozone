@@ -33,4 +33,11 @@ public class InsufficientDatanodesException extends IOException {
   public InsufficientDatanodesException(String message) {
     super(message);
   }
+
+  public InsufficientDatanodesException(int required, int available) {
+    super("Not enough datanodes" +
+        ", requested: " + required +
+        ", found: " + available
+    );
+  }
 }

@@ -23,7 +23,7 @@ an older release of Ozone and a later release (which may be the local build).
 - The whole test matrix of upgrading and downgrading to/from previous releases to the current code is too time consuming to do on every CI run. Instead we recommend release managers manually test the full matrix before each release, and let only the tests from the previous release to the current code be run in CI.
 
 1. Before the release, test the whole matrix of upgrades from the previous version to the version you are releasing.
-    - This is important manual verification that the release does not break backwards compatibility, and the results can be included in the release vote mailing thread.
+    - This is important to manually verify that the release does not break backwards compatibility. The results can be included in the release vote mailing thread.
     - To do this, uncomment all lines that contain `run_test` in the *test.sh* file, and execute *test.sh* either locally or on GitHub actions.
 
 2. After the release is finished and its docker image is published, add the new version to the test matrix.
@@ -36,7 +36,7 @@ an older release of Ozone and a later release (which may be the local build).
 - These tests will not catch backwards incompatible changes against commits in between releases.
     - Example:
         1. After 1.2.0, a change *c1* is made that is backwards compatible with 1.2.0.
-        2. After *c1*, a new change *c2* is made that is also backwards compatible with 1.0.0 but backwards *incompatible* with *c1*.
+        2. After *c1*, a new change *c2* is made that is also backwards compatible with 1.2.0 but backwards *incompatible* with *c1*.
 
         - This test suite will not raise an error for *c2*, because it only tests against the last release
         (1.2.0), and not the last commit (*c1*).
