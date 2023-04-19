@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
 import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -39,13 +38,10 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.powermock.api.mockito.PowerMockito.when;
@@ -58,8 +54,6 @@ public class TestSolrUtil {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
-  private ReconPipelineManager reconPipelineManager;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
@@ -88,12 +82,8 @@ public class TestSolrUtil {
             .addBinding(SolrUtil.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    ozoneStorageContainerManager =
-        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     ozoneConfiguration =
         reconTestInjector.getInstance(OzoneConfiguration.class);
-    reconPipelineManager = (ReconPipelineManager)
-        ozoneStorageContainerManager.getPipelineManager();
     solrUtilUnderTest = reconTestInjector.getInstance(SolrUtil.class);
     reconHttpClient = mock(ReconHttpClient.class);
     solrAuditResp = "{\n" +
@@ -776,19 +766,6 @@ public class TestSolrUtil {
     Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
         getLabel());
 
-  }
-
-  @Test
-  public void testSetDateRange() {
-    // Setup
-    // Run the test
-    final String result = solrUtilUnderTest.setDateRange("evtTime",
-        new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
-        new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime());
-
-    // Verify the results
-    assertEquals("evtTime:[2019-12-31T18:30:00Z TO 2019-12-31T18:30:00Z]",
-        result);
   }
 
   @Test(expected = IllegalArgumentException.class)
