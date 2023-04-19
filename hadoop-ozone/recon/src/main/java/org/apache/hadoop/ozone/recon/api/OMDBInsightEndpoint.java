@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
-import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResp;
+import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -143,9 +143,10 @@ public class OMDBInsightEndpoint {
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
       String prevKeyPrefix) {
-    KeyInsightInfoResp openKeyInsightInfo = new KeyInsightInfoResp();
+    KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
+    boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
     List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
@@ -159,7 +160,7 @@ public class OMDBInsightEndpoint {
               keyIter = openKeyTable.iterator()) {
         boolean skipPrevKey = false;
         String seekKey = prevKeyPrefix;
-        if (StringUtils.isNotBlank(prevKeyPrefix)) {
+        if (!skipPrevKeyDone && StringUtils.isNotBlank(prevKeyPrefix)) {
           skipPrevKey = true;
           Table.KeyValue<String, OmKeyInfo> seekKeyValue =
               keyIter.seek(seekKey);
@@ -178,6 +179,7 @@ public class OMDBInsightEndpoint {
           OmKeyInfo omKeyInfo = kv.getValue();
           // skip the prev key if prev key is present
           if (skipPrevKey && key.equals(prevKeyPrefix)) {
+            skipPrevKeyDone = true;
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
@@ -269,7 +271,8 @@ public class OMDBInsightEndpoint {
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
       String prevKeyPrefix) {
-    KeyInsightInfoResp deletedKeyAndDirInsightInfo = new KeyInsightInfoResp();
+    KeyInsightInfoResponse
+        deletedKeyAndDirInsightInfo = new KeyInsightInfoResponse();
     getPendingForDeletionKeyInfo(limit, prevKeyPrefix,
         deletedKeyAndDirInsightInfo);
     getPendingForDeletionDirInfo(limit, prevKeyPrefix,
@@ -279,7 +282,7 @@ public class OMDBInsightEndpoint {
 
   private void getPendingForDeletionDirInfo(
       int limit, String prevKeyPrefix,
-      KeyInsightInfoResp pendingForDeletionKeyInfo) {
+      KeyInsightInfoResponse pendingForDeletionKeyInfo) {
 
     List<KeyEntityInfo> deletedDirInfoList =
         pendingForDeletionKeyInfo.getDeletedDirInfoList();
@@ -344,7 +347,7 @@ public class OMDBInsightEndpoint {
   private void getPendingForDeletionKeyInfo(
       int limit,
       String prevKeyPrefix,
-      KeyInsightInfoResp deletedKeyAndDirInsightInfo) {
+      KeyInsightInfoResponse deletedKeyAndDirInsightInfo) {
     List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
         deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
     Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -395,7 +398,7 @@ public class OMDBInsightEndpoint {
   }
 
   private void updateReplicatedAndUnReplicatedTotal(
-      KeyInsightInfoResp deletedKeyAndDirInsightInfo,
+      KeyInsightInfoResponse deletedKeyAndDirInsightInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo) {
     repeatedOmKeyInfo.getOmKeyInfoList().forEach(omKeyInfo -> {
       deletedKeyAndDirInsightInfo.setUnreplicatedTotal(
@@ -410,7 +413,7 @@ public class OMDBInsightEndpoint {
   /** This method retrieves set of keys/files/dirs which are mapped to
    * containers in DELETED state in SCM. */
   @GET
-  @Path("/keys/deletedContainers")
+  @Path("/containers/mismatch/keys")
   public Response getDeletedContainerKeysInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,

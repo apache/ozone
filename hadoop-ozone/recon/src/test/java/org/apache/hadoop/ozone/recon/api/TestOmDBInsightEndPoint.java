@@ -30,14 +30,16 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResp;
+import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -65,6 +67,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
@@ -166,7 +169,7 @@ public class TestOmDBInsightEndPoint {
     infoGroups.add(new OmKeyLocationInfoGroup(0,
         omKeyLocationInfoListNew));
 
-    BlockID blockID4 = new BlockID(1, 104);
+    BlockID blockID4 = new BlockID(2, 104);
     OmKeyLocationInfo omKeyLocationInfo4 = getOmKeyLocationInfo(blockID4,
         pipeline);
 
@@ -180,12 +183,12 @@ public class TestOmDBInsightEndPoint {
         "key_two", "bucketOne", "sampleVol", infoGroups);
 
     List<OmKeyLocationInfo> omKeyLocationInfoList2 = new ArrayList<>();
-    BlockID blockID5 = new BlockID(2, 2);
+    BlockID blockID5 = new BlockID(3, 105);
     OmKeyLocationInfo omKeyLocationInfo5 = getOmKeyLocationInfo(blockID5,
         pipeline);
     omKeyLocationInfoList2.add(omKeyLocationInfo5);
 
-    BlockID blockID6 = new BlockID(2, 3);
+    BlockID blockID6 = new BlockID(3, 106);
     OmKeyLocationInfo omKeyLocationInfo6 = getOmKeyLocationInfo(blockID6,
         pipeline);
     omKeyLocationInfoList2.add(omKeyLocationInfo6);
@@ -204,7 +207,7 @@ public class TestOmDBInsightEndPoint {
     when(tableMock.getName()).thenReturn("KeyTable");
     when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
         .thenReturn(tableMock);
-    ContainerKeyMapperTask containerKeyMapperTask  =
+    ContainerKeyMapperTask containerKeyMapperTask =
         new ContainerKeyMapperTask(reconContainerMetadataManager);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
   }
@@ -220,11 +223,155 @@ public class TestOmDBInsightEndPoint {
             .get("/sampleVol/bucketOne/key_one");
     Assertions.assertEquals("key_one", omKeyInfo1.getKeyName());
     Response openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(-1, "");
-    KeyInsightInfoResp keyInsightInfoResp =
-        (KeyInsightInfoResp) openKeyInfoResp.getEntity();
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     Assertions.assertNotNull(keyInsightInfoResp);
     Assertions.assertEquals("key_one",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
+  }
+
+  @Test
+  public void testGetOpenKeyInfoLimitParam() throws Exception {
+    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
+    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketOne/key_two", omKeyInfo2);
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
+    Response openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(2, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals(0, keyInsightInfoResp.getFsoKeyInfoList().size());
+    Assertions.assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals("key_three",
+        keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
+
+    openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(3, "");
+    keyInsightInfoResp =
+        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    Assertions.assertEquals(3, keyInsightInfoResp.getFsoKeyInfoList().size() +
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals("key_three",
+        keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
+  }
+
+  @Test
+  public void testGetOpenKeyInfoPrevKeyParam() throws Exception {
+    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
+    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketOne/key_two", omKeyInfo2);
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
+    Response openKeyInfoResp =
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "/sampleVol/bucketOne/key_one");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(1,
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    Assertions.assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
+        keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    Assertions.assertEquals("key_three",
+        keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
+    Assertions.assertEquals("key_two",
+        keyInsightInfoResp.getFsoKeyInfoList().get(0).getPath());
+  }
+
+  @Test
+  public void testGetDeletedKeyInfoLimitParam() throws Exception {
+    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
+    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+
+    reconOMMetadataManager.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
+    reconOMMetadataManager.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_two", omKeyInfo2);
+    reconOMMetadataManager.getKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
+
+    OmKeyInfo omKeyInfoCopy =
+        reconOMMetadataManager.getKeyTable(getBucketLayout())
+            .get("/sampleVol/bucketOne/key_one");
+    Assertions.assertEquals("key_one", omKeyInfoCopy.getKeyName());
+    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfoCopy);
+
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
+    RepeatedOmKeyInfo repeatedOmKeyInfoCopy1 =
+        reconOMMetadataManager.getDeletedTable()
+            .get("/sampleVol/bucketOne/key_one");
+    Assertions.assertEquals("key_one",
+        repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
+
+    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
+    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo2);
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_two", repeatedOmKeyInfo2);
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_three", repeatedOmKeyInfo3);
+
+    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+    Assertions.assertEquals("key_two",
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().get(1).getOmKeyInfoList()
+            .get(0).getKeyName());
+  }
+
+  @Test
+  public void testGetDeletedKeyInfoPrevKeyParam() throws Exception {
+    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
+    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+
+    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfo1);
+    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
+    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo3);
+
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_two", repeatedOmKeyInfo2);
+    reconOMMetadataManager.getDeletedTable()
+        .put("/sampleVol/bucketOne/key_three", repeatedOmKeyInfo3);
+
+    Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2,
+        "/sampleVol/bucketOne/key_one");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
+
+    List<String> pendingDeleteKeys =
+        keyInsightInfoResp.getRepeatedOmKeyInfoList().stream()
+            .map(
+                repeatedOmKeyInfo -> repeatedOmKeyInfo.getOmKeyInfoList().get(0)
+                    .getKeyName())
+            .collect(Collectors.toList());
+    Assertions.assertFalse(pendingDeleteKeys.contains("key_one"));
   }
 
   @Test
@@ -245,8 +392,8 @@ public class TestOmDBInsightEndPoint {
     Assertions.assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
     Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
-    KeyInsightInfoResp keyInsightInfoResp =
-        (KeyInsightInfoResp) deletedKeyInfo.getEntity();
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
     Assertions.assertNotNull(keyInsightInfoResp);
     Assertions.assertEquals("key_one",
         keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList()
@@ -304,6 +451,86 @@ public class TestOmDBInsightEndPoint {
     assertEquals(2, keysResponseList.get(0).getKeys().size());
     assertEquals(3, keysResponseList.get(0).getTotalCount());
     assertEquals(1, keysResponseList.size());
+  }
+
+  @Test
+  public void testGetDeletedContainerKeysInfoLimitParam() throws Exception {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(3);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 1 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(1);
+    updateContainerStateToDeleted(2);
+
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(2, containerIDs.size());
+
+    List<ContainerInfo> deletedSCMContainers =
+        reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(2, deletedSCMContainers.size());
+
+    Response deletedContainerKeysInfo =
+        omdbInsightEndpoint.getDeletedContainerKeysInfo(1, "");
+    assertNotNull(deletedContainerKeysInfo);
+    List<KeysResponse> keysResponseList =
+        (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
+    assertEquals(1, keysResponseList.get(0).getKeys().size());
+    assertEquals(2, keysResponseList.get(0).getTotalCount());
+    assertEquals(2, keysResponseList.size());
+  }
+
+  private void updateContainerStateToDeleted(long containerId)
+      throws IOException, InvalidStateTransitionException, TimeoutException {
+    reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(containerId),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(containerId),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+  }
+
+  @Test
+  public void testGetDeletedContainerKeysInfoPrevKeyParam() throws Exception {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(3);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // Update container state of Container Id 1 to CLOSING to CLOSED
+    // and then to DELETED
+    updateContainerStateToDeleted(1);
+    updateContainerStateToDeleted(2);
+
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assert.assertEquals(2, containerIDs.size());
+
+    List<ContainerInfo> deletedSCMContainers =
+        reconContainerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+    assertEquals(2, deletedSCMContainers.size());
+
+    Response deletedContainerKeysInfo =
+        omdbInsightEndpoint.getDeletedContainerKeysInfo(2,
+            "/sampleVol/bucketOne/key_one");
+    assertNotNull(deletedContainerKeysInfo);
+    List<KeysResponse> keysResponseList =
+        (List<KeysResponse>) deletedContainerKeysInfo.getEntity();
+    assertEquals(1, keysResponseList.get(0).getKeys().size());
+    assertEquals(2, keysResponseList.get(0).getTotalCount());
+    assertEquals(2, keysResponseList.size());
+    List<String> keyList = keysResponseList.get(0).getKeys().stream()
+        .map(keyMetadata -> keyMetadata.getKey()).collect(
+            Collectors.toList());
+    assertEquals(1, keyList.size());
+    assertEquals("key_two", keyList.get(0));
   }
 
   ContainerInfo newContainerInfo(long containerId) {

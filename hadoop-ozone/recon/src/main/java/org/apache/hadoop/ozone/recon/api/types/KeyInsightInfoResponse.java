@@ -28,7 +28,7 @@ import java.util.List;
 /**
  * HTTP Response wrapped for keys insights.
  */
-public class KeyInsightInfoResp {
+public class KeyInsightInfoResponse {
 
   /** Amount of data mapped to all keys and files in
    * a cluster across all DNs. */
@@ -40,7 +40,7 @@ public class KeyInsightInfoResp {
   private long unreplicatedTotal;
 
   /** List of all non-fso keys. */
-  @JsonProperty("non-fso")
+  @JsonProperty("nonFSO")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<KeyEntityInfo> nonFSOKeyInfoList;
 
@@ -50,11 +50,11 @@ public class KeyInsightInfoResp {
   private List<KeyEntityInfo> fsoKeyInfoList;
 
   /** List of all deleted and repeatedly deleted keys.  */
-  @JsonProperty("deletedkeyinfo")
+  @JsonProperty("deletedKeyInfo")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<RepeatedOmKeyInfo> repeatedOmKeyInfoList;
 
-  @JsonProperty("deleteddirinfo")
+  @JsonProperty("deletedDirInfo")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<KeyEntityInfo> deletedDirInfoList;
 
@@ -62,7 +62,7 @@ public class KeyInsightInfoResp {
   @JsonProperty("status")
   private ResponseStatus responseCode;
 
-  public KeyInsightInfoResp() {
+  public KeyInsightInfoResponse() {
     responseCode = ResponseStatus.OK;
     replicatedTotal = 0L;
     unreplicatedTotal = 0L;
