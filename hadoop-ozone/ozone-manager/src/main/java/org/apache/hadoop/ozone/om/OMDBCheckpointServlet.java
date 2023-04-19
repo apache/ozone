@@ -129,6 +129,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      archiveOutputStream
+          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
     }
   }
