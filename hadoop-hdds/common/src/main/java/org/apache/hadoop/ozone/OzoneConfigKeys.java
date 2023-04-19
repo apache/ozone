@@ -174,9 +174,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
           "ozone.s3.administrators.groups";
 
-  public static final String OZONE_SUPER_READ_USERNAMES =
+  public static final String OZONE_READONLY_ADMINISTRATORS =
           "ozone.readonly.administrators";
-  public static final String OZONE_SUPER_READ_GROUPS =
+  public static final String OZONE_READONLY_ADMINISTRATORS_GROUPS =
           "ozone.readonly.administrators.groups";
 
   /**

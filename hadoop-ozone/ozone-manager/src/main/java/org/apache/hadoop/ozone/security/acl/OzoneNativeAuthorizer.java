@@ -50,7 +50,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private KeyManager keyManager;
   private PrefixManager prefixManager;
   private OzoneAdmins ozAdmins;
-  private OzoneAdmins ozSuperReadAdmins;
+  private OzoneAdmins ozReadOnlyAdmins;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -98,11 +98,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
     boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
 
-    boolean isSuperReadAdmin = isAdmin(ozSuperReadAdmins,
+    boolean isReadOnlyAdmin = isAdmin(ozReadOnlyAdmins,
         context.getClientUgi());
 
-    // bypass read checks for super read users
-    if (isSuperReadAdmin && (context.getAclRights() == ACLType.READ
+    // bypass read checks for read only admin users
+    if (isReadOnlyAdmin
+        && (context.getAclRights() == ACLType.READ
         || context.getAclRights() == ACLType.READ_ACL
         || context.getAclRights() == ACLType.LIST)) {
       return true;
@@ -205,8 +206,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.ozAdmins = ozoneAdmins;
   }
 
-  public void setOzoneSuperReadAdmins(OzoneAdmins ozoneSuperReadAdmins) {
-    this.ozSuperReadAdmins = ozoneSuperReadAdmins;
+  public void setOzoneReadOnlyAdmins(OzoneAdmins ozReadOnlyAdmins) {
+    this.ozReadOnlyAdmins = ozReadOnlyAdmins;
   }
 
   public OzoneAdmins getOzoneAdmins() {
