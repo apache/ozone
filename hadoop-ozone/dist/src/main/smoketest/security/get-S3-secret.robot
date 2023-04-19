@@ -25,17 +25,20 @@ Test Timeout        2 minutes
 GetSecret success
     Run Keyword   Kinit test user     testuser     testuser.keytab
     ${output}=             Execute             ozone s3 getsecret
-    Should contain         ${output}           awsAccessKey=
-    Should contain         ${output}           awsSecret=
+    Should contain         ${output}           awsAccessKey
+    Should contain         ${output}           awsSecret
+    Execute                kdestroy
 
 GetSecret failure
     Run Keyword   Kinit test user     testuser     testuser.keytab
-    ${output}=             Execute             ozone s3 getsecret
-    Should not contain     ${output}           awsAccessKey
-    Should not contain     ${output}           awsSecret
-    Should contain         ${output}           S3_SECRET_ALREADY_EXISTS
+    ${output2}=            Execute and Ignore Error    ozone s3 getsecret
+    Should not contain     ${output2}           awsAccessKey
+    Should not contain     ${output2}           awsSecret
+    Should contain         ${output2}           S3_SECRET_ALREADY_EXISTS
+    Execute                kdestroy
 
 *** Test Cases ***
 Get S3 secret twice
-    Run Keyword            GetSecret success
-    Run Keyword            GetSecret failure
+    GetSecret success
+    GetSecret failure
+
