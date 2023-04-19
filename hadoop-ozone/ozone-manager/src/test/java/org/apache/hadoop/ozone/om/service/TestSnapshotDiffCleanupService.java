@@ -44,7 +44,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -68,7 +69,6 @@ public class TestSnapshotDiffCleanupService {
   private static ManagedRocksDB db;
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
-  private OzoneManager ozoneManager;
   private final byte[] jobTableNameBytes =
       StringUtils.string2Bytes("snap-diff-job-table");
   private final byte[] purgedJobTableNameBytes =
@@ -84,6 +84,8 @@ public class TestSnapshotDiffCleanupService {
   private CodecRegistry codecRegistry;
   private byte[] emptyReportEntry;
   private SnapshotDiffCleanupService diffCleanupService;
+  @Mock
+  private OzoneManager ozoneManager;
 
   @BeforeAll
   public static void staticInit() throws RocksDBException {
@@ -128,8 +130,8 @@ public class TestSnapshotDiffCleanupService {
 
   @BeforeEach
   public void init() throws RocksDBException, IOException {
-    ozoneManager = Mockito.mock(OzoneManager.class);
-    when(ozoneManager.isLeaderReady()).thenReturn(false);
+    MockitoAnnotations.initMocks(this);
+    when(ozoneManager.isLeaderReady()).thenReturn(true);
 
     jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
         columnFamilyOptions);
@@ -192,6 +194,10 @@ public class TestSnapshotDiffCleanupService {
   @Test
   public void testSnapshotDiffCleanUpService()
       throws RocksDBException, IOException {
+    // Suspend before adding jobs and reports to tables to get the consistent
+    // behaviour.
+    diffCleanupService.suspend();
+
     long currentTime = System.currentTimeMillis() - 1;
 
     // Add a valid DONE snapDiff job and report to DB.
@@ -218,6 +224,8 @@ public class TestSnapshotDiffCleanupService {
     // Add a stale and REJECTED snapDiff job and report to DB.
     SnapshotDiffJob staleRejectedJob = addJobAndReport(REJECTED,
         currentTime - Duration.ofDays(10).toMillis(), 0);
+
+    diffCleanupService.resume();
 
     // Run 1.
     diffCleanupService.run();

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -76,7 +75,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -121,8 +119,8 @@ public class TestOMKeyRequest {
         return null;
       });
 
+
   @Before
-  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
   public void setup() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
@@ -139,7 +137,6 @@ public class TestOMKeyRequest {
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
-    when(ozoneManager.isLeaderReady()).thenReturn(false);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
@@ -216,7 +213,8 @@ public class TestOMKeyRequest {
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
-    doReturn(omSnapshotManager).when(ozoneManager).getOmSnapshotManager();
+    when(ozoneManager.getOmSnapshotManager())
+        .thenReturn(omSnapshotManager);
   }
 
   @NotNull

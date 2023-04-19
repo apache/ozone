@@ -170,8 +170,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         DEFAULT_THREAD_POOL_SIZE,
         0,
         TimeUnit.SECONDS,
-        new ArrayBlockingQueue<>(DEFAULT_THREAD_POOL_SIZE),
-        new ThreadPoolExecutor.CallerRunsPolicy()
+        new ArrayBlockingQueue<>(DEFAULT_THREAD_POOL_SIZE)
     );
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
@@ -982,6 +981,13 @@ public class SnapshotDiffManager implements AutoCloseable {
         String jobKey = next.getKey();
         SnapshotDiffJob snapshotDiffJob = next.getValue();
         if (snapshotDiffJob.getStatus() == IN_PROGRESS) {
+          // This is done just to be in parity of the workflow.
+          // If job status is not updated to QUEUED, workflow will fail when
+          // job gets submitted to executor and its status is IN_PROGRESS.
+          // Because according to workflow job can change its state from
+          // QUEUED to IN_PROGRESS but not IN_PROGRESS to IN_PROGRESS.
+          updateJobStatus(jobKey, IN_PROGRESS, QUEUED);
+
           loadJobOnStartUp(jobKey,
               snapshotDiffJob.getJobId(),
               snapshotDiffJob.getVolume(),
