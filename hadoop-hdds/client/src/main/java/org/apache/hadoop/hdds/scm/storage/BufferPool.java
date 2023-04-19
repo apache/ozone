@@ -46,7 +46,7 @@ public class BufferPool {
   }
 
   public BufferPool(int bufferSize, int capacity,
-      Function<ByteBuffer, ByteString> byteStringConversion){
+      Function<ByteBuffer, ByteString> byteStringConversion) {
     this.capacity = capacity;
     this.bufferSize = bufferSize;
     bufferList = new ArrayList<>(capacity);

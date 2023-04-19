@@ -28,6 +28,8 @@ if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
 fi
 
+: ${SCM:=scm}
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
@@ -38,13 +40,19 @@ create_results_dir() {
 }
 
 ## @description find all the test.sh scripts in the immediate child dirs
+all_tests_in_immediate_child_dirs() {
+  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+}
+
+## @description Find all test.sh scripts in immediate child dirs,
+## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$")
 
      # 'misc' is default suite, add untagged tests, too
     if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | xargs grep -L "^#suite:")"
+       untagged="$(all_tests_in_immediate_child_dirs | xargs grep -L "^#suite:")"
        if [[ -n "${untagged}" ]]; then
          tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
        fi
@@ -53,9 +61,11 @@ find_tests(){
     if [[ -z "${tests}" ]]; then
        echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
        exit 1
-  fi
+    fi
+  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+    tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}")
   else
-    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+    tests=$(all_tests_in_immediate_child_dirs | xargs grep -L '^#suite:failing')
   fi
   echo $tests
 }
@@ -74,9 +84,9 @@ wait_for_safemode_exit(){
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T ${SCM} bash -c "$command")
      fi
 
      echo "SECONDS: $SECONDS"
@@ -108,14 +118,24 @@ wait_for_om_leader() {
 
   #Don't give it up until 120 seconds
   while [[ $SECONDS -lt 120 ]]; do
-    local command="ozone admin om roles --service-id '${OM_SERVICE_ID}'"
+    local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T scm bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
     else
-      status=$(docker-compose exec -T scm bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+
+      local grep_command="grep -e FOLLOWER -e LEADER | sort -r -k3 | awk '{ print \$1 }' | xargs echo | sed 's/ /,/g'"
+      local new_order
+      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+        new_order=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command | ${grep_command}")
+      else
+        new_order=$(docker-compose exec -T ${SCM} bash -c "$command | ${grep_command}")
+      fi
+
+      reorder_om_nodes "${new_order}"
       return
     else
       echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
@@ -136,11 +156,12 @@ start_docker_env(){
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
-  docker-compose --no-ansi down
-  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
+
+  docker-compose --ansi never down
+  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
       && wait_for_safemode_exit \
       && wait_for_om_leader ; }; then
-    OUTPUT_NAME="$COMPOSE_ENV_NAME"
+    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
   fi
@@ -159,7 +180,7 @@ execute_robot_test(){
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
-  OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
@@ -180,6 +201,7 @@ execute_robot_test(){
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
+      -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
@@ -188,6 +210,10 @@ execute_robot_test(){
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   copy_daemon_logs
+
+  if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
+    create_stack_dumps
+  fi
 
   set -e
 
@@ -198,11 +224,35 @@ execute_robot_test(){
   return ${rc}
 }
 
+## @description Replace OM node order in config
+reorder_om_nodes() {
+  local c pid procname new_order
+  local new_order="$1"
+
+  if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
+      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
+      echo "Replaced OM order with ${new_order} in ${c}"
+    done
+  fi
+}
+
+## @description Create stack dump of each java process in each container
+create_stack_dumps() {
+  local c pid procname
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm); do
+    while read -r pid procname; do
+      echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
+      docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+  done
+}
+
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
   for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
-    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
   done
@@ -223,7 +273,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose --no-ansi stop $@
+  docker-compose --ansi never stop $@
   set +e
 }
 
@@ -232,7 +282,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose --no-ansi start $@
+  docker-compose --ansi never start $@
   set +e
 }
 
@@ -251,7 +301,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
@@ -265,12 +315,39 @@ wait_for_port(){
    return 1
 }
 
+## @description wait for the stat to be ready
+## @param The container ID
+## @param The maximum time to wait in seconds
+## @param The command line to be executed
+wait_for_execute_command(){
+  local container=$1
+  local timeout=$2
+  local command=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose exec -T $container bash -c '$command'
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "$command succeed"
+         return;
+     fi
+     echo "$command hasn't succeed yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $command to be successful"
+   return 1
+}
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --no-ansi down
+     docker-compose --ansi never down
   fi
 }
 
@@ -285,10 +362,15 @@ cleanup_docker_images() {
 generate_report(){
   local title="${1:-${COMPOSE_ENV_NAME}}"
   local dir="${2:-${RESULT_DIR}}"
+  local xunitdir="${3:-}"
 
   if command -v rebot > /dev/null 2>&1; then
      #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     if [ -z "${xunitdir}" ]; then
+       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
+     else
+       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
+     fi
   else
      echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
      exit 1
@@ -303,25 +385,29 @@ copy_results() {
   local result_dir="${test_dir}/result"
   local test_dir_name=$(basename ${test_dir})
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}"/*.xml
+    rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
-  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
-    cp "${result_dir}"/*.out* "${all_result_dir}"/
-  fi
+  mkdir -p "${all_result_dir}"/"${test_dir_name}"
+  mv -v "${result_dir}"/* "${all_result_dir}"/"${test_dir_name}"/
 }
 
 run_test_script() {
   local d="$1"
+  local test_script="$2"
+
+  if [[ -z "$test_script" ]]; then
+    test_script=./test.sh
+  fi
 
   echo "Executing test in ${d}"
 
   #required to read the .env file from the right location
   cd "${d}" || return
 
-  ret=0
-  if ! ./test.sh; then
+  local ret=0
+  if ! "$test_script"; then
     ret=1
     echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
@@ -332,7 +418,7 @@ run_test_script() {
 }
 
 run_test_scripts() {
-  ret=0
+  local ret=0
 
   for t in "$@"; do
     d="$(dirname "${t}")"
@@ -379,34 +465,70 @@ prepare_for_binary_image() {
 prepare_for_runner_image() {
   local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
   local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
+  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
   local v=${1:-${runner_version}} # prefer explicit argument
 
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="apache/ozone-runner:${v}"
+  export OZONE_IMAGE="${runner_image}:${v}"
 }
 
-## @description Print the logical version for a specific release
-## @param the release for which logical version should be printed
-get_logical_version() {
-  local v="$1"
+## @description Executing the Ozone Debug CLI related robot tests
+execute_debug_tests() {
+  local prefix=${RANDOM}
 
-  # shellcheck source=/dev/null
-  echo $(source "${_testlib_dir}/versions/${v}.sh" && ozone_logical_version)
+  local volume="cli-debug-volume${prefix}"
+  local bucket="cli-debug-bucket"
+  local key="testfile"
+
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
+
+  # get block locations for key
+  local chunkinfo="${key}-blocks-${prefix}"
+  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${volume}/${bucket}/${key}" > "$chunkinfo"
+  local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
+  local container="${host%%.*}"
+
+  # corrupt the first block of key on one of the datanodes
+  local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
+  docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
+
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
+
+  docker stop "${container}"
+
+  wait_for_datanode "${container}" STALE 60
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
+
+  wait_for_datanode "${container}" DEAD 60
+  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
+
+  docker start "${container}"
+
+  wait_for_datanode "${container}" HEALTHY 60
 }
 
-## @description Activate the version-specific behavior for a given release
-## @param the release for which definitions should be loaded
-load_version_specifics() {
-  local v="$1"
+## @description  Wait for datanode state
+## @param        Datanode name, eg datanode_1 datanode_2
+## @param        State to check for
+## @param        The maximum time to wait in seconds
+wait_for_datanode() {
+  local datanode=$1
+  local state=$2
+  local timeout=$3
 
-  # shellcheck source=/dev/null
-  source "${_testlib_dir}/versions/${v}.sh"
+  SECONDS=0
+  while [[ $SECONDS -lt $timeout ]]; do
+    local command="ozone admin datanode list"
+    docker-compose exec -T ${SCM} bash -c "$command" | grep -A2 "$datanode" > /tmp/dn_check
+    local health=$(grep -c "State: $state" /tmp/dn_check)
 
-  ozone_version_load
-}
-
-## @description Deactivate the previously version-specific behavior,
-##   reverting to the current version's definitions
-unload_version_specifics() {
-  ozone_version_unload
+    if [[ "$health" -eq 1 ]]; then
+      echo "$datanode is $state"
+      return
+    else
+      echo "Waiting for $datanode to be $state"
+    fi
+    echo "SECONDS: $SECONDS"
+  done
+  echo "WARNING: $datanode is still not $state"
 }

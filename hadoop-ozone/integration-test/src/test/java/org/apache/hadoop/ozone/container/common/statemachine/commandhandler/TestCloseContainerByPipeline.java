@@ -17,15 +17,16 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -34,18 +35,20 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.junit.AfterClass;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,12 +57,14 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Test container closing.
  */
-@Ignore
+@Flaky("HDDS-3263")
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;
@@ -74,7 +79,7 @@ public class TestCloseContainerByPipeline {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, "1");
@@ -95,8 +100,9 @@ public class TestCloseContainerByPipeline {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -114,16 +120,16 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
-            .setKeyName(keyName).setRefreshPipeline(true).build();
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+            .setDataSize(1024)
+            .setKeyName(keyName).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -144,9 +150,12 @@ public class TestCloseContainerByPipeline {
             .getCloseContainerHandler();
     int lastInvocationCount = closeContainerHandler.getInvocationCount();
     //send the order to close the container
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
@@ -168,10 +177,9 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+            .setDataSize(1024)
             .setKeyName("standalone")
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -180,7 +188,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -192,9 +200,12 @@ public class TestCloseContainerByPipeline {
 
     // Send the order to close the container, give random pipeline id so that
     // the container will not be closed via RATIS
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId());
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId()));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     //double check if it's really closed (waitFor also throws an exception)
     // TODO: change the below line after implementing QUASI_CLOSED to CLOSED
@@ -205,7 +216,7 @@ public class TestCloseContainerByPipeline {
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
 
     cluster.getStorageContainerManager().getPipelineManager()
-        .finalizeAndDestroyPipeline(pipeline, false);
+        .closePipeline(pipeline, false);
     Thread.sleep(5000);
     // Pipeline close should not affect a container in CLOSED state
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
@@ -223,9 +234,10 @@ public class TestCloseContainerByPipeline {
 
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
-        setBucketName("test").setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setDataSize(1024)
-        .setKeyName("ratis").setRefreshPipeline(true).build();
+        setBucketName("test")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(1024)
+        .setKeyName("ratis").build();
 
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -233,24 +245,27 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
     Assert.assertEquals(3, datanodes.size());
 
-    List<ReferenceCountedDB> metadataStores = new ArrayList<>(datanodes.size());
+    List<DBHandle> metadataStores = new ArrayList<>(datanodes.size());
     for (DatanodeDetails details : datanodes) {
       Assert.assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
+      SCMCommand<?> command = new CloseContainerCommand(
+          containerID, pipeline.getId());
+      command.setTerm(cluster.getStorageContainerManager()
+          .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(details.getUuid(),
-              new CloseContainerCommand(containerID, pipeline.getId()));
+          .addDatanodeCommand(details.getUuid(), command);
       int index = cluster.getHddsDatanodeIndex(details);
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
           .getContainer(containerID);
-      try(ReferenceCountedDB store = BlockUtils.getDB(
+      try (DBHandle store = BlockUtils.getDB(
           (KeyValueContainerData) dnContainer.getContainerData(), conf)) {
         metadataStores.add(store);
       }
@@ -271,6 +286,7 @@ public class TestCloseContainerByPipeline {
     }
   }
 
+  @Disabled("Failing with timeout")
   @Test
   public void testQuasiCloseTransitionViaRatis()
       throws IOException, TimeoutException, InterruptedException {
@@ -284,10 +300,9 @@ public class TestCloseContainerByPipeline {
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+            .setDataSize(1024)
             .setKeyName(keyName)
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -296,7 +311,7 @@ public class TestCloseContainerByPipeline {
 
     long containerID = omKeyLocationInfo.getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
@@ -308,7 +323,7 @@ public class TestCloseContainerByPipeline {
 
     // close the pipeline
     cluster.getStorageContainerManager()
-        .getPipelineManager().finalizeAndDestroyPipeline(pipeline, false);
+        .getPipelineManager().closePipeline(pipeline, false);
 
     // All the containers in OPEN or CLOSING state should transition to
     // QUASI-CLOSED after pipeline close
@@ -320,9 +335,12 @@ public class TestCloseContainerByPipeline {
 
     // Send close container command from SCM to datanode with forced flag as
     // true
+    SCMCommand<?> command = new CloseContainerCommand(
+        containerID, pipeline.getId(), true);
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(),
-            new CloseContainerCommand(containerID, pipeline.getId(), true));
+        .addDatanodeCommand(datanodeDetails.getUuid(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(
             cluster, containerID, datanodeDetails), 500, 5 * 1000);

@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -51,10 +52,15 @@ public class RepeatedOmKeyInfo {
     return omKeyInfoList;
   }
 
+  // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
+  public List<OmKeyInfo> cloneOmKeyInfoList() {
+    return new ArrayList<>(omKeyInfoList);
+  }
+
   public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo
-      repeatedKeyInfo) {
+      repeatedKeyInfo) throws IOException {
     List<OmKeyInfo> list = new ArrayList<>();
-    for(KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
+    for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));
     }
     return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
@@ -67,7 +73,7 @@ public class RepeatedOmKeyInfo {
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
     List<KeyInfo> list = new ArrayList<>();
-    for(OmKeyInfo k : omKeyInfoList) {
+    for (OmKeyInfo k : cloneOmKeyInfoList()) {
       list.add(k.getProtobuf(compact, clientVersion));
     }
 
@@ -82,7 +88,7 @@ public class RepeatedOmKeyInfo {
   public static class Builder {
     private List<OmKeyInfo> omKeyInfos;
 
-    public Builder(){}
+    public Builder() { }
 
     public Builder setOmKeyInfos(List<OmKeyInfo> infoList) {
       this.omKeyInfos = infoList;
@@ -92,5 +98,9 @@ public class RepeatedOmKeyInfo {
     public RepeatedOmKeyInfo build() {
       return new RepeatedOmKeyInfo(omKeyInfos);
     }
+  }
+
+  public RepeatedOmKeyInfo copyObject() {
+    return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
   }
 }

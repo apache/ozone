@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -30,6 +31,8 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -37,7 +40,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = KEY_TABLE)
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE, BUCKET_TABLE})
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
   private OmBucketInfo omBucketInfo;
@@ -54,8 +57,9 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For when the request is not successful or it is a replay transaction.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeysDeleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMKeysDeleteResponse(@Nonnull OMResponse omResponse, @Nonnull
+                              BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
   }
 
   @Override
@@ -73,7 +77,8 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     String volumeName = "";
     String bucketName = "";
     String keyName = "";
-    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(getBucketLayout());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       volumeName = omKeyInfo.getVolumeName();
       bucketName = omKeyInfo.getBucketName();
@@ -90,5 +95,13 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
+  }
+
+  public List<OmKeyInfo> getOmKeyInfoList() {
+    return omKeyInfoList;
+  }
+
+  public OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -61,6 +62,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return super.getTableLock(tableName);
+  }
+
+  @Override
   public void start(OzoneConfiguration configuration) throws IOException {
     LOG.info("Starting ReconOMMetadataManagerImpl");
     File reconDbDir =
@@ -94,7 +100,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables();
+      initializeOmTables(true);
       omTablesInitialized = true;
     }
   }
@@ -109,7 +115,15 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
         FileUtils.deleteDirectory(oldDBLocation);
       }
     }
-    initializeNewRdbStore(newDbLocation);
+    DBStore current = getStore();
+    try {
+      initializeNewRdbStore(newDbLocation);
+    } finally {
+      // Always close DBStore if it's replaced.
+      if (current != null && current != getStore()) {
+        current.close();
+      }
+    }
   }
 
   @Override

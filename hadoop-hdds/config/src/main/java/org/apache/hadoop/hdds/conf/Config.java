@@ -55,5 +55,10 @@ public @interface Config {
    */
   TimeUnit timeUnit() default TimeUnit.MILLISECONDS;
 
+  /**
+   * If type == SIZE the unit should be defined with this attribute.
+   */
+  StorageUnit sizeUnit() default StorageUnit.BYTES;
+
   ConfigTag[] tags();
 }

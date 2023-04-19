@@ -17,56 +17,21 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.ozone.container.common.interfaces
-    .ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicyTemplate;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Randomly choosing containers for block deletion.
  */
 public class RandomContainerDeletionChoosingPolicy
-    implements ContainerDeletionChoosingPolicy {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(RandomContainerDeletionChoosingPolicy.class);
+    extends ContainerDeletionChoosingPolicyTemplate {
 
   @Override
-  public List<ContainerData> chooseContainerForBlockDeletion(int count,
-      Map<Long, ContainerData> candidateContainers)
-      throws StorageContainerException {
-    Preconditions.checkNotNull(candidateContainers,
-        "Internal assertion: candidate containers cannot be null");
-
-    int currentCount = 0;
-    List<ContainerData> result = new LinkedList<>();
-    ContainerData[] values = new ContainerData[candidateContainers.size()];
-    // to get a shuffle list
-    ContainerData[] shuffled = candidateContainers.values().toArray(values);
-    ArrayUtils.shuffle(shuffled);
-    for (ContainerData entry : shuffled) {
-      if (currentCount < count) {
-        result.add(entry);
-        currentCount++;
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Select container {} for block deletion, "
-                  + "pending deletion blocks num: {}.",
-              entry.getContainerID(),
-              ((KeyValueContainerData) entry).getNumPendingDeletionBlocks());
-        }
-      } else {
-        break;
-      }
-    }
-
-    return result;
+  protected void orderByDescendingPriority(
+      List<KeyValueContainerData> candidateContainers) {
+    Collections.shuffle(candidateContainers);
   }
 }

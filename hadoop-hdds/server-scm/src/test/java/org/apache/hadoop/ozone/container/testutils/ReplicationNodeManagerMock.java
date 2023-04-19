@@ -17,10 +17,14 @@
 package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -43,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,6 +84,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   @Override
   public Map<String, Long> getNodeInfo() {
+    return null;
+  }
+
+  @Override
+  public Map<String, List<String>> getNodeStatusInfo() {
     return null;
   }
 
@@ -157,6 +167,31 @@ public class ReplicationNodeManagerMock implements NodeManager {
    */
   @Override
   public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
+    return null;
+  }
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  @Override
+  public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed) {
+    return null;
+  }
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  @Override
+  public DatanodeUsageInfo getUsageInfo(DatanodeDetails dn) {
     return null;
   }
 
@@ -258,6 +293,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 
+  @Override
+  public void removeContainer(DatanodeDetails datanodeDetails,
+                           ContainerID containerId) {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
   /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
@@ -321,7 +362,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public RegisteredCommand register(DatanodeDetails dd,
                                     NodeReportProto nodeReport,
-                                    PipelineReportsProto pipelineReportsProto) {
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -329,10 +371,14 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param dd - Datanode Details.
+   * @param layoutInfo - Layout Version Proto
+   * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails dd) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 
@@ -365,6 +411,14 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  @Override
+  public void refreshAllHealthyDnUsageInfo() {
+    //no op
+  }
+  /**
    * Empty implementation for processNodeReport.
    * @param dnUuid
    * @param nodeReport
@@ -373,6 +427,66 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public void processNodeReport(DatanodeDetails dnUuid,
                                 NodeReportProto nodeReport) {
     // do nothing.
+  }
+
+  /**
+   * Empty implementation for processLayoutVersionReport.
+   * @param dnUuid
+   * @param layoutVersionReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                LayoutVersionProto layoutVersionReport) {
+    // do nothing.
+  }
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  @Override
+  public int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) {
+    return -1;
+  }
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  @Override
+  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+    return commandQueue.getDatanodeCommandCount(dnID, cmdType);
+  }
+
+  /**
+   * Get the total number of pending commands of the given type on the given
+   * datanode. This includes both the number of commands queued in SCM which
+   * will be sent to the datanode on the next heartbeat, and the number of
+   * commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The command Type To query.
+   * @return The number of commands of the given type pending on the datanode.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException {
+    return 0;
+  }
+
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
   }
 
   @Override

@@ -20,8 +20,16 @@ package org.apache.hadoop.ozone.container;
 
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,8 +46,11 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.io.BlockDataStreamOutputEntry;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -48,7 +59,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -119,12 +130,30 @@ public final class TestHelper {
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
+    if (type == ReplicationType.STAND_ALONE) {
+      throw new IllegalArgumentException(ReplicationType.STAND_ALONE +
+          " replication type should not be used in tests to write keys anymore."
+      );
+    }
+    org.apache.hadoop.hdds.client.ReplicationFactor factor =
+            org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    ReplicationConfig config =
+            ReplicationConfig.fromTypeAndFactor(type, factor);
+    return objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey(keyName, size, config, new HashMap<>());
+  }
+
+  public static OzoneDataStreamOutput createStreamKey(String keyName,
+      ReplicationType type, long size, ObjectStore objectStore,
+      String volumeName, String bucketName) throws Exception {
     org.apache.hadoop.hdds.client.ReplicationFactor factor =
         type == ReplicationType.STAND_ALONE ?
             org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    ReplicationConfig config =
+        ReplicationConfig.fromTypeAndFactor(type, factor);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createStreamKey(keyName, size, config, new HashMap<>());
   }
 
   public static OzoneOutputStream createKey(String keyName,
@@ -132,24 +161,33 @@ public final class TestHelper {
       org.apache.hadoop.hdds.client.ReplicationFactor factor, long size,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
+    ReplicationConfig config =
+            ReplicationConfig.fromTypeAndFactor(type, factor);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, config, new HashMap<>());
+  }
+
+  public static OzoneOutputStream createKey(String keyName,
+      ReplicationConfig replicationConfig, long size, ObjectStore objectStore,
+      String volumeName, String bucketName) throws Exception {
+    return objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey(keyName, size, replicationConfig, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
-    byte[] readData = new byte[data.length];
-    OzoneInputStream is =
+    try (OzoneInputStream is =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .readKey(keyName);
-    is.read(readData);
-    MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
-    sha1.update(data);
-    MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
-    sha2.update(readData);
-    Assert.assertTrue(Arrays.equals(sha1.digest(), sha2.digest()));
-    is.close();
+            .readKey(keyName)) {
+      byte[] readData = new byte[data.length];
+      is.read(readData);
+      MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+      sha1.update(data);
+      MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+      sha2.update(readData);
+      Assert.assertTrue(Arrays.equals(sha1.digest(), sha2.digest()));
+    }
   }
 
   public static void waitForContainerClose(OzoneOutputStream outputStream,
@@ -160,6 +198,24 @@ public final class TestHelper {
         keyOutputStream.getStreamEntries();
     List<Long> containerIdList = new ArrayList<>();
     for (BlockOutputStreamEntry entry : streamEntryList) {
+      long id = entry.getBlockID().getContainerID();
+      if (!containerIdList.contains(id)) {
+        containerIdList.add(id);
+      }
+    }
+    Assert.assertTrue(!containerIdList.isEmpty());
+    waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
+  }
+
+
+  public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
+      MiniOzoneCluster cluster) throws Exception {
+    KeyDataStreamOutput keyOutputStream =
+        (KeyDataStreamOutput) outputStream.getByteBufStreamOutput();
+    List<BlockDataStreamOutputEntry> streamEntryList =
+        keyOutputStream.getStreamEntries();
+    List<Long> containerIdList = new ArrayList<>();
+    for (BlockDataStreamOutputEntry entry : streamEntryList) {
       long id = entry.getBlockID().getContainerID();
       if (!containerIdList.contains(id)) {
         containerIdList.add(id);
@@ -195,7 +251,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -227,8 +283,8 @@ public final class TestHelper {
       throws TimeoutException, InterruptedException, IOException {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
-      cluster.getStorageContainerManager().getPipelineManager()
-          .finalizeAndDestroyPipeline(pipeline1, false);
+      cluster.getStorageContainerManager()
+          .getPipelineManager().closePipeline(pipeline1, false);
     }
 
     // wait for the pipeline to get destroyed in the datanodes
@@ -273,7 +329,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -294,7 +350,7 @@ public final class TestHelper {
         // send the order to close the container
         cluster.getStorageContainerManager().getEventQueue()
             .fireEvent(SCMEvents.CLOSE_CONTAINER,
-                ContainerID.valueof(containerID));
+                ContainerID.valueOf(containerID));
       }
     }
     int index = 0;
@@ -338,8 +394,7 @@ public final class TestHelper {
   }
 
   public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
-      MiniOzoneCluster cluster)
-      throws IOException {
+      MiniOzoneCluster cluster) throws IOException {
     DatanodeDetails dnDetails =  info.getPipeline().
         getFirstNode();
     return cluster.getHddsDatanodes().get(cluster.
@@ -364,7 +419,7 @@ public final class TestHelper {
         .getContainerManager();
     try {
       Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(ContainerID.valueof(containerID));
+          .getContainerReplicas(ContainerID.valueOf(containerID));
       LOG.info("Container {} has {} replicas on {}", containerID,
           replicas.size(),
           replicas.stream()
@@ -383,7 +438,6 @@ public final class TestHelper {
   public static void waitForReplicaCount(long containerID, int count,
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
-        1000, 30_000);
+        1000, 30000);
   }
-
 }

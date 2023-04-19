@@ -17,6 +17,8 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -78,5 +80,43 @@ public class CloseContainerCommand
 
   public PipelineID getPipelineID() {
     return pipelineID;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": containerID: ").append(getContainerID())
+        .append(", pipelineID: ").append(getPipelineID())
+        .append(", force: ").append(force);
+    return sb.toString();
+  }
+
+  @Override
+  public int hashCode() {
+    return new HashCodeBuilder(61, 71)
+        .append(getContainerID())
+        .append(getPipelineID())
+        .append(force)
+        .toHashCode();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    final CloseContainerCommand that = (CloseContainerCommand) o;
+
+    return new EqualsBuilder()
+        .append(getContainerID(), that.getContainerID())
+        .append(getPipelineID(), that.getPipelineID())
+        .append(force, that.force)
+        .isEquals();
   }
 }

@@ -20,6 +20,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -39,8 +40,27 @@ public class TestOmKeyLocationInfoGroup {
   @Test
   public void testGettingPreviousVersions() {
     OmKeyLocationInfoGroup testInstance = createTestInstance();
-    List<OmKeyLocationInfo> list = testInstance.getLocationList(1L);
+    Collection<OmKeyLocationInfo> list = testInstance.getLocationList(1L);
     Assert.assertEquals(2, list.size());
+  }
+
+  @Test
+  public void testGenerateNextVersion() {
+    OmKeyLocationInfoGroup testInstance = createTestInstance();
+    List<OmKeyLocationInfo> locationInfoList = createLocationList();
+    OmKeyLocationInfoGroup newInstance =
+        testInstance.generateNextVersion(locationInfoList);
+    Assert.assertEquals(1, newInstance.getLocationList().size());
+    // createTestInstance is of version 2, nextVersion should be 3
+    Assert.assertEquals(3, newInstance.getVersion());
+
+  }
+
+  private List<OmKeyLocationInfo> createLocationList() {
+    OmKeyLocationInfo info = new OmKeyLocationInfo.Builder().build();
+    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+    locationInfoList.add(info);
+    return locationInfoList;
   }
 
   private OmKeyLocationInfoGroup createTestInstance() {

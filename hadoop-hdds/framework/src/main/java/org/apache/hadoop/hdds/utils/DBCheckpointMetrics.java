@@ -32,7 +32,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
  * This interface is for maintaining DB checkpoint statistics.
  */
 @InterfaceAudience.Private
-@Metrics(about="DB checkpoint Metrics", context="dfs")
+@Metrics(about = "DB checkpoint Metrics", context = "dfs")
 public class DBCheckpointMetrics {
   private static final String SOURCE_NAME =
       DBCheckpointMetrics.class.getSimpleName();
@@ -51,6 +51,11 @@ public class DBCheckpointMetrics {
     return ms.register(SOURCE_NAME,
         parent,
         new DBCheckpointMetrics());
+  }
+
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
   }
 
   @VisibleForTesting

@@ -18,24 +18,24 @@
 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-hdds</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-hdds-container-service</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
+  <artifactId>hdds-container-service</artifactId>
+  <version>1.4.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Container Service</description>
   <name>Apache Ozone HDDS Container Service</name>
   <packaging>jar</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-common</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -43,18 +43,22 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>commons-compress</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-common</artifactId>
+      <groupId>com.github.luben</groupId>
+      <artifactId>zstd-jni</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-server-framework</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-client</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-client</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
@@ -77,14 +81,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-docs</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-docs</artifactId>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs</artifactId>
+      <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -98,14 +102,47 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
+      <artifactId>slf4j-reload4j</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>javax.xml.bind</groupId>
+      <artifactId>jaxb-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-codec</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
     </dependency>
 
   </dependencies>
@@ -132,15 +169,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <artifactItems>
                 <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-server-framework</artifactId>
+                  <groupId>org.apache.ozone</groupId>
+                  <artifactId>hdds-server-framework</artifactId>
                   <outputDirectory>${project.build.outputDirectory}
                   </outputDirectory>
                   <includes>webapps/static/**/*.*</includes>
                 </artifactItem>
                 <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-docs</artifactId>
+                  <groupId>org.apache.ozone</groupId>
+                  <artifactId>hdds-docs</artifactId>
                   <outputDirectory>${project.build.outputDirectory}/webapps/hddsDatanode</outputDirectory>
                   <includes>docs/**/*.*</includes>
                 </artifactItem>

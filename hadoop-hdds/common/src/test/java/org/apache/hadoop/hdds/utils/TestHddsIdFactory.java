@@ -26,11 +26,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.hadoop.hdds.HddsIdFactory;
-import org.junit.After;
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test the JMX interface for the rocksdb metastore implementation.
@@ -41,7 +41,7 @@ public class TestHddsIdFactory {
   private static final int IDS_PER_THREAD = 10000;
   private static final int NUM_OF_THREADS = 5;
 
-  @After
+  @AfterEach
   public void cleanup() {
     ID_SET.clear();
   }
@@ -65,7 +65,7 @@ public class TestHddsIdFactory {
         for (int idNum = 0; idNum < IDS_PER_THREAD; idNum++) {
           long var = HddsIdFactory.getLongId();
           if (ID_SET.contains(var)) {
-            Assert.fail("Duplicate id found");
+            Assertions.fail("Duplicate id found");
           }
           ID_SET.add(var);
         }

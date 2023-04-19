@@ -17,10 +17,8 @@
 
 package org.apache.hadoop.ozone.lease;
 
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,9 +27,6 @@ import java.util.Map;
  * Test class to check functionality and consistency of LeaseManager.
  */
 public class TestLeaseManager {
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   /**
    * Dummy resource on which leases can be acquired.
@@ -51,7 +46,7 @@ public class TestLeaseManager {
 
     @Override
     public boolean equals(Object obj) {
-      if(obj instanceof DummyResource) {
+      if (obj instanceof DummyResource) {
         return name.equals(((DummyResource) obj).name);
       }
       return false;
@@ -85,19 +80,19 @@ public class TestLeaseManager {
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
     Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo);
     Lease<DummyResource> leaseThree = manager.acquire(resourceThree);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertEquals(leaseTwo, manager.get(resourceTwo));
-    Assert.assertEquals(leaseThree, manager.get(resourceThree));
-    Assert.assertFalse(leaseOne.hasExpired());
-    Assert.assertFalse(leaseTwo.hasExpired());
-    Assert.assertFalse(leaseThree.hasExpired());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertEquals(leaseTwo, manager.get(resourceTwo));
+    Assertions.assertEquals(leaseThree, manager.get(resourceThree));
+    Assertions.assertFalse(leaseOne.hasExpired());
+    Assertions.assertFalse(leaseTwo.hasExpired());
+    Assertions.assertFalse(leaseThree.hasExpired());
     //The below releases should not throw LeaseNotFoundException.
     manager.release(resourceOne);
     manager.release(resourceTwo);
     manager.release(resourceThree);
-    Assert.assertTrue(leaseOne.hasExpired());
-    Assert.assertTrue(leaseTwo.hasExpired());
-    Assert.assertTrue(leaseThree.hasExpired());
+    Assertions.assertTrue(leaseOne.hasExpired());
+    Assertions.assertTrue(leaseTwo.hasExpired());
+    Assertions.assertTrue(leaseThree.hasExpired());
     manager.shutdown();
   }
 
@@ -109,12 +104,11 @@ public class TestLeaseManager {
     DummyResource resourceTwo = new DummyResource("two");
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
     Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertEquals(leaseTwo, manager.get(resourceTwo));
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertEquals(leaseTwo, manager.get(resourceTwo));
 
-    exception.expect(LeaseAlreadyExistException.class);
-    exception.expectMessage("Resource: " + resourceOne);
-    manager.acquire(resourceOne);
+    Assertions.assertThrowsExactly(LeaseAlreadyExistException.class,
+        () -> manager.acquire(resourceOne), "Resource: " + resourceOne);
 
     manager.release(resourceOne);
     manager.release(resourceTwo);
@@ -130,24 +124,22 @@ public class TestLeaseManager {
     DummyResource resourceThree = new DummyResource("three");
 
     //Case 1: lease was never acquired.
-    exception.expect(LeaseNotFoundException.class);
-    exception.expectMessage("Resource: " + resourceOne);
-    manager.get(resourceOne);
+    Assertions.assertThrowsExactly(LeaseNotFoundException.class,
+        () -> manager.get(resourceOne), "Resource: " + resourceOne);
 
     //Case 2: lease is acquired and released.
     Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo);
-    Assert.assertEquals(leaseTwo, manager.get(resourceTwo));
-    Assert.assertFalse(leaseTwo.hasExpired());
+    Assertions.assertEquals(leaseTwo, manager.get(resourceTwo));
+    Assertions.assertFalse(leaseTwo.hasExpired());
     manager.release(resourceTwo);
-    Assert.assertTrue(leaseTwo.hasExpired());
-    exception.expect(LeaseNotFoundException.class);
-    exception.expectMessage("Resource: " + resourceTwo);
-    manager.get(resourceTwo);
+    Assertions.assertTrue(leaseTwo.hasExpired());
+    Assertions.assertThrowsExactly(LeaseNotFoundException.class,
+        () -> manager.get(resourceTwo), "Resource: " + resourceTwo);
 
     //Case 3: lease acquired and timed out.
     Lease<DummyResource> leaseThree = manager.acquire(resourceThree);
-    Assert.assertEquals(leaseThree, manager.get(resourceThree));
-    Assert.assertFalse(leaseThree.hasExpired());
+    Assertions.assertEquals(leaseThree, manager.get(resourceThree));
+    Assertions.assertFalse(leaseThree.hasExpired());
     long sleepTime = leaseThree.getRemainingTime() + 1000;
     try {
       Thread.sleep(sleepTime);
@@ -155,10 +147,9 @@ public class TestLeaseManager {
       //even in case of interrupt we have to wait till lease times out.
       Thread.sleep(sleepTime);
     }
-    Assert.assertTrue(leaseThree.hasExpired());
-    exception.expect(LeaseNotFoundException.class);
-    exception.expectMessage("Resource: " + resourceThree);
-    manager.get(resourceThree);
+    Assertions.assertTrue(leaseThree.hasExpired());
+    Assertions.assertThrowsExactly(LeaseNotFoundException.class,
+        () -> manager.get(resourceThree), "Resource: " + resourceThree);
     manager.shutdown();
   }
 
@@ -172,15 +163,15 @@ public class TestLeaseManager {
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
     Lease<DummyResource> leaseTwo = manager.acquire(resourceTwo, 10000);
     Lease<DummyResource> leaseThree = manager.acquire(resourceThree, 50000);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertEquals(leaseTwo, manager.get(resourceTwo));
-    Assert.assertEquals(leaseThree, manager.get(resourceThree));
-    Assert.assertFalse(leaseOne.hasExpired());
-    Assert.assertFalse(leaseTwo.hasExpired());
-    Assert.assertFalse(leaseThree.hasExpired());
-    Assert.assertEquals(5000, leaseOne.getLeaseLifeTime());
-    Assert.assertEquals(10000, leaseTwo.getLeaseLifeTime());
-    Assert.assertEquals(50000, leaseThree.getLeaseLifeTime());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertEquals(leaseTwo, manager.get(resourceTwo));
+    Assertions.assertEquals(leaseThree, manager.get(resourceThree));
+    Assertions.assertFalse(leaseOne.hasExpired());
+    Assertions.assertFalse(leaseTwo.hasExpired());
+    Assertions.assertFalse(leaseThree.hasExpired());
+    Assertions.assertEquals(5000, leaseOne.getLeaseLifeTime());
+    Assertions.assertEquals(10000, leaseTwo.getLeaseLifeTime());
+    Assertions.assertEquals(50000, leaseThree.getLeaseLifeTime());
     // Releasing of leases is done in shutdown, so don't have to worry about
     // lease release
     manager.shutdown();
@@ -206,12 +197,11 @@ public class TestLeaseManager {
       //even in case of interrupt we have to wait till lease times out.
       Thread.sleep(sleepTime);
     }
-    Assert.assertTrue(leaseOne.hasExpired());
-    exception.expect(LeaseNotFoundException.class);
-    exception.expectMessage("Resource: " + resourceOne);
-    manager.get(resourceOne);
+    Assertions.assertTrue(leaseOne.hasExpired());
+    Assertions.assertThrowsExactly(LeaseNotFoundException.class,
+        () -> manager.get(resourceOne), "Resource: " + resourceOne);
     // check if callback has been executed
-    Assert.assertEquals("lease expired", leaseStatus.get(resourceOne));
+    Assertions.assertEquals("lease expired", leaseStatus.get(resourceOne));
   }
 
   @Test
@@ -230,11 +220,10 @@ public class TestLeaseManager {
     });
     leaseStatus.put(resourceOne, "lease released");
     manager.release(resourceOne);
-    Assert.assertTrue(leaseOne.hasExpired());
-    exception.expect(LeaseNotFoundException.class);
-    exception.expectMessage("Resource: " + resourceOne);
-    manager.get(resourceOne);
-    Assert.assertEquals("lease released", leaseStatus.get(resourceOne));
+    Assertions.assertTrue(leaseOne.hasExpired());
+    Assertions.assertThrowsExactly(LeaseNotFoundException.class,
+        () -> manager.get(resourceOne), "Resource: " + resourceOne);
+    Assertions.assertEquals("lease released", leaseStatus.get(resourceOne));
   }
 
   @Test
@@ -296,17 +285,17 @@ public class TestLeaseManager {
       //even in case of interrupt we have to wait till lease times out.
       Thread.sleep(sleepTime);
     }
-    Assert.assertTrue(leaseOne.hasExpired());
-    Assert.assertTrue(leaseTwo.hasExpired());
-    Assert.assertTrue(leaseThree.hasExpired());
-    Assert.assertTrue(leaseFour.hasExpired());
-    Assert.assertTrue(leaseFive.hasExpired());
+    Assertions.assertTrue(leaseOne.hasExpired());
+    Assertions.assertTrue(leaseTwo.hasExpired());
+    Assertions.assertTrue(leaseThree.hasExpired());
+    Assertions.assertTrue(leaseFour.hasExpired());
+    Assertions.assertTrue(leaseFive.hasExpired());
 
-    Assert.assertEquals("lease released", leaseStatus.get(resourceOne));
-    Assert.assertEquals("lease released", leaseStatus.get(resourceTwo));
-    Assert.assertEquals("lease released", leaseStatus.get(resourceThree));
-    Assert.assertEquals("lease expired", leaseStatus.get(resourceFour));
-    Assert.assertEquals("lease expired", leaseStatus.get(resourceFive));
+    Assertions.assertEquals("lease released", leaseStatus.get(resourceOne));
+    Assertions.assertEquals("lease released", leaseStatus.get(resourceTwo));
+    Assertions.assertEquals("lease released", leaseStatus.get(resourceThree));
+    Assertions.assertEquals("lease expired", leaseStatus.get(resourceFour));
+    Assertions.assertEquals("lease expired", leaseStatus.get(resourceFive));
     manager.shutdown();
   }
 
@@ -316,18 +305,18 @@ public class TestLeaseManager {
     manager.start();
     DummyResource resourceOne = new DummyResource("one");
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertFalse(leaseOne.hasExpired());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertFalse(leaseOne.hasExpired());
 
     manager.release(resourceOne);
-    Assert.assertTrue(leaseOne.hasExpired());
+    Assertions.assertTrue(leaseOne.hasExpired());
 
     Lease<DummyResource> sameResourceLease = manager.acquire(resourceOne);
-    Assert.assertEquals(sameResourceLease, manager.get(resourceOne));
-    Assert.assertFalse(sameResourceLease.hasExpired());
+    Assertions.assertEquals(sameResourceLease, manager.get(resourceOne));
+    Assertions.assertFalse(sameResourceLease.hasExpired());
 
     manager.release(resourceOne);
-    Assert.assertTrue(sameResourceLease.hasExpired());
+    Assertions.assertTrue(sameResourceLease.hasExpired());
     manager.shutdown();
   }
 
@@ -338,8 +327,8 @@ public class TestLeaseManager {
     manager.start();
     DummyResource resourceOne = new DummyResource("one");
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertFalse(leaseOne.hasExpired());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertFalse(leaseOne.hasExpired());
     // wait for lease to expire
     long sleepTime = leaseOne.getRemainingTime() + 1000;
     try {
@@ -348,14 +337,14 @@ public class TestLeaseManager {
       //even in case of interrupt we have to wait till lease times out.
       Thread.sleep(sleepTime);
     }
-    Assert.assertTrue(leaseOne.hasExpired());
+    Assertions.assertTrue(leaseOne.hasExpired());
 
     Lease<DummyResource> sameResourceLease = manager.acquire(resourceOne);
-    Assert.assertEquals(sameResourceLease, manager.get(resourceOne));
-    Assert.assertFalse(sameResourceLease.hasExpired());
+    Assertions.assertEquals(sameResourceLease, manager.get(resourceOne));
+    Assertions.assertFalse(sameResourceLease.hasExpired());
 
     manager.release(resourceOne);
-    Assert.assertTrue(sameResourceLease.hasExpired());
+    Assertions.assertTrue(sameResourceLease.hasExpired());
     manager.shutdown();
   }
 
@@ -365,8 +354,8 @@ public class TestLeaseManager {
     manager.start();
     DummyResource resourceOne = new DummyResource("one");
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne);
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertFalse(leaseOne.hasExpired());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertFalse(leaseOne.hasExpired());
 
     // add 5 more seconds to the lease
     leaseOne.renew(5000);
@@ -374,8 +363,8 @@ public class TestLeaseManager {
     Thread.sleep(5000);
 
     // lease should still be active
-    Assert.assertEquals(leaseOne, manager.get(resourceOne));
-    Assert.assertFalse(leaseOne.hasExpired());
+    Assertions.assertEquals(leaseOne, manager.get(resourceOne));
+    Assertions.assertFalse(leaseOne.hasExpired());
     manager.release(resourceOne);
     manager.shutdown();
   }

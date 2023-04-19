@@ -1,14 +1,16 @@
 {
   "clusterState": {
+    "pipelines": 32,
     "totalDatanodes": 24,
     "healthyDatanodes": 24,
-    "pipelines": 32,
     "storageReport": {
-      "capacity": 32985348833280,
-      "used": 15942918602752,
-      "remaining": 12094627905536
+      "capacity": 202114732032,
+      "used": 16384,
+      "remaining": 182447632384
     },
     "containers": 3230,
+    "missingContainers": 1002,
+    "openContainers": 5,
     "volumes": 5,
     "buckets": 156,
     "keys": 253000
@@ -17,7 +19,7 @@
     "totalCount": 12,
     "datanodes": [
       {
-        "hostname": "localhost1.storage.enterprise.com",
+        "hostname": "localhost2.storage.enterprise.com",
         "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "IN_SERVICE",
@@ -42,6 +44,7 @@
           }
         ],
         "containers": 80,
+        "openContainers": 79,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574728775759,
@@ -49,7 +52,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost2.storage.enterprise.com",
+        "hostname": "localhost1.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONING",
@@ -64,7 +67,7 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost2.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
@@ -74,6 +77,7 @@
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -81,7 +85,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost3.storage.enterprise.com",
+        "hostname": "localhost4.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONED",
@@ -96,16 +100,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost3.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost2.storage.enterprise.com"
+            "leaderNode": "localhost3.storage.enterprise.com"
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -113,7 +118,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost4.storage.enterprise.com",
+        "hostname": "localhost3.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
@@ -128,16 +133,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost4.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost2.storage.enterprise.com"
+            "leaderNode": "localhost4.storage.enterprise.com"
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -145,7 +151,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost5.storage.enterprise.com",
+        "hostname": "localhost6.storage.enterprise.com",
         "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "opState": "IN_MAINTENANCE",
@@ -160,16 +166,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost5.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost2.storage.enterprise.com"
+            "leaderNode": "localhost5.storage.enterprise.com"
           }
         ],
         "containers": 8192,
+        "openContainers": 8182,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724805059,
@@ -177,7 +184,7 @@
         "buildDate": "2020-07-20T15:45Z"
       },
       {
-        "hostname": "localhost6.storage.enterprise.com",
+        "hostname": "localhost5.storage.enterprise.com",
         "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "opState": "IN_SERVICE",
@@ -192,22 +199,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost6.storage.enterprise.com"
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -230,22 +238,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost7.storage.enterprise.com"
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -268,22 +277,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost8.storage.enterprise.com"
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -306,22 +316,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost9.storage.enterprise.com"
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -344,22 +355,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost1.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           },
           {
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost3.storage.enterprise.com"
+            "leaderNode": "localhost10.storage.enterprise.com"
           }
         ],
         "containers": 43,
+        "openContainers": 42,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1343544679543,
@@ -379,6 +391,7 @@
         },
         "pipelines": [],
         "containers": 0,
+        "openContainers": 0,
         "leaderCount": 0,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1074724802059,
@@ -401,16 +414,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost12.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost12.storage.enterprise.com"
           }
         ],
         "containers": 643,
+        "openContainers": 632,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724816029,
@@ -433,16 +447,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost13.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost6.storage.enterprise.com"
+            "leaderNode": "localhost13.storage.enterprise.com"
           }
         ],
         "containers": 5,
+        "openContainers": 4,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724802059,
@@ -465,22 +480,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost7.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost7.storage.enterprise.com"
+            "leaderNode": "localhost14.storage.enterprise.com"
           }
         ],
         "containers": 64,
+        "openContainers": 63,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724676009,
@@ -503,16 +519,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost5.storage.enterprise.com"
+            "leaderNode": "localhost15.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost8.storage.enterprise.com"
+            "leaderNode": "localhost15.storage.enterprise.com"
           }
         ],
         "containers": 21,
+        "openContainers": 20,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724276050,
@@ -535,16 +552,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost16.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost9.storage.enterprise.com"
+            "leaderNode": "localhost16.storage.enterprise.com"
           }
         ],
         "containers": 897,
+        "openContainers": 896,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724573011,
@@ -567,22 +585,23 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost10.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           },
           {
             "pipelineID": "01f2e105-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "STAND_ALONE",
             "replicationFactor": 1,
-            "leaderNode": "localhost10.storage.enterprise.com"
+            "leaderNode": "localhost17.storage.enterprise.com"
           }
         ],
         "containers": 6754,
+        "openContainers": 6744,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574723756059,
@@ -605,16 +624,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost18.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost18.storage.enterprise.com"
           }
         ],
         "containers": 78,
+        "openContainers": 77,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1474724705783,
@@ -637,16 +657,17 @@
             "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
             "replicationType": "RATIS",
             "replicationFactor": 3,
-            "leaderNode": "localhost11.storage.enterprise.com"
+            "leaderNode": "localhost19.storage.enterprise.com"
           },
           {
             "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
             "replicationType": "RATIS",
             "replicationFactor": 1,
-            "leaderNode": "localhost12.storage.enterprise.com"
+            "leaderNode": "localhost19.storage.enterprise.com"
           }
         ],
         "containers": 543,
+        "openContainers": 540,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
         "setupTime": 1574724706232,
@@ -663,9 +684,57 @@
         "status": "OPEN",
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost2.storage.enterprise.com",
-          "localhost3.storage.enterprise.com"
+          {
+          "level": 0,
+          "parent": null,
+          "cost": 0,
+          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "ipAddress": "172.22.0.5",
+          "hostName": "ozone_datanode_1.ozone_default",
+          "ports": [
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
+          
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "IN_SERVICE",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "signature": -460136136,
+          "decomissioned": false,
+          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+          "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578491471528,
         "duration": 389445,
@@ -679,9 +748,106 @@
         "status": "OPEN",
         "leaderNode": "localhost5.storage.enterprise.com",
         "datanodes": [
-          "localhost4.storage.enterprise.com",
-          "localhost5.storage.enterprise.com",
-          "localhost6.storage.enterprise.com"
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8728",
+            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8728",
+            "ipAddress": "172.22.0.5",
+            "hostName": "ozone_datanode_2.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": -460136136,
+            "decomissioned": false,
+            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "numOfLeaves": 1
+          },
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "uuidString": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "ipAddress": "172.22.0.3",
+            "hostName": "ozone_datanode_3.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": 776905284,
+            "decomissioned": false,
+            "networkName": "0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/0523e1bb-d0a8-457c-be51-5e30ee0ad295",
+            "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578441471528,
         "duration": 50073382,
@@ -695,9 +861,56 @@
         "status": "CLOSED",
         "leaderNode": "localhost9.storage.enterprise.com",
         "datanodes": [
-          "localhost7.storage.enterprise.com",
-          "localhost8.storage.enterprise.com",
-          "localhost9.storage.enterprise.com"
+          {
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "uuidString": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "ipAddress": "172.22.0.2",
+            "hostName": "ozone_datanode_4.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": 1287180809,
+            "decomissioned": false,
+            "networkName": "e9011d34-2aeb-49fc-ab17-a35175342058",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/e9011d34-2aeb-49fc-ab17-a35175342058",
+            "numOfLeaves": 1
+          }
         ],
         "lastLeaderElection": 1578441871828,
         "duration": 49712212,
@@ -836,45 +1049,879 @@
     },
     {
       "volume": "vol1",
-      "bucket": "bucket1",
+      "bucket": "bucket2",
       "fileSize": 4096,
       "count": 25
     },
     {
       "volume": "vol1",
-      "bucket": "bucket1",
+      "bucket": "bucket3",
       "fileSize": 32768,
       "count": 312
     },
     {
       "volume": "vol1",
-      "bucket": "bucket1",
+      "bucket": "bucket4",
       "fileSize": 131072,
       "count": 78
     },
     {
       "volume": "vol1",
-      "bucket": "bucket2",
+      "bucket": "bucket5",
       "fileSize": 1024,
       "count": 123
     },
     {
       "volume": "vol1",
-      "bucket": "bucket2",
+      "bucket": "bucket6",
       "fileSize": 131072,
       "count": 187
     },
     {
       "volume": "vol2",
-      "bucket": "bucket1",
+      "bucket": "bucket7",
       "fileSize": 1024,
       "count": 54
     },
     {
-      "volume": "vol2",
-      "bucket": "bucket2",
+      "volume": "vol3",
+      "bucket": "bucket8",
       "fileSize": 131072,
       "count": 217
     }
-  ]
+  ],
+  "root": {
+    "status": "OK",
+    "path": "/",
+    "size": 100000,
+    "sizeWithReplica": 300000,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/vol1",
+        "size": 50000,
+        "sizeWithReplica": 150000
+      },
+      {
+        "path": "/vol2",
+        "size": 20000,
+        "sizeWithReplica": 60000
+      },
+      {
+        "path": "/vol3",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol4",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      },
+      {
+        "path": "/vol5",
+        "size": 10000,
+        "sizeWithReplica": 30000
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "volume": {
+    "status": "OK",
+    "path": "/dummyVolume",
+    "size": 150000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/bucket1",
+        "size": 100000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/bucket5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "bucket": {
+    "status": "OK",
+    "path": "/dummyVolume/dummyBucket",
+    "size": 200000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/dummyBucket/dir1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir2",
+        "size": 20000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir3",
+        "size": 30000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir4",
+        "size": 40000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dir5",
+        "size": 50000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/key1",
+        "size": 25000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/key2",
+        "size": 25000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/empty",
+        "size": 0,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 50000
+  },
+  "dir": {
+    "status": "OK",
+    "path": "/dummyVolume/dummyBucket/dummyDir",
+    "size": 200000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key1",
+        "size": 100000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key2",
+        "size": 30000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key3",
+        "size": 30000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      },
+      {
+        "path": "/dummyVolume/dummyBucket/dummyDir/key4",
+        "size": 40000,
+        "sizeWithReplica": -1,
+        "isKey": true
+      }
+    ],
+    "sizeDirectKey": 50000
+  },
+  "empty": {
+    "status": "OK",
+    "path": "/vol1/bucket1/empty",
+    "size": 0,
+    "sizeWithReplica": -1,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
+  "key": {
+    "status": "OK",
+    "path": "/vol1/bucket1/dir1/key1",
+    "size": 3800,
+    "sizeWithReplica": 11400,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": 0
+  },
+  "metadata": {
+  "path": "",
+  "type": "DUMMY_TYPE",
+  "countStats": {
+    "numVolume": 100,
+    "numBucket": 200,
+    "numDir": 400,
+    "numKey": 80
+  },
+  "objectInfo": {
+    "versioningEnabled": false,
+    "metadata": {
+      
+    },
+    "name": "fso-bucket",
+    "fileName": "file1",
+    "file": false,
+    "quotaInBytes": 1000000000,
+    "quotaInNamespace": 2000000000,
+    "usedNamespace": 10,
+    "creationTime": 1673415921920,
+    "modificationTime": 1673415921920,
+    "acls": [
+      {
+        "type": "USER",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      },
+      {
+        "type": "GROUP",
+        "name": "hadoop",
+        "aclScope": "ACCESS",
+        "aclList": [
+          "ALL"
+        ]
+      }
+    ],
+    "keyLocationVersions": [
+      {
+        "version": 0,
+        "locationList": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "multipartKey": false,
+        "blocksLatestVersionOnly": [
+          {
+            "blockID": {
+              "containerBlockID": {
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "blockCommitSequenceId": 18,
+              "containerID": 1,
+              "localID": 111677748019200007
+            },
+            "length": 3879,
+            "offset": 0,
+            "token": null,
+            "createVersion": 0,
+            "pipeline": null,
+            "partNumber": 0,
+            "containerID": 1,
+            "localID": 111677748019200007,
+            "blockCommitSequenceId": 18
+          }
+        ],
+        "locationLists": [
+          [
+            {
+              "blockID": {
+                "containerBlockID": {
+                  "containerID": 1,
+                  "localID": 111677748019200007
+                },
+                "blockCommitSequenceId": 18,
+                "containerID": 1,
+                "localID": 111677748019200007
+              },
+              "length": 3879,
+              "offset": 0,
+              "token": null,
+              "createVersion": 0,
+              "pipeline": null,
+              "partNumber": 0,
+              "containerID": 1,
+              "localID": 111677748019200007,
+              "blockCommitSequenceId": 18
+            }
+          ]
+        ],
+        "locationListCount": 1
+      }
+    ],
+    "volumeName": "volume1",
+    "bucketName": "fso-bucket",
+    "keyName": "file1",
+    "dataSize": 18513,
+    "storageType": "DISK",
+    "versioning": false,
+    "usedBytes": null,
+    "encryptionInfo": null,
+    "replicationConfig": {
+      "replicationFactor": "THREE",
+      "requiredNodes": 3,
+      "replicationType": "RATIS"
+    },
+    "encInfo": null,
+    "sourceVolume": null,
+    "sourceBucket": null,
+    "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
+    "owner": "hadoop",
+    "volume": "vol1"
+  },
+  "status": "OK"
+  },
+  "quota": {
+    "allowed": 1000000000,
+    "used": 5000000,
+    "status": "OK"
+  },
+  "clunky": {
+    "status": "OK",
+    "path": "/clunky",
+    "size": 250000,
+    "sizeWithReplica": -1,
+    "subPathCount": 5,
+    "subPaths": [
+      {
+        "path": "/nested/b1",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b2",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b3",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b4",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b5",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b6",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b7",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b8",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b9",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b10",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b11",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b12",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b13",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b14",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b15",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b16",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b17",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b18",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b19",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b20",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b21",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b22",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b23",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b24",
+        "size": 10000,
+        "sizeWithReplica": -1
+      },
+      {
+        "path": "/nested/b25",
+        "size": 10000,
+        "sizeWithReplica": -1
+      }
+    ],
+    "sizeDirectKey": 0
+  },
+  "taskStatus": [
+    {
+      "taskName": "ContainerKeyMapperTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "FileSizeCountTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "TableCountTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "NSSummaryTaskWithFSO",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "OmDeltaRequest",
+      "lastUpdatedTimestamp": 1663421088035,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "OmSnapshotRequest",
+      "lastUpdatedTimestamp": 1663421088035,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "ContainerHealthTask",
+      "lastUpdatedTimestamp": 0,
+      "lastUpdatedSeqNumber": 0
+    },
+    {
+      "taskName": "PipelineSyncTask",
+      "lastUpdatedTimestamp": 1663421094507,
+      "lastUpdatedSeqNumber": 0
+    }
+  ],
+  "unhealthyContainers":{
+    "missingCount": 3,
+    "underReplicatedCount": 2,
+    "overReplicatedCount": 2,
+    "misReplicatedCount": 2,
+    "containers": [
+      {
+        "containerID": 1,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_misreplicated1",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 1,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_misreplicated1",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 1,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_misreplicated1",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 2,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 2,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_misreplicated2",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 2,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_misreplicated2",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 2,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_misreplicated2",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 3,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 3,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_overreplicated3",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 3,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_overreplicated3",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 3,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_overreplicated3",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 4,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 4,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 4,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_overreplicated4",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 4,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 5,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 5,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_underreplicated5",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_underreplicated5",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_underreplicated5",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 6,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 6,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_underreplicated6",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 6,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_underreplicated6",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 6,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_underreplicated6",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 7,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 7,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_missing7",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 7,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_missing7",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 7,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_missing7",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 8,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a2",
+        "replicas": [
+          {
+            "containerId": 8,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_missing8",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_missing8",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_missing8",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 9,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 4,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a3",
+        "replicas": [
+          {
+            "containerId": 9,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_missing9",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 9,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_missing9",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 9,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_missing9",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0
+          }
+        ]
+      }
+    ]
+  }
 }

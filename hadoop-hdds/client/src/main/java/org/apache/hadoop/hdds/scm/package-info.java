@@ -16,8 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm;
-
 /**
  * Classes for different type of container service client.
+ *
+ * In Ozone there are two type of clients, the Ratis client and the Standalone
+ * client.
+ *
+ * The Ratis client we use for writing data, and it is using Ratis communication
+ * facilities to connect to the server side.
+ *
+ * The Standalone client is used for reading data via protobuf messages over
+ * gRPC facilities. For more information on how the gRPC client works, and why
+ * one can check the README file in this package.
+ *
+ * We are using a caching mechanism to cache the created clients inside the
+ * {@link org.apache.hadoop.hdds.scm.XceiverClientManager}, and the client
+ * interface is defined by the
+ * {@link org.apache.hadoop.hdds.scm.XceiverClientSpi} interface.
  */
+package org.apache.hadoop.hdds.scm;

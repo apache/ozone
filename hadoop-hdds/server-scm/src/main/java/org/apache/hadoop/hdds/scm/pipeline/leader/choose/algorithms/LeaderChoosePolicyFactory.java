@@ -58,7 +58,7 @@ public final class LeaderChoosePolicyFactory {
           policyClass.getCanonicalName());
     } catch (NoSuchMethodException e) {
       String msg = "Failed to find constructor(NodeManager, " +
-          "PipelineStateManager) for class " +
+          "PipelineStateManagerImpl) for class " +
           policyClass.getCanonicalName();
       LOG.error(msg);
       throw new SCMException(msg,

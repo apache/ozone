@@ -16,11 +16,14 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -28,12 +31,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -49,7 +51,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManager prefixManager;
-  private Collection<String> ozAdmins;
+  private OzoneAdmins ozAdmins;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
@@ -57,7 +59,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
   public OzoneNativeAuthorizer(VolumeManager volumeManager,
       BucketManager bucketManager, KeyManager keyManager,
-      PrefixManager prefixManager, Collection<String> ozoneAdmins) {
+      PrefixManager prefixManager, OzoneAdmins ozoneAdmins) {
     this.volumeManager = volumeManager;
     this.bucketManager = bucketManager;
     this.keyManager = keyManager;
@@ -79,8 +81,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     Objects.requireNonNull(context);
     OzoneObjInfo objInfo;
     RequestContext parentContext;
+    RequestContext parentVolContext;
     boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
-    boolean isACLTypeDelete = (context.getAclRights() == ACLType.DELETE);
 
     if (ozObject instanceof OzoneObjInfo) {
       objInfo = (OzoneObjInfo) ozObject;
@@ -102,20 +104,21 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return getAllowListAllVolumes();
     }
 
-    // For CREATE and DELETE acl requests, the parents need to be checked
-    // for WRITE acl. If Key create request is received, then we need to
-    // check if user has WRITE acl set on Bucket and Volume. In all other cases
-    // the parents also need to be checked for the same acl type.
-    if (isACLTypeCreate || isACLTypeDelete) {
-      parentContext = RequestContext.newBuilder()
+    ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
+        context.getAclRights(), objInfo.getResourceType());
+    
+    parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
         .setAclType(context.getAclType())
-        .setAclRights(ACLType.WRITE)
-        .build();
-    } else {
-      parentContext = context;
-    }
+        .setAclRights(parentAclRight).build();
+    
+    // Volume will be always read in case of key and prefix
+    parentVolContext = RequestContext.newBuilder()
+        .setClientUgi(context.getClientUgi())
+        .setIp(context.getIp())
+        .setAclType(context.getAclType())
+        .setAclRights(ACLType.READ).build();
 
     switch (objInfo.getResourceType()) {
     case VOLUME:
@@ -152,7 +155,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return (keyAccess
           && prefixManager.checkAccess(objInfo, parentContext)
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     case PREFIX:
       LOG.trace("Checking access for Prefix: {}", objInfo);
       // Skip check for volume owner
@@ -165,7 +168,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           || prefixManager.checkAccess(objInfo, context);
       return (prefixAccess
           && bucketManager.checkAccess(objInfo, parentContext)
-          && volumeManager.checkAccess(objInfo, parentContext));
+          && volumeManager.checkAccess(objInfo, parentVolContext));
     default:
       throw new OMException("Unexpected object type:" +
           objInfo.getResourceType(), INVALID_REQUEST);
@@ -188,12 +191,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.prefixManager = prefixManager;
   }
 
-  public void setOzoneAdmins(Collection<String> ozoneAdmins) {
+  public void setOzoneAdmins(OzoneAdmins ozoneAdmins) {
     this.ozAdmins = ozoneAdmins;
   }
 
-  public Collection<String> getOzoneAdmins() {
-    return Collections.unmodifiableCollection(this.ozAdmins);
+  public OzoneAdmins getOzoneAdmins() {
+    return ozAdmins;
   }
 
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
@@ -208,24 +211,19 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     if (ownerName == null) {
       return false;
     }
-    if (callerUgi.getUserName().equals(ownerName) ||
-        callerUgi.getShortUserName().equals(ownerName)) {
+    if (callerUgi.getShortUserName().equals(ownerName)) {
       return true;
     }
     return false;
   }
 
   private boolean isAdmin(UserGroupInformation callerUgi) {
+    Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
+
     if (ozAdmins == null) {
       return false;
     }
 
-    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
-        ozAdmins.contains(callerUgi.getUserName()) ||
-        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-      return true;
-    }
-
-    return false;
+    return ozAdmins.isAdmin(callerUgi);
   }
 }
