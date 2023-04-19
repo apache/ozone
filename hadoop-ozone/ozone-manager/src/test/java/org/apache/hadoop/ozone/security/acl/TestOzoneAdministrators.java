@@ -58,6 +58,47 @@ public class TestOzoneAdministrators {
   }
 
   @Test
+  public void testBucketOperation() throws OMException {
+    UserGroupInformation.createUserForTesting("testuser",
+        new String[]{"testgroup"});
+    try {
+      OzoneObj obj = getTestBucketobj("testbucket");
+      RequestContext context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.LIST);
+      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+          Collections.singletonList("testuser"), null));
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ_ACL);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.WRITE);
+      RequestContext finalContext = context;
+      // ACLType is WRITE, execute volumeManager.checkAccess, volumeManager is null
+      Assert.assertThrows(NullPointerException.class,
+          () -> nativeAuthorizer.checkAccess(obj, finalContext));
+
+      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+          null, Collections.singletonList("testgroup")));
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ_ACL);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } finally {
+      UserGroupInformation.reset();
+    }
+  }
+
+  @Test
   public void testListAllVolume() throws Exception {
     UserGroupInformation.createUserForTesting("testuser",
         new String[]{"testgroup"});
@@ -159,5 +200,12 @@ public class TestOzoneAdministrators {
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .setVolumeName(volumename).build();
+  }
+
+  private OzoneObj getTestBucketobj(String bucketname) {
+    return OzoneObjInfo.Builder.newBuilder()
+            .setResType(OzoneObj.ResourceType.BUCKET)
+            .setStoreType(OzoneObj.StoreType.OZONE)
+            .setVolumeName(bucketname).build();
   }
 }
