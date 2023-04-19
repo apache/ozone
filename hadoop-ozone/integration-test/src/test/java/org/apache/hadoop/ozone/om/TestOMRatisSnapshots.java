@@ -160,7 +160,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  //@Flaky("HDDS-8355")
   public void testInstallSnapshot() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
