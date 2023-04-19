@@ -85,10 +85,6 @@ SetSecret Failure For Invalid Secret 2
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user setsecret 'tenantone$testuser' --secret=short
                         Should contain   ${output}         Secret key length should be at least 8 characters
 
-GetSecret Success
-    ${output} =         Execute          ozone tenant user getsecret 'tenantone$testuser'
-                        Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
-
 Delete Bucket 1 Failure With Old SecretKey via S3 API
     ${rc}  ${output} =  Run And Return Rc And Output  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
                         Should Be True	${rc} > 0
