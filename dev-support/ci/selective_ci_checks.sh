@@ -307,6 +307,7 @@ function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/build.sh"
+        "^hadoop-ozone/dev-support/checks/native_check.sh"
         "src/main/java"
         "src/main/resources"
     )
@@ -547,6 +548,7 @@ function set_outputs() {
 }
 
 check_for_full_tests_needed_label
+
 if (($# < 1)); then
     echo
     echo "No Commit SHA - running all tests (likely direct merge, or scheduled run)"
