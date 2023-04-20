@@ -583,9 +583,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private OzoneAdmins getOmReadOnlyAdmins(OzoneConfiguration configuration) {
     // Get read only admin list
     Collection<String> omReadOnlyAdmins =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(configuration);
+        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(
+            configuration);
     Collection<String> omReadOnlyAdminsGroups =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(configuration);
-    return new OzoneAdmins(omReadOnlyAdmins, omReadOnlyAdminsGroups);
+        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(
+            configuration);
+    return new OzoneAdmins(omReadOnlyAdmins,
+        omReadOnlyAdminsGroups);
   }
 }

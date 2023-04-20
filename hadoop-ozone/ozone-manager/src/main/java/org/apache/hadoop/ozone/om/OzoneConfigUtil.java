@@ -106,7 +106,8 @@ public final class OzoneConfigUtil {
 
   static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
       OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS_GROUPS);
+    return conf.getTrimmedStringCollection(
+        OZONE_READONLY_ADMINISTRATORS_GROUPS);
   }
 
   public static ReplicationConfig resolveReplicationConfigPreference(

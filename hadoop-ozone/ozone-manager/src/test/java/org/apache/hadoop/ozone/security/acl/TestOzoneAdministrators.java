@@ -83,7 +83,8 @@ public class TestOzoneAdministrators {
       context = getUserRequestContext("testuser",
           IAccessAuthorizer.ACLType.WRITE);
       RequestContext finalContext = context;
-      // ACLType is WRITE, execute volumeManager.checkAccess, volumeManager is null
+      // ACLType is WRITE
+      // execute volumeManager.checkAccess volumeManager is null
       Assert.assertThrows(NullPointerException.class,
           () -> nativeAuthorizer.checkAccess(obj, finalContext));
 
