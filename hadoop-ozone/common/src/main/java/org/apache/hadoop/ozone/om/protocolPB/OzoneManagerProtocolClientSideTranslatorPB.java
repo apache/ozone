@@ -607,16 +607,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param startKey
    * @param prefix
    * @param count
+   * @param isSnapshot
    * @return
    * @throws IOException
    */
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startKey, String prefix, int count) throws IOException {
+                                        String startKey, String prefix,
+                                        int count, boolean isSnapshot)
+      throws IOException {
     List<OmBucketInfo> buckets = new ArrayList<>();
     ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setCount(count);
+    reqBuilder.setIsSnapshot(isSnapshot);
     if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }

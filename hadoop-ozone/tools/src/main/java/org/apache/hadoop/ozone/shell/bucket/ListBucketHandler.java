@@ -26,7 +26,6 @@ import java.util.List;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.ListOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -48,8 +47,8 @@ public class ListBucketHandler extends VolumeHandler {
 
   @CommandLine.Option(names = {"--snapshot"},
       description = "List bucket which have snapshots.")
-
   private boolean bucketWithSnapshot;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -58,28 +57,18 @@ public class ListBucketHandler extends VolumeHandler {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume vol = objectStore.getVolume(volumeName);
     Iterator<? extends OzoneBucket> bucketIterator =
-        vol.listBuckets(listOptions.getPrefix(), listOptions.getStartItem());
+        vol.listBuckets(listOptions.getPrefix(),
+            listOptions.getStartItem(), bucketWithSnapshot);
     List<Object> bucketList = new ArrayList<>();
     int counter = 0;
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {
       OzoneBucket bucket = bucketIterator.next();
-      if (!bucketWithSnapshot) {
-        if (bucket.isLink()) {
-          bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
-        } else {
-          bucketList.add(bucket);
-        }
-        counter++;
+      if (bucket.isLink()) {
+        bucketList.add(new InfoBucketHandler.LinkBucket(bucket));
       } else {
-        if (!bucket.isLink()) {
-          List<OzoneSnapshot> snapshotList =
-              objectStore.listSnapshot(volumeName, bucket.getName());
-          if (!snapshotList.isEmpty()) {
-            bucketList.add(bucket);
-            counter++;
-          }
-        }
+        bucketList.add(bucket);
       }
+      counter++;
     }
     printAsJsonArray(bucketList.iterator(), listOptions.getLimit());
     if (isVerbose()) {

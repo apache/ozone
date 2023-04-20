@@ -365,7 +365,25 @@ public class OzoneVolume extends WithMetadata {
    */
   public Iterator<? extends OzoneBucket> listBuckets(String bucketPrefix,
       String prevBucket) {
-    return new BucketIterator(bucketPrefix, prevBucket);
+    return listBuckets(bucketPrefix, prevBucket, false);
+  }
+
+  /**
+   * Returns Iterator to iterate over all buckets after prevBucket in the
+   * volume.
+   * If prevBucket is null it iterates from the first bucket in the volume.
+   * The result can be restricted using bucket prefix, will return all
+   * buckets if bucket prefix is null.
+   *
+   * @param bucketPrefix Bucket prefix to match
+   * @param prevBucket Buckets are listed after this bucket
+   * @param isSnapshot Set the flag to list the buckets which have snapshot
+   * @return {@code Iterator<OzoneBucket>}
+   */
+  public Iterator<? extends OzoneBucket> listBuckets(String bucketPrefix,
+                                                     String prevBucket,
+                                                     boolean isSnapshot) {
+    return new BucketIterator(bucketPrefix, prevBucket, isSnapshot);
   }
 
   /**
@@ -483,6 +501,7 @@ public class OzoneVolume extends WithMetadata {
     private Iterator<OzoneBucket> currentIterator;
     private OzoneBucket currentValue;
 
+    private boolean isSnapshot;
 
     /**
      * Creates an Iterator to iterate over all buckets after prevBucket in
@@ -491,9 +510,11 @@ public class OzoneVolume extends WithMetadata {
      * The returned buckets match bucket prefix.
      * @param bucketPrefix
      */
-    BucketIterator(String bucketPrefix, String prevBucket) {
+    BucketIterator(String bucketPrefix, String prevBucket,
+                   boolean isSnapshot) {
       this.bucketPrefix = bucketPrefix;
       this.currentValue = null;
+      this.isSnapshot = isSnapshot;
       this.currentIterator = getNextListOfBuckets(prevBucket).iterator();
     }
 
@@ -522,7 +543,8 @@ public class OzoneVolume extends WithMetadata {
      */
     private List<OzoneBucket> getNextListOfBuckets(String prevBucket) {
       try {
-        return proxy.listBuckets(name, bucketPrefix, prevBucket, listCacheSize);
+        return proxy.listBuckets(name, bucketPrefix, prevBucket,
+            listCacheSize, isSnapshot);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

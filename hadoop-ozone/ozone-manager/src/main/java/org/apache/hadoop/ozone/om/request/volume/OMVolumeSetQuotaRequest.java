@@ -200,7 +200,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     boolean isBucketQuotaSet = true;
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        volumeName, null, null, Integer.MAX_VALUE);
+        volumeName, null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
@@ -239,7 +239,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     }
 
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        volumeName, null, null, Integer.MAX_VALUE);
+        volumeName, null, null, Integer.MAX_VALUE, false);
     if (bucketList.size() > quotaInNamespace) {
       throw new OMException("Total number of buckets " + bucketList.size() +
           " in this volume should not be greater than volume namespace quota "

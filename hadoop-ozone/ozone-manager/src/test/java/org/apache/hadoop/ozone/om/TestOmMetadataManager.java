@@ -194,6 +194,7 @@ public class TestOmMetadataManager {
     String volumeName1 = "volumeA";
     String prefixBucketNameWithOzoneOwner = "ozoneBucket";
     String prefixBucketNameWithHadoopOwner = "hadoopBucket";
+    String prefixSnapshot = "snapshot";
 
     OMRequestTestUtils.addVolumeToDB(volumeName1, omMetadataManager);
 
@@ -236,10 +237,25 @@ public class TestOmMetadataManager {
       }
     }
 
-    // List all buckets which have prefix ozoneBucket
+    for (int i = 1; i < 100; i++) {
+      if (i % 2 == 0) { // This part adds 49 buckets.
+        OMRequestTestUtils.addSnapshotToTable(
+            volumeName1, prefixBucketNameWithOzoneOwner + i,
+            prefixSnapshot + i, omMetadataManager);
+      }
+    }
     List<OmBucketInfo> omBucketInfoList =
+        omMetadataManager.listBuckets(volumeName1, null, null, 100, true);
+    assertEquals(omBucketInfoList.size(), 49);
+    for (OmBucketInfo omBucketInfo : omBucketInfoList) {
+      assertTrue(omBucketInfo.getBucketName().startsWith(
+          prefixBucketNameWithOzoneOwner));
+    }
+
+    // List all buckets which have prefix ozoneBucket
+    omBucketInfoList =
         omMetadataManager.listBuckets(volumeName1,
-            null, prefixBucketNameWithOzoneOwner, 100);
+            null, prefixBucketNameWithOzoneOwner, 100, false);
 
     // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
@@ -256,7 +272,7 @@ public class TestOmMetadataManager {
     omBucketInfoList =
         omMetadataManager.listBuckets(volumeName1,
             startBucket, prefixBucketNameWithOzoneOwner,
-            100);
+            100, false);
 
     assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
         startBucket).size() - 1, omBucketInfoList.size());
@@ -265,7 +281,7 @@ public class TestOmMetadataManager {
     omBucketInfoList =
         omMetadataManager.listBuckets(volumeName1,
             startBucket, prefixBucketNameWithOzoneOwner,
-            100);
+            100, false);
 
     assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
         startBucket).size() - 1, omBucketInfoList.size());
@@ -280,7 +296,7 @@ public class TestOmMetadataManager {
 
 
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
-        null, prefixBucketNameWithHadoopOwner, 100);
+        null, prefixBucketNameWithHadoopOwner, 100, false);
 
     // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
@@ -299,7 +315,7 @@ public class TestOmMetadataManager {
     for (int i = 0; i < 5; i++) {
 
       omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
-          startBucket, prefixBucketNameWithHadoopOwner, 10);
+          startBucket, prefixBucketNameWithHadoopOwner, 10, false);
 
       assertEquals(omBucketInfoList.size(), 10);
 
@@ -316,12 +332,11 @@ public class TestOmMetadataManager {
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
-        startBucket, prefixBucketNameWithHadoopOwner, 10);
+        startBucket, prefixBucketNameWithHadoopOwner, 10, false);
 
     assertEquals(omBucketInfoList.size(), 0);
 
   }
-
 
   private void addBucketsToCache(String volumeName, String bucketName) {
 
