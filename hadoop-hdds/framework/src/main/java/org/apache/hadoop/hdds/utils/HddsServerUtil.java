@@ -537,10 +537,12 @@ public final class HddsServerUtil {
       throws IOException {
     toExcludeList = toExcludeList == null ? new ArrayList<>() : toExcludeList;
     List<String> excluded = new ArrayList<>();
-    try (ArchiveOutputStream archiveOutputStream =
-             new TarArchiveOutputStream(destination);
-         Stream<Path> files =
-             Files.list(checkpoint.getCheckpointLocation())) {
+    try (TarArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      archiveOutputStream.setBigNumberMode(
+          TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (Path path : files.collect(Collectors.toList())) {
         if (path != null) {
           Path fileNamePath = path.getFileName();

@@ -145,6 +145,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      archiveOutputStream
+          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
     }
     return excluded;
@@ -199,6 +201,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         waitForDirToExist(path);
         snapshotPaths.add(path);
       }
+    } finally {
+      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }

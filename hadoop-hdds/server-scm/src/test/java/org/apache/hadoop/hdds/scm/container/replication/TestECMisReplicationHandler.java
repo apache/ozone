@@ -20,12 +20,14 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,8 +39,10 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.junit.Assert.assertThrows;
@@ -157,12 +161,12 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
             .thenReturn(true);
     Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
-    List<ContainerReplicaOp> pendingOp = Collections.singletonList(
+    List<ContainerReplicaOp> pendingOp = singletonList(
             ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
                     MockDatanodeDetails.randomDatanodeDetails(), 1));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
-    pendingOp = Collections.singletonList(ContainerReplicaOp
+    pendingOp = singletonList(ContainerReplicaOp
             .create(ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
                     .stream().findAny().get().getDatanodeDetails(), 1));
     testMisReplication(availableReplicas, placementPolicy,
@@ -180,8 +184,24 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
     assertThrows(CommandTargetOverloadedException.class,
+        () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
+            Collections.emptyList(), 0, 1, 1, 0));
+  }
+
+  @Test
+  public void commandsForFewerThanRequiredNodes() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(placementPolicy.chooseDatanodes(
+            any(), any(), any(),
+            Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
+        .thenReturn(singletonList(availableReplicas.iterator().next()));
+    assertThrows(InsufficientDatanodesException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),
-            0, 1, 1));
+            0, 2, 1));
   }
 
   @Override
@@ -189,6 +209,14 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new ECMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
+  }
+
+  @Override
+  protected void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex) {
+    Assertions.assertEquals(
+        expectedReplicaIndexes.get(sourceDatanode), actualReplicaIndex);
   }
 }

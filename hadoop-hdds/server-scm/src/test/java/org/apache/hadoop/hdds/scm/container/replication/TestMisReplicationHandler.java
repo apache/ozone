@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -72,6 +73,7 @@ public abstract class TestMisReplicationHandler {
   protected void setup(ReplicationConfig repConfig)
       throws NodeNotFoundException, CommandTargetOverloadedException,
       NotLeaderException {
+    conf = SCMTestUtils.getConf();
 
     replicationManager = Mockito.mock(ReplicationManager.class);
     Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
@@ -80,6 +82,10 @@ public abstract class TestMisReplicationHandler {
           return new NodeStatus(dd.getPersistedOpState(),
               HddsProtos.NodeState.HEALTHY, 0);
         });
+    ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(rmConf);
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendDatanodeCommand(
@@ -87,7 +93,6 @@ public abstract class TestMisReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
         replicationManager, commandsSent);
 
-    conf = SCMTestUtils.getConf();
     container = ReplicationTestUtil
             .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     NodeSchema[] schemas =
@@ -99,6 +104,17 @@ public abstract class TestMisReplicationHandler {
     return replicationManager;
   }
 
+  static PlacementPolicy<?> mockPlacementPolicy() {
+    PlacementPolicy<?> placementPolicy = Mockito.mock(PlacementPolicy.class);
+    ContainerPlacementStatus mockedContainerPlacementStatus =
+        Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+        .thenReturn(false);
+    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
+        anyInt())).thenReturn(mockedContainerPlacementStatus);
+    return placementPolicy;
+  }
+
   protected abstract MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration configuration,
           ReplicationManager rm);
@@ -107,23 +123,28 @@ public abstract class TestMisReplicationHandler {
                                   int maintenanceCnt, int misreplicationCount,
                                     int expectedNumberOfNodes)
           throws IOException {
-    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
-    ContainerPlacementStatus mockedContainerPlacementStatus =
-            Mockito.mock(ContainerPlacementStatus.class);
-    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
-            .thenReturn(false);
-    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
-            anyInt())).thenReturn(mockedContainerPlacementStatus);
-    testMisReplication(availableReplicas, placementPolicy, pendingOp,
+    testMisReplication(availableReplicas, mockPlacementPolicy(), pendingOp,
             maintenanceCnt, misreplicationCount, expectedNumberOfNodes);
   }
 
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
-                                  PlacementPolicy mockedPlacementPolicy,
-                                  List<ContainerReplicaOp> pendingOp,
-                                  int maintenanceCnt, int misreplicationCount,
-                                  int expectedNumberOfNodes)
-          throws IOException {
+      PlacementPolicy mockedPlacementPolicy,
+      List<ContainerReplicaOp> pendingOp,
+      int maintenanceCnt, int misreplicationCount,
+      int expectedNumberOfNodes)
+      throws IOException {
+    testMisReplication(availableReplicas, mockedPlacementPolicy, pendingOp,
+        maintenanceCnt, misreplicationCount, expectedNumberOfNodes,
+        expectedNumberOfNodes);
+  }
+
+  protected void testMisReplication(Set<ContainerReplica> availableReplicas,
+      PlacementPolicy mockedPlacementPolicy,
+      List<ContainerReplicaOp> pendingOp,
+      int maintenanceCnt, int misreplicationCount,
+      int expectedNumberOfNodes,
+      int expectedNumberOfCommands
+  ) throws IOException {
     MisReplicationHandler misReplicationHandler = getMisreplicationHandler(
         mockedPlacementPolicy, conf, replicationManager);
 
@@ -146,6 +167,11 @@ public abstract class TestMisReplicationHandler {
                       return false;
                     }));
 
+    Set<DatanodeDetails> sourceDns = sources.entrySet().stream()
+        .filter(Map.Entry::getValue)
+        .map(Map.Entry::getKey)
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toSet());
     Set<ContainerReplica> copy = sources.entrySet().stream()
             .filter(Map.Entry::getValue).limit(misreplicationCount)
             .map(Map.Entry::getKey).collect(Collectors.toSet());
@@ -171,25 +197,32 @@ public abstract class TestMisReplicationHandler {
                 return targetNodes;
               });
     }
-    Map<DatanodeDetails, Integer> copyReplicaIdxMap = copy.stream()
+    Map<DatanodeDetails, Integer> replicaIndexMap = copy.stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
-    misReplicationHandler.processAndSendCommands(availableReplicas,
-                    pendingOp, result, maintenanceCnt);
-    Assertions.assertEquals(expectedNumberOfNodes, commandsSent.size());
-    for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
-      SCMCommand<?> command = pair.getValue();
-      Assertions.assertTrue(command.getType() == replicateContainerCommand);
-      ReplicateContainerCommand replicateContainerCommand =
-              (ReplicateContainerCommand) command;
-      Assertions.assertEquals(replicateContainerCommand.getContainerID(),
-              container.getContainerID());
-      DatanodeDetails replicateSrcDn = pair.getKey();
-      DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
-      Assertions.assertTrue(copyReplicaIdxMap.containsKey(replicateSrcDn));
-      Assertions.assertTrue(targetNodes.contains(target));
-      Assertions.assertEquals(copyReplicaIdxMap.get(replicateSrcDn),
-              replicateContainerCommand.getReplicaIndex());
+    try {
+      misReplicationHandler.processAndSendCommands(availableReplicas,
+          pendingOp, result, maintenanceCnt);
+    } finally {
+      Assertions.assertEquals(expectedNumberOfCommands, commandsSent.size());
+      for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
+        SCMCommand<?> command = pair.getValue();
+        Assertions.assertSame(replicateContainerCommand, command.getType());
+        ReplicateContainerCommand replicateContainerCommand =
+            (ReplicateContainerCommand) command;
+        Assertions.assertEquals(replicateContainerCommand.getContainerID(),
+            container.getContainerID());
+        DatanodeDetails replicateSrcDn = pair.getKey();
+        DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
+        Assertions.assertTrue(sourceDns.contains(replicateSrcDn));
+        Assertions.assertTrue(targetNodes.contains(target));
+        int replicaIndex = replicateContainerCommand.getReplicaIndex();
+        assertReplicaIndex(replicaIndexMap, replicateSrcDn, replicaIndex);
+      }
     }
   }
+
+  protected abstract void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex);
 }

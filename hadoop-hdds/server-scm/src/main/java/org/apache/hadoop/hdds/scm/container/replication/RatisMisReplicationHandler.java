@@ -19,11 +19,13 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,9 +39,8 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
           PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, ReplicationManager replicationManager,
-          boolean push) {
-    super(containerPlacement, conf, replicationManager, push);
+          ConfigurationSource conf, ReplicationManager replicationManager) {
+    super(containerPlacement, conf, replicationManager);
   }
 
   @Override
@@ -58,8 +59,27 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
   }
 
   @Override
-  protected ReplicateContainerCommand updateReplicateCommand(
-          ReplicateContainerCommand command, ContainerReplica replica) {
-    return command;
+  protected int sendReplicateCommands(
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    ReplicationManager replicationManager = getReplicationManager();
+    long containerID = containerInfo.getContainerID();
+
+    int commandsSent = 0;
+    for (DatanodeDetails target : targetDns) {
+      if (replicationManager.getConfig().isPush()) {
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            sources, target, 0);
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, sources);
+        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+      }
+      commandsSent++;
+    }
+
+    return commandsSent;
   }
 }

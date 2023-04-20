@@ -485,7 +485,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public boolean checkAcls(OzoneObj obj, RequestContext context,
       boolean throwIfPermissionDenied) throws OMException {
 
-    if (!accessAuthorizer.checkAccess(obj, context)) {
+    if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";

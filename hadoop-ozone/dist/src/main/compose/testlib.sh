@@ -315,6 +315,33 @@ wait_for_port(){
    return 1
 }
 
+## @description wait for the stat to be ready
+## @param The container ID
+## @param The maximum time to wait in seconds
+## @param The command line to be executed
+wait_for_execute_command(){
+  local container=$1
+  local timeout=$2
+  local command=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose exec -T $container bash -c '$command'
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "$command succeed"
+         return;
+     fi
+     echo "$command hasn't succeed yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $command to be successful"
+   return 1
+}
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
