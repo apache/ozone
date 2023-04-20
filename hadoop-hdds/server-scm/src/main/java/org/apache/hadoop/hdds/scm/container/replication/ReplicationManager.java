@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.health.MismatchedReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
@@ -920,6 +921,27 @@ public class ReplicationManager implements SCMService {
             "check chain", containerInfo.containerID());
       }
     }
+  }
+
+  /**
+   * Increments and samples health states for container when there are no
+   * replicas.
+   * @param replicas The replicas for which size is checked.
+   * @param containerInfo The container info used to retrieve container id.
+   * @param report The report which is incremented and sampled
+   */
+  public void setHealthStateForClosing(Set<ContainerReplica> replicas,
+      ContainerInfo containerInfo,
+      ReplicationManagerReport report) {
+    if (replicas.size() != 0) {
+      return;
+    }
+
+    report.incrementAndSample(HealthState.MISSING, containerInfo.containerID());
+    report.incrementAndSample(HealthState.UNDER_REPLICATED,
+        containerInfo.containerID());
+    report.incrementAndSample(HealthState.MIS_REPLICATED,
+        containerInfo.containerID());
   }
 
   /**

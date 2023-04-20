@@ -61,6 +61,9 @@ public class ClosingContainerHandler extends AbstractCheck {
     boolean forceClose = request.getContainerInfo().getReplicationConfig()
         .getReplicationType() != HddsProtos.ReplicationType.RATIS;
 
+    replicationManager.setHealthStateForClosing(request.getContainerReplicas(),
+        containerInfo, request.getReport());
+
     for (ContainerReplica replica : request.getContainerReplicas()) {
       if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {
         replicationManager.sendCloseContainerReplicaCommand(
