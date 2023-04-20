@@ -76,6 +76,7 @@ public class ObjectStore {
    */
   private int listCacheSize;
   private final String defaultS3Volume;
+  private BucketLayout s3BucketLayout;
 
   /**
    * Creates an instance of ObjectStore.
@@ -87,6 +88,10 @@ public class ObjectStore {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
+    s3BucketLayout = OmUtils.validateBucketLayout(
+        conf.getTrimmed(
+            OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY,
+            OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT));
   }
 
   @VisibleForTesting
@@ -130,26 +135,23 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws IOException {
     OzoneVolume volume = getS3Volume();
-    String bucketLayoutFromConfig  = conf.getTrimmed(
-        OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY,
-        OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT);
-    BucketLayout bucketLayout = OmUtils
-        .validateBucketLayout(bucketLayoutFromConfig);
-
     // Backwards compatibility:
     // When OM is pre-finalized for the bucket layout feature, it will block
     // the creation of all bucket types except legacy. If OBS bucket creation
     // fails for this reason, retry with legacy bucket layout.
     try {
       volume.createBucket(bucketName,
-          BucketArgs.newBuilder().setBucketLayout(bucketLayout).build());
+          BucketArgs.newBuilder().setBucketLayout(s3BucketLayout).build());
     } catch (OMException ex) {
       if (ex.getResult() ==
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION) {
-        LOG.info("Failed to create OBS bucket since OM is pre-finalized for " +
-            "bucket layouts, retrying creation with a LEGACY bucket.");
+        final BucketLayout fallbackLayout = BucketLayout.LEGACY;
+        LOG.info("Failed to create S3 bucket with layout {} since OM is " +
+                "pre-finalized for bucket layouts. Retrying creation with a " +
+                "{} bucket.",
+            s3BucketLayout, fallbackLayout);
         volume.createBucket(bucketName, BucketArgs.newBuilder()
-            .setBucketLayout(BucketLayout.LEGACY).build());
+            .setBucketLayout(fallbackLayout).build());
       } else {
         throw ex;
       }
