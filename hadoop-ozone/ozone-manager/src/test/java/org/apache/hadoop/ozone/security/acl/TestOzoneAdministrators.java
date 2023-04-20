@@ -204,8 +204,8 @@ public class TestOzoneAdministrators {
 
   private OzoneObj getTestBucketobj(String bucketname) {
     return OzoneObjInfo.Builder.newBuilder()
-            .setResType(OzoneObj.ResourceType.BUCKET)
-            .setStoreType(OzoneObj.StoreType.OZONE)
-            .setVolumeName(bucketname).build();
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(bucketname).build();
   }
 }

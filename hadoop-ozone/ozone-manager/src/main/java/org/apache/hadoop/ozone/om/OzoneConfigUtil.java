@@ -83,7 +83,7 @@ public final class OzoneConfigUtil {
    * Return list of Ozone Read only admin Usernames from config.
    */
   static Collection<String> getOzoneReadOnlyAdminsFromConfig(
-          OzoneConfiguration conf) {
+      OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
   }
 
@@ -105,7 +105,7 @@ public final class OzoneConfigUtil {
   }
 
   static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
-          OzoneConfiguration conf) {
+      OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS_GROUPS);
   }
 
