@@ -135,8 +135,25 @@ public class ObjectStore {
         OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT);
     BucketLayout bucketLayout = OmUtils
         .validateBucketLayout(bucketLayoutFromConfig);
-    volume.createBucket(bucketName,
-        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build());
+
+    // Backwards compatibility:
+    // When OM is pre-finalized for the bucket layout feature, it will block
+    // the creation of all bucket types except legacy. If OBS bucket creation
+    // fails for this reason, retry with legacy bucket layout.
+    try {
+      volume.createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(bucketLayout).build());
+    } catch (OMException ex) {
+      if (ex.getResult() ==
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION) {
+        LOG.info("Failed to create OBS bucket since OM is pre-finalized for " +
+            "bucket layouts, retrying creation with a LEGACY bucket.");
+        volume.createBucket(bucketName, BucketArgs.newBuilder()
+            .setBucketLayout(BucketLayout.LEGACY).build());
+      } else {
+        throw ex;
+      }
+    }
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
