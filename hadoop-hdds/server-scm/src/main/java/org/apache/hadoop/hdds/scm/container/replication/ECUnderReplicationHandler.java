@@ -159,17 +159,19 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               .collect(Collectors.toList());
 
       try {
-        InsufficientDatanodesException firstException = null;
+        IOException firstException = null;
         try {
           commandsSent += processMissingIndexes(replicaCount, sources,
               availableSourceNodes, excludedNodes);
-        } catch (InsufficientDatanodesException e) {
+        } catch (InsufficientDatanodesException
+            | CommandTargetOverloadedException  e) {
           firstException = e;
         }
         try {
           commandsSent += processDecommissioningIndexes(replicaCount, sources,
               availableSourceNodes, excludedNodes);
-        } catch (InsufficientDatanodesException e) {
+        } catch (InsufficientDatanodesException
+            | CommandTargetOverloadedException e) {
           if (firstException == null) {
             firstException = e;
           }
@@ -177,7 +179,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         try {
           commandsSent += processMaintenanceOnlyIndexes(replicaCount, sources,
               excludedNodes);
-        } catch (InsufficientDatanodesException e) {
+        } catch (InsufficientDatanodesException
+            | CommandTargetOverloadedException e) {
           if (firstException == null) {
             firstException = e;
           }
@@ -313,6 +316,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 sourceDatanodesWithIndex, selectedDatanodes,
                 int2byte(missingIndexes),
                 repConfig);
+        // This can throw a CommandTargetOverloadedException, but there is no
+        // point in retrying here. The sources we picked already have the
+        // overloaded nodes excluded, so we should not get an overloaded
+        // exception, but it could happen due to other threads adding work to
+        // the DNs. If it happens here, we just let the exception bubble up.
         replicationManager.sendThrottledReconstructionCommand(
             container, reconstructionCommand);
         for (int i = 0; i < missingIndexes.size(); i++) {
@@ -363,6 +371,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         excludedNodes.addAll(selectedDatanodes);
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
         // In this case we need to do one to one copy.
+        CommandTargetOverloadedException overloadedException = null;
         for (Integer decomIndex : decomIndexes) {
           Pair<ContainerReplica, NodeStatus> source = sources.get(decomIndex);
           if (source == null) {
@@ -380,9 +389,20 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 selectedDatanodes, excludedNodes, decomIndexes);
             break;
           }
-          createReplicateCommand(
-              container, iterator, sourceReplica, replicaCount);
-          commandsSent++;
+          try {
+            createReplicateCommand(
+                container, iterator, sourceReplica, replicaCount);
+            commandsSent++;
+          } catch (CommandTargetOverloadedException e) {
+            LOG.debug("Unable to send Replicate command for container {}" +
+                " index {} because the source node {} is overloaded.",
+                container.getContainerID(), sourceReplica.getReplicaIndex(),
+                sourceReplica.getDatanodeDetails());
+            overloadedException = e;
+          }
+        }
+        if (overloadedException != null) {
+          throw overloadedException;
         }
       }
       if (selectedDatanodes.size() != decomIndexes.size()) {
@@ -432,6 +452,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     int commandsSent = 0;
     // copy replica from source maintenance DN to a target DN
 
+    CommandTargetOverloadedException overloadedException = null;
     for (Integer maintIndex : maintIndexes) {
       if (additionalMaintenanceCopiesNeeded <= 0) {
         break;
@@ -452,9 +473,21 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             targets, excludedNodes, maintIndexes);
         break;
       }
-      createReplicateCommand(container, iterator, sourceReplica, replicaCount);
-      commandsSent++;
-      additionalMaintenanceCopiesNeeded -= 1;
+      try {
+        createReplicateCommand(
+            container, iterator, sourceReplica, replicaCount);
+        commandsSent++;
+        additionalMaintenanceCopiesNeeded -= 1;
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("Unable to send Replicate command for container {}" +
+            " index {} because the source node {} is overloaded.",
+            container.getContainerID(), sourceReplica.getReplicaIndex(),
+            sourceReplica.getDatanodeDetails());
+        overloadedException = e;
+      }
+    }
+    if (overloadedException != null) {
+      throw overloadedException;
     }
     if (targets.size() != maintIndexes.size()) {
       LOG.debug("Insufficient nodes were returned from the placement policy" +

@@ -189,6 +189,18 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   }
 
   @Test
+  public void testFirstSourcesOverloaded() {
+    setThrowThrottledException(true);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
+            Collections.emptyList(), 0, 2, 2, 1));
+  }
+
+  @Test
   public void commandsForFewerThanRequiredNodes() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),

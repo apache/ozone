@@ -65,6 +65,7 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
     ReplicationManager replicationManager = getReplicationManager();
     int commandsSent = 0;
     int datanodeIdx = 0;
+    CommandTargetOverloadedException overloadedException = null;
     for (ContainerReplica replica : replicasToBeReplicated) {
       if (datanodeIdx == targetDns.size()) {
         break;
@@ -72,20 +73,30 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
       long containerID = containerInfo.getContainerID();
       DatanodeDetails source = replica.getDatanodeDetails();
       DatanodeDetails target = targetDns.get(datanodeIdx);
-      if (replicationManager.getConfig().isPush()) {
-        replicationManager.sendThrottledReplicationCommand(containerInfo,
-            Collections.singletonList(source), target,
-            replica.getReplicaIndex());
-      } else {
-        ReplicateContainerCommand cmd = ReplicateContainerCommand
-            .fromSources(containerID, Collections.singletonList(source));
-        // For EC containers, we need to track the replica index which is
-        // to be replicated, so add it to the command.
-        cmd.setReplicaIndex(replica.getReplicaIndex());
-        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+      try {
+        if (replicationManager.getConfig().isPush()) {
+          replicationManager.sendThrottledReplicationCommand(containerInfo,
+              Collections.singletonList(source), target,
+              replica.getReplicaIndex());
+        } else {
+          ReplicateContainerCommand cmd = ReplicateContainerCommand
+              .fromSources(containerID, Collections.singletonList(source));
+          // For EC containers, we need to track the replica index which is
+          // to be replicated, so add it to the command.
+          cmd.setReplicaIndex(replica.getReplicaIndex());
+          replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+        }
+        commandsSent++;
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("Unable to replicate container {} and index {} from {} to {}"
+                + " because the source is overloaded",
+            containerID, replica.getReplicaIndex(), source, target);
+        overloadedException = e;
       }
-      commandsSent++;
       datanodeIdx += 1;
+    }
+    if (overloadedException != null) {
+      throw overloadedException;
     }
     return commandsSent;
   }
