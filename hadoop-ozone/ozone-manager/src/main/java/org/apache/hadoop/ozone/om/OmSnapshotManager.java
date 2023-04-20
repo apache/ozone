@@ -227,7 +227,7 @@ public final class OmSnapshotManager implements AutoCloseable {
               LOG.debug("Closing OmSnapshot '{}'", snapshotTableKey);
               omSnapshot.close();
             } else {
-              // Assuming the value becomes null when weak ref is GC'ed by JVM.
+              // Assuming the value becomes null when soft ref is GC'ed by JVM.
               LOG.debug("OmSnapshot '{}' was already garbage collected by JVM.",
                   snapshotTableKey);
             }
@@ -238,11 +238,11 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // init LRU cache
     snapshotCache = CacheBuilder.newBuilder()
-        // Indicating OmSnapshot instances are weakly referenced from the cache.
+        // Indicating OmSnapshot instances are softly referenced from the cache.
         // If no thread is holding a strong reference to an OmSnapshot instance
-        // (e.g. SnapDiff), the instance will be garbage collected by JVM at
-        // some point.
-        .weakValues()
+        // (e.g. SnapDiff), the instance could be garbage collected by JVM at
+        // its discretion.
+        .softValues()
         .removalListener(removalListener)
         .build(loader);
 

@@ -261,11 +261,13 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   }
 
   @Override
-  protected void finalize() throws IOException {
-    // Close the DB if it hasn't been closed when GC'ed by JVM
+  protected void finalize() throws Throwable {
+    // Close the DB if it hasn't been closed when this OmSnapshot instance is
+    // garbage-collected by the JVM to avoid handle leaks.
     if (!omMetadataManager.getStore().isClosed()) {
       omMetadataManager.getStore().close();
     }
+    super.finalize();
   }
 
   @VisibleForTesting
