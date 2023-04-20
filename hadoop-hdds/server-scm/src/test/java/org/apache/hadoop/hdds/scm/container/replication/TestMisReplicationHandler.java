@@ -110,8 +110,8 @@ public abstract class TestMisReplicationHandler {
     throwThrottledException.set(showThrow);
   }
 
-  static PlacementPolicy<?> mockPlacementPolicy() {
-    PlacementPolicy<?> placementPolicy = Mockito.mock(PlacementPolicy.class);
+  static PlacementPolicy mockPlacementPolicy() {
+    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
         Mockito.mock(ContainerPlacementStatus.class);
     Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
