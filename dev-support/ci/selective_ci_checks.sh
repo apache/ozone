@@ -81,18 +81,6 @@ function get_changed_files() {
     start_end::group_end
 }
 
-function get_rocks_native_git_sha() {
-    start_end::group_start "Get Rocks Native Git sha"
-    echo
-    echo "git log -n 1 --format=\"%h\" ./hadoop-hdds/rocks-native"
-    ROCKS_NATIVE_GIT_SHA=$(git log -n 1 --format="%h" ./hadoop-hdds/rocks-native)
-    echo "ROCKS_NATIVE_GIT_SHA"
-    echo
-    echo "${ROCKS_NATIVE_GIT_SHA}"
-    readonly ROCKS_NATIVE_GIT_SHA
-    start_end::group_end
-}
-
 function set_outputs_run_everything_and_exit() {
     BASIC_CHECKS="author bats checkstyle docs findbugs rat unit"
     compile_needed=true
@@ -556,10 +544,8 @@ function set_outputs() {
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
-    initialization::ga_output rocks-native-git-sha "${ROCKS_NATIVE_GIT_SHA}"
 }
 
-get_rocks_native_git_sha
 check_for_full_tests_needed_label
 if (($# < 1)); then
     echo

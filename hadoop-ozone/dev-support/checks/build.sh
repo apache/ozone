@@ -17,6 +17,8 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 : ${OZONE_WITH_COVERAGE:="false"}
+. "$DIR/native_checks.sh"
+init_native_maven_opts
 
 MAVEN_OPTIONS='-V -B -Dmaven.javadoc.skip=true -DskipTests -DskipDocs --no-transfer-progress'
 
@@ -25,22 +27,7 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
-
-PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-VERSION_NUMBER=$(echo "${PROJECT_VERSION}"| cut -f1 -d'-')
-EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}".${NATIVE_ROCKS_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
-echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
-mvn dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION}
-
-EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
-if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
-  echo "Build using hdds-rocks-native version: $(mvn help:evaluate -Dexpression=hdds.rocks.native.version -q -DforceStdout -Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION})"
-  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
-else
-  echo "Build using hdds-rocks-native version: $(mvn help:evaluate -Dexpression=hdds.rocks.native.version -q -DforceStdout)"
-  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Drocks_tools_native"
-fi
-echo "MAVEN_OPTIONS= ${MAVEN_OPTIONS}"
+MAVEN_OPTIONS="${MAVEN_OPTIONS} ${NATIVE_MAVEN_OPTIONS}"
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
 mvn ${MAVEN_OPTIONS} clean install "$@"
 exit $?
