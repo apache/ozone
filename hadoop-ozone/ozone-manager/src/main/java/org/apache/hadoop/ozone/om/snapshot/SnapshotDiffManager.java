@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -117,8 +116,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final LoadingCache<String, OmSnapshot> snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
+  // TODO: [SNAPSHOT] Use different wait time based of job status.
   private final long defaultWaitTime;
-  private final int threadPoolSize;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -161,7 +160,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         TimeUnit.MILLISECONDS
     );
 
-    this.threadPoolSize = ozoneManager.getConfiguration().getInt(
+    int threadPoolSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT
     );
@@ -209,7 +208,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private boolean initSSTDumpTool(OzoneConfiguration conf) {
     try {
-      int threadPoolSizeForSstDumpTool = conf.getInt(
+      int threadPoolSize = conf.getInt(
               OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
               OMConfigKeys
                   .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT);
@@ -219,7 +218,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
               StorageUnit.BYTES);
       ExecutorService execService = new ThreadPoolExecutor(0,
-              threadPoolSizeForSstDumpTool, 60, TimeUnit.SECONDS,
+              threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),

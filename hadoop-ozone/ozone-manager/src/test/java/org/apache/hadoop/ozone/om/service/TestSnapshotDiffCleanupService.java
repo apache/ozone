@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -93,7 +94,7 @@ public class TestSnapshotDiffCleanupService {
   @Mock
   private OzoneManager ozoneManager;
   @Mock
-  OzoneConfiguration config;
+  private OzoneConfiguration config;
 
   @BeforeAll
   public static void staticInit() throws RocksDBException {
@@ -139,18 +140,17 @@ public class TestSnapshotDiffCleanupService {
   @BeforeEach
   public void init() throws RocksDBException, IOException {
     MockitoAnnotations.initMocks(this);
-    Mockito.when(config.getLong(
+    when(config.getLong(
         OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK,
         OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT)
     ).thenReturn(1000L);
 
-    Mockito.when(config.getTimeDuration(
+    when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME,
         OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT,
         TimeUnit.MILLISECONDS)
     ).thenReturn(TimeUnit.DAYS.toMillis(7));
 
-    ozoneManager = Mockito.mock(OzoneManager.class);
     when(ozoneManager.getConfiguration()).thenReturn(config);
 
     jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
@@ -278,6 +278,10 @@ public class TestSnapshotDiffCleanupService {
     assertJobAndReport(failedJob, false);
     assertJobAndReport(recentRejectedJob, false);
     assertJobAndReport(staleRejectedJob, false);
+
+    assertNumberOfEntriesInTable(jobTableCfh, 4);
+    assertNumberOfEntriesInTable(purgedJobTableCfh, 0);
+    assertNumberOfEntriesInTable(reportTableCfh, 19);
   }
 
   private SnapshotDiffJob addJobAndReport(JobStatus jobStatus,

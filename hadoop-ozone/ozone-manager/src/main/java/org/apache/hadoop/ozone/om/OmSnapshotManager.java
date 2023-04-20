@@ -26,7 +26,6 @@ import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -111,8 +110,6 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public static final String DELIMITER = "-";
 
-  public static final String DELIMITER = "-";
-
   /**
    * Contains all the snap diff job which are either queued, in_progress or
    * done. This table is used to make sure that there is only single job for
@@ -154,7 +151,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
-   private final CodecRegistry codecRegistry;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
 
   private final int maxPageSize;
@@ -165,7 +161,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
     this.columnFamilyDescriptors = new ArrayList<>();
     this.columnFamilyHandles = new ArrayList<>();
-    this.codecRegistry = createCodecRegistryForSnapDiff();
+    CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
     this.maxPageSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT

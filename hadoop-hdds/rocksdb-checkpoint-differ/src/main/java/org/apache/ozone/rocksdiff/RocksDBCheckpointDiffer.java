@@ -235,45 +235,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     }
   }
 
-  public RocksDBCheckpointDiffer(String metadataDirName,
-                                 String sstBackupDirName,
-                                 String compactionLogDirName,
-                                 String activeDBLocationName,
-                                 long maxAllowedTimeInDag,
-                                 long pruneCompactionDagDaemonRunIntervalInMs) {
-    Preconditions.checkNotNull(metadataDirName);
-    Preconditions.checkNotNull(sstBackupDirName);
-    Preconditions.checkNotNull(compactionLogDirName);
-    Preconditions.checkNotNull(activeDBLocationName);
-
-    this.compactionLogDir =
-        createCompactionLogDir(metadataDirName, compactionLogDirName);
-    this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
-    createSstBackUpDir();
-
-    // Active DB location is used in getSSTFileSummary
-    this.activeDBLocationStr = activeDBLocationName + "/";
-    this.maxAllowedTimeInDag = maxAllowedTimeInDag;
-
-    if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
-      this.executor = Executors.newSingleThreadScheduledExecutor();
-      this.executor.scheduleWithFixedDelay(
-          this::pruneOlderSnapshotsWithCompactionHistory,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS);
-
-      this.executor.scheduleWithFixedDelay(
-          this::pruneSstFiles,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS
-      );
-    } else {
-      this.executor = null;
-    }
-  }
-
   private String createCompactionLogDir(String metadataDir,
                                         String compactionLogDirName) {
 
