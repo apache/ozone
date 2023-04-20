@@ -222,7 +222,10 @@ public class RatisUnderReplicationHandler
     // We should replicate only the max available sequence ID, as replicas with
     // earlier sequence IDs may be stale copies.
     long maxSequenceId = availableSources.stream()
-        .map(ContainerReplica::getSequenceId).max(Long::compareTo).orElse(0L);
+        .map(r -> {
+          Long seqId = r.getSequenceId();
+          return seqId == null ? 0L : seqId;
+        }).max(Long::compareTo).orElse(0L);
 
     return availableSources.stream()
         .filter(r -> r.getSequenceId() == maxSequenceId)
