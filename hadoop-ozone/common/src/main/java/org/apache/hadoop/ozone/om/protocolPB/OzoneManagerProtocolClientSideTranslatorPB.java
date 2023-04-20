@@ -151,6 +151,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
@@ -2192,6 +2194,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     EchoRPCResponse echoRPCResponse =
             handleError(submitRequest(omRequest)).getEchoRPCResponse();
     return echoRPCResponse;
+  }
+
+  @Override
+  public boolean recoverLease(String volumeName, String bucketName,
+                              String keyName) throws IOException {
+    RecoverLeaseRequest recoverLeaseRequest =
+            RecoverLeaseRequest.newBuilder()
+                    .setVolumeName(volumeName)
+                    .setBucketName(bucketName)
+                    .setKeyName(keyName)
+                    .build();
+
+    OMRequest omRequest = createOMRequest(Type.RecoverLease)
+            .setRecoverLeaseRequest(recoverLeaseRequest).build();
+
+    RecoverLeaseResponse recoverLeaseResponse =
+            handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
+    return recoverLeaseResponse.getResponse();
   }
 
   @VisibleForTesting

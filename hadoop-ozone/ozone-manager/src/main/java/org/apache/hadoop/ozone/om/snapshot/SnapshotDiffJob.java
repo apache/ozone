@@ -156,7 +156,7 @@ public class SnapshotDiffJob {
       return true;
     }
 
-    if (other instanceof  SnapshotDiffJob) {
+    if (other instanceof SnapshotDiffJob) {
       SnapshotDiffJob otherJob = (SnapshotDiffJob) other;
       return Objects.equals(this.creationTime, otherJob.creationTime) &&
           Objects.equals(this.jobId, otherJob.jobId) &&
@@ -173,7 +173,8 @@ public class SnapshotDiffJob {
 
   @Override
   public int hashCode() {
-    return toString().hashCode();
+    return Objects.hash(creationTime, jobId, status, volume, bucket,
+        fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
   }
 
   /**

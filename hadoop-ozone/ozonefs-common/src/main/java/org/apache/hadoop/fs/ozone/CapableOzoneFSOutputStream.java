@@ -38,8 +38,11 @@ import java.io.OutputStream;
  */
 public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
     implements StreamCapabilities {
-  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream) {
+  private final boolean isHsyncEnabled;
+  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream,
+      boolean enabled) {
     super(outputStream.getWrappedOutputStream());
+    this.isHsyncEnabled = enabled;
   }
 
   @Override
@@ -53,7 +56,7 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
     return hasWrappedCapability(os, capability);
   }
 
-  private static boolean hasWrappedCapability(OutputStream os,
+  private boolean hasWrappedCapability(OutputStream os,
       String capability) {
     if (os instanceof ECKeyOutputStream) {
       return false;
@@ -61,7 +64,7 @@ public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
       switch (StringUtils.toLowerCase(capability)) {
       case StreamCapabilities.HFLUSH:
       case StreamCapabilities.HSYNC:
-        return true;
+        return isHsyncEnabled;
       default:
         return false;
       }

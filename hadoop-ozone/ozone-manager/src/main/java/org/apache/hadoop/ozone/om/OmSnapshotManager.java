@@ -26,6 +26,7 @@ import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -110,6 +111,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public static final String DELIMITER = "-";
 
+  public static final String DELIMITER = "-";
+
   /**
    * Contains all the snap diff job which are either queued, in_progress or
    * done. This table is used to make sure that there is only single job for
@@ -141,7 +144,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * |-------------------------------------------|
    * |  KEY     |  VALUE                         |
    * |-------------------------------------------|
-   * |  jobId   | noOfTotalEntriesInReportTable  |
+   * |  jobId   | numOfTotalEntriesInReportTable |
    * |-------------------------------------------|
    */
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
@@ -151,7 +154,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
-  private final CodecRegistry codecRegistry;
+   private final CodecRegistry codecRegistry;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
 
   private final int maxPageSize;
@@ -185,7 +188,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           dbPath, columnFamilyDescriptors, columnFamilyHandles);
 
       snapDiffJobCf = getOrCreateColumnFamily(SNAP_DIFF_JOB_TABLE_NAME,
-              columnFamilyDescriptors, columnFamilyHandles);
+          columnFamilyDescriptors, columnFamilyHandles);
       snapDiffReportCf = getOrCreateColumnFamily(SNAP_DIFF_REPORT_TABLE_NAME,
           columnFamilyDescriptors, columnFamilyHandles);
       snapDiffPurgedJobCf = getOrCreateColumnFamily(
@@ -209,7 +212,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
 
-    CacheLoader<String, OmSnapshot> loader = createLoadingCache();
+    CacheLoader<String, OmSnapshot> loader = createCacheLoader();
 
     RemovalListener<String, OmSnapshot> removalListener
         = notification -> {
@@ -257,21 +260,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.snapshotDiffCleanupService.start();
   }
 
-  private CodecRegistry createCodecRegistryForSnapDiff() {
-    CodecRegistry registry = new CodecRegistry();
-
-    // Integers are used for indexing persistent list.
-    registry.addCodec(Integer.class, new IntegerCodec());
-    // DiffReportEntry codec for Diff Report.
-    registry.addCodec(SnapshotDiffReport.DiffReportEntry.class,
-        new OmDBDiffReportEntryCodec());
-    registry.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
-
-    return registry;
-  }
-
-  private CacheLoader<String, OmSnapshot> createLoadingCache() {
+  private CacheLoader<String, OmSnapshot> createCacheLoader() {
     return new CacheLoader<String, OmSnapshot>() {
       @Override
 
@@ -340,6 +329,20 @@ public final class OmSnapshotManager implements AutoCloseable {
             snapshotInfo.getName());
       }
     };
+  }
+
+  private CodecRegistry createCodecRegistryForSnapDiff() {
+    CodecRegistry registry = new CodecRegistry();
+
+    // Integers are used for indexing persistent list.
+    registry.addCodec(Integer.class, new IntegerCodec());
+    // DiffReportEntry codec for Diff Report.
+    registry.addCodec(SnapshotDiffReport.DiffReportEntry.class,
+        new OmDBDiffReportEntryCodec());
+    registry.addCodec(SnapshotDiffJob.class,
+        new SnapshotDiffJob.SnapshotDiffJobCodec());
+
+    return registry;
   }
 
   /**

@@ -78,6 +78,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

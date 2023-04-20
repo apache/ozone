@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -97,6 +98,7 @@ public class TestHSync {
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -301,12 +303,16 @@ public class TestHSync {
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
 
     try (CapableOzoneFSOutputStream cofsos =
-        new CapableOzoneFSOutputStream(ofso)) {
+        new CapableOzoneFSOutputStream(ofso, true)) {
       if (isEC) {
         assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
       } else {
         assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
       }
+    }
+    try (CapableOzoneFSOutputStream cofsos =
+        new CapableOzoneFSOutputStream(ofso, false)) {
+      assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
     }
   }
 }
