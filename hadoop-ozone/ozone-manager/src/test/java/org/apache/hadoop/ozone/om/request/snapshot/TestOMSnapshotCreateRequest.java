@@ -256,7 +256,7 @@ public class TestOMSnapshotCreateRequest {
     renameKey("key1", "key2");
     // Rename table should be empty as there is no rename happening in
     // the snapshot scope.
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    Assert.assertTrue(omMetadataManager.getSnapshotRenamedTable().isEmpty());
 
     // Create snapshot
     createSnapshot(snapshotName1);
@@ -268,12 +268,12 @@ public class TestOMSnapshotCreateRequest {
 
     renameKey("key3", "key4");
     // Rename table should have one entry as rename is within snapshot scope.
-    Assert.assertFalse(omMetadataManager.getSnapshotRenamedKeyTable()
+    Assert.assertFalse(omMetadataManager.getSnapshotRenamedTable()
         .isEmpty());
 
-    // Create snapshot to clear snapshotRenamedKeyTable
+    // Create snapshot to clear snapshotRenamedTable
     createSnapshot(snapshotName2);
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    Assert.assertTrue(omMetadataManager.getSnapshotRenamedTable().isEmpty());
 
   }
 
@@ -326,7 +326,7 @@ public class TestOMSnapshotCreateRequest {
         new OMKeyRenameResponse(omResponse, fromKeyInfo.getKeyName(),
             toKeyInfo.getKeyName(), toKeyInfo);
 
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    Assert.assertTrue(omMetadataManager.getSnapshotRenamedTable().isEmpty());
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }

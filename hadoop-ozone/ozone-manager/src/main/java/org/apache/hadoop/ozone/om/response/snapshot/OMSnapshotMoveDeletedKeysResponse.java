@@ -126,7 +126,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     // Move renamed keys to only the next snapshot or active DB.
     if (isNextDB) {
       for (HddsProtos.KeyValue renamedKey: renamedKeysList) {
-        metadataManager.getSnapshotRenamedKeyTable()
+        metadataManager.getSnapshotRenamedTable()
             .putWithBatch(batchOp, renamedKey.getKey(), renamedKey.getValue());
       }
     }
