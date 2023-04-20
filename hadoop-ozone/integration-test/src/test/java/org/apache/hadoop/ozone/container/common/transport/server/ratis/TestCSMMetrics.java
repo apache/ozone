@@ -129,12 +129,12 @@ public class TestCSMMetrics {
       assertCounter("NumBytesCommittedCount", 0L, metric);
       assertCounter("NumStartTransactionVerifyFailures", 0L, metric);
       assertCounter("NumContainerNotOpenVerifyFailures", 0L, metric);
-      assertCounter("WriteChunkNumOps", 0L, metric);
+      assertCounter("WriteChunkMsNumOps", 0L, metric);
       double applyTransactionLatency = getDoubleGauge(
-          "ApplyTransactionAvgTime", metric);
+          "ApplyTransactionNsAvgTime", metric);
       assertTrue(applyTransactionLatency == 0.0);
       double writeStateMachineLatency = getDoubleGauge(
-          "WriteStateMachineDataAvgTime", metric);
+          "WriteStateMachineDataNsAvgTime", metric);
       assertTrue(writeStateMachineLatency == 0.0);
 
       // Write Chunk
@@ -156,7 +156,7 @@ public class TestCSMMetrics {
       assertCounter("NumBytesCommittedCount", 1024L, metric);
       assertCounter("NumStartTransactionVerifyFailures", 0L, metric);
       assertCounter("NumContainerNotOpenVerifyFailures", 0L, metric);
-      assertCounter("WriteChunkNumOps", 1L, metric);
+      assertCounter("WriteChunkMsNumOps", 1L, metric);
 
       //Read Chunk
       ContainerProtos.ContainerCommandRequestProto readChunkRequest =
@@ -171,10 +171,10 @@ public class TestCSMMetrics {
       assertCounter("NumQueryStateMachineOps", 1L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
       applyTransactionLatency = getDoubleGauge(
-          "ApplyTransactionAvgTime", metric);
+          "ApplyTransactionNsAvgTime", metric);
       assertTrue(applyTransactionLatency > 0.0);
       writeStateMachineLatency = getDoubleGauge(
-          "WriteStateMachineDataAvgTime", metric);
+          "WriteStateMachineDataNsAvgTime", metric);
       assertTrue(writeStateMachineLatency > 0.0);
 
     } finally {
