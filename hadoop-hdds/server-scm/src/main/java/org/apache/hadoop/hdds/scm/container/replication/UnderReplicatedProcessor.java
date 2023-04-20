@@ -17,11 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * Class used to pick messages from the ReplicationManager under replicated
@@ -50,7 +46,7 @@ public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
   }
 
   @Override
-  protected Map<DatanodeDetails, SCMCommand<?>> getDatanodeCommands(
+  protected int sendDatanodeCommands(
           ReplicationManager replicationManager,
           ContainerHealthResult.UnderReplicatedHealthResult healthResult)
           throws IOException {

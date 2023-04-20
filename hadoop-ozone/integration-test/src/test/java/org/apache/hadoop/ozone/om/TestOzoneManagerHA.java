@@ -20,12 +20,14 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -57,6 +59,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.junit.Assert.fail;
 
@@ -81,6 +84,7 @@ public abstract class TestOzoneManagerHA {
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
+  private static OzoneClient client;
 
 
   public MiniOzoneHAClusterImpl getCluster() {
@@ -89,6 +93,10 @@ public abstract class TestOzoneManagerHA {
 
   public ObjectStore getObjectStore() {
     return objectStore;
+  }
+
+  public static OzoneClient getClient() {
+    return client;
   }
 
   public OzoneConfiguration getConf() {
@@ -151,6 +159,11 @@ public abstract class TestOzoneManagerHA {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
 
+    // Some subclasses check RocksDB directly as part of their tests. These
+    // depend on OBS layout.
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
+
     OzoneManagerRatisServerConfig omHAConfig =
         conf.getObject(OzoneManagerRatisServerConfig.class);
 
@@ -173,8 +186,8 @@ public abstract class TestOzoneManagerHA {
 
     cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    objectStore = client.getObjectStore();
   }
 
 
@@ -184,6 +197,7 @@ public abstract class TestOzoneManagerHA {
   @AfterEach
   public void resetCluster()
       throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
@@ -338,11 +352,11 @@ public abstract class TestOzoneManagerHA {
         ozoneKeyDetails.getVolumeName());
     Assert.assertEquals(data.length(), ozoneKeyDetails.getDataSize());
 
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-    ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent, UTF_8));
+    try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+      byte[] fileContent = new byte[data.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assert.assertEquals(data, new String(fileContent, UTF_8));
+    }
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
@@ -380,11 +394,11 @@ public abstract class TestOzoneManagerHA {
       ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
       ozoneOutputStream.close();
 
-      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
+      try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        ozoneInputStream.read(fileContent);
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+      }
 
     } catch (IOException e) {
       if (!checkSuccess) {

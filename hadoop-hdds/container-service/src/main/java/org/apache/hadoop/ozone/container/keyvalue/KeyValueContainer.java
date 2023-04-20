@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
@@ -296,16 +296,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       KeyValueContainerUtil.removeContainer(containerData, config);
     } catch (StorageContainerException ex) {
+      // Disk needs replacement.
       throw ex;
     } catch (IOException ex) {
-      // TODO : An I/O error during delete can leave partial artifacts on the
-      // disk. We will need the cleaner thread to cleanup this information.
+      // Container will be removed from tmp directory under the volume.
+      // On datanode shutdown/restart any partial artifacts left
+      // will be wiped from volume's tmp directory.
       onFailure(containerData.getVolume());
       String errMsg = String.format("Failed to cleanup container. ID: %d",
           containerId);
       LOG.error(errMsg, ex);
       throw new StorageContainerException(errMsg, ex, CONTAINER_INTERNAL_ERROR);
     }
+  }
+
+  @Override
+  public boolean isEmpty() throws IOException {
+    return KeyValueContainerUtil.noBlocksInContainer(containerData);
   }
 
   @Override
@@ -518,7 +525,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     Path destContainerDir =
         Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
             hddsVolume.getHddsRootDir().toString(), idDir, containerId));
-    Path tmpDir = DownloadAndImportReplicator.getUntarDirectory(hddsVolume);
+    Path tmpDir = ContainerImporter.getUntarDirectory(hddsVolume);
     writeLock();
     try {
       //copy the values from the input stream to the final destination

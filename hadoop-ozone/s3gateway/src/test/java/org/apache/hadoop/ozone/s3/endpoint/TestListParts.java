@@ -94,7 +94,7 @@ public class TestListParts {
   @Test
   public void testListParts() throws Exception {
     Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        uploadID, 3, "0", null);
+        uploadID, 3, "0");
 
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
@@ -107,7 +107,7 @@ public class TestListParts {
   @Test
   public void testListPartsContinuation() throws Exception {
     Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        uploadID, 2, "0", null);
+        uploadID, 2, "0");
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
 
@@ -116,7 +116,7 @@ public class TestListParts {
 
     // Continue
     response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, 2,
-        Integer.toString(listPartsResponse.getNextPartNumberMarker()), null);
+        Integer.toString(listPartsResponse.getNextPartNumberMarker()));
     listPartsResponse = (ListPartsResponse) response.getEntity();
 
     Assert.assertFalse(listPartsResponse.getTruncated());
@@ -128,7 +128,7 @@ public class TestListParts {
   public void testListPartsWithUnknownUploadID() throws Exception {
     try {
       REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-          uploadID, 2, "0", null);
+          uploadID, 2, "0");
     } catch (OS3Exception ex) {
       Assert.assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
           ex.getErrorMessage());

@@ -28,6 +28,17 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE =
+      "ozone.om.snapshot.sst_dumptool.pool.size";
+  public static final int
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
+      "ozone.om.snapshot.sst_dumptool.buffer.size";
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT = "8KB";
+
   /**
    * Never constructed.
    */
@@ -85,6 +96,10 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.key.deleting.limit.per.task";
+  public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
+      = 20000;
 
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.key.cleanup.service.interval";
@@ -151,6 +166,15 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
+  public static final String OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX
+      = "ozone.om.ratis.log.purge.upto.snapshot.index";
+  public static final boolean
+      OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX_DEFAULT = true;
+  public static final String
+      OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM
+      = "ozone.om.ratis.log.purge.preservation.log.num";
+  public static final long
+      OZONE_OM_RATIS_LOG_PURGE_PRESERVATION_LOG_NUM_DEFAULT = 0L;
 
   public static final String OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
       = "ozone.om.ratis.snapshot.auto.trigger.threshold";
@@ -183,7 +207,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE =
       "ozone.om.ratis.server.leaderelection.pre-vote";
   public static final boolean
-      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+      OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
 
   // OM SnapshotProvider configurations
@@ -206,6 +230,10 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+
+  public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
+      "ozone.om.fs.snapshot.max.limit";
+  public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 1000;
 
   public static final String OZONE_OM_KERBEROS_KEYTAB_FILE_KEY = "ozone.om."
       + "kerberos.keytab.file";
@@ -298,7 +326,7 @@ public final class OMConfigKeys {
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT =
       "ozone.default.bucket.layout";
   public static final String OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT =
-      BucketLayout.LEGACY.name();
+      BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
   public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
   public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
@@ -316,6 +344,20 @@ public final class OMConfigKeys {
       "ozone.path.deleting.limit.per.task";
   public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
 
+  public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.filtering.limit.per.task";
+  public static final int SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT = 2;
+
+  public static final String SNAPSHOT_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.deleting.limit.per.task";
+  public static final int SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT = 10;
+
+  public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
+      "ozone.snapshot.filtering.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
+
   public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
       "ozone.om.grpc.maximum.response.length";
   /** Default value for GRPC_MAXIMUM_RESPONSE_LENGTH. */
@@ -325,7 +367,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
-      false;
+      true;
   /**
    * Configuration properties for OMAdminProtcol service.
    */
@@ -410,4 +452,6 @@ public final class OMConfigKeys {
       = "ozone.om.enable.ofs.shared.tmp.dir";
   public static final boolean OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT
       = false;
+  public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
+      = "ozone.om.snapshot.diff.db.dir";
 }

@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -70,6 +71,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
@@ -77,6 +79,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
@@ -107,6 +110,8 @@ public class BasicOzoneFileSystem extends FileSystem {
   private int listingPageSize =
       OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 
+  private boolean hsyncEnabled = OZONE_FS_HSYNC_ENABLED_DEFAULT;
+
   private static final Pattern URL_SCHEMA_PATTERN =
       Pattern.compile("([^\\.]+)\\.([^\\.]+)\\.{0,1}(.*)");
 
@@ -126,6 +131,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
+    hsyncEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OZONE_FS_HSYNC_ENABLED_DEFAULT);
     setConf(conf);
     Preconditions.checkNotNull(name.getScheme(),
         "No scheme provided in %s", name);
@@ -199,6 +207,10 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     return new BasicOzoneClientAdapterImpl(omHost, omPort, conf,
         volumeStr, bucketStr);
+  }
+
+  protected boolean isHsyncEnabled() {
+    return hsyncEnabled;
   }
 
   @Override
@@ -278,8 +290,14 @@ public class BasicOzoneFileSystem extends FileSystem {
       return new FSDataOutputStream(adapter.createStreamFile(key,
           replication, overwrite, recursive), statistics);
     }
-    return new FSDataOutputStream(adapter.createFile(key,
-        replication, overwrite, recursive), statistics);
+    return new FSDataOutputStream(createFSOutputStream(
+            adapter.createFile(key,
+        replication, overwrite, recursive)), statistics);
+  }
+
+  protected OutputStream createFSOutputStream(
+      OzoneFSOutputStream outputStream) {
+    return outputStream;
   }
 
   @Override
@@ -889,6 +907,14 @@ public class BasicOzoneFileSystem extends FileSystem {
     return new OzoneFileStatusIterator<>(f);
   }
 
+  @Override
+  public Path createSnapshot(Path path, String snapshotName)
+          throws IOException {
+    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
+    return new Path(path,
+        OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
+  }
+
   /**
    * A private class implementation for iterating list of file status.
    *
@@ -1201,5 +1227,4 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
   }
-
 }

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -29,6 +28,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -100,8 +101,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OmKeyInfo fromKeyValue;
     Result result;
     try {
-      if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
-        throw new OMException("Key name is empty",
+      if (fromKeyName.length() == 0) {
+        throw new OMException("Source key name is empty",
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }
 
@@ -117,8 +118,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           IAccessAuthorizer.ACLType.DELETE);
 
       // check Acl toKeyName
-      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+      if (toKeyName.isEmpty()) {
+        // if the toKeyName is empty we are checking the ACLs of the bucket
+        checkBucketAcls(ozoneManager, volumeName, bucketName, toKeyName,
+            IAccessAuthorizer.ACLType.CREATE);
+      } else {
+        checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
+            IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+      }
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
@@ -182,9 +189,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                     OMException.ResultCodes.KEY_ALREADY_EXISTS);
           }
 
-          omClientResponse = renameKey(toKeyValue.getObjectID(), trxnLogIndex,
-                  fromKeyValue, isRenameDirectory, newToKeyName,
-                  keyArgs.getModificationTime(), omResponse, ozoneManager);
+          omClientResponse = renameKey(toKeyValue, newToKeyName, fromKeyValue,
+              fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
+              ozoneManager, omResponse, trxnLogIndex);
           result = Result.SUCCESS;
         } else {
           // case-6) If destination is a file type and if exists then throws
@@ -197,12 +204,12 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         // case-7) Check whether dst parent dir exists or not. If parent
         // doesn't exist then throw exception, otw the source can be renamed to
         // destination path.
-        long toKeyParentId = OMFileRequest.getToKeyNameParentId(volumeName,
-                bucketName, toKeyName, fromKeyName, omMetadataManager);
+        OmKeyInfo toKeyParent = OMFileRequest.getKeyParentDir(volumeName,
+                bucketName, toKeyName, omMetadataManager);
 
-        omClientResponse = renameKey(toKeyParentId, trxnLogIndex,
-                fromKeyValue, isRenameDirectory, toKeyName,
-                keyArgs.getModificationTime(), omResponse, ozoneManager);
+        omClientResponse = renameKey(toKeyParent, toKeyName, fromKeyValue,
+            fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
+            ozoneManager, omResponse, trxnLogIndex);
 
         result = Result.SUCCESS;
       }
@@ -243,27 +250,52 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   }
 
   @SuppressWarnings("parameternumber")
-  private OMClientResponse renameKey(long toKeyParentId,
-      long trxnLogIndex, OmKeyInfo fromKeyValue, boolean isRenameDirectory,
-      String toKeyName, long modificationTime, OMResponse.Builder omResponse,
-      OzoneManager ozoneManager) throws IOException {
-
+  private OMClientResponse renameKey(OmKeyInfo toKeyParent, String toKeyName,
+      OmKeyInfo fromKeyValue, String fromKeyName, boolean isRenameDirectory,
+      long modificationTime, OzoneManager ozoneManager,
+      OMResponse.Builder omResponse, long trxnLogIndex) throws IOException {
     final OMMetadataManager ommm = ozoneManager.getMetadataManager();
     final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
     final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
             fromKeyValue.getBucketName());
+    OmBucketInfo omBucketInfo = null;
     final String dbFromKey = ommm.getOzonePathKey(volumeId, bucketId,
             fromKeyValue.getParentObjectID(), fromKeyValue.getFileName());
-    String toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
+    String toKeyFileName;
+    if (toKeyName.isEmpty()) {
+      // if toKeyName is empty we use the source key name.
+      toKeyFileName = OzoneFSUtils.getFileName(fromKeyName);
+    } else {
+      toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
+    }
+    OmKeyInfo fromKeyParent = null;
+    OMMetadataManager metadataMgr = ozoneManager.getMetadataManager();
+    Table<String, OmDirectoryInfo> dirTable = metadataMgr.getDirectoryTable();
+    String bucketKey = metadataMgr.getBucketKey(
+        fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
     fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
     // Set toFileName
     fromKeyValue.setKeyName(toKeyFileName);
     fromKeyValue.setFileName(toKeyFileName);
     // Set toKeyObjectId
-    fromKeyValue.setParentObjectID(toKeyParentId);
-    //Set modification time
-    fromKeyValue.setModificationTime(modificationTime);
+    if (toKeyParent != null) {
+      fromKeyValue.setParentObjectID(toKeyParent.getObjectID());
+    } else {
+      omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
+      fromKeyValue.setParentObjectID(omBucketInfo.getObjectID());
+    }
+    // Set modification time
+    setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
+        modificationTime, dirTable, trxnLogIndex);
+    fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
+        fromKeyValue.getBucketName(), fromKeyName, metadataMgr);
+    if (fromKeyParent == null && omBucketInfo == null) {
+      // Get omBucketInfo only when needed to reduce unnecessary DB IO
+      omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
+    }
+    setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
+        bucketId, modificationTime, dirTable, trxnLogIndex);
 
     // destination dbKeyName
     String dbToKey = ommm.getOzonePathKey(volumeId, bucketId,
@@ -273,31 +305,59 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     // dbFromKey should be deleted, dbToKey should be added with newly updated
     // omKeyInfo.
     // Add from_key and to_key details into cache.
-    OMMetadataManager metadataMgr = ozoneManager.getMetadataManager();
     if (isRenameDirectory) {
-      Table<String, OmDirectoryInfo> dirTable = metadataMgr.getDirectoryTable();
       dirTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       dirTable.addCacheEntry(new CacheKey<>(dbToKey),
-              new CacheValue<>(Optional.of(OMFileRequest.
-                              getDirectoryInfo(fromKeyValue)), trxnLogIndex));
+          CacheValue.get(trxnLogIndex,
+              OMFileRequest.getDirectoryInfo(fromKeyValue)));
     } else {
       Table<String, OmKeyInfo> keyTable =
           metadataMgr.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       keyTable.addCacheEntry(new CacheKey<>(dbToKey),
-              new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+              CacheValue.get(trxnLogIndex, fromKeyValue));
     }
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-        dbFromKey, dbToKey, fromKeyValue, isRenameDirectory,
-        getBucketLayout());
+        dbFromKey, dbToKey, fromKeyParent, toKeyParent, fromKeyValue,
+        omBucketInfo, isRenameDirectory, getBucketLayout());
     return omClientResponse;
+  }
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private void setModificationTime(OMMetadataManager omMetadataManager,
+      OmBucketInfo bucketInfo, OmKeyInfo keyParent,
+      long volumeId, long bucketId, long modificationTime,
+      Table<String, OmDirectoryInfo> dirTable, long trxnLogIndex)
+      throws OMException {
+    // For Filesystem. rename will change renamed file parent directory
+    // modification time but not change its modification time.
+    if (keyParent != null) {
+      keyParent.setModificationTime(modificationTime);
+      String dbToKeyParent = omMetadataManager.getOzonePathKey(volumeId,
+          bucketId, keyParent.getParentObjectID(), keyParent.getFileName());
+      dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
+          CacheValue.get(trxnLogIndex,
+              OMFileRequest.getDirectoryInfo(keyParent)));
+    } else {
+      // For FSO a bucket is root of the filesystem, so rename an
+      // object at the root of a bucket need change bucket's modificationTime
+      if (bucketInfo == null) {
+        throw new OMException("Bucket not found",
+            OMException.ResultCodes.BUCKET_NOT_FOUND);
+      }
+      bucketInfo.setModificationTime(modificationTime);
+      String bucketKey = omMetadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().addCacheEntry(
+          new CacheKey<>(bucketKey),
+          CacheValue.get(trxnLogIndex, bucketInfo));
+    }
   }
 
   private Map<String, String> buildAuditMap(
@@ -307,5 +367,34 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
+  }
+
+  /**
+   * Returns the normalized and validated destination key name. It is handling
+   * the case when the toKeyName is empty (if we are renaming a key to bucket
+   * level, e.g. source is /vol1/buck1/dir1/key1 and dest is /vol1/buck1).
+   *
+   * @param request
+   * @return
+   * @throws OMException
+   */
+  @Override
+  protected String extractDstKey(RenameKeyRequest request) throws OMException {
+    String normalizedDstKey = normalizeKey(request.getToKeyName(), false);
+    return normalizedDstKey.isEmpty() ?
+        normalizedDstKey :
+        isValidKeyPath(normalizedDstKey);
+  }
+
+  /**
+   * Returns the validated and normalized source key name.
+   *
+   * @param keyArgs
+   * @return
+   * @throws OMException
+   */
+  @Override
+  protected String extractSrcKey(KeyArgs keyArgs) throws OMException {
+    return validateAndNormalizeKey(keyArgs.getKeyName());
   }
 }

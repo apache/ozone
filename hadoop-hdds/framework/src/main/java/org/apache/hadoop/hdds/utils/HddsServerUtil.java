@@ -447,8 +447,8 @@ public final class HddsServerUtil {
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf)
-      throws IOException {
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
+      UserGroupInformation ugi) throws IOException {
     // Certificate from SCM is required for DN startup to succeed, so retry
     // for ever. In this way DN start up is resilient to SCM service running
     // status.
@@ -461,7 +461,7 @@ public final class HddsServerUtil {
 
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(configuration,
-            UserGroupInformation.getCurrentUser()));
+            ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB
@@ -532,10 +532,12 @@ public final class HddsServerUtil {
   public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
-    try (ArchiveOutputStream archiveOutputStream =
+    try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination);
         Stream<Path> files =
             Files.list(checkpoint.getCheckpointLocation())) {
+      archiveOutputStream.setBigNumberMode(
+          TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (Path path : files.collect(Collectors.toList())) {
         if (path != null) {
           Path fileName = path.getFileName();
@@ -548,7 +550,7 @@ public final class HddsServerUtil {
     }
   }
 
-  private static void includeFile(File file, String entryName,
+  public static void includeFile(File file, String entryName,
                                  ArchiveOutputStream archiveOutputStream)
       throws IOException {
     ArchiveEntry archiveEntry =

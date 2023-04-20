@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -52,10 +52,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   public SCMCertificateClient(SecurityConfig securityConfig,
       String certSerialId) {
     super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
-  }
-
-  public SCMCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME, null, null);
   }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
@@ -135,7 +131,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         .setDigitalEncryption(true)
         .setDigitalSignature(true)
         // Set CA to true, as this will be used to sign certs for OM/DN.
-        .setCA(true);
+        .setCA(true)
+        .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
 
@@ -147,12 +144,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
       Path certPath) throws CertificateException {
-    return null;
-  }
-
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException {
-    return null;
+    throw new UnsupportedOperationException("signAndStoreCertificate of " +
+        " SCMCertificateClient is not supported currently");
   }
 }

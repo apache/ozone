@@ -47,24 +47,28 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           " balancer will run for.")
   private Optional<Integer> iterations;
 
-  @Option(names = {"-d", "--maxDatanodesPercentageToInvolvePerIteration"},
+  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
+      "--maxDatanodesPercentageToInvolvePerIteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration (for example, " +
           "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
-  @Option(names = {"-s", "--maxSizeToMovePerIterationInGB"},
+  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
+      "--maxSizeToMovePerIterationInGB"},
       description = "Maximum size that can be moved per iteration of " +
           "balancing (for example, '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
-  @Option(names = {"-e", "--maxSizeEnteringTargetInGB"},
+  @Option(names = {"-e", "--max-size-entering-target-in-gb",
+      "--maxSizeEnteringTargetInGB"},
       description = "Maximum size that can enter a target datanode while " +
           "balancing. This is the sum of data from multiple sources (for " +
           "example, '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
-  @Option(names = {"-l", "--maxSizeLeavingSourceInGB"},
+  @Option(names = {"-l", "--max-size-leaving-source-in-gb",
+      "--maxSizeLeavingSourceInGB"},
       description = "Maximum size that can leave a source datanode while " +
           "balancing. This is the sum of data moving to multiple targets " +
           "(for example, '26' for 26GB).")

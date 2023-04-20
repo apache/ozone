@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -354,7 +355,7 @@ public class ObjectStore {
       String volumePrefix, String prevVolume)
       throws IOException {
     if (Strings.isNullOrEmpty(user)) {
-      user = UserGroupInformation.getCurrentUser().getUserName();
+      user = UserGroupInformation.getCurrentUser().getShortUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
   }
@@ -531,4 +532,64 @@ public class ObjectStore {
     return proxy.getAcl(obj);
   }
 
+  /**
+   * Create snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name to be used
+   * @return name used
+   * @throws IOException
+   */
+  public String createSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    return proxy.createSnapshot(volumeName, bucketName, snapshotName);
+  }
+
+  /**
+   * Delete snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param snapshotName name of the snapshot to be deleted
+   * @throws IOException
+   */
+  public void deleteSnapshot(String volumeName,
+      String bucketName, String snapshotName) throws IOException {
+    proxy.deleteSnapshot(volumeName, bucketName, snapshotName);
+  }
+
+  /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshots for volume/bucket snapshot path.
+   * @throws IOException
+   */
+  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
+      throws IOException {
+    return proxy.listSnapshot(volumeName, bucketName);
+  }
+
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff)
+      throws IOException {
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff);
+  }
 }

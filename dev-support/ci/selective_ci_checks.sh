@@ -192,6 +192,7 @@ function check_if_tests_are_needed_at_all() {
 function run_all_tests_if_environment_files_changed() {
     start_end::group_start "Check if everything should be run"
     local pattern_array=(
+        "^.github/workflows/ci.yml"
         "^.github/workflows/post-commit.yml"
         "^dev-support/ci"
         "^hadoop-ozone/dev-support/checks/_lib.sh"
@@ -253,6 +254,7 @@ function get_count_integration_files() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
@@ -434,6 +436,7 @@ function check_needs_unit_test() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/unit.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "src/test/java"
         "src/test/resources"
     )

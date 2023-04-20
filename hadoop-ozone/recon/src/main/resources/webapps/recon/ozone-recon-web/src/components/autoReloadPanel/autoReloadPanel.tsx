@@ -77,7 +77,7 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
      const lastUpdatedDeltaFullText = lastUpdatedOMDBDelta === 0 || lastUpdatedOMDBDelta === undefined || lastUpdatedOMDBFull === 0 || lastUpdatedOMDBFull === undefined ? '' :
      (
       <>
-      &nbsp; | OM DB updated at {lastUpdatedDeltaFullToolTip}
+      &nbsp; | DB Synced at {lastUpdatedDeltaFullToolTip}
       &nbsp;<Button shape='circle' icon='play-circle' size='small' loading={isLoading} onClick={omSyncLoad} disabled={omStatus === '' ? false : true } />
       </>
      );

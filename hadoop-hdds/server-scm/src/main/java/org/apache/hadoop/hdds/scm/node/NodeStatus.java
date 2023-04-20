@@ -28,7 +28,7 @@ import java.util.Objects;
  * in_service, decommissioned and maintenance mode) along with the expiry time
  * for the operational state (used with maintenance mode).
  */
-public class NodeStatus {
+public class NodeStatus implements Comparable<NodeStatus> {
 
   private HddsProtos.NodeOperationalState operationalState;
   private HddsProtos.NodeState health;
@@ -91,6 +91,10 @@ public class NodeStatus {
       return false;
     }
     return System.currentTimeMillis() / 1000 >= opStateExpiryEpochSeconds;
+  }
+
+  public boolean isInService() {
+    return operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
   }
 
   /**
@@ -212,6 +216,18 @@ public class NodeStatus {
   public String toString() {
     return "OperationalState: " + operationalState + " Health: " + health +
         " OperationStateExpiry: " + opStateExpiryEpochSeconds;
+  }
+
+  @Override
+  public int compareTo(NodeStatus o) {
+    int order = Boolean.compare(o.isHealthy(), isHealthy());
+    if (order == 0) {
+      order = Boolean.compare(isDead(), o.isDead());
+    }
+    if (order == 0) {
+      order = operationalState.compareTo(o.operationalState);
+    }
+    return order;
   }
 
 }

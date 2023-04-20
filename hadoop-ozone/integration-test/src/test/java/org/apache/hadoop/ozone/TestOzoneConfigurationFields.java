@@ -57,7 +57,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
-    xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
     xmlPropsToSkipCompare.add("ozone.om.decommissioned.nodes" +
         ".EXAMPLEOMSERVICEID");
@@ -125,7 +124,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_HA_PREFIX,
-        OMConfigKeys.OZONE_OM_TRANSPORT_CLASS,
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
         // TODO HDDS-2856
         OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
@@ -134,7 +132,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
-        ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY
+        ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED
     ));
   }
 }

@@ -19,15 +19,15 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -38,9 +38,9 @@ import java.util.Set;
 public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
-          PlacementPolicy<ContainerReplica> containerPlacement,
-          ConfigurationSource conf, NodeManager nodeManager) {
-    super(containerPlacement, conf, nodeManager);
+          PlacementPolicy containerPlacement,
+          ConfigurationSource conf, ReplicationManager replicationManager) {
+    super(containerPlacement, conf, replicationManager);
   }
 
   @Override
@@ -54,25 +54,32 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
               + " %s.Expected Container Replication Type : RATIS",
               containerInfo.getReplicationType().toString()));
     }
-    // count pending adds and deletes
-    int pendingAdd = 0, pendingDelete = 0;
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd++;
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        pendingDelete++;
-      }
-    }
-    return new RatisContainerReplicaCount(
-            containerInfo, replicas, pendingAdd,
-            pendingDelete, containerInfo.getReplicationFactor().getNumber(),
-            minHealthyForMaintenance);
+    return new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
+        minHealthyForMaintenance, true);
   }
 
   @Override
-  protected ReplicateContainerCommand getReplicateCommand(
-          ContainerInfo containerInfo, ContainerReplica replica) {
-    return new ReplicateContainerCommand(containerInfo.getContainerID(),
-            Collections.singletonList(replica.getDatanodeDetails()));
+  protected int sendReplicateCommands(
+      ContainerInfo containerInfo,
+      Set<ContainerReplica> replicasToBeReplicated,
+      List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
+      throws CommandTargetOverloadedException, NotLeaderException {
+    ReplicationManager replicationManager = getReplicationManager();
+    long containerID = containerInfo.getContainerID();
+
+    int commandsSent = 0;
+    for (DatanodeDetails target : targetDns) {
+      if (replicationManager.getConfig().isPush()) {
+        replicationManager.sendThrottledReplicationCommand(containerInfo,
+            sources, target, 0);
+      } else {
+        ReplicateContainerCommand cmd = ReplicateContainerCommand
+            .fromSources(containerID, sources);
+        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
+      }
+      commandsSent++;
+    }
+
+    return commandsSent;
   }
 }
