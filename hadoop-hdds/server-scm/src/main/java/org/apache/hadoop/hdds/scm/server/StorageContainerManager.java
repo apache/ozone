@@ -160,6 +160,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2149,24 +2150,46 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   /**
    * This will remove the given SCM node from HA Ring by removing it from
-   * Ratis Ring and deleting the related certificates from certificate store.
+   * Ratis Ring.
    *
    * @return true if remove was successful, else false.
    */
-  public boolean removePeerFromHARing(RemoveSCMRequest request)
+  public boolean removePeerFromHARing(String scmId)
       throws IOException {
+
+    if (getScmHAManager().getRatisServer() == null) {
+      throw new IOException("Cannot remove SCM " +
+          scmId + " in a non-HA cluster");
+    }
+
     // We cannot remove a node if it's currently leader.
-    if (scmContext.isLeader() && request.getScmId().equals(getScmId())) {
+    if (scmContext.isLeader() && scmId.equals(getScmId())) {
       throw new IOException("Cannot remove current leader.");
     }
 
     // Currently we don't support removal of primordial node.
-    if (request.getScmId().equals(primaryScmNodeId)) {
+    if (scmId.equals(primaryScmNodeId)) {
       throw new IOException("Removal of primordial node is not supported.");
     }
 
-    // TODO: Remove the certificate from certificate store.
-    return scmHAManager.removeSCM(request);
+    Preconditions.checkNotNull(getScmHAManager().getRatisServer()
+        .getDivision().getGroup());
+
+    // check valid scmid in ratis peers list
+    if (!getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeers().contains(RaftPeerId.valueOf(scmId))) {
+      throw new IOException("ScmId " + scmId +
+          " supplied for scm removal not in Ratis Peer list");
+    }
+
+    // create removeSCM request
+    RemoveSCMRequest request = new RemoveSCMRequest(
+        getClusterId(), scmId,
+        getScmHAManager().getRatisServer().getDivision()
+            .getGroup().getPeer(RaftPeerId.valueOf(scmId))
+            .getAddress());
+
+    return getScmHAManager().removeSCM(request);
 
   }
 
