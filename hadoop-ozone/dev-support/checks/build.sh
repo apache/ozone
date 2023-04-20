@@ -25,7 +25,19 @@ if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
+EXPECTED_ROCKS_NATIVE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)".${NATIVE_ROCKS_SHA}"
+echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
+mvn dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION}
 
+EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
+if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
+  echo "Build using hdds-rocks-native version: $(mvn help:evaluate -Dexpression=hdds.rocks.native.version -q -DforceStdout -Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION})"
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
+else
+  echo "Build using hdds-rocks-native version: $(mvn help:evaluate -Dexpression=hdds.rocks.native.version -q -DforceStdout)"
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Drocks_tools_native"
+fi
+echo "MAVEN_OPTIONS= ${MAVEN_OPTIONS}"
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
 mvn ${MAVEN_OPTIONS} clean install "$@"
 exit $?

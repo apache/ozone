@@ -33,6 +33,7 @@ jobs:
       needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      rocks-native-git-sha: ${{ steps.selective-checks.outputs.rocks-native-git-sha }}
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v3
@@ -94,7 +95,9 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        env:
+          NATIVE_ROCKS_SHA: "${{ needs.build-info.outputs.rocks-native-git-sha }}"
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist -Psrc
       - name: Store binaries for tests
         uses: actions/upload-artifact@v3
         with:
