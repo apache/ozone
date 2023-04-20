@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,5 +66,21 @@ public final class SnapshotUtils {
       throw new OMException(KEY_NOT_FOUND);
     }
     return snapshotInfo;
+  }
+
+  public static void dropColumnFamilyHandle(
+      final ManagedRocksDB rocksDB,
+      final ColumnFamilyHandle columnFamilyHandle) {
+
+    if (columnFamilyHandle == null) {
+      return;
+    }
+
+    try {
+      rocksDB.get().dropColumnFamily(columnFamilyHandle);
+    } catch (RocksDBException exception) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
+    }
   }
 }
