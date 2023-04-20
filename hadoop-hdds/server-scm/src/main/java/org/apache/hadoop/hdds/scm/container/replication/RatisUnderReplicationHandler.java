@@ -203,10 +203,10 @@ public class RatisUnderReplicationHandler
 
     /*
      * Return healthy datanodes which have a replica that satisfies the
-     * predicate and is not pending replica deletion. Sorted in descending
-     * order of sequence id.
+     * predicate and is not pending replica deletion
      */
-    return replicaCount.getReplicas().stream()
+    List<ContainerReplica> availableSources = replicaCount.getReplicas()
+        .stream()
         .filter(predicate)
         .filter(r -> {
           try {
@@ -217,7 +217,15 @@ public class RatisUnderReplicationHandler
           }
         })
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
-        .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
+        .collect(Collectors.toList());
+
+    // We should replicate only the max available sequence ID, as replicas with
+    // earlier sequence IDs may be stale copies.
+    long maxSequenceId = availableSources.stream()
+        .map(ContainerReplica::getSequenceId).max(Long::compareTo).orElse(0L);
+
+    return availableSources.stream()
+        .filter(r -> r.getSequenceId() == maxSequenceId)
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
   }
