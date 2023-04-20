@@ -184,7 +184,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotDeleteResponse(
           omResponse.build(), tableKey, snapshotInfo);
 
-      // No longer need to invalidate the snapshot cache here.
+      // No longer need to invalidate the entry in the snapshot cache here.
 
     } catch (IOException ex) {
       exception = ex;
