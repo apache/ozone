@@ -127,6 +127,37 @@ public class LeaseManager<T> {
   }
 
   /**
+   * Returns a lease for the specified resource with the timeout provided.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param timeout
+   *        The timeout in milliseconds which has to be set on the lease
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, long timeout, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    checkStatus();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquiring lease on {} for {} milliseconds", resource, timeout);
+    }
+    if (activeLeases.containsKey(resource)) {
+      throw new LeaseAlreadyExistException(messageForResource(resource));
+    }
+    Lease<T> lease = new Lease<>(resource, timeout);
+    lease.registerCallBack(callback);
+    activeLeases.put(resource, lease);
+    synchronized (monitor) {
+      monitor.notifyAll();
+    }
+    return lease;
+  }
+
+  /**
    * Returns a lease associated with the specified resource.
    *
    * @param resource
