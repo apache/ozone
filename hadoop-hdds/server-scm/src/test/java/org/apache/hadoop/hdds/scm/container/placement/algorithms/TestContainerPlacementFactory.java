@@ -184,7 +184,7 @@ public class TestContainerPlacementFactory {
    * A dummy container placement implementation for test.
    */
   public static class DummyImpl implements
-          PlacementPolicy<ContainerReplica> {
+          PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,

@@ -37,7 +37,7 @@ import java.util.Set;
  */
 public class ECMisReplicationHandler extends MisReplicationHandler {
   public ECMisReplicationHandler(
-          PlacementPolicy<ContainerReplica> containerPlacement,
+          PlacementPolicy containerPlacement,
           ConfigurationSource conf, ReplicationManager replicationManager) {
     super(containerPlacement, conf, replicationManager);
   }

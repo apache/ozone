@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
  * functions which are common to placement policies.
  */
 public abstract class SCMCommonPlacementPolicy implements
-        PlacementPolicy<ContainerReplica> {
+        PlacementPolicy {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
