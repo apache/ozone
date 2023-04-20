@@ -209,11 +209,11 @@ public class CSMMetrics {
     numContainerNotOpenVerifyFailures.incr();
   }
 
-  public void recordApplyTransactionNsCompletion(long latencyNanos) {
+  public void recordApplyTransactionCompletionNs(long latencyNanos) {
     applyTransactionNs.add(latencyNanos);
   }
 
-  public void recordWriteStateMachineNsCompletion(long latencyNanos) {
+  public void recordWriteStateMachineCompletionNs(long latencyNanos) {
     writeStateMachineDataNs.add(latencyNanos);
   }
 

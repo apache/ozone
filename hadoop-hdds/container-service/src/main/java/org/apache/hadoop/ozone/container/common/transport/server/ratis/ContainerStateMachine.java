@@ -540,7 +540,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               write.getChunkData().getChunkName());
         }
         raftFuture.complete(r::toByteString);
-        metrics.recordWriteStateMachineNsCompletion(
+        metrics.recordWriteStateMachineCompletionNs(
             Time.monotonicNowNanos() - startTime);
       }
 
@@ -966,7 +966,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               + "{} exception {}", gid, requestProto.getCmdType(), index, t);
         }
         applyTransactionSemaphore.release();
-        metrics.recordApplyTransactionNsCompletion(
+        metrics.recordApplyTransactionCompletionNs(
             Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;
