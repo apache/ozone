@@ -96,12 +96,9 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return true;
     }
 
-    boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
-
+    // bypass read checks for read only admin users
     boolean isReadOnlyAdmin = isAdmin(ozReadOnlyAdmins,
         context.getClientUgi());
-
-    // bypass read checks for read only admin users
     if (isReadOnlyAdmin
         && (context.getAclRights() == ACLType.READ
         || context.getAclRights() == ACLType.READ_ACL
@@ -109,6 +106,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       return true;
     }
 
+    boolean isOwner = isOwner(context.getClientUgi(), context.getOwnerName());
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
     if (isListAllVolume) {
