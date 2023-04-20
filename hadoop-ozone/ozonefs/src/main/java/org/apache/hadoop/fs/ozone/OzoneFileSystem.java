@@ -106,7 +106,7 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   @Override
   protected OutputStream createFSOutputStream(
           OzoneFSOutputStream outputStream) {
-    return new CapableOzoneFSOutputStream(outputStream);
+    return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
   }
 
   @Override

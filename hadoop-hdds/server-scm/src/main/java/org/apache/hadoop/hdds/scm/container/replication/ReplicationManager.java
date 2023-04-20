@@ -249,13 +249,13 @@ public class ReplicationManager implements SCMService {
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, this);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
-        conf, this, rmConf.isPush());
+        conf, this);
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
-        ratisContainerPlacement, conf, this, rmConf.isPush());
+        ratisContainerPlacement, conf, this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -712,8 +712,26 @@ public class ReplicationManager implements SCMService {
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
-      containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(),
-          targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+
+      if (rcc.getTargetDatanode() == null) {
+        /*
+        This means the target will pull a replica from a source, so the
+        op's target Datanode should be the Datanode this command is being
+        sent to.
+         */
+        containerReplicaPendingOps.scheduleAddReplica(
+            containerInfo.containerID(),
+            targetDatanode, rcc.getReplicaIndex(), scmDeadlineEpochMs);
+      } else {
+        /*
+        This means the source will push replica to the target, so the op's
+        target Datanode should be the Datanode the replica will be pushed to.
+         */
+        containerReplicaPendingOps.scheduleAddReplica(
+            containerInfo.containerID(),
+            rcc.getTargetDatanode(), rcc.getReplicaIndex(), scmDeadlineEpochMs);
+      }
+
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
@@ -994,14 +1012,16 @@ public class ReplicationManager implements SCMService {
    */
   public ContainerHealthResult getContainerReplicationHealth(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder request = new ContainerCheckRequest.Builder()
         .setContainerInfo(containerInfo)
         .setContainerReplicas(replicas)
-        .build();
+        .setPendingOps(getPendingReplicationOps(containerInfo.containerID()));
     if (containerInfo.getReplicationConfig().getReplicationType() == EC) {
-      return ecReplicationCheckHandler.checkHealth(request);
+      request.setMaintenanceRedundancy(maintenanceRedundancy);
+      return ecReplicationCheckHandler.checkHealth(request.build());
     } else {
-      return ratisReplicationCheckHandler.checkHealth(request);
+      request.setMaintenanceRedundancy(ratisMaintenanceMinReplicas);
+      return ratisReplicationCheckHandler.checkHealth(request.build());
     }
   }
 

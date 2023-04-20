@@ -19,10 +19,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.MBeanServer;
 import java.io.File;
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
@@ -195,32 +193,6 @@ public class TestRDBStore {
     // Let us make sure that our estimate is not off by 10%
     Assertions.assertTrue(rdbStore.getEstimatedKeyCount() > 180
         || rdbStore.getEstimatedKeyCount() < 220);
-  }
-
-  @Test
-  public void getStatMBeanName() throws Exception {
-
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      for (int y = 0; y < 100; y++) {
-        byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    }
-    MBeanServer platformMBeanServer =
-        ManagementFactory.getPlatformMBeanServer();
-    Thread.sleep(2000);
-
-    Object keysWritten = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "NUMBER_KEYS_WRITTEN");
-
-    Assertions.assertTrue(((Long) keysWritten) >= 99L);
-
-    Object dbWriteAverage = platformMBeanServer
-        .getAttribute(rdbStore.getStatMBeanName(), "DB_WRITE_AVERAGE");
-    Assertions.assertTrue((double) dbWriteAverage > 0);
   }
 
   @Test

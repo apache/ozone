@@ -532,10 +532,12 @@ public final class HddsServerUtil {
   public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
-    try (ArchiveOutputStream archiveOutputStream =
+    try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination);
         Stream<Path> files =
             Files.list(checkpoint.getCheckpointLocation())) {
+      archiveOutputStream.setBigNumberMode(
+          TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (Path path : files.collect(Collectors.toList())) {
         if (path != null) {
           Path fileName = path.getFileName();

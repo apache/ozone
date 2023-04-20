@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.ContainerStateCounts;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -51,7 +52,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-
 
 /**
  * Endpoint to fetch current state of ozone cluster.
@@ -91,25 +91,37 @@ public class ClusterStateEndpoint {
    */
   @GET
   public Response getClusterState() {
+    ContainerStateCounts containerStateCounts = new ContainerStateCounts();
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-    int containers = this.containerManager.getContainers().size();
+
     int pipelines = this.pipelineManager.getPipelines().size();
+
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0, MISSING_CONTAINER_COUNT_LIMIT);
-    int totalMissingContainerCount = missingContainers.size() ==
-        MISSING_CONTAINER_COUNT_LIMIT ?
-        MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size();
-    int openContainersCount = this.containerManager.getContainerStateCount(
-        HddsProtos.LifeCycleState.OPEN);
+
+    containerStateCounts.setMissingContainerCount(
+        missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?
+            MISSING_CONTAINER_COUNT_LIMIT : missingContainers.size());
+
+    containerStateCounts.setOpenContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.OPEN));
+
+    containerStateCounts.setDeletedContainersCount(
+        this.containerManager.getContainerStateCount(
+            HddsProtos.LifeCycleState.DELETED));
+
     int healthyDatanodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
+
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),
             stats.getScmUsed().get(), stats.getRemaining().get());
+
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(
         TableCountTask.getRowKeyFromTable(VOLUME_TABLE));
@@ -156,14 +168,19 @@ public class ClusterStateEndpoint {
     builder.setDeletedKeys(deletedKeys);
     builder.setDeletedDirs(deletedDirs);
 
+    // Subtract deleted containers from total containers.
+    containerStateCounts.setTotalContainerCount(
+        this.containerManager.getContainers().size() -
+            containerStateCounts.getDeletedContainersCount());
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
         .setPipelines(pipelines)
-        .setContainers(containers)
-        .setMissingContainers(totalMissingContainerCount)
+        .setContainers(containerStateCounts.getTotalContainerCount())
+        .setMissingContainers(containerStateCounts.getMissingContainerCount())
         .setTotalDatanodes(datanodeDetails.size())
         .setHealthyDatanodes(healthyDatanodes)
-        .setOpenContainers(openContainersCount)
+        .setOpenContainers(containerStateCounts.getOpenContainersCount())
+        .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
         .build();
     return Response.ok(response).build();
   }

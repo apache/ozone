@@ -55,6 +55,7 @@ import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
@@ -154,6 +155,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public SnapshotInfo getLatestSnapshot() {
     LOG.debug("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
+  }
+
+  @Override
+  public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
+                                  RaftPeerId newLeaderId) {
+    // Initialize OMHAMetrics
+    ozoneManager.omHAMetricsInit(newLeaderId.toString());
   }
 
   /**

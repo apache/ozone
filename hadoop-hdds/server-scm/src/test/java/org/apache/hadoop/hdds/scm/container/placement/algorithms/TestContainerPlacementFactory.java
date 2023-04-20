@@ -163,10 +163,13 @@ public class TestContainerPlacementFactory {
   }
 
   @Test
-  public void testDefaultPolicy() throws IOException {
+  public void testRackAwareContainerPolicy() throws IOException {
+    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+            SCMContainerPlacementRackAware.class.getName());
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, null, null, true, null);
-    Assertions.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+    Assertions.assertSame(SCMContainerPlacementRackAware.class,
+            policy.getClass());
   }
 
   @Test
@@ -181,7 +184,7 @@ public class TestContainerPlacementFactory {
    * A dummy container placement implementation for test.
    */
   public static class DummyImpl implements
-          PlacementPolicy<ContainerReplica> {
+          PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,
