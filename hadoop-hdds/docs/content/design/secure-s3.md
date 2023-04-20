@@ -24,8 +24,11 @@ There are problems related to the current S3 keys management:
 * Storing keys as plain text in Ozone Manager rocksdb is insecure. An ozone administrator can easily impersonate any user by recovering his keys from rocksdb.
 * The only way for a user to generate keys is to have SSH access to the Ozone cluster. Security policies can also prohibit this.
 * Keys revocation process is manual which leads to security issues.
-* Extend Ozone S3 secret key management to support centralized remote S3 secret storage
-* Implement S3 gateway endpoint to provide get s3 secret and secret renewal
+
+We intend to extend Ozone S3 secret key management:
+* Support centralized remote S3 secret storage.
+* Implement S3 gateway endpoint to provide get s3 secret and secret renewal.
+* Add TTL to secrets.
 
 This document proposes solutions to the above issues.
 
