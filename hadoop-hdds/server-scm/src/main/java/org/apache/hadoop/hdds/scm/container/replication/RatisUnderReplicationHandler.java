@@ -224,7 +224,7 @@ public class RatisUnderReplicationHandler
     long maxSequenceId = availableSources.stream()
         .map(r -> {
           Long seqId = r.getSequenceId();
-          return seqId == null ? 0L : seqId;
+          return seqId == null ? Long.valueOf(0L) : seqId;
         }).max(Long::compareTo).orElse(0L);
 
     return availableSources.stream()
