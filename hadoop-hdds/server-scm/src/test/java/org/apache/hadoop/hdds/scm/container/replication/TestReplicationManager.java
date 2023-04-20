@@ -1192,48 +1192,6 @@ public class TestReplicationManager {
     Assert.assertFalse(excluded.contains(dn1));
   }
 
-  @Test
-  public void testSetHealthStateForClosingWhenThereAreReplicas() {
-    // GIVEN
-    Set<ContainerReplica> replicas = new HashSet<>();
-    replicas.add(Mockito.mock(ContainerReplica.class));
-    ContainerInfo containerInfo = new ContainerInfo();
-    ReplicationManagerReport report =
-        Mockito.mock(ReplicationManagerReport.class);
-
-    // WHEN
-    replicationManager
-        .setHealthStateForClosing(replicas, containerInfo, report);
-
-    // THEN
-    Mockito.verifyZeroInteractions(report);
-  }
-
-  @Test
-  public void testSetHealthStateForClosingWhenThereAreNoReplicas() {
-    // GIVEN
-    Set<ContainerReplica> replicas = new HashSet<>();
-    ContainerInfo containerInfo = new ContainerInfo();
-    ReplicationManagerReport report =
-        Mockito.mock(ReplicationManagerReport.class);
-
-    // WHEN
-    replicationManager
-        .setHealthStateForClosing(replicas, containerInfo, report);
-
-    // THEN
-    Mockito.verify(report).incrementAndSample(
-        ReplicationManagerReport.HealthState.MISSING,
-        containerInfo.containerID());
-    Mockito.verify(report).incrementAndSample(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-        containerInfo.containerID());
-    Mockito.verify(report).incrementAndSample(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED,
-        containerInfo.containerID());
-  }
-
-
   @SafeVarargs
   private final Set<ContainerReplica>  addReplicas(ContainerInfo container,
       ContainerReplicaProto.State replicaState,

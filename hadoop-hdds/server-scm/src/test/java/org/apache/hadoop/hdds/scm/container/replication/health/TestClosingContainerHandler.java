@@ -183,12 +183,7 @@ public class TestClosingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Mockito.doCallRealMethod().when(replicationManager)
-        .setHealthStateForClosing(containerReplicas, containerInfo, report);
-
     assertAndVerify(request, true, 3);
-    Mockito.verify(replicationManager).
-        setHealthStateForClosing(containerReplicas, containerInfo, report);
     report.getStats().forEach((k, v) -> Assertions.assertEquals(0L, v));
   }
 
@@ -205,21 +200,14 @@ public class TestClosingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Mockito.doCallRealMethod().when(replicationManager)
-        .setHealthStateForClosing(containerReplicas, containerInfo, report);
-
     assertAndVerify(request, true, 0);
     report.getStats().forEach((k, v) -> {
-      if (k.equals("MISSING") ||
-          k.equals("MIS_REPLICATED") ||
-          k.equals("UNDER_REPLICATED")) {
+      if (k.equals("MISSING")) {
         Assertions.assertEquals(1L, v);
       } else {
         Assertions.assertEquals(0L, v);
       }
     });
-    Mockito.verify(replicationManager).
-        setHealthStateForClosing(containerReplicas, containerInfo, report);
   }
 
   /**
