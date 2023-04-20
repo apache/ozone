@@ -62,7 +62,7 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: needs.build-info.outputs.needs-build == 'true'
     strategy:
       matrix:
