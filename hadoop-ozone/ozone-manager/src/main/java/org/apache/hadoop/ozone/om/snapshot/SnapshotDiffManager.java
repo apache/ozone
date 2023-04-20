@@ -519,7 +519,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     return snapDiffJob;
   }
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"checkstyle:Parameternumber", "checkstyle:MethodLength"})
   private void generateSnapshotDiffReport(final String jobKey,
                                           final String jobId,
                                           final String volume,
@@ -589,10 +589,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       List<String> tablesToLookUp =
               Collections.singletonList(fsKeyTable.getName());
       Set<String> deltaFilesForKeyOrFileTable = getDeltaFiles(fromSnapshot,
-          toSnapshot, tablesToLookUp, fsInfo,
-          tsInfo, useFullDiff, tablePrefixes, path.toString());
+          toSnapshot, tablesToLookUp, fsInfo, tsInfo, useFullDiff,
+          tablePrefixes, path.toString());
 
-      // Workaround to handle deletes if native rockstools for reading
+      // Workaround to handle deletes if native rocksDb tool for reading
       // tombstone is not loaded.
       // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
       if (!isNativeRocksToolsLoaded) {
