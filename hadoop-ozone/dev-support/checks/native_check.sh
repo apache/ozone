@@ -15,15 +15,12 @@
 # limitations under the License.
 
 function get_rocks_native_git_sha() {
-    start_end::group_start "Get Rocks Native Git sha"
+    echo "Getting Rocks Native Git sha"
     echo
     echo "git log -n 1 --format=\"%h\" ./hadoop-hdds/rocks-native"
     ROCKS_NATIVE_GIT_SHA=$(git log -n 1 --format="%h" ./hadoop-hdds/rocks-native)
-    echo "ROCKS_NATIVE_GIT_SHA"
-    echo
-    echo "${ROCKS_NATIVE_GIT_SHA}"
+    echo "ROCKS_NATIVE_GIT_SHA = ${ROCKS_NATIVE_GIT_SHA}"
     readonly ROCKS_NATIVE_GIT_SHA
-    start_end::group_end
 }
 
 function init_native_maven_opts() {
@@ -35,7 +32,7 @@ function init_native_maven_opts() {
         VERSION_NUMBER=$(echo "${PROJECT_VERSION}"| cut -f1 -d'-')
         EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}".${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
         echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
-        mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION}
+        mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
 
         EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
         if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
@@ -46,6 +43,7 @@ function init_native_maven_opts() {
           NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
         fi
     fi
+    readonly NATIVE_MAVEN_OPTIONS
     echo "Native Maven options : ${NATIVE_MAVEN_OPTIONS}"
 }
 

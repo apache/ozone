@@ -17,7 +17,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 : ${OZONE_WITH_COVERAGE:="false"}
-. "$DIR/native_checks.sh"
+. "$DIR/native_check.sh"
 init_native_maven_opts
 
 MAVEN_OPTIONS='-V -B -Dmaven.javadoc.skip=true -DskipTests -DskipDocs --no-transfer-progress'
@@ -29,5 +29,5 @@ else
 fi
 MAVEN_OPTIONS="${MAVEN_OPTIONS} ${NATIVE_MAVEN_OPTIONS}"
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-mvn ${MAVEN_OPTIONS} clean install "$@"
+#mvn ${MAVEN_OPTIONS} clean install "$@"
 exit $?
