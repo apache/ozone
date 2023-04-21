@@ -36,9 +36,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This class handles Ratis containers that are under replicated. It should
@@ -221,15 +223,22 @@ public class RatisUnderReplicationHandler
 
     // We should replicate only the max available sequence ID, as replicas with
     // earlier sequence IDs may be stale copies.
-    long maxSequenceId = availableSources.stream()
-        .map(r -> {
-          Long seqId = r.getSequenceId();
-          return seqId == null ? Long.valueOf(0L) : seqId;
-        }).max(Long::compareTo).orElse(0L);
+    // First we get the max sequence ID, if there is at least one replica with
+    // a non-null sequence.
+    OptionalLong maxSequenceId = availableSources.stream()
+        .filter(r -> r.getSequenceId() != null)
+        .mapToLong(ContainerReplica::getSequenceId)
+        .max();
 
-    return availableSources.stream()
-        .filter(r -> r.getSequenceId() == maxSequenceId)
-        .map(ContainerReplica::getDatanodeDetails)
+    // Filter out all but the max sequence ID, or keep all if there is no
+    // max.
+    Stream<ContainerReplica> replicaStream = availableSources.stream();
+    if (maxSequenceId.isPresent()) {
+      replicaStream = replicaStream
+          .filter(r -> r.getSequenceId() != null)
+          .filter(r -> r.getSequenceId() == maxSequenceId.getAsLong());
+    }
+    return replicaStream.map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
   }
 
