@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Schedulable;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -29,52 +28,60 @@ import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
 
 /**
- * Test class for {@link OzoneIdentityProvider}
+ * Test class for {@link OzoneIdentityProvider}.
  */
 public class TestOzoneIdentityProvider {
   private static OzoneIdentityProvider identityProvider;
-  private static Schedulable schedulable;
   private static final String ACCESS_ID = "testuser";
+
+  private static final Schedulable DEFAULT_SCHEDULABLE = new Schedulable() {
+    @Override
+    public UserGroupInformation getUserGroupInformation() {
+      return UserGroupInformation.createRemoteUser(ACCESS_ID);
+    }
+
+    @Override
+    public int getPriorityLevel() {
+      return 0;
+    }
+  };
 
   @BeforeAll
   public static void setUp() {
     identityProvider = new OzoneIdentityProvider();
-    schedulable = Mockito.mock(Schedulable.class);
-  }
-
-  @AfterEach
-  public void reset() {
-    when(schedulable.getUserGroupInformation()).thenReturn(null);
-    when(schedulable.getCallerContext()).thenReturn(null);
   }
 
   @Test
   public void testGetUserFromCallerContext() {
+    Schedulable callerContextSchedulable = Mockito.mock(Schedulable.class);
+
     CallerContext callerContext =
         new CallerContext.Builder(
             ACCESS_ID).build();
 
-    when(schedulable.getCallerContext()).thenReturn(callerContext);
+    when(callerContextSchedulable.getCallerContext())
+        .thenReturn(callerContext);
 
-    String identity = identityProvider.makeIdentity(schedulable);
-    String username = callerContext.getContext();
+    String identity = identityProvider.makeIdentity(callerContextSchedulable);
+    String usernameFromContext = callerContext.getContext();
 
-    Assertions.assertEquals(username, identity);
+    Assertions.assertEquals(usernameFromContext, identity);
   }
 
   @Test
   public void testGetUserFromUGI() {
-    UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(ACCESS_ID);
+    String identity = identityProvider.makeIdentity(DEFAULT_SCHEDULABLE);
 
-    when(schedulable.getUserGroupInformation()).thenReturn(ugi);
+    // defaultSchedulable doesn't override CallerContext and
+    // accessing it should throw an exception.
+    UnsupportedOperationException uoex = Assertions
+        .assertThrows(UnsupportedOperationException.class,
+            DEFAULT_SCHEDULABLE::getCallerContext);
+    Assertions.assertEquals("Invalid operation.",
+        uoex.getMessage());
 
-    String identity = identityProvider.makeIdentity(schedulable);
-
-    // CallerContext doesn't have a value and should be null
-    Assertions.assertNull(schedulable.getCallerContext());
-
-    String username = ugi.getShortUserName();
-    Assertions.assertEquals(username, identity);
+    String usernameFromUGI = DEFAULT_SCHEDULABLE
+        .getUserGroupInformation().getShortUserName();
+    Assertions.assertEquals(usernameFromUGI, identity);
   }
 }

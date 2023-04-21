@@ -21,6 +21,7 @@ import io.netty.util.internal.StringUtil;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.IdentityProvider;
 import org.apache.hadoop.ipc.Schedulable;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -32,11 +33,19 @@ public class OzoneIdentityProvider implements IdentityProvider {
   public OzoneIdentityProvider() {
   }
 
+  /**
+   * If schedulable isn't instance of {@link Server.Call},
+   * then trying to access getCallerContext() method, will
+   * result in an exception.
+   *
+   * @param schedulable Schedulable object
+   * @return string with the identity of the user
+   */
   @Override
   public String makeIdentity(Schedulable schedulable) {
     UserGroupInformation ugi = schedulable.getUserGroupInformation();
-    CallerContext callerContext = schedulable.getCallerContext();
-    if (callerContext != null) {
+    if (schedulable instanceof Server.Call) {
+      CallerContext callerContext = schedulable.getCallerContext();
       if (!StringUtil.isNullOrEmpty(callerContext.getContext())) {
         return callerContext.getContext();
       }
