@@ -77,11 +77,4 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
         RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
     );
   }
-
-  public static ManagedRocksDB open(
-      final ManagedOptions managedOptions,
-      final String path
-  ) throws RocksDBException {
-    return new ManagedRocksDB(RocksDB.open(managedOptions, path));
-  }
 }

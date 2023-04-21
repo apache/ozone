@@ -227,4 +227,31 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
   }
+
+  @Test
+  public void testValidateAndUpdateCacheQuotaSetFailureLesserNamespaceQuota()
+      throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String nxtBucketName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName,
+        bucketName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(volumeName, nxtBucketName,
+        omMetadataManager);
+    OMRequest originalRequest =
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, 1L);
+
+    OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
+        new OMVolumeSetQuotaRequest(originalRequest);
+
+    OMClientResponse omClientResponse = omVolumeSetQuotaRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+    Assert.assertTrue(omClientResponse.getOMResponse().getMessage().contains(
+        "this volume should not be greater than volume namespace quota"));
+  }
 }

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.collections.iterators.LoopingIterator;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -28,16 +26,15 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -53,18 +50,16 @@ public class RatisUnderReplicationHandler
   public static final Logger LOG =
       LoggerFactory.getLogger(RatisUnderReplicationHandler.class);
   private final PlacementPolicy placementPolicy;
-  private final NodeManager nodeManager;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
-      final ConfigurationSource conf, final NodeManager nodeManager,
+      final ConfigurationSource conf,
       final ReplicationManager replicationManager) {
     this.placementPolicy = placementPolicy;
     this.currentContainerSize = (long) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
   }
 
@@ -78,14 +73,10 @@ public class RatisUnderReplicationHandler
    * @param result Health check result indicating under replication.
    * @param minHealthyForMaintenance Number of healthy replicas that must be
    *                                 available for a DN to enter maintenance
-   * @return Returns the key value pair of destination dn where the command gets
-   * executed and the command itself. If an empty map is returned, it indicates
-   * the container is no longer unhealthy and can be removed from the unhealthy
-   * queue. Any exception indicates that the container is still unhealthy and
-   * should be retried later.
+   * @return The number of commands sent.
    */
   @Override
-  public Set<Pair<DatanodeDetails, SCMCommand<?>>> processAndCreateCommands(
+  public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int minHealthyForMaintenance)
       throws IOException {
@@ -103,7 +94,7 @@ public class RatisUnderReplicationHandler
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
     if (!verifyUnderReplication(withUnhealthy, withoutUnhealthy)) {
-      return Collections.emptySet();
+      return 0;
     }
 
     // find sources that can provide replicas
@@ -112,20 +103,30 @@ public class RatisUnderReplicationHandler
     if (sourceDatanodes.isEmpty()) {
       LOG.warn("Cannot replicate container {} because no CLOSED, QUASI_CLOSED" +
           " or UNHEALTHY replicas were found.", containerInfo);
-      return Collections.emptySet();
+      return 0;
     }
 
     // find targets to send replicas to
     List<DatanodeDetails> targetDatanodes =
         getTargets(withUnhealthy, pendingOps);
-    if (targetDatanodes.isEmpty()) {
-      LOG.warn("Cannot replicate container {} because no eligible targets " +
-          "were found.", containerInfo);
-      return Collections.emptySet();
-    }
 
-    return createReplicationCommands(containerInfo.getContainerID(),
-        sourceDatanodes, targetDatanodes);
+    int commandsSent = sendReplicationCommands(
+        containerInfo, sourceDatanodes, targetDatanodes);
+
+    if (targetDatanodes.size() < withUnhealthy.additionalReplicaNeeded()) {
+      // The placement policy failed to find enough targets to satisfy fix
+      // the under replication. There fore even though some commands were sent,
+      // we throw an exception to indicate that the container is still under
+      // replicated and should be re-queued for another attempt later.
+      LOG.debug("Placement policy failed to find enough targets to satisfy " +
+          "under replication for container {}. Targets found: {}, " +
+          "additional replicas needed: {}",
+          containerInfo, targetDatanodes.size(),
+          withUnhealthy.additionalReplicaNeeded());
+      throw new InsufficientDatanodesException(
+          withUnhealthy.additionalReplicaNeeded(), targetDatanodes.size());
+    }
+    return commandsSent;
   }
 
   /**
@@ -207,8 +208,14 @@ public class RatisUnderReplicationHandler
      */
     return replicaCount.getReplicas().stream()
         .filter(predicate)
-        .filter(r -> ReplicationManager.getNodeStatus(r.getDatanodeDetails(),
-            nodeManager).isHealthy())
+        .filter(r -> {
+          try {
+            return replicationManager.getNodeStatus(r.getDatanodeDetails())
+                .isHealthy();
+          } catch (NodeNotFoundException e) {
+            return false;
+          }
+        })
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
         .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
         .map(ContainerReplica::getDatanodeDetails)
@@ -233,42 +240,33 @@ public class RatisUnderReplicationHandler
             .collect(Collectors.toList());
     excludeList.addAll(pendingReplication);
 
-    /*
-    Ensure that target datanodes have enough space to hold a complete
-    container.
-    */
-    final long dataSizeRequired =
-        Math.max(replicaCount.getContainer().getUsedBytes(),
-            currentContainerSize);
-    return placementPolicy.chooseDatanodes(excludeList, null,
-        replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
+    return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
+        replicaCount.additionalReplicaNeeded(), null, excludeList,
+        currentContainerSize, replicaCount.getContainer());
   }
 
-  private Set<Pair<DatanodeDetails, SCMCommand<?>>> createReplicationCommands(
-      long containerID, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) {
+  private int sendReplicationCommands(
+      ContainerInfo containerInfo, List<DatanodeDetails> sources,
+      List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
+      NotLeaderException {
     final boolean push = replicationManager.getConfig().isPush();
-    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = new HashSet<>();
+    int commandsSent = 0;
 
     if (push) {
-      Collections.shuffle(sources);
-      for (Iterator<DatanodeDetails> srcIter = new LoopingIterator(sources),
-              targetIter = targets.iterator();
-          srcIter.hasNext() && targetIter.hasNext();) {
-        DatanodeDetails source = srcIter.next();
-        DatanodeDetails target = targetIter.next();
-        ReplicateContainerCommand command =
-            ReplicateContainerCommand.toTarget(containerID, target);
-        commands.add(Pair.of(source, command));
+      for (DatanodeDetails target : targets) {
+        replicationManager.sendThrottledReplicationCommand(
+            containerInfo, sources, target, 0);
+        commandsSent++;
       }
     } else {
       for (DatanodeDetails target : targets) {
         ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(containerID, sources);
-        commands.add(Pair.of(target, command));
+            ReplicateContainerCommand.fromSources(
+                containerInfo.getContainerID(), sources);
+        replicationManager.sendDatanodeCommand(command, containerInfo, target);
+        commandsSent++;
       }
     }
-
-    return commands;
+    return commandsSent;
   }
 }

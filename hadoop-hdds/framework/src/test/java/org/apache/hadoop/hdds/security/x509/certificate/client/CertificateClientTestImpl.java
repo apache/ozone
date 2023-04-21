@@ -31,6 +31,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -147,6 +148,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
         x509Certificate);
 
+    notificationReceivers = new HashSet<>();
     serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
         securityConfig, this, true);
     clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
@@ -156,7 +158,7 @@ public class CertificateClientTestImpl implements CertificateClient {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();
       Date expireDate = x509Certificate.getNotAfter();
       LocalDateTime gracePeriodStart = expireDate.toInstant()
-          .atZone(ZoneId.systemDefault()).toLocalDateTime().minus(gracePeriod);
+          .minus(gracePeriod).atZone(ZoneId.systemDefault()).toLocalDateTime();
       LocalDateTime currentTime = LocalDateTime.now();
       Duration delay = gracePeriodStart.isBefore(currentTime) ? Duration.ZERO :
           Duration.between(currentTime, gracePeriodStart);
@@ -167,7 +169,6 @@ public class CertificateClientTestImpl implements CertificateClient {
       this.executorService.schedule(new RenewCertTask(),
           delay.toMillis(), TimeUnit.MILLISECONDS);
     }
-    notificationReceivers = new HashSet<>();
   }
 
   @Override
@@ -205,6 +206,14 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public CertPath getCACertPath() {
     return null;
+  }
+
+  @Override
+  public List<X509Certificate> getTrustChain() {
+    List<X509Certificate> list = new ArrayList<>();
+    list.add(x509Certificate);
+    list.add(rootCert);
+    return list;
   }
 
   @Override
@@ -262,7 +271,7 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public X509Certificate getRootCACertificate() {
-    return x509Certificate;
+    return rootCert;
   }
 
   @Override
@@ -333,7 +342,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     System.out.println(new Date() + " certificated is renewed");
 
     // notify notification receivers
-    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(this,
         oldCert.getSerialNumber().toString(),
         x509Certificate.getSerialNumber().toString()));
   }

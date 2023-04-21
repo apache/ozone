@@ -97,7 +97,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     Result result;
     boolean isHSync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();
-    if (!isHSync) {
+    if (isHSync) {
+      omMetrics.incNumKeyHSyncs();
+    } else {
       omMetrics.incNumKeyCommits();
     }
 

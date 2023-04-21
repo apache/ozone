@@ -24,7 +24,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -64,7 +63,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
-    Assert.assertTrue(omMetadataManager.getRenamedKeyTable().isEmpty());
+    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
@@ -87,13 +86,11 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String renameDbKey = omMetadataManager.getRenameKey(
         fromKeyInfo.getVolumeName(), fromKeyInfo.getBucketName(),
         fromKeyInfo.getObjectID());
-    Assert.assertTrue(omMetadataManager.getRenamedKeyTable()
+    // snapshotRenamedKeyTable shouldn't contain those keys which
+    // is not part of snapshot bucket.
+    Assert.assertFalse(omMetadataManager.getSnapshotRenamedKeyTable()
         .isExist(renameDbKey));
 
-    OmKeyRenameInfo omKeyRenameInfo =
-        omMetadataManager.getRenamedKeyTable().get(renameDbKey);
-    Assert.assertTrue(omKeyRenameInfo.getOmKeyRenameInfoList()
-        .contains(dbFromKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));

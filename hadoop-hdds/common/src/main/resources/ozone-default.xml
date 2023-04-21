@@ -20,9 +20,7 @@
 <!-- wish to modify from this file into ozone-site.xml and change them -->
 <!-- there.  If ozone-site.xml does not already exist, create it.      -->
 
-<!--Tags supported are OZONE, CBLOCK, MANAGEMENT, SECURITY, PERFORMANCE,   -->
-<!--DEBUG, CLIENT, SERVER, OM, SCM, CRITICAL, RATIS, CONTAINER, REQUIRED, -->
-<!--REST, STORAGE, PIPELINE, STANDALONE                                    -->
+<!--Tags supported are defined in org.apache.hadoop.hdds.conf.ConfigTag-->
 
 <configuration>
 
@@ -494,6 +492,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.key.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of deleted keys to be scanned by Snapshot
+      Deleting Service per snapshot run.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.service.ids</name>
     <value/>
     <tag>OM, HA</tag>
@@ -863,7 +870,7 @@
   </property>
   <property>
     <name>ozone.scm.container.placement.impl</name>
-    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
+    <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware</value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       The full name of class which implements
@@ -1340,17 +1347,6 @@
   </property>
 
   <property>
-    <name>hadoop.tags.custom</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,RECON</value>
-  </property>
-
-  <property>
-    <name>ozone.tags.system</name>
-    <value>OZONE,MANAGEMENT,SECURITY,PERFORMANCE,DEBUG,CLIENT,SERVER,OM,SCM,CRITICAL,RATIS,CONTAINER,REQUIRED,REST,STORAGE,PIPELINE,STANDALONE,S3GATEWAY,TOKEN,TLS,RECON</value>
-  </property>
-
-
-  <property>
     <name>hdds.rest.rest-csrf.enabled</name>
     <value>false</value>
     <description>
@@ -1640,6 +1636,24 @@
   </property>
 
   <property>
+    <name>ozone.readonly.administrators</name>
+    <value/>
+    <description>
+      Ozone read only admin users delimited by the comma.
+      If set, This is the list of users are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.readonly.administrators.groups</name>
+    <value/>
+    <description>
+      Ozone read only admin groups delimited by the comma.
+      If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1877,7 +1891,23 @@
       its log segments after taking snapshot.
     </description>
   </property>
-
+  <property>
+    <name>ozone.om.ratis.log.purge.upto.snapshot.index</name>
+    <value>true</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Enable/disable Raft server to purge its log up to the snapshot index
+      after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.purge.preservation.log.num</name>
+    <value>0</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      The number of latest Raft logs to not be purged after taking snapshot.
+    </description>
+  </property>
   <property>
     <name>ozone.om.ratis.server.request.timeout</name>
     <value>3s</value>
@@ -2455,24 +2485,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.security.ssl.keystore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the keystore
-      certificates file has changed and needs reloading. Default is 60s. Unit could be
-      defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>hdds.security.ssl.truststore.reload.interval</name>
-    <value>60s</value>
-    <tag>SECURITY</tag>
-    <description>The time interval in milliseconds used to check if the truststore
-      certificates file has changed and needs reloading. Default is 60s. Unit could
-      be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>
@@ -2593,6 +2605,14 @@
     <description>
       Expert only. The time to wait, in milliseconds, between retry attempts
       for Ozone Manager Admin protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.transport.class</name>
+    <value>org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Enable Ozone Manager S3G Grpc channel.
     </description>
   </property>
   <property>
@@ -2728,7 +2748,7 @@
   <property>
     <name>ozone.s3g.http.auth.type</name>
     <value>simple</value>
-    <tag>S3G, SECURITY, KERBEROS</tag>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
     </description>
@@ -2759,7 +2779,7 @@
   </property>
   <property>
     <name>ozone.network.topology.aware.read</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       Whether to enable topology aware read to improve the read performance.
@@ -2855,6 +2875,18 @@
     <description>
       Recon each time get a limited delta updates from OM.
       The actual fetched data might be larger than this limit.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.delta.update.data.size.max.limit</name>
+    <value>1024MB</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Recon get a limited delta updates from OM periodically since sequence number.
+      Based on sequence number passed, OM DB delta update may have large number of
+      log files and each log batch data may be huge depending on frequent writes and
+      updates by ozone client, so to avoid increase in heap memory, this config is used
+      as limiting factor of default 1 GB while preparing DB updates object.
     </description>
   </property>
   <property>
@@ -3146,6 +3178,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.deleting.limit.per.task</name>
+    <value>10</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be reclaimed by
+      Snapshot Deleting Service per run.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -3157,6 +3197,25 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDeletingService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.deleting.service.interval</name>
+    <value>30s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDeletingService
+      thread run.
     </description>
   </property>
 
@@ -3305,6 +3364,13 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
+  <property>
+    <name>ozone.scm.close.container.wait.duration</name>
+    <value>150s</value>
+    <tag>SCM, OZONE, RECON</tag>
+    <description>Wait duration before which close container
+      is send to DN.</description>
+  </property>
 
 
   <property>
@@ -3416,7 +3482,7 @@
   <property>
     <name>ozone.audit.log.debug.cmd.list.dnaudit</name>
     <value></value>
-    <tag>DN</tag>
+    <tag>DATANODE</tag>
     <description>
       A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
       log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".
@@ -3547,6 +3613,15 @@
   </property>
 
   <property>
+    <name>ozone.fs.hsync.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Enable hsync/hflush. By default they are disabled.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.recon.scm.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, MANAGEMENT, RECON</tag>
@@ -3605,6 +3680,24 @@
     <description>
       If true, snapshot diff will always perform full diff (can be slow)
       without using the optimised DAG based pruning approach
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.sst_dumptool.pool.size</name>
+    <value>1</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Threadpool size for SST Dumptool which would be used for computing snapdiff when native library is enabled.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
+    <value>8KB</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
     </description>
   </property>
 </configuration>

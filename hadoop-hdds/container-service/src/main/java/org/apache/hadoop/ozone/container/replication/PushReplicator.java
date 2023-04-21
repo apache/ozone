@@ -66,6 +66,7 @@ public class PushReplicator implements ContainerReplicator {
           uploader.startUpload(containerID, target, fut, compression));
       source.copyData(containerID, output, compression);
       fut.get();
+
       task.setTransferredBytes(output.getByteCount());
       task.setStatus(Status.DONE);
     } catch (Exception e) {

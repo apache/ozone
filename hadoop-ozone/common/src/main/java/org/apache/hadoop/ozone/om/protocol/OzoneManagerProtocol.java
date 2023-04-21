@@ -705,6 +705,7 @@ public interface OzoneManagerProtocol
    * @param toSnapshot The name of the ending snapshot
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -713,7 +714,8 @@ public interface OzoneManagerProtocol
                                             String fromSnapshot,
                                             String toSnapshot,
                                             String token,
-                                            int pageSize)
+                                            int pageSize,
+                                            boolean forceFullDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
@@ -981,4 +983,16 @@ public interface OzoneManagerProtocol
                              int payloadSizeResp)
           throws IOException;
 
+
+  /**
+   * Start the lease recovery of a file.
+   *
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  boolean recoverLease(String volumeName, String bucketName,
+                              String keyName) throws IOException;
 }

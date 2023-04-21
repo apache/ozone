@@ -315,6 +315,11 @@ public class TestOzoneManagerServiceProviderImpl {
             getMockOzoneManagerClientWith4Updates(dbUpdatesWrapper[0],
                 dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]));
 
+    assertEquals(true, dbUpdatesWrapper[0].isDBUpdateSuccess());
+    assertEquals(true, dbUpdatesWrapper[1].isDBUpdateSuccess());
+    assertEquals(true, dbUpdatesWrapper[2].isDBUpdateSuccess());
+    assertEquals(true, dbUpdatesWrapper[3].isDBUpdateSuccess());
+
     OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
     ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(

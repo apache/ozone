@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -78,6 +79,9 @@ public class TestBucketRequest {
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
         BucketLayout.fromString(
             OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
+
+    setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
+
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);

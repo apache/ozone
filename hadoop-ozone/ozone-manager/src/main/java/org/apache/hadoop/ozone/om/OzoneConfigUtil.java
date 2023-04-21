@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS_GROUPS;
 
 /**
  * Utility class for ozone configurations.
@@ -76,6 +79,14 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
+  /**
+   * Return list of Ozone Read only admin Usernames from config.
+   */
+  static Collection<String> getOzoneReadOnlyAdminsFromConfig(
+      OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
+  }
+
   static Collection<String> getOzoneAdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
@@ -93,23 +104,31 @@ public final class OzoneConfigUtil {
     return s3AdminsGroup;
   }
 
+  static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(
+        OZONE_READONLY_ADMINISTRATORS_GROUPS);
+  }
+
   public static ReplicationConfig resolveReplicationConfigPreference(
       HddsProtos.ReplicationType clientType,
       HddsProtos.ReplicationFactor clientFactor,
       HddsProtos.ECReplicationConfig clientECReplicationConfig,
       DefaultReplicationConfig bucketDefaultReplicationConfig,
-      ReplicationConfig omDefaultReplicationConfig) {
+      OzoneManager ozoneManager) throws OMException {
     ReplicationConfig replicationConfig = null;
     if (clientType != HddsProtos.ReplicationType.NONE) {
       // Client passed the replication config, so let's use it.
       replicationConfig = ReplicationConfig
           .fromProto(clientType, clientFactor, clientECReplicationConfig);
+
+      ozoneManager.validateReplicationConfig(replicationConfig);
     } else if (bucketDefaultReplicationConfig != null) {
       // type is NONE, so, let's look for the bucket defaults.
       replicationConfig = bucketDefaultReplicationConfig.getReplicationConfig();
     } else {
       // if bucket defaults also not available, then use server defaults.
-      replicationConfig = omDefaultReplicationConfig;
+      replicationConfig = ozoneManager.getDefaultReplicationConfig();
     }
     return replicationConfig;
   }

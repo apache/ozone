@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -193,6 +194,10 @@ public class TestOzoneClient {
   public void testPutKeyWithECReplicationConfig() throws IOException {
     close();
     OzoneConfiguration config = new OzoneConfiguration();
+    ReplicationConfigValidator validator =
+        config.getObject(ReplicationConfigValidator.class);
+    validator.disableValidation();
+    config.setFromObject(validator);
     config.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 2,
         StorageUnit.KB);
     int data = 3;

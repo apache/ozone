@@ -46,7 +46,7 @@ public class TransferScmLeaderSubCommand implements Callable<Void> {
 
   static class TransferOption {
     @CommandLine.Option(
-        names = {"-n", "--newLeaderId"},
+        names = {"-n", "--newLeaderId", "--new-leader-id"},
         description = "The new leader id of SCM to transfer leadership. " +
             "Should be ScmId(UUID)."
     )

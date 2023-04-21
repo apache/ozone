@@ -1449,15 +1449,11 @@ public class LegacyReplicationManager {
 
     final ContainerID id = container.containerID();
     final long containerID = id.getId();
-    final boolean push = rmConf.isPush();
-    final ReplicateContainerCommand replicateCommand = push
-        ? ReplicateContainerCommand.toTarget(containerID, target)
-        : ReplicateContainerCommand.fromSources(containerID, sources);
-    final DatanodeDetails source = sources.get(0); // TODO randomize
-    final DatanodeDetails receiver = push ? source : target;
-    LOG.info("Sending {} to {}", replicateCommand, receiver);
+    final ReplicateContainerCommand replicateCommand =
+        ReplicateContainerCommand.fromSources(containerID, sources);
+    LOG.info("Sending {} to {}", replicateCommand, target);
 
-    final boolean sent = sendAndTrackDatanodeCommand(receiver, replicateCommand,
+    final boolean sent = sendAndTrackDatanodeCommand(target, replicateCommand,
         action -> addInflight(InflightType.REPLICATION, id, action));
 
     if (sent) {

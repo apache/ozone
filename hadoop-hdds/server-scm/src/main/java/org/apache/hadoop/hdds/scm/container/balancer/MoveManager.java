@@ -46,7 +46,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A class which schedules, tracks and completes moves scheduled by the
@@ -110,9 +109,11 @@ public final class MoveManager implements
   // TODO - Should pending ops notify under lock to allow MM to schedule a
   //        delete after the move, but before anything else can, eg RM?
 
-  // TODO - these need to be config defined somewhere, probably in the balancer
-  private static final long MOVE_DEADLINE = 1000 * 60 * 60; // 1 hour
-  private static final double MOVE_DEADLINE_FACTOR = 0.95;
+  /*
+  moveTimeout and replicationTimeout are set by ContainerBalancer.
+   */
+  private long moveTimeout = 1000 * 65 * 60;
+  private long replicationTimeout = 1000 * 50 * 60;
 
   private final ReplicationManager replicationManager;
   private final ContainerManager containerManager;
@@ -122,13 +123,11 @@ public final class MoveManager implements
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> pendingMoves =
       new ConcurrentHashMap<>();
 
-  private volatile boolean running = false;
-
   public MoveManager(final ReplicationManager replicationManager,
-      final Clock clock, final ContainerManager containerManager) {
+      final ContainerManager containerManager) {
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
-    this.clock = clock;
+    this.clock = replicationManager.getClock();
   }
 
   /**
@@ -137,6 +136,10 @@ public final class MoveManager implements
   public Map<ContainerID,
       Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> getPendingMove() {
     return pendingMoves;
+  }
+
+  void resetState() {
+    pendingMoves.clear();
   }
 
   /**
@@ -155,6 +158,8 @@ public final class MoveManager implements
         // for example , after becoming a new leader, we might need
         // to complete some moves and we know these futures does not
         // exist.
+        LOG.debug("Completing container move for container {} with result {}.",
+            cid, mr);
         future.complete(mr);
       }
     }
@@ -191,22 +196,6 @@ public final class MoveManager implements
   }
 
   /**
-   * notify MoveManager that the current scm has become leader and ready.
-   */
-  public void onLeaderReady() {
-    //discard all stale records
-    pendingMoves.clear();
-    running = true;
-  }
-
-  /**
-   * notify MoveManager that the current scm leader steps down.
-   */
-  public void onNotLeader() {
-    running = false;
-  }
-
-  /**
    * move a container replica from source datanode to
    * target datanode. A move is a two part operation. First a replication
    * command is scheduled to create a new copy of the replica. Later, when the
@@ -216,16 +205,11 @@ public final class MoveManager implements
    * @param src source datanode
    * @param tgt target datanode
    */
-  public CompletableFuture<MoveResult> move(
+  CompletableFuture<MoveResult> move(
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
-      TimeoutException, ContainerReplicaNotFoundException {
+      ContainerReplicaNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
-
-    if (!running) {
-      ret.complete(MoveResult.FAIL_LEADER_NOT_READY);
-      return ret;
-    }
 
     // Ensure src and tgt are IN_SERVICE and HEALTHY
     for (DatanodeDetails dn : Arrays.asList(src, tgt)) {
@@ -330,10 +314,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpCompleted(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -344,8 +324,11 @@ public final class MoveManager implements
         try {
           handleSuccessfulAdd(containerID);
         } catch (ContainerNotFoundException | NodeNotFoundException |
-                 ContainerReplicaNotFoundException e) {
-          LOG.warn("Can not handle successful Add for move", e);
+                 ContainerReplicaNotFoundException | NotLeaderException e) {
+          LOG.warn("Failed to handle successful Add for container {} being " +
+              "moved from source {} to target {}.", containerID,
+              mdnp.getSrc(), mdnp.getTgt(), e);
+          pair.getLeft().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
         }
       } else if (
             opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
@@ -362,10 +345,6 @@ public final class MoveManager implements
    */
   private void notifyContainerOpExpired(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    if (!running) {
-      return;
-    }
-
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(containerID);
     if (pair != null) {
@@ -383,8 +362,8 @@ public final class MoveManager implements
 
   private void handleSuccessfulAdd(final ContainerID cid)
       throws ContainerNotFoundException,
-      ContainerReplicaNotFoundException, NodeNotFoundException {
-
+      ContainerReplicaNotFoundException, NodeNotFoundException,
+      NotLeaderException {
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(cid);
     if (pair == null) {
@@ -392,6 +371,9 @@ public final class MoveManager implements
     }
     MoveDataNodePair movePair = pair.getRight();
     final DatanodeDetails src = movePair.getSrc();
+    final DatanodeDetails tgt = movePair.getTgt();
+    LOG.debug("Handling successful addition of Container {} from" +
+        " source {} to target {}.", cid, src, tgt);
 
     ContainerInfo containerInfo = containerManager.getContainer(cid);
     synchronized (containerInfo) {
@@ -470,8 +452,7 @@ public final class MoveManager implements
         containerInfo.containerID(), src);
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + MOVE_DEADLINE,
-        now + Math.round(MOVE_DEADLINE * MOVE_DEADLINE_FACTOR));
+        replicaIndex, src, tgt, now + replicationTimeout);
   }
 
   /**
@@ -479,20 +460,18 @@ public final class MoveManager implements
    * datanode.
    *
    * @param containerInfo Container to be deleted
-   * @param datanode      The datanode on which the replica should be deleted
+   * @param datanode The datanode on which the replica should be deleted
    */
   private void sendDeleteCommand(
       final ContainerInfo containerInfo, final DatanodeDetails datanode)
-      throws ContainerReplicaNotFoundException, ContainerNotFoundException {
+      throws ContainerReplicaNotFoundException, ContainerNotFoundException,
+      NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), datanode);
-    try {
-      replicationManager.sendDeleteCommand(
-          containerInfo, replicaIndex, datanode, true);
-    } catch (NotLeaderException nle) {
-      LOG.warn("Skipped deleting the container as this SCM is not the leader.",
-          nle);
-    }
+    long deleteTimeout = moveTimeout - replicationTimeout;
+    long now = clock.millis();
+    replicationManager.sendDeleteCommand(
+        containerInfo, replicaIndex, datanode, true, now + deleteTimeout);
   }
 
   private int getContainerReplicaIndex(
@@ -510,14 +489,18 @@ public final class MoveManager implements
   @Override
   public void opCompleted(ContainerReplicaOp op, ContainerID containerID,
       boolean timedOut) {
-    if (!running) {
-      return;
-    }
-
     if (timedOut) {
       notifyContainerOpExpired(op, containerID);
     } else {
       notifyContainerOpCompleted(op, containerID);
     }
+  }
+
+  void setMoveTimeout(long moveTimeout) {
+    this.moveTimeout = moveTimeout;
+  }
+
+  void setReplicationTimeout(long replicationTimeout) {
+    this.replicationTimeout = replicationTimeout;
   }
 }

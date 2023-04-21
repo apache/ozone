@@ -21,8 +21,10 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
@@ -108,6 +110,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
       AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
 
   private static MiniOzoneChaosCluster cluster;
+  private static OzoneClient client;
   private static MiniOzoneLoadGenerator loadGenerator;
 
   private static String omServiceId = null;
@@ -135,8 +138,9 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     cluster = chaosBuilder.build();
     cluster.waitForClusterToBeReady();
 
+    client = cluster.newClient();
+    ObjectStore store = client.getObjectStore();
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    ObjectStore store = cluster.getRpcClient().getObjectStore();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
@@ -194,6 +198,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
+
+    IOUtils.closeQuietly(client);
 
     if (cluster != null) {
       cluster.shutdown();
