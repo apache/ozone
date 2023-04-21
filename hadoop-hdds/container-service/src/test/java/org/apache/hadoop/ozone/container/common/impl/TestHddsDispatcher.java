@@ -220,7 +220,8 @@ public class TestHddsDispatcher {
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
-      containerData.getVolume().getVolumeInfo().incrementUsedSpace(50);
+      containerData.getVolume().getVolumeInfo()
+          .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
       ContainerCommandResponseProto response = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,

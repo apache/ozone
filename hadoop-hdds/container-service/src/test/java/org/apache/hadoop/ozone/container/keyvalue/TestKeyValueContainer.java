@@ -259,7 +259,8 @@ public class TestKeyValueContainer {
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1,
+          1.0f);
 
       container.populatePathFields(scmId, containerVolume);
       try (FileInputStream fis = new FileInputStream(folderToExport)) {
@@ -301,7 +302,8 @@ public class TestKeyValueContainer {
       container = new KeyValueContainer(containerData, CONF);
 
       containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1,
+          1.0f);
       container.populatePathFields(scmId, containerVolume);
       try {
         FileInputStream fis = new FileInputStream(folderToExport);
@@ -427,7 +429,8 @@ public class TestKeyValueContainer {
   @Test
   public void testDiskFullExceptionCreateContainer() throws Exception {
 
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    Mockito.when(
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
     try {
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -689,7 +692,8 @@ public class TestKeyValueContainer {
     KeyValueContainer container;
     List<File> exportFiles = new ArrayList<>();
     for (HddsVolume volume: volumeList) {
-      Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+      Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(),
+              anyLong(), anyFloat()))
           .thenReturn(volume);
       for (int index = 0; index < count; index++, containerId++) {
         // Create new container
