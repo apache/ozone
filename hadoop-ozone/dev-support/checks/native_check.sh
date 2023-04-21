@@ -25,28 +25,24 @@ function get_rocks_native_git_sha() {
 }
 
 function init_native_maven_opts() {
-    if [[ "${FORCE_NATIVE_BUILD}" == "true" ]]; then
-        NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
-    else
-        get_rocks_native_git_sha
-        PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-        # Parsing out version number from project version by getting the first occurance of '-'.
-        # If project version is 1.4.0-SNAPSHOT, VERSION_NUMBER = 1.4.0
-        VERSION_NUMBER=$(echo "${PROJECT_VERSION}"| cut -f1 -d'-')
-        # Adding rocks native sha after the version number in the project version.
-        # EXPECTED_ROCK_NATIVE_VERSION = 1.4.0.<rocks native git sha>-SNAPSHOT
-        EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}".${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
-        echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
-        mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
+    get_rocks_native_git_sha
+    PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+    # Parsing out version number from project version by getting the first occurance of '-'.
+    # If project version is 1.4.0-SNAPSHOT, VERSION_NUMBER = 1.4.0
+    VERSION_NUMBER=$(echo "${PROJECT_VERSION}" | cut -f1 -d'-')
+    # Adding rocks native sha after the version number in the project version.
+    # EXPECTED_ROCK_NATIVE_VERSION = 1.4.0.<rocks native git sha>-SNAPSHOT
+    EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}".${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
+    echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
+    mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
 
-        EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
-        if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
-          echo "Build using hdds-rocks-native version: ${EXPECTED_ROCKS_NATIVE_VERSION}"
-          NATIVE_MAVEN_OPTIONS="-Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
-        else
-          echo "Building hdds-rocks-native module as version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found"
-          NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
-        fi
+    EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
+    if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
+      echo "Build using hdds-rocks-native version: ${EXPECTED_ROCKS_NATIVE_VERSION}"
+      NATIVE_MAVEN_OPTIONS="-Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
+    else
+      echo "Building hdds-rocks-native module as version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found"
+      NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
     fi
     readonly NATIVE_MAVEN_OPTIONS
     echo "Native Maven options : ${NATIVE_MAVEN_OPTIONS}"
