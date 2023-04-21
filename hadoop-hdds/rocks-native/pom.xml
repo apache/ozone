@@ -384,7 +384,7 @@
         <profile>
             <id>java-11</id>
             <activation>
-                <jdk>[11,17]</jdk>
+                <jdk>[11,]</jdk>
                 <property>
                     <name>rocks_tools_native</name>
                 </property>
