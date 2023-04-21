@@ -718,4 +718,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return applyTransactionMap.get(transactionIndex);
   }
 
+  public void awaitDoubleBufferFlush() throws InterruptedException {
+    ozoneManagerDoubleBuffer.awaitFlush();
+  }
 }

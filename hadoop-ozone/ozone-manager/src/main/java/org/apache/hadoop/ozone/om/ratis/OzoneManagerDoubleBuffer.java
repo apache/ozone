@@ -31,12 +31,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.fs.shell.Count;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -54,6 +58,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.java2d.SurfaceDataProxy;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
@@ -104,6 +109,8 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
+  private final ConcurrentHashMap<CountDownLatch, Object> flushLatches =
+      new ConcurrentHashMap<>();
 
   /**
    * function which will get term associated with the transaction index.
@@ -295,6 +302,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       clearReadyBuffer();
+      notifyWaiters();
     } catch (IOException ex) {
       terminate(ex, 1);
     } catch (Throwable t) {
@@ -611,7 +619,8 @@ public final class OzoneManagerDoubleBuffer {
   private synchronized boolean canFlush() {
     try {
       while (currentBuffer.size() == 0) {
-        wait(Long.MAX_VALUE);
+        wait(1000L);
+        notifyWaiters();
       }
       return true;
     }  catch (InterruptedException ex) {
@@ -648,5 +657,20 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public OzoneManagerDoubleBufferMetrics getOzoneManagerDoubleBufferMetrics() {
     return ozoneManagerDoubleBufferMetrics;
+  }
+
+  void awaitFlush() throws InterruptedException {
+
+    // wait until both the current and ready buffers are flushed
+    CountDownLatch latch = new CountDownLatch(2);
+    flushLatches.put(latch, latch);
+    latch.await();
+    flushLatches.remove(latch);
+  }
+
+  void notifyWaiters() {
+    for (CountDownLatch l: flushLatches.keySet()) {
+      l.countDown();
+    }
   }
 }
