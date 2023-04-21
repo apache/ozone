@@ -942,7 +942,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         bucketLayout.isFileSystemOptimized() ?
                 OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
                         bucketId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX :
-                bucketKey;
+            OzoneFSUtils.addTrailingSlashIfNeeded(bucketKey);
 
     // Check key/file Table
     Table<String, OmKeyInfo> table = getKeyTable(bucketLayout);
