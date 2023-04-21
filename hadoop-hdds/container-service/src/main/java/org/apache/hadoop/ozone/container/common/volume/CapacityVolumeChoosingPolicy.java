@@ -51,6 +51,12 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
+      long maxContainerSize) throws IOException {
+    return chooseVolume(volumes, maxContainerSize, 1.0f);
+  }
+
+  @Override
+  public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize, float volumeUtilisationThreshold)
       throws IOException {
 

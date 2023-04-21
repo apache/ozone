@@ -43,4 +43,7 @@ public interface VolumeChoosingPolicy {
    */
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
       float volumeUtilisationThreshold) throws IOException;
+
+  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
+      throws IOException;
 }
