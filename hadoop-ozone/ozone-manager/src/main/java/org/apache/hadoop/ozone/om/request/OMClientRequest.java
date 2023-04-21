@@ -534,7 +534,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * ":", ".", "..", "//", "". If it has any of these characters throws
    * OMException, else return the path.
    */
-  private static String isValidKeyPath(String path) throws OMException {
+  public static String isValidKeyPath(String path) throws OMException {
     boolean isValid = true;
 
     // If keyName is empty string throw error.

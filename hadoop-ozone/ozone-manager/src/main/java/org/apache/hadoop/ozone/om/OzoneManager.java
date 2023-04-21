@@ -4035,6 +4035,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Return OzoneAdmins.
+   */
+  public OzoneAdmins getOmAdmins() {
+    return omAdmins;
+  }
+
+  /**
    * Return true if a UserGroupInformation is OM admin, false otherwise.
    * @param callerUgi Caller UserGroupInformation
    */
@@ -4418,6 +4425,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                     int payloadSizeResp)
           throws IOException {
     return null;
+  }
+
+  @Override
+  public boolean recoverLease(String volumeName, String bucketName,
+                              String keyName) throws IOException {
+    return false;
   }
 
   /**

@@ -40,6 +40,12 @@ Head object in non existing bucket
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET}-non-existent --key ${PREFIX}/headobject/key=value/f1   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
+Head object where path is a directory
+    ${legacy-bucket} =  Create legacy bucket
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${legacy-bucket} --key ${PREFIX}/headobject/keyvalue/f1 --body /tmp/testfile   0
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${legacy-bucket} --key ${PREFIX}/headobject/keyvalue/   255
+                        Should contain          ${result}    404
+                        Should contain          ${result}    Not Found
 
 Head non existing key
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
