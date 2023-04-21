@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Schedulable;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,7 +54,7 @@ public class TestOzoneIdentityProvider {
 
   @Test
   public void testGetUserFromCallerContext() {
-    Schedulable callerContextSchedulable = Mockito.mock(Schedulable.class);
+    Schedulable callerContextSchedulable = Mockito.mock(Server.Call.class);
 
     CallerContext callerContext =
         new CallerContext.Builder(
