@@ -49,7 +49,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   // The second tells the sequence number of the key.
   // The third token gives the type of key in the sst file.
   private static final String PATTERN_REGEX =
-          "'([\\s\\S]+)' seq:([0-9]+), type:([0-9]+)";
+      "'([\\s\\S]+)' seq:([0-9]+), type:([0-9]+)";
   public static final int PATTERN_KEY_GROUP_NUMBER = 1;
   public static final int PATTERN_SEQ_GROUP_NUMBER = 2;
   public static final int PATTERN_TYPE_GROUP_NUMBER = 3;
@@ -82,6 +82,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   /**
    * Parses next occuring number in the stream.
+   *
    * @return Optional of the integer empty if no integer exists
    */
   private Optional<Integer> getNextNumberInStream() throws IOException {
@@ -89,27 +90,28 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     int val;
     while ((val = processOutput.read()) != -1) {
       if (val >= '0' && val <= '9') {
-        value.append((char)val);
+        value.append((char) val);
       } else if (value.length() > 0) {
         break;
       }
     }
     return value.length() > 0 ? Optional.of(Integer.valueOf(value.toString()))
-            : Optional.empty();
+        : Optional.empty();
   }
 
   /**
    * Reads the next n chars from the stream & makes a string.
+   *
    * @param numberOfChars
    * @return String of next chars read
    * @throws IOException
    */
   private String readNextNumberOfCharsFromStream(int numberOfChars)
-          throws IOException {
+      throws IOException {
     StringBuilder value = new StringBuilder();
     while (numberOfChars > 0) {
       int noOfCharsRead = processOutput.read(charBuffer, 0,
-              Math.min(numberOfChars, charBuffer.length));
+          Math.min(numberOfChars, charBuffer.length));
       if (noOfCharsRead == -1) {
         break;
       }
@@ -126,7 +128,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = new BufferedReader(new InputStreamReader(
-            sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
+        sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
     charBuffer = new char[8192];
     open = new AtomicBoolean(true);
     next();
@@ -192,13 +194,13 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
           Optional<Integer> valueLength = getNextNumberInStream();
           if (valueLength.isPresent()) {
             String valueStr = readNextNumberOfCharsFromStream(
-                    valueLength.get());
+                valueLength.get());
             if (valueStr.length() == valueLength.get()) {
               keyFound = true;
               nextKey = new KeyValue(matcher.group(PATTERN_KEY_GROUP_NUMBER),
-                      matcher.group(PATTERN_SEQ_GROUP_NUMBER),
-                      matcher.group(PATTERN_TYPE_GROUP_NUMBER),
-                      valueStr);
+                  matcher.group(PATTERN_SEQ_GROUP_NUMBER),
+                  matcher.group(PATTERN_TYPE_GROUP_NUMBER),
+                  valueStr);
             }
           }
         }
