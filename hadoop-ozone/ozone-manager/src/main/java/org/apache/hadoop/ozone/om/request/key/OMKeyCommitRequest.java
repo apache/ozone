@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -262,11 +261,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           dbOzoneKey, omKeyInfo, trxnLogIndex);
-
-      if (oldKeyVersionsToDelete != null) {
-        OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbOzoneKey,
-            oldKeyVersionsToDelete, trxnLogIndex);
-      }
 
       omBucketInfo.incrUsedBytes(correctedSpace);
 

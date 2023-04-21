@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.jetbrains.annotations.NotNull;
@@ -120,10 +122,12 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     Assert.assertNotNull(keysToDelete);
     testAddToDBBatch();
 
-    RepeatedOmKeyInfo keysInDeleteTable =
-            omMetadataManager.getDeletedTable().get(getOzoneKey());
-    Assert.assertNotNull(keysInDeleteTable);
-    Assert.assertEquals(1, keysInDeleteTable.getOmKeyInfoList().size());
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, getOzoneKey());
+    Assert.assertTrue(rangeKVs.size() > 0);
+    Assert.assertEquals(1,
+        rangeKVs.get(0).getValue().getOmKeyInfoList().size());
 
   }
 

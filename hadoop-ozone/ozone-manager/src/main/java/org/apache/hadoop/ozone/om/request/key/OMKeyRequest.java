@@ -808,13 +808,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
       OMMetadataManager omMetadataManager, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
-
-    // Past keys that was deleted but still in deleted table,
-    // waiting for deletion service.
-    RepeatedOmKeyInfo keysToDelete =
-        omMetadataManager.getDeletedTable().get(dbOzoneKey);
-
-    return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+    return OmUtils.prepareKeyForDelete(keyToDelete, null,
           trxnLogIndex, isRatisEnabled);
   }
 

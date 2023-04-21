@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -353,18 +354,16 @@ public class TestOzoneAtRestEncryption {
     bucket.deleteKey(key.getName());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMetadataManager.getDeletedTable().isExist(objectKey);
+        return getMatchedKeyInfo(keyName, omMetadataManager) != null;
       } catch (IOException e) {
         return false;
       }
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
-        omMetadataManager.getDeletedTable().get(objectKey);
+        getMatchedKeyInfo(keyName, omMetadataManager);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
     Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
@@ -617,5 +616,18 @@ public class TestOzoneAtRestEncryption {
     // Restore ozClient and store
     TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
     TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+  }
+
+  private static RepeatedOmKeyInfo getMatchedKeyInfo(
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, "/");
+    for (int i = 0; i < rangeKVs.size(); ++i) {
+      if (rangeKVs.get(i).getKey().contains(keyName)) {
+        return rangeKVs.get(i).getValue();
+      }
+    }
+    return null;
   }
 }

@@ -118,9 +118,12 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
   protected void updateDeletedTable(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (this.keysToDelete != null) {
+    if (this.keysToDelete != null
+        && this.keysToDelete.getOmKeyInfoList().size() > 0) {
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          keysToDelete.getOmKeyInfoList().get(0).getObjectID(), openKeyName);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-              ozoneKeyName, keysToDelete);
+          deleteKey, keysToDelete);
     }
   }
 

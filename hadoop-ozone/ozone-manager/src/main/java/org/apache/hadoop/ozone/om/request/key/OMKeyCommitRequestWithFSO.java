@@ -216,11 +216,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
               omKeyInfo, fileName, trxnLogIndex);
 
-      if (oldKeyVersionsToDelete != null) {
-        OMFileRequest.addDeletedTableCacheEntry(omMetadataManager, dbFileKey,
-                oldKeyVersionsToDelete, trxnLogIndex);
-      }
-
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
