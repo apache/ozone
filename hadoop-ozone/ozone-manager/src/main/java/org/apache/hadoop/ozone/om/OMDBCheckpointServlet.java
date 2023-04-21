@@ -43,13 +43,13 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -115,12 +115,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Override
-  public List<String> writeDbDataToStream(DBCheckpoint checkpoint,
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
                                   OutputStream destination,
-                                  List<String> toExcludeList)
+                                  List<String> toExcludeList,
+                                  List<String> excludedList)
       throws IOException, InterruptedException {
-    List<String> excluded = new ArrayList<>();
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
 
     // Map of inodes to path.
     Map<Object, Path> copyFiles = new HashMap<>();
@@ -137,7 +139,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       if (!toExcludeList.contains(fName)) {
         finalCopyFiles.put(o, path);
       } else {
-        excluded.add(fName);
+        excludedList.add(fName);
       }
     });
 
@@ -149,7 +151,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
     }
-    return excluded;
   }
 
   private void getFilesForArchive(DBCheckpoint checkpoint,

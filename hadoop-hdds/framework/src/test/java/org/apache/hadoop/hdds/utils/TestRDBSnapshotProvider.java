@@ -45,6 +45,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -116,7 +117,7 @@ public class TestRDBSnapshotProvider {
         try (OutputStream outputStream = new FileOutputStream(targetFile)) {
           writeDBCheckpointToStream(dbCheckpoint, outputStream,
               HAUtils.getExistingSstFiles(
-                  rdbSnapshotProvider.getCandidateDir()));
+                  rdbSnapshotProvider.getCandidateDir()), new ArrayList<>());
         }
       }
     };

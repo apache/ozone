@@ -529,14 +529,15 @@ public final class HddsServerUtil {
    * @param checkpoint    checkpoint file
    * @param destination   destination output stream.
    * @param toExcludeList the files to be excluded
-   * @return excluded file list
+   * @param excludedList  the files excluded
    * @throws IOException
    */
-  public static List<String> writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination, List<String> toExcludeList)
+  public static void writeDBCheckpointToStream(
+      DBCheckpoint checkpoint,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList)
       throws IOException {
-    toExcludeList = toExcludeList == null ? new ArrayList<>() : toExcludeList;
-    List<String> excluded = new ArrayList<>();
     try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination);
         Stream<Path> files =
@@ -551,13 +552,12 @@ public final class HddsServerUtil {
             if (!toExcludeList.contains(fileName)) {
               includeFile(path.toFile(), fileName, archiveOutputStream);
             } else {
-              excluded.add(fileName);
+              excludedList.add(fileName);
             }
           }
         }
       }
     }
-    return excluded;
   }
 
   public static void includeFile(File file, String entryName,

@@ -194,7 +194,7 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -301,7 +301,7 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>());
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
     }
 
     // Untar the file into a temp folder to be examined.
@@ -381,7 +381,7 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>());
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
     }
 
     // Untar the file into a temp folder to be examined.
@@ -413,6 +413,7 @@ public class TestOMDbCheckpointServlet {
     }
     Assert.assertTrue(dummyFile.exists());
     List<String> toExcludeList = new ArrayList<>();
+    List<String> excludedList = new ArrayList<>();
     toExcludeList.add(dummyFile.getName());
 
     // Set http param to exclude snapshot data.
@@ -422,7 +423,7 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList);
+          fileOutputStream, toExcludeList, excludedList);
     }
 
     // Untar the file into a temp folder to be examined.

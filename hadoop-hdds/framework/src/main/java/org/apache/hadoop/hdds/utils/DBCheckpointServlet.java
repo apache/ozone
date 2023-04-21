@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -149,6 +150,7 @@ public class DBCheckpointServlet extends HttpServlet {
       }
 
       List<String> receivedSstList = new ArrayList<>();
+      List<String> excludedSstList = new ArrayList<>();
       String[] sstParam = request.getParameterValues(
           OZONE_DB_CHECKPOINT_REQUEST_SST);
       if (sstParam != null) {
@@ -180,23 +182,21 @@ public class DBCheckpointServlet extends HttpServlet {
                file + ".tar\"");
 
       Instant start = Instant.now();
-      List<String> excluded = writeDbDataToStream(checkpoint, request,
-          response.getOutputStream(), receivedSstList);
+      writeDbDataToStream(checkpoint, request,
+          response.getOutputStream(), receivedSstList, excludedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
 
-      if (!excluded.isEmpty()) {
-        LOG.info("Excluded SST {} from the latest checkpoint.", excluded);
-        dbMetrics.incNumCheckpoints();
+      LOG.info("Excluded SST {} from the latest checkpoint.",
+          excludedSstList);
+      if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
-        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(excluded.size());
-      } else {
-        dbMetrics.incNumCheckpoints();
-        dbMetrics.setLastCheckpointStreamingNumSSTExcluded(0);
       }
+      dbMetrics.setLastCheckpointStreamingNumSSTExcluded(
+          excludedSstList.size());
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
       dbMetrics.incNumCheckpoints();
     } catch (Exception e) {
@@ -224,14 +224,19 @@ public class DBCheckpointServlet extends HttpServlet {
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
    * @param toExcludeList the files to be excluded
-   * @return excluded file list
+   * @param excludedList  the files excluded
+   *
    */
-  public List<String>  writeDbDataToStream(DBCheckpoint checkpoint,
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
       OutputStream destination,
-      List<String> toExcludeList)
+      List<String> toExcludeList,
+      List<String> excludedList)
       throws IOException, InterruptedException {
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
 
-    return writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
+    writeDBCheckpointToStream(checkpoint, destination,
+        toExcludeList, excludedList);
   }
 }
