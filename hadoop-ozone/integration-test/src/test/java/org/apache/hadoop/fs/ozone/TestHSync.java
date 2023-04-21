@@ -234,19 +234,19 @@ public class TestHSync {
   private void runConcurrentWriteHSync(FileSystem fs, Path file,
       final FSDataOutputStream out, int initialDataSize)
       throws InterruptedException, IOException {
-    final long length = 0;
-    LOG.info("runConcurrentWriteHSync {} with size {}, skipLength={}",
-        file, initialDataSize, length);
     final byte[] data = new byte[initialDataSize];
     ThreadLocalRandom.current().nextBytes(data);
 
     AtomicReference<IOException> writerException = new AtomicReference<>();
     AtomicReference<IOException> syncerException = new AtomicReference<>();
 
+    LOG.info("runConcurrentWriteHSync {} with size {}",
+        file, initialDataSize);
+
+    final long start = Time.monotonicNow();
     // two threads: write and hsync
     Runnable writer = () -> {
-      final long start = Time.monotonicNow();
-      while ((Time.monotonicNow() - start < 30000)) {
+      while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.write(data);
         } catch (IOException e) {
@@ -257,8 +257,7 @@ public class TestHSync {
     };
 
     Runnable syncer = () -> {
-      final long start = Time.monotonicNow();
-      while ((Time.monotonicNow() - start < 30000)) {
+      while ((Time.monotonicNow() - start < 10000)) {
         try {
           out.hsync();
         } catch (IOException e) {
@@ -284,7 +283,8 @@ public class TestHSync {
   }
 
   @Test
-  public void testConcurrentWriteHSync() throws IOException {
+  public void testConcurrentWriteHSync()
+      throws IOException, InterruptedException {
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
@@ -295,13 +295,10 @@ public class TestHSync {
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
-        //runTestHSync(fs, file, 1 << i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {
           int initialDataSize = 1 << i;
           runConcurrentWriteHSync(fs, file, out, initialDataSize);
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
         }
 
         fs.delete(file, false);
