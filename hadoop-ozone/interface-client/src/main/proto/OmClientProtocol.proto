@@ -899,7 +899,7 @@ message ListBucketsRequest {
     optional string startKey = 2;
     optional string prefix = 3;
     optional int32 count = 4;
-    required bool isSnapshot = 5;
+    optional bool isSnapshot = 5;
 }
 
 message ListBucketsResponse {
