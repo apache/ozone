@@ -124,10 +124,12 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     Assert.assertFalse(
         omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
-
+    
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
-        null, 100, ozoneKey);
+        null, 100, deletedKey);
 
     // Key has blocks, it should not be in deletedKeyTable.
     Assert.assertTrue(rangeKVs.size() > 0);

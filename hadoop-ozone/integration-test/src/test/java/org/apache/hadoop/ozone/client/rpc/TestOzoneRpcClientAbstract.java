@@ -4074,7 +4074,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     createRequiredForVersioningTest(volumeName, bucketName, keyName, false);
 
-      checkExceptedResultForVersioningTest(volumeName, bucketName, keyName, 1);
+    checkExceptedResultForVersioningTest(volumeName, bucketName, keyName, 1);
 
 
     // Versioning turned on
