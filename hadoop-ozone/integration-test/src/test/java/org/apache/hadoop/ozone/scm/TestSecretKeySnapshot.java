@@ -81,8 +81,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public final class TestSecretKeySnapshot {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeySnapshot.class);
-  private static final long SNAPSHOT_THRESHOLD = 5;
-  private static final int LOG_PURGE_GAP = 5;
+  private static final long SNAPSHOT_THRESHOLD = 100;
+  private static final int LOG_PURGE_GAP = 100;
   public static final int ROTATE_CHECK_DURATION_MS = 1_000;
   public static final int ROTATE_DURATION_MS = 30_000;
   public static final int EXPIRY_DURATION_MS = 61_000;
