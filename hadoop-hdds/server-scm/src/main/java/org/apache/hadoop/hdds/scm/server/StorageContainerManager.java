@@ -2176,8 +2176,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .getDivision().getGroup());
 
     // check valid scmid in ratis peers list
-    if (!getScmHAManager().getRatisServer().getDivision()
-        .getGroup().getPeers().contains(RaftPeerId.valueOf(scmId))) {
+    if (getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeer(RaftPeerId.valueOf(scmId)) == null) {
       throw new IOException("ScmId " + scmId +
           " supplied for scm removal not in Ratis Peer list");
     }
