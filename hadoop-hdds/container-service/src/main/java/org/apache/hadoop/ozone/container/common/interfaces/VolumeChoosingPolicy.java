@@ -41,6 +41,6 @@ public interface VolumeChoosingPolicy {
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
-  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
-      throws IOException;
+  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
+      float volumeUtilisationThreshold) throws IOException;
 }

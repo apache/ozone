@@ -44,14 +44,16 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize) throws IOException {
+      long maxContainerSize, float volumeUtilisationThreshold)
+      throws IOException {
 
     // No volumes available to choose from
     if (volumes.size() < 1) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+    AvailableSpaceFilter filter =
+        new AvailableSpaceFilter(maxContainerSize, volumeUtilisationThreshold);
 
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds

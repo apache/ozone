@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -136,11 +137,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     File containerMetaDataPath = null;
     //acquiring volumeset read lock
     long maxSize = containerData.getMaxSize();
+    float volumeUtilisationLimit =
+        config.getFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT,
+            HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT);
     volumeSet.readLock();
     try {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          maxSize);
+          maxSize, volumeUtilisationLimit);
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       // Set volume before getContainerDBFile(), because we may need the
       // volume to deduce the db file.

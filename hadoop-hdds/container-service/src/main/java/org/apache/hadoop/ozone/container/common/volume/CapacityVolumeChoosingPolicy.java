@@ -51,14 +51,16 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize) throws IOException {
+      long maxContainerSize, float volumeUtilisationThreshold)
+      throws IOException {
 
     // No volumes available to choose from
     if (volumes.isEmpty()) {
       throw new DiskOutOfSpaceException("No more available volumes");
     }
 
-    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize);
+    AvailableSpaceFilter filter = new AvailableSpaceFilter(maxContainerSize,
+        volumeUtilisationThreshold);
 
     List<HddsVolume> volumesWithEnoughSpace = volumes.stream()
         .filter(filter)
