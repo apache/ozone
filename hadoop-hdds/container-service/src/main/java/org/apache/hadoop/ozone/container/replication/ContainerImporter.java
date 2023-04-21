@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -57,6 +58,7 @@ public class ContainerImporter {
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long containerSize;
+  private final float volumeUtilisationThreshold;
 
   public ContainerImporter(ConfigurationSource conf, ContainerSet containerSet,
       ContainerController controller,
@@ -74,6 +76,9 @@ public class ContainerImporter {
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    volumeUtilisationThreshold =
+        conf.getFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT,
+            HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT);
   }
 
   public void importContainer(long containerID, Path tarFilePath,
@@ -116,7 +121,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerSize * 2);
+        containerSize * 2, volumeUtilisationThreshold);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

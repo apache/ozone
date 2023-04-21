@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
@@ -38,12 +39,15 @@ public interface VolumeChoosingPolicy {
    * @param volumes - a list of available volumes.
    * @param maxContainerSize - the maximum size of the container for which a
    *                         volume is sought.
+   * @param volumeUtilisationThreshold - volume used/capacity threshold, if
+   *          volume crosses this container wont be allocated in this volume.
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
       float volumeUtilisationThreshold) throws IOException;
 
+  @VisibleForTesting
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
       throws IOException;
 }
