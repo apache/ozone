@@ -413,11 +413,8 @@ public class KeyManagerImpl implements KeyManager {
       if (ex instanceof OMException) {
         throw ex;
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Get key failed for volume:{} bucket:{} key:{}", volumeName,
-                bucketName, keyName, ex);
-      }
-      throw new OMException(ex.getMessage(), KEY_NOT_FOUND);
+      throw new OMException("Error reading key metadata: " + keyName, ex,
+          INTERNAL_ERROR);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
