@@ -17,20 +17,27 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.Closeable;
@@ -38,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collection;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -63,6 +71,23 @@ import java.util.UUID;
  */
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
+
+
+  /**
+   * Register API without a layout version info object passed in. Useful for
+   * tests.
+   * @param datanodeDetails DN details
+   * @param nodeReport Node report
+   * @param pipelineReportsProto Pipeline reports
+   * @return whatever the regular register command returns with default
+   * layout version passed in.
+   */
+  default RegisteredCommand register(
+      DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
+      PipelineReportsProto pipelineReportsProto) {
+    return register(datanodeDetails, nodeReport, pipelineReportsProto,
+        defaultLayoutVersionProto());
+  }
 
   /**
    * Gets all Live Datanodes that are currently communicating with SCM.
@@ -116,6 +141,25 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return a map of individual node stats (live/stale but not dead).
    */
   Map<DatanodeDetails, SCMNodeStat> getNodeStats();
+
+  /**
+   * Gets a sorted list of most or least used DatanodeUsageInfo containing
+   * healthy, in-service nodes. If the specified mostUsed is true, the returned
+   * list is in descending order of usage. Otherwise, the returned list is in
+   * ascending order of usage.
+   *
+   * @param mostUsed true if most used, false if least used
+   * @return List of DatanodeUsageInfo
+   */
+  List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(boolean mostUsed);
+
+  /**
+   * Get the usage info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeUsageInfo of the specified datanode
+   */
+  DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
    * Return the node stat of the specified datanode.
@@ -192,6 +236,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                     ContainerID containerId) throws NodeNotFoundException;
 
   /**
+   * Removes the given container from the specified datanode.
+   *
+   * @param datanodeDetails - DatanodeDetails
+   * @param containerId - containerID
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  void removeContainer(DatanodeDetails datanodeDetails,
+      ContainerID containerId) throws NodeNotFoundException;
+
+  /**
    * Remaps datanode to containers mapping to the new set of containers.
    * @param datanodeDetails - DatanodeDetails
    * @param containerIds - Set of containerIDs
@@ -217,6 +272,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void addDatanodeCommand(UUID dnId, SCMCommand command);
 
+
+  /**
+   * send refresh command to all the healthy datanodes to refresh
+   * volume usage info immediately.
+   */
+  void refreshAllHealthyDnUsageInfo();
+
   /**
    * Process node report.
    *
@@ -225,6 +287,68 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void processNodeReport(DatanodeDetails datanodeDetails,
                          NodeReportProto nodeReport);
+
+  /**
+   * Process Node LayoutVersion report.
+   *
+   * @param datanodeDetails
+   * @param layoutReport
+   */
+  void processLayoutVersionReport(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutReport);
+
+  /**
+   * Get the number of commands of the given type queued on the datanode at the
+   * last heartbeat. If the Datanode has not reported information for the given
+   * command type, -1 will be returned.
+   * @param cmdType
+   * @return The queued count or -1 if no data has been received from the DN.
+   */
+  int getNodeQueuedCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException;
+
+  /**
+   * Get the number of commands of the given type queued in the SCM CommandQueue
+   * for the given datanode.
+   * @param dnID The UUID of the datanode.
+   * @param cmdType The Type of command to query the current count for.
+   * @return The count of commands queued, or zero if none.
+   */
+  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
+
+  /**
+   * Get the total number of pending commands of the given type on the given
+   * datanode. This includes both the number of commands queued in SCM which
+   * will be sent to the datanode on the next heartbeat, and the number of
+   * commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The command Type To query.
+   * @return The number of commands of the given type pending on the datanode.
+   * @throws NodeNotFoundException
+   */
+  int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException;
+
+  /**
+   * Get the total number of pending commands of the given types on the given
+   * datanode. For each command, this includes both the number of commands
+   * queued in SCM which will be sent to the datanode on the next heartbeat,
+   * and the number of commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * All commands are retrieved under a single read lock, so the counts are
+   * consistent.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The list of command Types To query.
+   * @return A Map of commandType to Integer with an entry for each command type
+   *         passed.
+   * @throws NodeNotFoundException
+   */
+  Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType)
+      throws NodeNotFoundException;
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
@@ -262,4 +386,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int pipelineLimit(DatanodeDetails dn);
 
   int minPipelineLimit(List<DatanodeDetails> dn);
+
+  /**
+   * Gets the peers in all the pipelines for the particular datnode.
+   * @param dn datanode
+   */
+  default Collection<DatanodeDetails> getPeerList(DatanodeDetails dn) {
+    return null;
+  }
+
+  default HDDSLayoutVersionManager getLayoutVersionManager() {
+    return null;
+  }
+
+  default void forceNodesToHealthyReadOnly() { }
 }

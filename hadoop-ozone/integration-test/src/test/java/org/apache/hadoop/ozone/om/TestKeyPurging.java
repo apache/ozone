@@ -21,15 +21,18 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -64,6 +67,7 @@ public class TestKeyPurging {
 
   private static final int NUM_KEYS = 10;
   private static final int KEY_SIZE = 100;
+  private OzoneClient client;
 
   @Before
   public void setup() throws Exception {
@@ -81,12 +85,14 @@ public class TestKeyPurging {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
     om = cluster.getOzoneManager();
   }
 
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -112,7 +118,7 @@ public class TestKeyPurging {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
       OzoneOutputStream keyStream = TestHelper.createKey(
-          keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+          keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
           KEY_SIZE, store, volumeName, bucketName);
       keyStream.write(data);
       keyStream.close();

@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -35,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -43,9 +44,10 @@ import java.util.stream.Collectors;
  * and network topology to supply pipeline creation.
  * <p>
  * 1. get a list of healthy nodes
- * 2. filter out nodes that are not too heavily engaged in other pipelines
- * 3. Choose an anchor node among the viable nodes.
- * 4. Choose other nodes around the anchor node based on network topology
+ * 2. filter out nodes that have space less than container size.
+ * 3. filter out nodes that are not too heavily engaged in other pipelines
+ * 4. Choose an anchor node among the viable nodes.
+ * 5. Choose other nodes around the anchor node based on network topology
  */
 public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
@@ -67,11 +69,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * load balancing and rack awareness.
    *
    * @param nodeManager NodeManager
-   * @param stateManager PipelineStateManager
+   * @param stateManager PipelineStateManagerImpl
    * @param conf        Configuration
    */
   public PipelinePlacementPolicy(final NodeManager nodeManager,
-      final PipelineStateManager stateManager, final ConfigurationSource conf) {
+                                 final PipelineStateManager stateManager,
+                                 final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
     this.conf = conf;
@@ -80,41 +83,44 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
-  int currentPipelineCount(DatanodeDetails datanodeDetails, int nodesRequired) {
-
-    // Datanodes from pipeline in some states can also be considered available
-    // for pipeline allocation. Thus the number of these pipeline shall be
-    // deducted from total heaviness calculation.
-    int pipelineNumDeductable = 0;
-    Set<PipelineID> pipelines = nodeManager.getPipelines(datanodeDetails);
-    for (PipelineID pid : pipelines) {
-      Pipeline pipeline;
-      try {
-        pipeline = stateManager.getPipeline(pid);
-      } catch (PipelineNotFoundException e) {
-        LOG.debug("Pipeline not found in pipeline state manager during" +
-            " pipeline creation. PipelineID: {}", pid, e);
-        continue;
-      }
-      if (pipeline != null &&
-            // single node pipeline are not accounted for while determining
-            // the pipeline limit for dn
-            pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-            (pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE ||
-          pipeline.getFactor().getNumber() == nodesRequired &&
-          pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED)) {
-        pipelineNumDeductable++;
-      }
-    }
-    return pipelines.size() - pipelineNumDeductable;
+  public static int currentRatisThreePipelineCount(
+      NodeManager nodeManager,
+      PipelineStateManager stateManager,
+      DatanodeDetails datanodeDetails) {
+    // Safe to cast collection's size to int
+    return (int) nodeManager.getPipelines(datanodeDetails).stream()
+        .map(id -> {
+          try {
+            return stateManager.getPipeline(id);
+          } catch (PipelineNotFoundException e) {
+            LOG.debug("Pipeline not found in pipeline state manager during" +
+                " pipeline creation. PipelineID: {}", id, e);
+            return null;
+          }
+        })
+        .filter(PipelinePlacementPolicy::isNonClosedRatisThreePipeline)
+        .count();
   }
 
+  private static boolean isNonClosedRatisThreePipeline(Pipeline p) {
+    return p != null && p.getReplicationConfig()
+        .equals(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        && !p.isClosed();
+  }
 
+  @Override
+  protected int getMaxReplicasPerRack(int numReplicas, int numberOfRacks) {
+    if (numberOfRacks == 1) {
+      return numReplicas;
+    }
+    return Math.max(numReplicas - 1, 1);
+  }
 
   /**
    * Filter out viable nodes based on
    * 1. nodes that are healthy
-   * 2. nodes that are not too heavily engaged in other pipelines
+   * 2. nodes that have enough space
+   * 3. nodes that are not too heavily engaged in other pipelines
    * The results are sorted based on pipeline count of each node.
    *
    * @param excludedNodes - excluded nodes
@@ -123,22 +129,34 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @throws SCMException when viable nodes are not enough in numbers
    */
   List<DatanodeDetails> filterViableNodes(
-      List<DatanodeDetails> excludedNodes, int nodesRequired)
+      List<DatanodeDetails> excludedNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    String msg;
+    if (healthyNodes.size() == 0) {
+      msg = "No healthy node found to allocate container.";
+      LOG.error(msg);
+      throw new SCMException(msg, SCMException.ResultCodes
+              .FAILED_TO_FIND_HEALTHY_NODES);
+    }
+
+    healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
+        metadataSizeRequired, dataSizeRequired);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
+    int excludedNodesSize = 0;
     if (excludedNodes != null) {
+      excludedNodesSize = excludedNodes.size();
       healthyNodes.removeAll(excludedNodes);
     }
     int initialHealthyNodesCount = healthyNodes.size();
-    String msg;
 
     if (initialHealthyNodesCount < nodesRequired) {
       msg = String.format("Pipeline creation failed due to no sufficient" +
-              " healthy datanodes. Required %d. Found %d.",
-          nodesRequired, initialHealthyNodesCount);
+              " healthy datanodes. Required %d. Found %d. Excluded %d.",
+          nodesRequired, initialHealthyNodesCount, excludedNodesSize);
       LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -150,7 +168,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // TODO check if sorting could cause performance issue: HDDS-3466.
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
-            new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
+            new DnWithPipelines(d, currentRatisThreePipelineCount(nodeManager,
+                stateManager, d)))
         .filter(d ->
             (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
@@ -161,14 +180,16 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to find enough nodes that meet the criteria that" +
             " cannot engage in more than" + heavyNodeCriteria +
-            " pipelines. Nodes required: " + nodesRequired + " Found:" +
+            " pipelines. Nodes required: " + nodesRequired + " Excluded: " +
+            excludedNodesSize + " Found:" +
             healthyList.size() + " healthy nodes count in NodeManager: " +
             initialHealthyNodesCount);
       }
       msg = String.format("Pipeline creation failed because nodes are engaged" +
               " in other pipelines and every node can only be engaged in" +
-              " max %d pipelines. Required %d. Found %d",
-          heavyNodeCriteria, nodesRequired, healthyList.size());
+              " max %d pipelines. Required %d. Found %d. Excluded: %d.",
+          heavyNodeCriteria, nodesRequired, healthyList.size(),
+          excludedNodesSize);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
@@ -206,22 +227,28 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   /**
    * Pipeline placement choose datanodes to join the pipeline.
-   *
+   * TODO: HDDS-7227: Update Implementation to accomodate for already used
+   * nodes in pipeline to conform to existing placement policy.
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
    * @param excludedNodes - excluded nodes
    * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired  - size required for the container or block.
+   * @param dataSizeRequired - size required for the container.
+   * @param metadataSizeRequired - size required for Ratis metadata.
    * @return a list of chosen datanodeDetails
    * @throws SCMException when chosen nodes are not enough in numbers
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      int nodesRequired, final long sizeRequired) throws SCMException {
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes,
+          int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
     // Get a list of viable nodes based on criteria
     // and make sure excludedNodes are excluded from list.
-    List<DatanodeDetails> healthyNodes =
-        filterViableNodes(excludedNodes, nodesRequired);
+    List<DatanodeDetails> healthyNodes = filterViableNodes(excludedNodes,
+        nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     // Randomly picks nodes when all nodes are equal or factor is ONE.
     // This happens when network topology is absent or
@@ -273,9 +300,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // base on distance in topology, rack awareness and load balancing.
     List<DatanodeDetails> exclude = new ArrayList<>();
     // First choose an anchor node.
-    DatanodeDetails anchor = chooseNode(healthyNodes);
+    DatanodeDetails anchor = chooseFirstNode(healthyNodes);
     if (anchor != null) {
       results.add(anchor);
+      removePeers(anchor, healthyNodes);
       exclude.add(anchor);
     } else {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
@@ -295,6 +323,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       // Rack awareness is detected.
       rackAwareness = true;
       results.add(nextNode);
+      removePeers(nextNode, healthyNodes);
       exclude.add(nextNode);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Second node chosen: {}", nextNode);
@@ -325,6 +354,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
       if (pick != null) {
         results.add(pick);
+        removePeers(pick, healthyNodes);
         exclude.add(pick);
         LOG.debug("Remaining node chosen: {}", pick);
       } else {
@@ -350,6 +380,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
+   * Return random node in the list.
    *
    * @param healthyNodes - Set of healthy nodes we can choose from.
    * @return chosen datanodeDetails
@@ -362,6 +393,30 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     DatanodeDetails selectedNode =
             healthyNodes.get(getRand().nextInt(healthyNodes.size()));
     healthyNodes.remove(selectedNode);
+    if (selectedNode != null) {
+      removePeers(selectedNode, healthyNodes);
+    }
+    return selectedNode;
+  }
+
+  /**
+   * Find a node from the healthy list and return it after removing it from the
+   * list that we are operating on.
+   * Return the first node in the list.
+   *
+   * @param healthyNodes - Set of healthy nodes we can choose from.
+   * @return chosen datanodeDetails
+   */
+  private DatanodeDetails chooseFirstNode(
+      final List<DatanodeDetails> healthyNodes) {
+    if (healthyNodes == null || healthyNodes.isEmpty()) {
+      return null;
+    }
+    DatanodeDetails selectedNode = healthyNodes.get(0);
+    healthyNodes.remove(selectedNode);
+    if (selectedNode != null) {
+      removePeers(selectedNode, healthyNodes);
+    }
     return selectedNode;
   }
 
@@ -427,11 +482,15 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   @Override
-  protected int getRequiredRackCount() {
+  protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
   }
 
-  private static class DnWithPipelines {
+  /**
+   * static inner utility class for datanodes with pipeline, used for
+   * pipeline engagement checking.
+   */
+  public static class DnWithPipelines {
     private DatanodeDetails dn;
     private int pipelines;
 

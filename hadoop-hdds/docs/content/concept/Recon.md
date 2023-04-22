@@ -31,8 +31,7 @@ the current state of the cluster through REST based APIs and rich web UI.
 
 ## High Level Design
 
-{{<figure src="/concept/ReconHighLevelDesign.png" width="800px">}}
-
+![Recon High Level Design](ReconHighLevelDesign.png)
 <br/>
 
 On a high level, Recon collects and aggregates metadata from Ozone Manager (OM), 
@@ -50,8 +49,7 @@ the web UI.
 
 ## Recon and Ozone Manager
 
-{{<figure src="/concept/ReconOmDesign.png" width="800px">}}
-
+![Recon OM Design](ReconOmDesign.png)
 <br/>
 
 Recon gets a full snapshot of OM rocks db initially from the leader OM's HTTP 
@@ -68,8 +66,7 @@ further processing by OM db tasks via [Recon Task Framework](#task-framework).
 
 ## Recon and Storage Container Manager
 
-{{<figure src="/concept/ReconScmDesign.png" width="800px">}}
-
+![Recon SCM Design](ReconScmDesign.png)
 <br/>
 
 Recon also acts as a passive SCM for datanodes. When Recon is configured in the
@@ -112,7 +109,7 @@ Recon can integrate with any Prometheus instance configured to collected metrics
 and can display useful information in Recon UI in Datanodes and Pipelines pages.
 Recon also exposes a proxy endpoint ([/metrics]({{< ref "interface/ReconApi.md#metrics" >}}))
 to query Prometheus. This integration can be enabled by setting this configuration `ozone.recon.prometheus.http.endpoint` 
-to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=localhost:9090`.
+to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://prometheus:9090`.
 
 ## API Reference
 
@@ -155,6 +152,7 @@ ozone.recon.db.dir | none | Directory where the Recon Server stores its metadata
 ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM snapshot DB.
 ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot / delta updates.
 ozone.recon.task<br>.missingcontainer.interval | 300s | Time interval of the periodic check for Unhealthy Containers in the cluster.
+ozone.recon.task<br>.safemode.wait.threshold | 300s | Max time for Recon to wait before it exit out of safe or warmup mode.
 ozone.recon.sql.db.jooq.dialect | DERBY | Please refer to [SQL Dialect](https://www.jooq.org/javadoc/latest/org.jooq/org/jooq/SQLDialect.html) to specify a different dialect.
 ozone.recon.sql.db.jdbc.url | jdbc:derby:${ozone.recon.db.dir}<br>/ozone_recon_derby.db | Recon SQL database jdbc url.
 ozone.recon.sql.db.username | none | Recon SQL database username.

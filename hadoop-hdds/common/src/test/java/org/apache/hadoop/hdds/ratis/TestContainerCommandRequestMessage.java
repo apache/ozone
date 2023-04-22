@@ -36,8 +36,8 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
@@ -45,7 +45,7 @@ public class TestContainerCommandRequestMessage {
 
   static ByteString newData(int length) {
     final ByteString.Output out = ByteString.newOutput();
-    for(int i = 0; i < length; i++) {
+    for (int i = 0; i < length; i++) {
       out.write(RANDOM.nextInt());
     }
     return out.toByteString();
@@ -128,10 +128,10 @@ public class TestContainerCommandRequestMessage {
   static void runTest(
       BiFunction<BlockID, ByteString, ContainerCommandRequestProto> method)
       throws Exception {
-    for(int i = 0; i < 2; i++) {
+    for (int i = 0; i < 2; i++) {
       runTest(i, method);
     }
-    for(int i = 2; i < 1 << 10;) {
+    for (int i = 2; i < 1 << 10;) {
       runTest(i + 1 + RANDOM.nextInt(i - 1), method);
       i <<= 1;
       runTest(i, method);
@@ -150,6 +150,6 @@ public class TestContainerCommandRequestMessage {
         = ContainerCommandRequestMessage.toMessage(original, null);
     final ContainerCommandRequestProto computed
         = ContainerCommandRequestMessage.toProto(message.getContent(), null);
-    Assert.assertEquals(original, computed);
+    Assertions.assertEquals(original, computed);
   }
 }

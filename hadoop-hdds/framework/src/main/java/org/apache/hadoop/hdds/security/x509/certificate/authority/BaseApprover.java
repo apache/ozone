@@ -21,8 +21,8 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.pkcs.Attribute;
@@ -100,7 +100,7 @@ public abstract class BaseApprover implements CertificateApprover {
     Objects.requireNonNull(attribute);
     List<Extensions> extensionsList = new ArrayList<>();
     for (ASN1Encodable value : attribute.getAttributeValues()) {
-      if(value != null) {
+      if (value != null) {
         Extensions extensions = Extensions.getInstance(value);
         extensionsList.add(extensions);
       }

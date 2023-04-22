@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -26,20 +25,25 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -70,7 +74,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String rootPath;
 
-  private MiniOzoneCluster cluster = null;
+  private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
 
   private OzoneFileSystem o3fs;
 
@@ -78,22 +83,37 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String bucketName;
 
+  @BeforeClass
+  public static void initClass() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        BucketLayout.LEGACY.name());
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
+  }
+
+  @AfterClass
+  public static void teardownClass() {
+    IOUtils.closeQuietly(client);
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
 
   @Before
   public void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
-    OzoneConfiguration conf = new OzoneConfiguration();
-
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
+    OzoneConfiguration conf = cluster.getConf();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
 
     rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
@@ -102,9 +122,6 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   @After
   public void teardown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
     IOUtils.closeQuietly(o3fs);
   }
 
@@ -112,7 +129,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   public void test() throws Exception {
 
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
@@ -150,7 +167,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   @Test
   public void testObjectStoreCreateWithO3fs() throws Exception {
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
@@ -164,7 +181,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     keys.add("/dir1/dir2");
     keys.add("/dir1/dir2/dir3");
     keys.add("/dir1/dir2/dir3/dir4/");
-    for (int i=1; i <= 3; i++) {
+    for (int i = 1; i <= 3; i++) {
       int length = 10;
       String fileName = parentDir.concat("/file" + i + "/");
       keys.add(fileName);
@@ -177,7 +194,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     }
 
     // check
-    for (int i=1; i <= 3; i++) {
+    for (int i = 1; i <= 3; i++) {
       String fileName = parentDir.concat("/file" + i + "/");
       Path p = new Path(fileName);
       Assert.assertTrue(o3fs.getFileStatus(p).isFile());
@@ -196,12 +213,12 @@ public class TestOzoneFSWithObjectStoreCreate {
     Assert.assertTrue(result);
 
     // No Key should exist.
-    for(String key : keys) {
+    for (String key : keys) {
       checkPath(new Path(key));
     }
 
 
-    for (int i=1; i <= 3; i++) {
+    for (int i = 1; i <= 3; i++) {
       int length = 10;
       String fileName = parentDir.concat("/file" + i + "/");
       OzoneOutputStream ozoneOutputStream =
@@ -216,12 +233,12 @@ public class TestOzoneFSWithObjectStoreCreate {
     o3fs.rename(new Path("/dir1"), new Path("/dest"));
 
     // No source Key should exist.
-    for(String key : keys) {
+    for (String key : keys) {
       checkPath(new Path(key));
     }
 
     // check dest path.
-    for (int i=1; i <= 3; i++) {
+    for (int i = 1; i <= 3; i++) {
       String fileName = "/dest/".concat(parentDir.concat("/file" + i + "/"));
       Path p = new Path(fileName);
       Assert.assertTrue(o3fs.getFileStatus(p).isFile());
@@ -235,7 +252,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   public void testKeyCreationFailDuetoDirectoryCreationBeforeCommit()
       throws Exception {
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
@@ -264,7 +281,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   public void testMPUFailDuetoDirectoryCreationBeforeComplete()
       throws Exception {
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
@@ -330,7 +347,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     }
 
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     ozoneBucket.createDirectory("t1/t2");
     try {
@@ -347,7 +364,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   public void testListKeysWithNotNormalizedPath() throws Exception {
 
     OzoneVolume ozoneVolume =
-        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+        client.getObjectStore().getVolume(volumeName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
@@ -437,7 +454,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
     read = new byte[length];
     fsDataInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    fsDataInputStream.close();
 
     Assert.assertEquals(inputString, new String(read, UTF_8));
   }
@@ -454,7 +471,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private void checkAncestors(Path p) throws Exception {
     p = p.getParent();
-    while(p.getParent() != null) {
+    while (p.getParent() != null) {
       FileStatus fileStatus = o3fs.getFileStatus(p);
       Assert.assertTrue(fileStatus.isDirectory());
       p = p.getParent();

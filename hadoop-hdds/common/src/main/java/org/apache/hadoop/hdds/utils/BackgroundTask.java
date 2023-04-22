@@ -27,5 +27,7 @@ public interface BackgroundTask extends Callable<BackgroundTaskResult> {
   @Override
   BackgroundTaskResult call() throws Exception;
 
-  int getPriority();
+  default int getPriority() {
+    return 0;
+  }
 }

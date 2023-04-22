@@ -17,36 +17,52 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
  * The task to download a container from the sources.
  */
-public class ReplicationTask {
+public class ReplicationTask extends AbstractReplicationTask {
 
-  private volatile Status status = Status.QUEUED;
-
-  private final long containerId;
-
-  private List<DatanodeDetails> sources;
-
-  private final Instant queued = Instant.now();
+  private final ReplicateContainerCommand cmd;
+  private final ContainerReplicator replicator;
+  private final String debugString;
 
   /**
    * Counter for the transferred bytes.
    */
   private long transferredBytes;
 
-  public ReplicationTask(
+  public ReplicationTask(ReplicateContainerCommand cmd,
+                         ContainerReplicator replicator) {
+    super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
+    setPriority(cmd.getPriority());
+    this.cmd = cmd;
+    this.replicator = replicator;
+    if (cmd.getTargetDatanode() != null) {
+      // Only push replication will have a target datanode set, and it must be
+      // sent to the source datanode to be executed. It is possible the source
+      // is out of service, so we need to set the flag to allow the command to
+      // run.
+      setShouldOnlyRunOnInServiceDatanodes(false);
+    }
+    debugString = cmd.toString();
+  }
+
+  /**
+   * Intended to only be used in tests.
+   */
+  protected ReplicationTask(
       long containerId,
-      List<DatanodeDetails> sources
+      List<DatanodeDetails> sources,
+      ContainerReplicator replicator
   ) {
-    this.containerId = containerId;
-    this.sources = sources;
+    this(ReplicateContainerCommand.fromSources(containerId, sources),
+        replicator);
   }
 
   @Override
@@ -58,42 +74,35 @@ public class ReplicationTask {
       return false;
     }
     ReplicationTask that = (ReplicationTask) o;
-    return containerId == that.containerId;
+    return getContainerId() == that.getContainerId() &&
+        Objects.equals(getTarget(), that.getTarget());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(containerId);
+    return Objects.hash(getContainerId(), getTarget());
   }
 
   public long getContainerId() {
-    return containerId;
+    return cmd.getContainerID();
   }
 
   public List<DatanodeDetails> getSources() {
-    return sources;
+    return cmd.getSourceDatanodes();
   }
 
-  public Status getStatus() {
-    return status;
-  }
-
-  public void setStatus(Status status) {
-    this.status = status;
+  @Override
+  protected Object getCommandForDebug() {
+    return debugString;
   }
 
   @Override
   public String toString() {
-    return "ReplicationTask{" +
-        "status=" + status +
-        ", containerId=" + containerId +
-        ", sources=" + sources +
-        ", queued=" + queued +
-        '}';
-  }
-
-  public Instant getQueued() {
-    return queued;
+    String str = super.toString();
+    if (transferredBytes > 0) {
+      str += ", transferred " + transferredBytes + " bytes";
+    }
+    return str;
   }
 
   public long getTransferredBytes() {
@@ -104,13 +113,12 @@ public class ReplicationTask {
     this.transferredBytes = transferredBytes;
   }
 
-  /**
-   * Status of the replication.
-   */
-  public enum Status {
-    QUEUED,
-    DOWNLOADING,
-    FAILED,
-    DONE
+  DatanodeDetails getTarget() {
+    return cmd.getTargetDatanode();
+  }
+
+  @Override
+  public void runTask() {
+    replicator.replicate(this);
   }
 }

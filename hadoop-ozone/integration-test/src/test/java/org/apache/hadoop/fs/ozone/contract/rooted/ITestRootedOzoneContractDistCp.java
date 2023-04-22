@@ -26,6 +26,8 @@ import org.apache.hadoop.tools.contract.AbstractContractDistCpTest;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
+import static org.apache.hadoop.fs.contract.ContractTestUtils.cleanup;
+
 
 /**
  * Contract test suite covering S3A integration with DistCp.
@@ -47,5 +49,11 @@ public class ITestRootedOzoneContractDistCp extends AbstractContractDistCpTest {
   @Override
   protected RootedOzoneContract createContract(Configuration conf) {
     return new RootedOzoneContract(conf);
+  }
+
+  @Override
+  protected void deleteTestDirInTeardown() throws IOException {
+    super.deleteTestDirInTeardown();
+    cleanup("TEARDOWN", getLocalFS(), getLocalDir());
   }
 }

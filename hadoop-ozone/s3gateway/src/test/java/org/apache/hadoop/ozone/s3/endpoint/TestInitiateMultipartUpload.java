@@ -20,9 +20,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -52,9 +55,7 @@ public class TestInitiateMultipartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    ObjectEndpoint rest = new ObjectEndpoint();
-    rest.setHeaders(headers);
-    rest.setClient(client);
+    ObjectEndpoint rest = getObjectEndpoint(client, headers);
 
     Response response = rest.initializeMultipartUpload(bucket, key);
 
@@ -71,5 +72,33 @@ public class TestInitiateMultipartUpload {
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     assertNotEquals(multipartUploadInitiateResponse.getUploadID(), uploadID);
+  }
+
+  @Test
+  public void testInitiateMultipartUploadWithECKey() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    ObjectEndpoint rest = getObjectEndpoint(client, headers);
+    client.getObjectStore().getS3Bucket(bucket)
+        .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"));
+    Response response = rest.initializeMultipartUpload(bucket, key);
+
+    assertEquals(200, response.getStatus());
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+  }
+
+  @NotNull
+  private ObjectEndpoint getObjectEndpoint(OzoneClient client,
+      HttpHeaders headers) {
+    ObjectEndpoint rest = new ObjectEndpoint();
+    rest.setHeaders(headers);
+    rest.setClient(client);
+    rest.setOzoneConfiguration(new OzoneConfiguration());
+    return rest;
   }
 }

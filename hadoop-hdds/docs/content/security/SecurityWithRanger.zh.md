@@ -1,7 +1,7 @@
 ---
 title: "Apache Ranger"
 date: "2019-April-03"
-weight: 5
+weight: 7
 menu:
    main:
       parent: 安全
@@ -36,6 +36,13 @@ Apache Ranger™ 是一个用于管理和监控 Hadoop 平台复杂数据权限�
 --------|------------------------------------------------------------
 ozone.acl.enabled         | true
 ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer
+
+为了使用 RangerOzoneAuthorizer，还需要在 ozone-env.sh 中增加下面环境变量：
+```bash
+export OZONE_CLASSPATH="${OZONE_HOME}/share/ozone/lib/libext/*"
+```
+* ranger-ozone-plugin jars 具体路径取决于 Ranger Ozone plugin 安装配置。
+* 如果 ranger-ozone-plugin jars 安装在其他节点，需要拷贝到 Ozone 安装目录。
 
 Ozone各类操作对应Ranger权限如下：
 

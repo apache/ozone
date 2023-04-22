@@ -19,65 +19,87 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 
 import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
  */
-public class ReconPipelineManager extends SCMPipelineManager {
+public final class ReconPipelineManager extends PipelineManagerImpl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconPipelineManager.class);
 
-  public ReconPipelineManager(ConfigurationSource conf,
+  private ReconPipelineManager(ConfigurationSource conf,
+                               SCMHAManager scmhaManager,
+                               NodeManager nodeManager,
+                               PipelineStateManager pipelineStateManager,
+                               PipelineFactory pipelineFactory,
+                               EventPublisher eventPublisher,
+                               SCMContext scmContext) {
+    super(conf, scmhaManager, nodeManager, pipelineStateManager,
+        pipelineFactory, eventPublisher, scmContext,
+        Clock.system(ZoneOffset.UTC));
+  }
+
+  public static ReconPipelineManager newReconPipelineManager(
+      ConfigurationSource conf,
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
-      EventPublisher eventPublisher)
-      throws IOException {
-    super(conf, nodeManager, pipelineStore, eventPublisher,
-        new PipelineStateManager(),
-        new ReconPipelineFactory());
-    initializePipelineState();
-  }
-  
-  @Override
-  public void triggerPipelineCreation() {
-    // Don't do anything in Recon.
-  }
+      EventPublisher eventPublisher,
+      SCMHAManager scmhaManager,
+      SCMContext scmContext) throws IOException {
 
-  @Override
-  protected void destroyPipeline(Pipeline pipeline) throws IOException {
-    // remove the pipeline from the pipeline manager
-    removePipeline(pipeline.getId());
-  }
+    // Create PipelineStateManagerImpl
+    PipelineStateManager stateManager = PipelineStateManagerImpl
+        .newBuilder()
+        .setPipelineStore(pipelineStore)
+        .setNodeManager(nodeManager)
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
 
+    // Create PipelineFactory
+    PipelineFactory pipelineFactory = new ReconPipelineFactory();
+
+    return new ReconPipelineManager(conf, scmhaManager, nodeManager,
+        stateManager, pipelineFactory, eventPublisher, scmContext);
+  }
 
   /**
    * Bootstrap Recon's pipeline metadata with that from SCM.
    * @param pipelinesFromScm pipelines from SCM.
    * @throws IOException on exception.
    */
-  void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
+  void initializePipelines(List<Pipeline> pipelinesFromScm)
+      throws IOException, TimeoutException {
 
-    getLock().writeLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
@@ -90,20 +112,21 @@ public class ReconPipelineManager extends SCMPipelineManager {
         } else {
           // Recon already has this pipeline. Just update state and creation
           // time.
-          getStateManager().updatePipelineState(pipeline.getId(),
-              pipeline.getPipelineState());
+          getStateManager().updatePipelineState(
+              pipeline.getId().getProtobuf(),
+              Pipeline.PipelineState.getProtobuf(pipeline.getPipelineState()));
           getPipeline(pipeline.getId()).setCreationTimestamp(
               pipeline.getCreationTimestamp());
         }
         removeInvalidPipelines(pipelinesFromScm);
       }
     } finally {
-      getLock().writeLock().unlock();
+      releaseWriteLock();
     }
   }
 
   public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
-    getLock().writeLock().lock();
+    acquireWriteLock();
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
@@ -117,21 +140,23 @@ public class ReconPipelineManager extends SCMPipelineManager {
         PipelineID pipelineID = p.getId();
         if (!p.getPipelineState().equals(CLOSED)) {
           try {
-            getStateManager().updatePipelineState(pipelineID, CLOSED);
-          } catch (PipelineNotFoundException e) {
+            getStateManager().updatePipelineState(
+                pipelineID.getProtobuf(),
+                HddsProtos.PipelineState.PIPELINE_CLOSED);
+          } catch (IOException | TimeoutException e) {
             LOG.warn("Pipeline {} not found while updating state. ",
                 p.getId(), e);
           }
         }
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          finalizeAndDestroyPipeline(p, false);
-        } catch (IOException e) {
+          closePipeline(p, false);
+        } catch (IOException | TimeoutException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }
       });
     } finally {
-      getLock().writeLock().unlock();
+      releaseWriteLock();
     }
   }
   /**
@@ -140,14 +165,14 @@ public class ReconPipelineManager extends SCMPipelineManager {
    * @throws IOException
    */
   @VisibleForTesting
-  void addPipeline(Pipeline pipeline) throws IOException {
-    getLock().writeLock().lock();
+  public void addPipeline(Pipeline pipeline)
+      throws IOException, TimeoutException {
+    acquireWriteLock();
     try {
-      getPipelineStore().put(pipeline.getId(), pipeline);
-      getStateManager().addPipeline(pipeline);
-      getNodeManager().addPipeline(pipeline);
+      getStateManager().addPipeline(
+          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
     } finally {
-      getLock().writeLock().unlock();
+      releaseWriteLock();
     }
   }
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -24,9 +25,10 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 
 /**
  * ContainerReplicator wrapper with additional metrics.
@@ -34,51 +36,66 @@ import com.google.common.annotations.VisibleForTesting;
 @Metrics(about = "Closed container replication metrics", context = "dfs")
 public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
-  private static final String NAME = ContainerReplicator.class.toString();
+  private static final String NAME = ContainerReplicator.class.getSimpleName();
 
   private final ContainerReplicator delegate;
+  private final String name;
 
-  @Metric
+  @Metric(about = "Number of successful replication tasks")
   private MutableCounterLong success;
 
-  @Metric
+  @Metric(about = "Time spent on successful replication tasks")
   private MutableGaugeLong successTime;
 
-  @Metric
+  @Metric(about = "Number of failed replication attempts")
   private MutableCounterLong failure;
 
-  @Metric
+  @Metric(about = "Time spent waiting in the queue before starting the task")
   private MutableGaugeLong queueTime;
 
-  @Metric
+  @Metric(about = "Time spent on failed replication attempts")
+  private MutableGaugeLong failureTime;
+
+  @Metric(about = "Bytes transferred for failed replication attempts")
+  private MutableGaugeLong failureBytes;
+
+  @Metric(about = "Bytes transferred for successful replication tasks")
   private MutableGaugeLong transferredBytes;
 
-  public MeasuredReplicator(ContainerReplicator delegate) {
+  public MeasuredReplicator(ContainerReplicator delegate, String name) {
     this.delegate = delegate;
-    DefaultMetricsSystem.instance()
-        .register(NAME, "Closed container replication", this);
+    this.name = name;
+    DefaultMetricsSystem.instance().register(metricsName(),
+        "Closed container " + name + " replication metrics", this);
+  }
+
+  private String metricsName() {
+    return NAME + "/" + name;
   }
 
   @Override
   public void replicate(ReplicationTask task) {
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
 
     long msInQueue =
-        (Instant.now().getNano() - task.getQueued().getNano()) / 1_000_000;
+        Duration.between(task.getQueued(), Instant.now()).toMillis();
     queueTime.incr(msInQueue);
     delegate.replicate(task);
+    long elapsed = Time.monotonicNow() - start;
     if (task.getStatus() == Status.FAILED) {
       failure.incr();
+      failureBytes.incr(task.getTransferredBytes());
+      failureTime.incr(elapsed);
     } else if (task.getStatus() == Status.DONE) {
       transferredBytes.incr(task.getTransferredBytes());
       success.incr();
-      successTime.incr(System.currentTimeMillis() - start);
+      successTime.incr(elapsed);
     }
   }
 
   @Override
   public void close() throws Exception {
-    DefaultMetricsSystem.instance().unregisterSource(NAME);
+    DefaultMetricsSystem.instance().unregisterSource(metricsName());
   }
 
   @VisibleForTesting
@@ -89,6 +106,11 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @VisibleForTesting
   public MutableGaugeLong getSuccessTime() {
     return successTime;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getFailureTime() {
+    return failureTime;
   }
 
   @VisibleForTesting
@@ -106,4 +128,14 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
     return transferredBytes;
   }
 
+  @VisibleForTesting
+  public MutableGaugeLong getFailureBytes() {
+    return failureBytes;
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" + name + "}@"
+        + Integer.toHexString(hashCode());
+  }
 }

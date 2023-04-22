@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -54,11 +54,11 @@ public class TestChecksum {
     // A checksum is calculate for each bytesPerChecksum number of bytes in
     // the data. Since that value is 10 here and the data length is 55, we
     // should have 6 checksums in checksumData.
-    Assert.assertEquals(6, checksumData.getChecksums().size());
+    Assertions.assertEquals(6, checksumData.getChecksums().size());
 
     // Checksum verification should pass
-    Assert.assertTrue("Checksum mismatch",
-        Checksum.verifyChecksum(data, checksumData));
+    Assertions.assertTrue(Checksum.verifyChecksum(data, checksumData),
+        "Checksum mismatch");
   }
 
   /**
@@ -73,10 +73,10 @@ public class TestChecksum {
     // Change the data and check if new checksum matches the original checksum.
     // Modifying one byte of data should be enough for the checksum data to
     // mismatch
-    data[50] = (byte) (data[50]+1);
+    data[50] = (byte) (data[50] + 1);
     ChecksumData newChecksumData = checksum.computeChecksum(data);
-    Assert.assertNotEquals("Checksums should not match for different data",
-        originalChecksumData, newChecksumData);
+    Assertions.assertNotEquals(originalChecksumData, newChecksumData,
+        "Checksums should not match for different data");
   }
 
   /**
@@ -92,8 +92,7 @@ public class TestChecksum {
     Checksum checksum2 = getChecksum(ContainerProtos.ChecksumType.CRC32);
 
     // The two checksums should not match as they have different types
-    Assert.assertNotEquals(
-        "Checksums should not match for different checksum types",
-        checksum1, checksum2);
+    Assertions.assertNotEquals(checksum1, checksum2,
+        "Checksums should not match for different checksum types");
   }
 }

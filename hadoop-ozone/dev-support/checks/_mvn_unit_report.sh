@@ -26,11 +26,20 @@ _realpath() {
   fi
 }
 
+tempfile="${REPORT_DIR}/summary.tmp"
+
 ## generate summary txt file
 find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
     | xargs -n1 -0 "grep" -l -E "<failure|<error" \
     | awk -F/ '{sub("'"TEST-"'",""); sub(".xml",""); print $NF}' \
-    | tee "$REPORT_DIR/summary.txt"
+    > "${tempfile}"
+
+if [[ "${CHECK:-unit}" == "integration" ]]; then
+  find "." -not -path '*/iteration*' -name '*-output.txt' -print0 \
+      | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
+      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      >> "${tempfile}"
+fi
 
 #Copy heap dump and dump leftovers
 find "." -not -path '*/iteration*' \
@@ -45,17 +54,26 @@ grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
   | grep -v -e 'Crashed tests' -e '--' \
   | cut -f2- -d' ' \
   | sort -u \
-  | tee -a "${REPORT_DIR}/summary.txt"
+  >> "${tempfile}"
 
-# Add tests where "There was a timeout or other error in the fork"
-grep -e 'Running org' -e 'Tests run: .* in org' "${REPORT_DIR}/output.log" \
-  | sed -e 's/.* \(org[^ ]*\)/\1/' \
-  | uniq -c \
-  | grep -v ' 2 ' \
-  | awk '{ print $2 }' \
-  | sort -u \
-  | tee -a "${REPORT_DIR}/summary.txt"
+# Check for tests that started but were not finished
+if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
+  diff -uw \
+    <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
+      | sed -e 's/.* \(org[^ ]*\)/\1/' \
+      | uniq -c \
+      | sort -u -k2) \
+    <(grep -e 'Tests run: .* in org' "${REPORT_DIR}/output.log" \
+      | sed -e 's/.* \(org[^ ]*\)/\1/' \
+      | uniq -c \
+      | sort -u -k2) \
+    | grep '^- ' \
+    | awk '{ print $3 }' \
+    >> "${tempfile}"
+fi
 
+sort -u "${tempfile}" | tee "${REPORT_DIR}/summary.txt"
+rm "${tempfile}"
 
 #Collect of all of the report files of FAILED tests
 for failed_test in $(< ${REPORT_DIR}/summary.txt); do

@@ -20,16 +20,19 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -46,10 +49,12 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -70,26 +75,30 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -108,6 +117,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -144,6 +155,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
 
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
+
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
@@ -159,12 +172,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationFactor(ReplicationFactor.ONE)
+        .setReplicationConfig(RatisReplicationConfig
+            .getInstance(ReplicationFactor.ONE))
         .setState(LifeCycleState.OPEN)
         .setOwner("test")
         .setPipelineID(pipeline.getId())
-        .setReplicationType(ReplicationType.RATIS)
         .build();
+
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
@@ -176,6 +190,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         pipeline.getId().getProtobuf())).thenReturn(pipeline);
     when(mockScmServiceProvider.getContainerWithPipeline(containerId))
         .thenReturn(containerWithPipeline);
+    List<Long> containerIDs = new LinkedList<>();
+    containerIDs.add(containerId);
+    List<ContainerWithPipeline> cpw = new LinkedList<>();
+    cpw.add(containerWithPipeline);
+    when(mockScmServiceProvider
+        .getExistContainerWithPipelinesInBatch(containerIDs))
+        .thenReturn(cpw);
 
     InputStream inputStream =
         Thread.currentThread().getContextClassLoader().getResourceAsStream(
@@ -187,6 +208,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     when(urlConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
         anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+    when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
+        anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -223,8 +246,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         globalStatsDao, sqlConfiguration, reconOMMetadataManager);
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(reconScm, globalStatsDao);
+        new ClusterStateEndpoint(reconScm, globalStatsDao,
+            containerHealthSchemaManager);
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
@@ -232,7 +258,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     dslContext = getDslContext();
   }
 
-  @Before
+  @SuppressWarnings("checkstyle:MethodLength")
+  @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
@@ -327,23 +354,23 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
+    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
 
     try {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto);
+              containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build());
+              PipelineReportsProto.newBuilder().build(),
+              defaultLayoutVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assert.fail(ex.getMessage());
+      Assertions.fail(ex.getMessage());
     }
-
     // Write Data to OM
-
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
     // Create a new volume and bucket and then write keys to the bucket.
@@ -368,12 +395,29 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
-
     // key = key_two
     writeDataToOm(reconOMMetadataManager, "key_two");
-
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
+
+    // Populate the deletedKeys table in OM DB
+    List<String> deletedKeysList1 = Arrays.asList("key1");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList1, "Bucket1", "Volume1");
+    List<String> deletedKeysList2 = Arrays.asList("key2", "key2");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList2, "Bucket2", "Volume2");
+    List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList3, "Bucket3", "Volume3");
+
+    // Populate the deletedDirectories table in OM DB
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
+        3L, 2L, 1L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
+        6L, 5L, 4L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
+        9L, 8L, 7L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -382,46 +426,48 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
       throws IOException {
     // Check NodeState and NodeOperationalState field existence
-    Assert.assertEquals(NodeState.HEALTHY, datanodeMetadata.getState());
-    Assert.assertEquals(NodeOperationalState.IN_SERVICE,
+    Assertions.assertEquals(NodeState.HEALTHY, datanodeMetadata.getState());
+    Assertions.assertEquals(NodeOperationalState.IN_SERVICE,
         datanodeMetadata.getOperationalState());
 
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
     case HOST1:
-      Assert.assertEquals(75000,
+      Assertions.assertEquals(75000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
-      Assert.assertEquals(15400,
+      Assertions.assertEquals(15400,
           datanodeMetadata.getDatanodeStorageReport().getRemaining());
-      Assert.assertEquals(35000,
+      Assertions.assertEquals(35000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-      Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
-      Assert.assertEquals(pipelineId,
+      Assertions.assertEquals(1, datanodeMetadata.getPipelines().size());
+      Assertions.assertEquals(pipelineId,
           datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
-      Assert.assertEquals(pipeline.getFactor().getNumber(),
+      Assertions.assertEquals(pipeline.getReplicationConfig().getReplication(),
           datanodeMetadata.getPipelines().get(0).getReplicationFactor());
-      Assert.assertEquals(pipeline.getType().toString(),
+      Assertions.assertEquals(pipeline.getType().toString(),
           datanodeMetadata.getPipelines().get(0).getReplicationType());
-      Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
+      Assertions.assertEquals(pipeline.getLeaderNode().getHostName(),
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
-      Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
+      Assertions.assertEquals(1, datanodeMetadata.getLeaderCount());
       break;
     case HOST2:
-      Assert.assertEquals(130000,
+      Assertions.assertEquals(130000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
-      Assert.assertEquals(17800,
+      Assertions.assertEquals(17800,
           datanodeMetadata.getDatanodeStorageReport().getRemaining());
-      Assert.assertEquals(80000,
+      Assertions.assertEquals(80000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-      Assert.assertEquals(0, datanodeMetadata.getPipelines().size());
-      Assert.assertEquals(0, datanodeMetadata.getLeaderCount());
+      Assertions.assertEquals(0, datanodeMetadata.getPipelines().size());
+      Assertions.assertEquals(0, datanodeMetadata.getLeaderCount());
       break;
     default:
-      Assert.fail(String.format("Datanode %s not registered",
+      Assertions.fail(String.format("Datanode %s not registered",
           hostname));
     }
+    Assertions.assertEquals(HDDSLayoutVersionManager.maxLayoutVersion(),
+        datanodeMetadata.getLayoutVersion());
   }
 
   @Test
@@ -429,14 +475,14 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
         (DatanodesResponse) response.getEntity();
-    Assert.assertEquals(2, datanodesResponse.getTotalCount());
-    Assert.assertEquals(2, datanodesResponse.getDatanodes().size());
+    Assertions.assertEquals(2, datanodesResponse.getTotalCount());
+    Assertions.assertEquals(2, datanodesResponse.getDatanodes().size());
 
     datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
       try {
         testDatanodeResponse(datanodeMetadata);
       } catch (IOException e) {
-        Assert.fail(e.getMessage());
+        Assertions.fail(e.getMessage());
       }
     });
 
@@ -450,6 +496,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
               .findFirst().orElse(null);
       return (datanodeMetadata1 != null &&
           datanodeMetadata1.getContainers() == 1 &&
+          datanodeMetadata1.getOpenContainers() == 1 &&
           reconScm.getPipelineManager()
               .getContainersInPipeline(pipeline.getId()).size() == 1);
     });
@@ -497,20 +544,20 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Response response = pipelineEndpoint.getPipelines();
     PipelinesResponse pipelinesResponse =
         (PipelinesResponse) response.getEntity();
-    Assert.assertEquals(1, pipelinesResponse.getTotalCount());
-    Assert.assertEquals(1, pipelinesResponse.getPipelines().size());
+    Assertions.assertEquals(1, pipelinesResponse.getTotalCount());
+    Assertions.assertEquals(1, pipelinesResponse.getPipelines().size());
     PipelineMetadata pipelineMetadata =
         pipelinesResponse.getPipelines().iterator().next();
-    Assert.assertEquals(1, pipelineMetadata.getDatanodes().size());
-    Assert.assertEquals(pipeline.getType().toString(),
+    Assertions.assertEquals(1, pipelineMetadata.getDatanodes().size());
+    Assertions.assertEquals(pipeline.getType().toString(),
         pipelineMetadata.getReplicationType());
-    Assert.assertEquals(pipeline.getFactor().getNumber(),
+    Assertions.assertEquals(pipeline.getReplicationConfig().getReplication(),
         pipelineMetadata.getReplicationFactor());
-    Assert.assertEquals(datanodeDetails.getHostName(),
+    Assertions.assertEquals(datanodeDetails.getHostName(),
         pipelineMetadata.getLeaderNode());
-    Assert.assertEquals(pipeline.getId().getId(),
+    Assertions.assertEquals(pipeline.getId().getId(),
         pipelineMetadata.getPipelineId());
-    Assert.assertEquals(5, pipelineMetadata.getLeaderElections());
+    Assertions.assertEquals(5, pipelineMetadata.getLeaderElections());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = pipelineEndpoint.getPipelines();
@@ -560,12 +607,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     ClusterStateResponse clusterStateResponse =
         (ClusterStateResponse) response.getEntity();
 
-    Assert.assertEquals(1, clusterStateResponse.getPipelines());
-    Assert.assertEquals(0, clusterStateResponse.getVolumes());
-    Assert.assertEquals(0, clusterStateResponse.getBuckets());
-    Assert.assertEquals(0, clusterStateResponse.getKeys());
-    Assert.assertEquals(2, clusterStateResponse.getTotalDatanodes());
-    Assert.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    Assertions.assertEquals(1, clusterStateResponse.getPipelines());
+    Assertions.assertEquals(0, clusterStateResponse.getVolumes());
+    Assertions.assertEquals(0, clusterStateResponse.getBuckets());
+    Assertions.assertEquals(0, clusterStateResponse.getKeys());
+    Assertions.assertEquals(2, clusterStateResponse.getTotalDatanodes());
+    Assertions.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    Assertions.assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = clusterStateEndpoint.getClusterState();
@@ -580,9 +628,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertTrue(result.getRight());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
-    Assert.assertEquals(2, clusterStateResponse.getVolumes());
-    Assert.assertEquals(2, clusterStateResponse.getBuckets());
-    Assert.assertEquals(3, clusterStateResponse.getKeys());
+    Assertions.assertEquals(2, clusterStateResponse.getVolumes());
+    Assertions.assertEquals(2, clusterStateResponse.getBuckets());
+    Assertions.assertEquals(3, clusterStateResponse.getKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 
   @Test
@@ -606,22 +656,44 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     given(omKeyInfo3.getDataSize()).willReturn(1000L);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
+        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
+        keyTableLegacy);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
+
+    when(mockKeyIterLegacy.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
+    when(mockKeyIterFso.hasNext())
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(false);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+
+    when(mockKeyValueLegacy.getValue())
+        .thenReturn(omKeyInfo1)
+        .thenReturn(omKeyInfo2)
+        .thenReturn(omKeyInfo3);
+    when(mockKeyValueFso.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
@@ -637,13 +709,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(3, resultSet.size());
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
 
     // Test for "volume" query param
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);
@@ -682,7 +754,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(0, resultSet.size());
   }
 
-
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
       throws Exception {
     // if container report is processed first, and pipeline does not exist
@@ -692,8 +763,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
+            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
+  }
+
+  private BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }

@@ -43,9 +43,9 @@ public class TestOmVolumeArgs {
         .setAdminName(admin).setCreationTime(Time.now()).setOwnerName(owner)
         .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(Long.MAX_VALUE)
         .addMetadata("key1", "value1").addMetadata("key2", "value2")
-        .addOzoneAcls(OzoneAcl.toProtobuf(
+        .addOzoneAcls(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "user1",
-                IAccessAuthorizer.ACLType.READ, ACCESS))).build();
+                IAccessAuthorizer.ACLType.READ, ACCESS)).build();
 
     OmVolumeArgs cloneVolumeArgs = omVolumeArgs.copyObject();
 
@@ -57,31 +57,31 @@ public class TestOmVolumeArgs {
         IAccessAuthorizer.ACLType.WRITE, ACCESS));
 
     // Now check clone acl
-    Assert.assertNotEquals(cloneVolumeArgs.getAclMap().getAcl().get(0),
-        omVolumeArgs.getAclMap().getAcl().get(0));
+    Assert.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
+        omVolumeArgs.getAcls().get(0));
 
     // Set user acl to Write_ACL.
     omVolumeArgs.setAcls(Collections.singletonList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS)));
 
-    Assert.assertNotEquals(cloneVolumeArgs.getAclMap().getAcl().get(0),
-        omVolumeArgs.getAclMap().getAcl().get(0));
+    Assert.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
+        omVolumeArgs.getAcls().get(0));
 
     // Now clone and check. It should have same as original acl.
     cloneVolumeArgs = (OmVolumeArgs) omVolumeArgs.copyObject();
 
     Assert.assertEquals(omVolumeArgs, cloneVolumeArgs);
-    Assert.assertEquals(cloneVolumeArgs.getAclMap().getAcl().get(0),
-        omVolumeArgs.getAclMap().getAcl().get(0));
+    Assert.assertEquals(cloneVolumeArgs.getAcls().get(0),
+        omVolumeArgs.getAcls().get(0));
 
     omVolumeArgs.removeAcl(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS));
 
     // Removing acl, in original omVolumeArgs it should have no acls.
-    Assert.assertEquals(0, omVolumeArgs.getAclMap().getAcl().size());
-    Assert.assertEquals(1, cloneVolumeArgs.getAclMap().getAcl().size());
+    Assert.assertEquals(0, omVolumeArgs.getAcls().size());
+    Assert.assertEquals(1, cloneVolumeArgs.getAcls().size());
 
   }
 }

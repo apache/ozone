@@ -17,7 +17,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="CsiServer" type="Application" factoryName="Application" nameIsGenerated="true">
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.ozone.csi.CsiServer" />
-    <module name="hadoop-ozone-csi" />
+    <module name="ozone-csi" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site.xml" />
     <option name="VM_PARAMETERS" value="-Dlog4j.configuration=file:hadoop-ozone/dev-support/intellij/log4j.properties" />
     <extension name="coverage">

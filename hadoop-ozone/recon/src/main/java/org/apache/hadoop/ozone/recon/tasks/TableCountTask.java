@@ -24,7 +24,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -33,11 +32,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
 
 /**
  * Class to iterate over the OM DB and store the total counts of volumes,
@@ -69,18 +75,18 @@ public class TableCountTask implements ReconOmTask {
    */
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
+    HashMap<String, Long> objectCountMap = initializeCountMap();
     for (String tableName : getTaskTables()) {
       Table table = omMetadataManager.getTable(tableName);
       try (TableIterator keyIter = table.iterator()) {
         long count = getCount(keyIter);
-        ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
-            getRowKeyFromTable(tableName),
-            count);
+        objectCountMap.put(getRowKeyFromTable(tableName), count);
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
+    writeCountsToDB(objectCountMap);
     LOG.info("Completed a 'reprocess' run of TableCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
@@ -123,7 +129,7 @@ public class TableCountTask implements ReconOmTask {
         continue;
       }
       String rowKey = getRowKeyFromTable(omdbUpdateEvent.getTable());
-      try{
+      try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           objectCountMap.computeIfPresent(rowKey, (k, count) -> count + 1L);
@@ -149,14 +155,33 @@ public class TableCountTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
-    for (Entry<String, Long> entry: objectCountMap.entrySet()) {
-      ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
-          entry.getKey(),
-          entry.getValue());
-    }
+    writeCountsToDB(objectCountMap);
 
     LOG.info("Completed a 'process' run of TableCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private void writeCountsToDB(Map<String, Long> objectCountMap) {
+    List<GlobalStats> insertGlobalStats = new ArrayList<>();
+    List<GlobalStats> updateGlobalStats = new ArrayList<>();
+
+    for (Entry<String, Long> entry: objectCountMap.entrySet()) {
+      Timestamp now =
+          using(sqlConfiguration).fetchValue(select(currentTimestamp()));
+      GlobalStats record = globalStatsDao.fetchOneByKey(entry.getKey());
+      GlobalStats newRecord
+          = new GlobalStats(entry.getKey(), entry.getValue(), now);
+
+      // Insert a new record for key if it does not exist
+      if (record == null) {
+        insertGlobalStats.add(newRecord);
+      } else {
+        updateGlobalStats.add(newRecord);
+      }
+    }
+
+    globalStatsDao.insert(insertGlobalStats);
+    globalStatsDao.update(updateGlobalStats);
   }
 
   private HashMap<String, Long> initializeCountMap() {

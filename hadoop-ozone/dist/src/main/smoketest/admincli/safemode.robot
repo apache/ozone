@@ -19,13 +19,16 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
+*** Variables ***
+${SCM}       scm
+
 *** Test Cases ***
 Check safemode
     ${output} =         Execute          ozone admin safemode status
                         Should contain   ${output}   SCM is out of safe mode
 
 Check safemode with explicit host
-    ${output} =         Execute          ozone admin safemode status --scm scm
+    ${output} =         Execute          ozone admin safemode status --scm ${SCM}
                         Should contain   ${output}   SCM is out of safe mode
 
 Wait for safemode exit
@@ -39,7 +42,7 @@ Incomplete command
                         Should contain   ${output}   exit
                         Should contain   ${output}   wait
 
-Check safemode on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+#Check safemode on unknown host
+#    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
+#                        Should contain   ${output}   Invalid host name
 

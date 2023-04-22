@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import org.apache.hadoop.hdds.utils.MetricsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,6 @@ import java.util.concurrent.Executors;
 
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 /**
@@ -54,6 +54,9 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   @Metric
   private MutableCounterLong failed;
 
+  @Metric
+  private MutableCounterLong scheduled;
+
   /**
    * Create SingleThreadExecutor.
    *
@@ -61,8 +64,8 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
    */
   public SingleThreadExecutor(String name) {
     this.name = name;
-    DefaultMetricsSystem.instance()
-        .register(EVENT_QUEUE + name, "Event Executor metrics ", this);
+    MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
+        "Event Executor metrics ", "EventQueue");
 
     executor = Executors.newSingleThreadExecutor(
         runnable -> {
@@ -77,6 +80,7 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
       publisher) {
     queued.incr();
     executor.execute(() -> {
+      scheduled.incr();
       try {
         handler.onMessage(message, publisher);
         done.incr();
@@ -100,6 +104,11 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   @Override
   public long queuedEvents() {
     return queued.value();
+  }
+
+  @Override
+  public long scheduledEvents() {
+    return scheduled.value();
   }
 
   @Override

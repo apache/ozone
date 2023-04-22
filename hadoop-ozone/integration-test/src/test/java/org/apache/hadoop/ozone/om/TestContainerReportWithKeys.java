@@ -20,13 +20,17 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -62,6 +66,7 @@ public class TestContainerReportWithKeys {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
 
@@ -80,6 +85,7 @@ public class TestContainerReportWithKeys {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
+    client = OzoneClientFactory.getRpcClient(conf);
     scm = cluster.getStorageContainerManager();
   }
 
@@ -88,6 +94,7 @@ public class TestContainerReportWithKeys {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -100,13 +107,12 @@ public class TestContainerReportWithKeys {
     final String keyName = "key" + RandomStringUtils.randomNumeric(5);
     final int keySize = 100;
 
-    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
+            .createKey(keyName, keySize, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
     key.write(dataString.getBytes(UTF_8));
@@ -116,9 +122,10 @@ public class TestContainerReportWithKeys {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(keySize)
-        .setRefreshPipeline(true)
+        .setReplicationConfig(
+            StandaloneReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(keySize)
         .build();
 
 
@@ -130,7 +137,7 @@ public class TestContainerReportWithKeys {
     ContainerInfo cinfo = scm.getContainerInfo(keyInfo.getContainerID());
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
-            new ContainerID(keyInfo.getContainerID()));
+            ContainerID.valueOf(keyInfo.getContainerID()));
     Assert.assertTrue(replicas.size() == 1);
     replicas.stream().forEach(rp ->
         Assert.assertTrue(rp.getDatanodeDetails().getParent() != null));
