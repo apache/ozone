@@ -58,6 +58,48 @@ public class TestOzoneAdministrators {
   }
 
   @Test
+  public void testBucketOperation() throws OMException {
+    UserGroupInformation.createUserForTesting("testuser",
+        new String[]{"testgroup"});
+    try {
+      OzoneObj obj = getTestBucketobj("testbucket");
+      RequestContext context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.LIST);
+      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+          Collections.singletonList("testuser"), null));
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ_ACL);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.WRITE);
+      RequestContext finalContext = context;
+      // ACLType is WRITE
+      // execute volumeManager.checkAccess volumeManager is null
+      Assert.assertThrows(NullPointerException.class,
+          () -> nativeAuthorizer.checkAccess(obj, finalContext));
+
+      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+          null, Collections.singletonList("testgroup")));
+      context = getUserRequestContext("testuser",
+          IAccessAuthorizer.ACLType.READ_ACL);
+      Assert.assertTrue("matching read only admins are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } finally {
+      UserGroupInformation.reset();
+    }
+  }
+
+  @Test
   public void testListAllVolume() throws Exception {
     UserGroupInformation.createUserForTesting("testuser",
         new String[]{"testgroup"});
@@ -97,6 +139,21 @@ public class TestOzoneAdministrators {
         asList(new String[]{"testuser2", "testuser3"})));
     Assert.assertFalse("mismatching admins are not allowed perform " +
         "admin operations", nativeAuthorizer.checkAccess(obj, context));
+
+    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+        Collections.singletonList("testuser"), null));
+    if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
+      Assert.assertTrue("matching read only user are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
+      Assert.assertFalse("mismatching read only user are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    }
+
+    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+        Collections.singletonList("testuser1"), null));
+    Assert.assertFalse("mismatching read only user are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
   }
 
   private void testGroupAdminOperations(OzoneObj obj, RequestContext context)
@@ -112,6 +169,22 @@ public class TestOzoneAdministrators {
     Assert.assertFalse("Users from mismatching admin groups " +
         "are allowed to perform admin operations",
             nativeAuthorizer.checkAccess(obj, context));
+
+    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+        null, Collections.singletonList("testgroup")));
+    if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
+      Assert.assertTrue("matching read only groups are allowed to preform" +
+          "read operations", nativeAuthorizer.checkAccess(obj, context));
+    } else if (context.getAclRights() == IAccessAuthorizer.ACLType.CREATE) {
+      Assert.assertFalse("mismatching read only groups are allowed to " +
+          "preform read operations",
+              nativeAuthorizer.checkAccess(obj, context));
+    }
+
+    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
+        null, Collections.singletonList("testgroup1")));
+    Assert.assertFalse("mismatching read only groups are allowed to preform" +
+        "read operations", nativeAuthorizer.checkAccess(obj, context));
   }
 
   private RequestContext getUserRequestContext(String username,
@@ -128,5 +201,12 @@ public class TestOzoneAdministrators {
         .setResType(OzoneObj.ResourceType.VOLUME)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .setVolumeName(volumename).build();
+  }
+
+  private OzoneObj getTestBucketobj(String bucketname) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .setVolumeName(bucketname).build();
   }
 }

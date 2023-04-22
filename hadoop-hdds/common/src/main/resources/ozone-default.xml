@@ -1636,6 +1636,24 @@
   </property>
 
   <property>
+    <name>ozone.readonly.administrators</name>
+    <value/>
+    <description>
+      Ozone read only admin users delimited by the comma.
+      If set, This is the list of users are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.readonly.administrators.groups</name>
+    <value/>
+    <description>
+      Ozone read only admin groups delimited by the comma.
+      If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
