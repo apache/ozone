@@ -39,8 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import org.apache.hadoop.fs.shell.Count;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -58,7 +56,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.java2d.SurfaceDataProxy;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
@@ -302,7 +299,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       clearReadyBuffer();
-      notifyWaiters();
+      notifyFlush();
     } catch (IOException ex) {
       terminate(ex, 1);
     } catch (Throwable t) {
@@ -620,7 +617,7 @@ public final class OzoneManagerDoubleBuffer {
     try {
       while (currentBuffer.size() == 0) {
         wait(1000L);
-        notifyWaiters();
+        notifyFlush();
       }
       return true;
     }  catch (InterruptedException ex) {
@@ -641,7 +638,8 @@ public final class OzoneManagerDoubleBuffer {
    * Swaps the currentBuffer with readyBuffer so that the readyBuffer can be
    * used by sync thread to flush transactions to DB.
    */
-  private synchronized void swapCurrentAndReadyBuffer() {
+  @VisibleForTesting
+  synchronized void swapCurrentAndReadyBuffer() {
     Queue<DoubleBufferEntry<OMClientResponse>> temp = currentBuffer;
     currentBuffer = readyBuffer;
     readyBuffer = temp;
@@ -668,9 +666,25 @@ public final class OzoneManagerDoubleBuffer {
     flushLatches.remove(latch);
   }
 
-  void notifyWaiters() {
+  void notifyFlush() {
     for (CountDownLatch l: flushLatches.keySet()) {
       l.countDown();
     }
+  }
+
+  @VisibleForTesting
+  int getCurrentBufferSize() {
+    return currentBuffer.size();
+  }
+
+  @VisibleForTesting
+  int getReadyBufferSize() {
+    return readyBuffer.size();
+  }
+  void pause() {
+    isRunning.set(false);
+  }
+  void resume() {
+    isRunning.set(true);
   }
 }

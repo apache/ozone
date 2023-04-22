@@ -20,6 +20,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -38,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -45,9 +51,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -56,6 +66,7 @@ import static org.mockito.Mockito.when;
 class TestOzoneManagerDoubleBuffer {
 
   private OzoneManagerDoubleBuffer doubleBuffer;
+  private OzoneManagerDoubleBuffer spyDoubleBuffer;
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
@@ -214,5 +225,50 @@ class TestOzoneManagerDoubleBuffer {
         bufferMetrics.getMaxNumberOfTransactionsFlushedInOneIteration());
     assertEquals(expectedAvgFlushTransactionsInMetric,
         bufferMetrics.getAvgFlushTransactionsInOneIteration(), 0.001);
+  }
+
+  @Test
+  public void testAwaitFlush ()
+      throws ExecutionException, InterruptedException {
+    List<OMClientResponse> omClientResponses = Arrays.asList(omKeyCreateResponse,
+                                       omBucketCreateResponse);
+
+
+    spyDoubleBuffer = Mockito.spy(doubleBuffer);
+    AtomicInteger counter = new AtomicInteger();
+    // doAnswer(invocationOnMock -> {
+    //   counter.getAndIncrement();
+    //   assertTrue(doubleBuffer.getCurrentBufferSize() == 0);
+    //   assertTrue(doubleBuffer.getReadyBufferSize() == 0);
+    //   doubleBuffer.notifyFlush();
+    //   return null;
+    // }).when(spyDoubleBuffer).notifyFlush();
+
+    ExecutorService executorService = Executors.newCachedThreadPool();
+
+    spyDoubleBuffer.pause();
+    for (int i = 0; i < omClientResponses.size(); i++) {
+      spyDoubleBuffer.add(omClientResponses.get(i), i);
+    }
+
+    assertTrue(spyDoubleBuffer.getCurrentBufferSize() == 2);
+    Future<?> await = checkAwait(executorService);
+    spyDoubleBuffer.resume();
+    await.get();
+    assertTrue(spyDoubleBuffer.getCurrentBufferSize() == 0);
+//    verify(spyDoubleBuffer).notifyFlush();
+
+    
+  }
+
+  private Future<?> checkAwait(
+      ExecutorService executorService) {
+    return executorService.submit(() -> {
+      try {
+        spyDoubleBuffer.awaitFlush();
+      } catch (InterruptedException e) {
+      }
+    });
+
   }
 }
