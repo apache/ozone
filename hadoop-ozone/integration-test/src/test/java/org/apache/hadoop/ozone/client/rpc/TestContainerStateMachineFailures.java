@@ -179,6 +179,9 @@ public class TestContainerStateMachineFailures {
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
+    if (xceiverClientManager != null) {
+      xceiverClientManager.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -449,6 +452,8 @@ public class TestContainerStateMachineFailures {
       Assert.fail("Expected exception not thrown");
     } catch (IOException e) {
       // Exception should be thrown
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
     }
     // Make sure the container is marked unhealthy
     Assert.assertTrue(dn.getDatanodeStateMachine()
@@ -540,6 +545,8 @@ public class TestContainerStateMachineFailures {
       stateMachine.takeSnapshot();
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown");
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
     }
     FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
