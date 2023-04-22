@@ -38,7 +38,7 @@ public class GetAclBucketHandler extends GetAclHandler {
   @CommandLine.Mixin
   private BucketUri address;
 
-  private enum BucketType { SOURCE, TARGET }
+  private enum BucketType { SOURCE, LINK }
 
   @CommandLine.Option(names = { "--type", "-t" },
       defaultValue = "SOURCE",

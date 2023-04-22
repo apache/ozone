@@ -376,7 +376,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     String volumeName = obj.getVolumeName();
     String bucketName = obj.getBucketName();
-    if (volumeName != null && bucketName != null) {
+    String keyName = obj.getKeyName();
+    boolean isGetKeyAcl =
+        volumeName != null && bucketName != null && keyName != null;
+    if (isGetKeyAcl) {
       ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
           Pair.of(volumeName, bucketName), false);
       volumeName = resolvedBucket.realVolume();
@@ -387,7 +390,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            volumeName, bucketName, obj.getKeyName());
+            volumeName, bucketName, keyName);
       }
       metrics.incNumGetAcl();
       switch (obj.getResourceType()) {

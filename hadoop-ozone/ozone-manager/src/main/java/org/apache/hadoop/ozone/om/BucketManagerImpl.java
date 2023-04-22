@@ -152,20 +152,22 @@ public class BucketManagerImpl implements BucketManager {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
 
-    String volume;
-    String bucket;
-    if (context.getAclRights() == ACLType.DELETE) {
-      volume = ozObject.getVolumeName();
-      bucket = ozObject.getBucketName();
-    } else {
+    String volume = ozObject.getVolumeName();
+    String bucket = ozObject.getBucketName();
+    if (context.getAclRights() != ACLType.DELETE) {
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(
             ozObject.getVolumeName(), ozObject.getBucketName()), false);
         volume = resolvedBucket.realVolume();
         bucket = resolvedBucket.realBucket();
       } catch (IOException e) {
-        throw new OMException("Failed to resolveBucketLink: ", e,
-            INTERNAL_ERROR);
+        if (e instanceof OMException &&
+            ((OMException) e).getResult() == BUCKET_NOT_FOUND) {
+          LOG.warn("checkAccess on non-exist source bucket " +
+                  "Volume:{} Bucket:{}.", volume, bucket);
+        } else {
+          throw new OMException(e.getMessage(), INTERNAL_ERROR);
+        }
       }
     }
 

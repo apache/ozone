@@ -46,7 +46,6 @@ Setup ACL tests
     Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
     Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
     Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:testuser2:x ${target}/link-to-unreadable-bucket
 
 Verify Bucket ACL
     [arguments]         ${bucket_type}   ${object}    ${type}   ${name}    ${acls}
@@ -76,10 +75,6 @@ ACL verified on source and target bucket
                         Should Contain              ${result}         PERMISSION_DENIED
     ${result} =         Execute And Ignore Error    ozone sh bucket info ${source}/unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
-    ${result} =         Execute And Ignore Error    ozone sh bucket getacl ${target}/link-to-unreadable-bucket
-                        Should Not Contain          ${result}         PERMISSION_DENIED
-    ${result} =         Execute And Ignore Error    ozone sh bucket getacl ${source}/unreadable-bucket
-                        Should Not Contain          ${result}         PERMISSION_DENIED
 
 Create link loop
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
@@ -140,7 +135,7 @@ Source and target bucket have separate ACLs
     Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
     Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
     Verify Bucket ACL   SOURCE    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify Bucket ACL   TARGET    ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   LINK      ${target}/link1      USER    user1    ${EMPTY}
 
 Source and target bucket default list same ACLs
     Execute             ozone sh bucket removeacl --acl user:user1:y ${target}/link1
