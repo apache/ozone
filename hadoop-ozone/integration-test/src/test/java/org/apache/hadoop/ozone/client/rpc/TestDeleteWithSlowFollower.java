@@ -180,6 +180,9 @@ public class TestDeleteWithSlowFollower {
   @AfterClass
   public static void shutdown() {
     IOUtils.closeQuietly(client);
+    if (xceiverClientManager != null) {
+      xceiverClientManager.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -242,8 +245,6 @@ public class TestDeleteWithSlowFollower {
     key.close();
 
     // now move the container to the closed on the datanode.
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.ContainerCommandRequestProto.Builder request =
         ContainerProtos.ContainerCommandRequestProto.newBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
@@ -251,7 +252,13 @@ public class TestDeleteWithSlowFollower {
     request.setContainerID(containerID);
     request.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    xceiverClient.sendCommand(request.build());
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
+    try {
+      xceiverClient.sendCommand(request.build());
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
+    }
 
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) RatisTestHelper
