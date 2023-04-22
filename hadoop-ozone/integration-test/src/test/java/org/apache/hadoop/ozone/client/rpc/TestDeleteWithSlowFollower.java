@@ -263,17 +263,13 @@ public class TestDeleteWithSlowFollower {
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName)
-        .setReplicationConfig(
-            RatisReplicationConfig
-                .getInstance(THREE))
-        .setKeyName(keyName)
-        .build();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName).build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
-    BlockID blockID =
-        info.getKeyLocationVersions().get(0).getLocationList().get(0)
-            .getBlockID();
+    BlockID blockID = info.getKeyLocationVersions().get(0)
+        .getLocationList().get(0).getBlockID();
     OzoneContainer ozoneContainer;
     final DatanodeStateMachine dnStateMachine =
         leader.getDatanodeStateMachine();
