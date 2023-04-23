@@ -146,12 +146,12 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       try (InputStream inputStream = connection.getInputStream()) {
         FileUtils.copyInputStreamToFile(inputStream, targetFile);
       } catch (IOException ex) {
-        LOG.error("OM snapshot {} cannot be downloaded.", targetFile, ex);
         boolean deleted = FileUtils.deleteQuietly(targetFile);
         if (!deleted) {
           LOG.error("OM snapshot which failed to download {} cannot be deleted",
               targetFile);
         }
+        throw ex;
       } finally {
         connection.disconnect();
       }

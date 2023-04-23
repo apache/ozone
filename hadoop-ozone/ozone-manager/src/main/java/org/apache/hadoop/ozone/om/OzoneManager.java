@@ -3546,9 +3546,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    LOG.info("Downloaded checkpoint from Leader {} to the location {}",
-        leaderId, omDBCheckpoint.getCheckpointLocation());
-
     TermIndex termIndex = null;
     try {
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
