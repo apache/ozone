@@ -211,7 +211,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   /**
    * Called to notify state machine about the snapshot install result.
-   * Used to trigger the cleanup of candidate DB dir.
+   * Trigger the cleanup of candidate DB dir.
    * @param result InstallSnapshotResult
    * @param snapshotIndex the index of installed snapshot
    * @param peer the peer which fini
@@ -219,13 +219,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifySnapshotInstalled(RaftProtos.InstallSnapshotResult result,
                                       long snapshotIndex, RaftPeer peer) {
-    LOG.info("Receive notifySnapshotInstalled: {} at snapshotIndex: {}.",
-        result, snapshotIndex);
+    LOG.info("Receive notifySnapshotInstalled event {} for the peer: {}" +
+        " snapshotIndex: {}.", result, peer.getId(), snapshotIndex);
     switch (result) {
     case SUCCESS:
     case SNAPSHOT_UNAVAILABLE:
-      if (!ozoneManager.isLeaderReady() && ozoneManager.getOmRatisServer().
-          getServer().getPeer().equals(peer)) {
+      // Currently, only trigger for the one who installed snapshot
+      if (ozoneManager.getOmRatisServer().getServer().getPeer().equals(peer)) {
         ozoneManager.getOmSnapshotProvider().init();
       }
       break;
