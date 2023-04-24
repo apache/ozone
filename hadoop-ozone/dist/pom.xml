@@ -75,7 +75,7 @@
               <includes>*.classpath</includes>
               <includeArtifactIds>
                 hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
-                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native
+                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native,ozone-s3-secret-store
               </includeArtifactIds>
             </configuration>
           </execution>
