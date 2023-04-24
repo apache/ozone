@@ -41,7 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -152,7 +152,7 @@ public class DBCheckpointServlet extends HttpServlet {
       List<String> receivedSstList = new ArrayList<>();
       List<String> excludedSstList = new ArrayList<>();
       String[] sstParam = request.getParameterValues(
-          OZONE_DB_CHECKPOINT_REQUEST_SST);
+          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
       if (sstParam != null) {
         receivedSstList.addAll(
             Arrays.stream(sstParam)

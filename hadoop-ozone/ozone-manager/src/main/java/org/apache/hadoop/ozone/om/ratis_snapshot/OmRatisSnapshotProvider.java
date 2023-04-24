@@ -23,8 +23,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -82,7 +82,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
     super(omRatisSnapshotDir, OM_DB_NAME);
     LOG.info("Initializing OM Snapshot Provider");
-    this.peerNodesMap = new HashMap<>();
+    this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
@@ -164,9 +164,5 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     if (connectionFactory != null) {
       connectionFactory.destroy();
     }
-  }
-
-  public void stop() throws IOException {
-    close();
   }
 }

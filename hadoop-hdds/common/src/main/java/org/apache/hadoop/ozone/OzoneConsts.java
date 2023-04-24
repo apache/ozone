@@ -143,7 +143,8 @@ public final class OzoneConsts {
       "flushBeforeCheckpoint";
   public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
       "includeSnapshotData";
-  public static final String OZONE_DB_CHECKPOINT_REQUEST_SST = "usedSst";
+  public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
+      "toExcludeSST";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";

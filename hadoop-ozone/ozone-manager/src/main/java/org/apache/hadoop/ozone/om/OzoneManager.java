@@ -2200,7 +2200,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         jvmPauseMonitor.stop();
       }
       if (omRatisSnapshotProvider != null) {
-        omRatisSnapshotProvider.stop();
+        omRatisSnapshotProvider.close();
       }
       OMPerformanceMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);

@@ -41,6 +41,7 @@ public class DBCheckpointMetrics {
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
   private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
   private @Metric MutableGaugeLong lastCheckpointStreamingNumSSTExcluded;
+  // NOTE: numCheckpoints includes numIncrementalCheckpoints
   private @Metric MutableCounterLong numCheckpoints;
   private @Metric MutableCounterLong numCheckpointFails;
   private @Metric MutableCounterLong numIncrementalCheckpoints;

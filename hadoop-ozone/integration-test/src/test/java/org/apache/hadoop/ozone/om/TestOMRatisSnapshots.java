@@ -521,7 +521,7 @@ public class TestOMRatisSnapshots {
         getDBCheckpointMetrics();
     assertEquals(0, dbMetrics.getLastCheckpointStreamingNumSSTExcluded());
     assertTrue(dbMetrics.getNumIncrementalCheckpoints() >= 1);
-    assertTrue(dbMetrics.getNumCheckpoints() >= 2);
+    assertTrue(dbMetrics.getNumCheckpoints() >= 3);
 
     // Verify RPC server is running
     GenericTestUtils.waitFor(() -> {

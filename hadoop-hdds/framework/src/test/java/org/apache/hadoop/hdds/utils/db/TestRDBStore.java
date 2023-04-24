@@ -418,6 +418,8 @@ public class TestRDBStore {
            InputStream fileStream2 = new FileInputStream(fileInCk2)) {
         byte[] content1 = new byte[fileStream1.available()];
         byte[] content2 = new byte[fileStream2.available()];
+        fileStream1.read(content1);
+        fileStream2.read(content2);
         Assertions.assertArrayEquals(content1, content2);
       }
     }

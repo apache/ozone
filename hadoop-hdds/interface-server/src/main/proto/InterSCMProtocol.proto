@@ -29,7 +29,6 @@ option java_generate_equals_and_hash = true;
 
 message CopyDBCheckpointRequestProto {
   required bool flush = 1;
-  repeated string sst = 2;      //SST file name
 }
 
 message CopyDBCheckpointResponseProto {
