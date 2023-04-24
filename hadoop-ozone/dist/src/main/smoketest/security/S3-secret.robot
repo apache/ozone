@@ -24,20 +24,17 @@ Test Timeout        2 minutes
 *** Keywords ***
 GetSecret success
     ${output}=             Execute             ozone s3 getsecret
-    Log To Console         ${output}
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
 
 GetSecret failure
     ${output2}=            Execute and Ignore Error    ozone s3 getsecret
-    Log To Console         ${output2}
     Should not contain     ${output2}           awsAccessKey
     Should not contain     ${output2}           awsSecret
     Should contain         ${output2}           S3_SECRET_ALREADY_EXISTS
 
 Revoke Secrets
     ${output}=       Execute and Ignore Error      ozone s3 revokesecret -y
-    Log To Console         ${output}
 
 *** Test Cases ***
 Get S3 secret twice
@@ -46,5 +43,5 @@ Get S3 secret twice
     GetSecret success
     GetSecret failure
     Revoke Secrets
-    Execute                kdestroy
+    Execute       kdestroy
 
