@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -85,6 +86,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -113,6 +116,7 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
@@ -273,6 +277,7 @@ public class TestRootedOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+    conf.setInt(OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE, 4);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
@@ -2260,5 +2265,65 @@ public class TestRootedOzoneFileSystem {
   public void testFileSystemDeclaresCapability() throws Throwable {
     assertHasPathCapabilities(fs, getBucketPath(), FS_ACLS);
     assertHasPathCapabilities(fs, getBucketPath(), FS_CHECKSUMS);
+  }
+
+
+  @Test
+  public void testSnapshotDiff() throws Exception {
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucketPath1 = new Path(volumePath1, bucket1.getName());
+    Path snap1 = fs.createSnapshot(bucketPath1);
+    Path file1 = new Path(bucketPath1, "key1");
+    Path file2 = new Path(bucketPath1, "key2");
+    ContractTestUtils.touch(fs, file1);
+    ContractTestUtils.touch(fs, file2);
+    Path snap2 = fs.createSnapshot(bucketPath1);
+    java.nio.file.Path fromSnapPath = Paths.get(snap1.toString()).getFileName();
+    java.nio.file.Path toSnapPath = Paths.get(snap2.toString()).getFileName();
+    String fromSnap = fromSnapPath != null ? fromSnapPath.toString() : null;
+    String toSnap = toSnapPath != null ? toSnapPath.toString() : null;
+    SnapshotDiffReport diff =
+        ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
+    Assert.assertEquals(2, diff.getDiffList().size());
+    Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
+        diff.getDiffList().get(0).getType());
+    Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
+        diff.getDiffList().get(1).getType());
+    Assert.assertArrayEquals("key1".getBytes(StandardCharsets.UTF_8),
+        diff.getDiffList().get(0).getSourcePath());
+    Assert.assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8),
+        diff.getDiffList().get(1).getSourcePath());
+
+    // test whether snapdiff returns aggregated response as
+    // page size is 4.
+    for (int fileCount = 0; fileCount < 10; fileCount++) {
+      Path file =
+          new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+      ContractTestUtils.touch(fs, file);
+    }
+    Path snap3 = fs.createSnapshot(bucketPath1);
+    fromSnapPath = toSnapPath;
+    toSnapPath = Paths.get(snap3.toString()).getFileName();
+    fromSnap = fromSnapPath != null ? fromSnapPath.toString() : null;
+    toSnap = toSnapPath != null ? toSnapPath.toString() : null;
+    diff = ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
+    Assert.assertEquals(10, diff.getDiffList().size());
+
+    Path file =
+        new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
+    ContractTestUtils.touch(fs, file);
+    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, ".");
+    Assert.assertEquals(1, diff.getDiffList().size());
+
+
+    // try snapDiff between non-bucket paths
+    String errorMsg = "Path is not a bucket";
+    String finalFromSnap = fromSnap;
+    String finalToSnap = toSnap;
+    LambdaTestUtils.intercept(IllegalArgumentException.class, errorMsg,
+        () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
+            finalToSnap));
   }
 }
