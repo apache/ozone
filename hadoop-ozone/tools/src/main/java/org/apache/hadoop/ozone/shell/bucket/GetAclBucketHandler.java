@@ -38,12 +38,11 @@ public class GetAclBucketHandler extends GetAclHandler {
   @CommandLine.Mixin
   private BucketUri address;
 
-  private enum BucketType { SOURCE, LINK }
-
-  @CommandLine.Option(names = { "--type", "-t" },
-      defaultValue = "SOURCE",
-      description = "Allowed Bucket Type: ${COMPLETION-CANDIDATES}")
-  private BucketType linkBucketType;
+  @CommandLine.Option(names = {"--source"},
+      defaultValue = "false",
+      description = "Display source bucket ACLs if --source=true," +
+          " default false to display ACLs of the link bucket itself.")
+  private boolean getSourceAcl;
 
   @Override
   protected OzoneAddress getAddress() {
@@ -52,7 +51,7 @@ public class GetAclBucketHandler extends GetAclHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
-    if (linkBucketType == BucketType.SOURCE) {
+    if (getSourceAcl) {
       obj = getSourceObj(client, obj);
     }
     super.execute(client, obj);

@@ -20,8 +20,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.shell.bucket.GetAclBucketHandler;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
@@ -226,16 +228,16 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
 
-    // add link acl and compare acls of src and link
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testAddAcl(user1, linkObj, acl1);
+    // Add ACL to the LINK and verify that it is added to the source bucket
+    OzoneAcl acl1 = new OzoneAcl(USER, "remoteUser1", READ, DEFAULT);
+    boolean addAcl = getObjectStore().addAcl(linkObj, acl1);
+    Assert.assertTrue(addAcl);
     assertEqualsAcls(srcObj, linkObj);
 
-    // add src acl and compare acls of src and link
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testAddAcl(user2, srcObj, acl2);
+    // Add ACL to the SOURCE and verify that it from link
+    OzoneAcl acl2 = new OzoneAcl(USER, "remoteUser2", WRITE, DEFAULT);
+    boolean addAcl2 = getObjectStore().addAcl(srcObj, acl2);
+    Assert.assertTrue(addAcl2);
     assertEqualsAcls(srcObj, linkObj);
 
   }
@@ -246,9 +248,12 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneBucket linkedBucket = linkBucket(srcBucket);
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
-    String user = "remoteUser1";
-    OzoneAcl acl = new OzoneAcl(USER, user, READ, DEFAULT);
-    testRemoveAcl(user, linkObj, acl);
+    // As by default create will add some default acls in RpcClient.
+    List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
+    Assert.assertTrue(acls.size() > 0);
+    // Remove an existing acl.
+    boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));
+    Assert.assertTrue(removeAcl);
     assertEqualsAcls(srcObj, linkObj);
 
     // case2 : test remove src acl
@@ -256,9 +261,12 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneBucket linkedBucket2 = linkBucket(srcBucket2);
     OzoneObj linkObj2 = buildBucketObj(linkedBucket2);
     OzoneObj srcObj2 = buildBucketObj(srcBucket2);
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testRemoveAcl(user2, srcObj2, acl2);
+    // As by default create will add some default acls in RpcClient.
+    List<OzoneAcl> acls2 = getObjectStore().getAcl(srcObj2);
+    Assert.assertTrue(acls2.size() > 0);
+    // Remove an existing acl.
+    boolean removeAcl2 = getObjectStore().removeAcl(srcObj2, acls.get(0));
+    Assert.assertTrue(removeAcl2);
     assertEqualsAcls(srcObj2, linkObj2);
 
   }
@@ -270,14 +278,18 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
 
-    String user1 = "remoteUser1";
-    OzoneAcl acl1 = new OzoneAcl(USER, user1, READ, DEFAULT);
-    testSetAcl(user1, linkObj, acl1);  // case1: set link acl
+    // Set ACL to the LINK and verify that it is set to the source bucket
+    List<OzoneAcl> acl1 = Collections.singletonList(
+        new OzoneAcl(USER, "remoteUser1", READ, DEFAULT));
+    boolean setAcl1 = getObjectStore().setAcl(linkObj, acl1);
+    Assert.assertTrue(setAcl1);
     assertEqualsAcls(srcObj, linkObj);
 
-    String user2 = "remoteUser2";
-    OzoneAcl acl2 = new OzoneAcl(USER, user2, READ, DEFAULT);
-    testSetAcl(user2, srcObj, acl2);   // case2: set src acl
+    // Set ACL to the SOURCE and verify that it from link
+    List<OzoneAcl> acl2 = Collections.singletonList(
+        new OzoneAcl(USER, "remoteUser2", WRITE, DEFAULT));
+    boolean setAcl2 = getObjectStore().setAcl(srcObj, acl2);
+    Assert.assertTrue(setAcl2);
     assertEqualsAcls(srcObj, linkObj);
 
   }
@@ -374,8 +386,30 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   private void assertEqualsAcls(OzoneObj srcObj, OzoneObj linkObj)
       throws IOException {
-    Assert.assertEquals(
-        getObjectStore().getAcl(srcObj), getObjectStore().getAcl(linkObj));
+    if (linkObj.getResourceType() == OzoneObj.ResourceType.BUCKET) {
+      linkObj = getSourceBucketObj(linkObj);
+    }
+    Assert.assertEquals(getObjectStore().getAcl(srcObj),
+        getObjectStore().getAcl(linkObj));
+  }
+
+  private OzoneObj getSourceBucketObj(OzoneObj obj)
+      throws IOException {
+    assert obj.getResourceType() == OzoneObj.ResourceType.BUCKET;
+    OzoneBucket bucket = getObjectStore()
+        .getVolume(obj.getVolumeName())
+        .getBucket(obj.getBucketName());
+    if (!bucket.isLink()) {
+      return obj;
+    }
+    obj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucket.getSourceBucket())
+        .setVolumeName(bucket.getSourceVolume())
+        .setKeyName(obj.getKeyName())
+        .setResType(obj.getResourceType())
+        .setStoreType(obj.getStoreType())
+        .build();
+    return getSourceBucketObj(obj);
   }
 
   private void testSetAcl(String remoteUserName, OzoneObj ozoneObj,
@@ -409,6 +443,27 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   }
 
   private void testAddAcl(String remoteUserName, OzoneObj ozoneObj,
+      OzoneAcl userAcl) throws Exception {
+    ObjectStore objectStore = getObjectStore();
+    boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
+    Assert.assertTrue(addAcl);
+
+    List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
+
+    Assert.assertTrue(containsAcl(userAcl, acls));
+
+    // Add an already existing acl.
+    addAcl = objectStore.addAcl(ozoneObj, userAcl);
+    Assert.assertFalse(addAcl);
+
+    // Add an acl by changing acl type with same type, name and scope.
+    userAcl = new OzoneAcl(USER, remoteUserName,
+        WRITE, DEFAULT);
+    addAcl = objectStore.addAcl(ozoneObj, userAcl);
+    Assert.assertTrue(addAcl);
+  }
+
+  private void testAddLinkAcl(String remoteUserName, OzoneObj ozoneObj,
       OzoneAcl userAcl) throws Exception {
     ObjectStore objectStore = getObjectStore();
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);

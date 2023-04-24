@@ -48,8 +48,8 @@ Setup ACL tests
     Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
 
 Verify Bucket ACL
-    [arguments]         ${bucket_type}   ${object}    ${type}   ${name}    ${acls}
-    ${actual_acls} =    Execute          ozone sh bucket getacl --type ${bucket_type} ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
+    [arguments]         ${source_option}   ${object}    ${type}   ${name}    ${acls}
+    ${actual_acls} =    Execute          ozone sh bucket getacl ${source_option} ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
                         Should Be Equal    ${acls}    ${actual_acls}
 
 Can follow link with read access
@@ -130,24 +130,24 @@ Bucket info shows source
                         Should Contain              ${result}            creationTime
                         Should Not contain          ${result}            metadata
 
-Source and target bucket have separate ACLs
+Source and target bucket have different ACLs
     Execute             ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
-    Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify Bucket ACL   SOURCE    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify Bucket ACL   LINK      ${target}/link1      USER    user1    ${EMPTY}
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source=false  ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL          bucket          ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
 
-Source and target bucket default list same ACLs
     Execute             ozone sh bucket removeacl --acl user:user1:y ${target}/link1
-    Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL
-    Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE READ_ACL
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL
+
     Execute             ozone sh bucket setacl --acl user:user1:rw ${source}/bucket1
-    Verify ACL          bucket    ${target}/link1      USER    user1    READ WRITE
-    Verify ACL          bucket    ${source}/bucket1    USER    user1    READ WRITE
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE
 
     Execute             ozone sh bucket addacl --acl group:group2:r ${source}/bucket1
-    Verify ACL          bucket    ${target}/link1      GROUP   group2    READ
-    Verify ACL          bucket    ${source}/bucket1    GROUP   group2    READ
+    Verify ACL          bucket          ${target}/link1      GROUP   group2    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      GROUP   group2    READ
 
 Source and target key have same ACLs
     Execute             ozone sh key addacl --acl user:user1:rwxy ${source}/bucket1/key1
