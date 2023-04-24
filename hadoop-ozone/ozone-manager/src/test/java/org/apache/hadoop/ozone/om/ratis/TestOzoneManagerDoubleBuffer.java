@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -305,30 +304,37 @@ class TestOzoneManagerDoubleBuffer {
         new OzoneManagerDoubleBuffer.FlushNotifier();
     assertEquals(0, flushNotifier.notifyFlush());
     ExecutorService executorService = Executors.newCachedThreadPool();
-    List<Callable<Boolean>> tasks = new ArrayList<>();
+    List<Future<Boolean>> tasks = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      tasks.add(waitFN(flushNotifier));
+      tasks.add(waitFN(flushNotifier, executorService));
     }
-    List<Future<Boolean>> resultsList = executorService.invokeAll(tasks);
     Thread.sleep(2000);
-    for (int i = 0; i < 3; i++) {
-      assertFalse(resultsList.get(i).isDone());
+    for (int i = 0; i < tasks.size(); i++) {
+      assertFalse(tasks.get(i).isDone());
     }
     assertEquals(3, flushNotifier.notifyFlush());
+    tasks.add(waitFN(flushNotifier, executorService));
+    Thread.sleep(2000);
+    assertEquals(4, flushNotifier.notifyFlush());
+    // Confirm the initial ones are done
     for (int i = 0; i < 3; i++) {
-      assertTrue(resultsList.get(i).get());
+      assertTrue(tasks.get(i).get());
     }
+    assertFalse(tasks.get(3).isDone());
+    assertEquals(1, flushNotifier.notifyFlush());
+    assertTrue(tasks.get(3).get());
     assertEquals(0, flushNotifier.notifyFlush());
 
   }
 
-  private Callable<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn) {
-    return () -> {
+  private Future<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn,
+      ExecutorService executorService) {
+    return executorService.submit(() -> {
       try {
         fn.await();
       } catch (InterruptedException e) {
       }
       return true;
-    };
+    });
   }
 }
