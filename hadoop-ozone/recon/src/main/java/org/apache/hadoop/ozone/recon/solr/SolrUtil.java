@@ -148,11 +148,11 @@ public class SolrUtil {
     children.stream().forEach(bucket -> {
       volumeInfo.setSize(volumeInfo.getSize() + bucket.getSize());
       updateBucketLevelMinMaxAccessCount(bucket);
-      updateBucketColors(bucket);
+      updateBucketAccessRatio(bucket);
     });
   }
 
-  private void updateBucketColors(EntityReadAccessHeatMapResponse bucket) {
+  private void updateBucketAccessRatio(EntityReadAccessHeatMapResponse bucket) {
     long delta = bucket.getMaxAccessCount() - bucket.getMinAccessCount();
     List<EntityReadAccessHeatMapResponse> children =
         bucket.getChildren();
@@ -222,7 +222,9 @@ public class SolrUtil {
       EntityReadAccessHeatMapResponse bucket) {
     List<EntityReadAccessHeatMapResponse> children =
         bucket.getChildren();
-    bucket.setMinAccessCount(Long.MAX_VALUE);
+    if (children.size() > 0) {
+      bucket.setMinAccessCount(Long.MAX_VALUE);
+    }
     children.stream().forEach(path -> {
       long readAccessCount = path.getAccessCount();
       bucket.setMinAccessCount(
@@ -380,6 +382,9 @@ public class SolrUtil {
     Arrays.stream(entities).forEach(entityMetaData -> {
       String path = entityMetaData.getVal();
       String[] split = path.split("/");
+      if (split.length == 0) {
+        return;
+      }
       long keySize = 0;
       try {
         keySize = getEntitySize(path);

@@ -63,7 +63,8 @@ public class SolrAccessAuditsService extends AccessAuditsService {
                                      namespaceSummaryManager,
                                  ReconOMMetadataManager omMetadataManager,
                                  OzoneStorageContainerManager reconSCM,
-                                 ReconHttpClient reconHttpClient) {
+                                 ReconHttpClient reconHttpClient)
+      throws AuthenticationException, IOException {
     this.reconHttpClient = reconHttpClient;
     this.ozoneConfiguration = ozoneConfiguration;
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
@@ -77,15 +78,18 @@ public class SolrAccessAuditsService extends AccessAuditsService {
    *
    * @param conf OzoneConfiguration
    * @return recon UserGroupInformation object
+   * @throws AuthenticationException
+   * @throws IOException
    */
   private static UserGroupInformation initializeReconUGI(
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf) throws AuthenticationException, IOException {
     try {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         return getReconUGI(conf);
       }
     } catch (Exception ex) {
       LOG.error("Error initializing recon UGI. ", ex);
+      throw ex;
     }
     return null;
   }
