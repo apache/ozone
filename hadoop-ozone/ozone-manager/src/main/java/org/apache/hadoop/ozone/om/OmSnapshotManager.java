@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -318,7 +318,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Integers are used for indexing persistent list.
     registry.addCodec(Integer.class, new IntegerCodec());
     // DiffReportEntry codec for Diff Report.
-    registry.addCodec(SnapshotDiffReport.DiffReportEntry.class,
+    registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
