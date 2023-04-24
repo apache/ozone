@@ -643,42 +643,46 @@ public class TestContainerStateMachineFailures {
       }
     };
 
-    List<Thread> threadList = new ArrayList<>();
-
-    for (int i = 0; i < 100; i++) {
-      count++;
-      Thread r = new Thread(r2);
-      r.start();
-      threadList.add(r);
-    }
-
-    Thread closeContainerThread = new Thread(r1);
-    closeContainerThread.start();
-    threadList.add(closeContainerThread);
-    latch.await(600, TimeUnit.SECONDS);
-    for (int i = 0; i < 101; i++) {
-      threadList.get(i).join();
-    }
-
-    if (failCount.get() > 0) {
-      fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
-    }
-    Assert.assertTrue(
-            TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
-                    .getDatanodeStateMachine()
-                    .getContainer().getContainerSet().getContainer(containerID)
-                    .getContainerState()
-                    == ContainerProtos.ContainerDataProto.State.CLOSED);
-    Assert.assertTrue(stateMachine.isStateMachineHealthy());
     try {
-      stateMachine.takeSnapshot();
-    } catch (IOException ioe) {
-      Assert.fail("Exception should not be thrown");
-    }
-    FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
-    Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+      List<Thread> threadList = new ArrayList<>();
 
-    r2.run();
+      for (int i = 0; i < 100; i++) {
+        count++;
+        Thread r = new Thread(r2);
+        r.start();
+        threadList.add(r);
+      }
+
+      Thread closeContainerThread = new Thread(r1);
+      closeContainerThread.start();
+      threadList.add(closeContainerThread);
+      latch.await(600, TimeUnit.SECONDS);
+      for (int i = 0; i < 101; i++) {
+        threadList.get(i).join();
+      }
+
+      if (failCount.get() > 0) {
+        fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
+      }
+      Assert.assertTrue(
+          TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+              .getDatanodeStateMachine()
+              .getContainer().getContainerSet().getContainer(containerID)
+              .getContainerState()
+              == ContainerProtos.ContainerDataProto.State.CLOSED);
+      Assert.assertTrue(stateMachine.isStateMachineHealthy());
+      try {
+        stateMachine.takeSnapshot();
+      } catch (IOException ioe) {
+        Assert.fail("Exception should not be thrown");
+      }
+      FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
+      Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+
+      r2.run();
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
+    }
   }
 
   @Test
