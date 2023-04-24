@@ -71,6 +71,8 @@ public class RocksDBConfiguration {
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
 
+  private boolean manualWalFlush = false;
+
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
   }
@@ -109,5 +111,13 @@ public class RocksDBConfiguration {
 
   public long getWalSizeLimit() {
     return walSizeLimit;
+  }
+
+  public void setManualWalFlush(boolean manualWalFlush) {
+    this.manualWalFlush = manualWalFlush;
+  }
+
+  public boolean getManualWalFlush() {
+    return manualWalFlush;
   }
 }

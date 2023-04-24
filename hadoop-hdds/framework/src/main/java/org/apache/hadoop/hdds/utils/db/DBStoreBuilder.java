@@ -120,6 +120,14 @@ public final class DBStoreBuilder {
     return newBuilder(configuration, definition).build();
   }
 
+  public static DBStore createDBStore(
+      ConfigurationSource configuration, DBDefinition definition,
+      RocksDBConfiguration rocksDBConfiguration) throws IOException {
+    DBStoreBuilder builder = newBuilder(configuration, rocksDBConfiguration);
+    builder.applyDBDefinition(definition);
+    return builder.build();
+  }
+
   public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
       DBDefinition definition) {
 
@@ -408,6 +416,7 @@ public final class DBStoreBuilder {
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
+    dbOptions.setManualWalFlush(rocksDBConfiguration.getManualWalFlush());
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {

@@ -21,9 +21,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
@@ -41,7 +39,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
-  private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
@@ -52,16 +49,12 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     init();
   }
 
-  private BatchOperation getCurrentBatchOperation() {
-    return currentBatchOperation;
-  }
-
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     rwLock.readLock().lock();
     try {
-      table.putWithBatch(getCurrentBatchOperation(), key, value);
+      table.put(key, value);
     } finally {
       rwLock.readLock().unlock();
     }
@@ -72,7 +65,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       throws IOException {
     rwLock.readLock().lock();
     try {
-      table.deleteWithBatch(getCurrentBatchOperation(), key);
+      table.delete(key);
     } finally {
       rwLock.readLock().unlock();
     }
@@ -110,14 +103,11 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       // write latest trx info into trx table in the same batch
       Table<String, TransactionInfo> transactionInfoTable
           = metadataStore.getTransactionInfoTable();
-      transactionInfoTable.putWithBatch(currentBatchOperation,
-          TRANSACTION_INFO_KEY, latestTrxInfo);
+      transactionInfoTable.put(TRANSACTION_INFO_KEY, latestTrxInfo);
 
-      metadataStore.getStore().commitBatchOperation(currentBatchOperation);
-      currentBatchOperation.close();
+      metadataStore.getStore().flushLog(true);
+      metadataStore.getStore().flushDB();
       this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
-      // reset batch operation
-      currentBatchOperation = metadataStore.getStore().initBatchOperation();
 
       DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
           .getDeletedBlockLog();
@@ -135,11 +125,6 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
     rwLock.writeLock().lock();
     try {
-      IOUtils.closeQuietly(currentBatchOperation);
-
-      // initialize a batch operation during construction time
-      currentBatchOperation = this.metadataStore.getStore().
-          initBatchOperation();
       latestTrxInfo = this.metadataStore.getTransactionInfoTable()
           .get(TRANSACTION_INFO_KEY);
       if (latestTrxInfo == null) {
@@ -164,8 +149,6 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void close() throws IOException {
-    if (currentBatchOperation != null) {
-      currentBatchOperation.close();
-    }
+    flush();
   }
 }

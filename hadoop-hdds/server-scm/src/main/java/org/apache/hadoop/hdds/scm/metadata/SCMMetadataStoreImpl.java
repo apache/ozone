@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
@@ -138,7 +139,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       }
 
 
-      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+      RocksDBConfiguration rocksdbConf
+          = configuration.getObject(RocksDBConfiguration.class);
+      rocksdbConf.setManualWalFlush(true);
+      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition(),
+          rocksdbConf);
 
       deletedBlocksTable =
           DELETED_BLOCKS.getTable(this.store);

@@ -396,6 +396,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // and then come back and enable it without any impact.
       securityProtocolServer = null;
     }
+    
+    // flush db update for security or seq generator upgrade
+    scmMetadataStore.getStore().flushLog(true);
 
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     Collection<String> scmAdminUsernames =
@@ -1500,6 +1503,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
       persistSCMCertificates();
+      scmMetadataStore.getStore().flushLog(true);
     }
 
     scmBlockManager.start();
