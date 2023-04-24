@@ -106,8 +106,7 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
-  private final ConcurrentHashMap<CountDownLatch, Object> flushLatches =
-      new ConcurrentHashMap<>();
+  private final FlushNotifier flushNotifier;
 
   /**
    * function which will get term associated with the transaction index.
@@ -124,6 +123,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
+    private FlushNotifier flushNotifier;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -156,6 +156,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setFlushNotifier(FlushNotifier flushNotifier) {
+      this.flushNotifier = flushNotifier;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
@@ -166,15 +171,21 @@ public final class OzoneManagerDoubleBuffer {
             "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
       }
+      if (flushNotifier == null) {
+        flushNotifier = new FlushNotifier();
+      }
+
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
+          flushNotifier);
     }
   }
 
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions) {
+      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
+                                   FlushNotifier flushNotifier) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -189,6 +200,7 @@ public final class OzoneManagerDoubleBuffer {
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
     this.indexToTerm = indexToTerm;
+    this.flushNotifier = flushNotifier;
 
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
@@ -299,7 +311,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       clearReadyBuffer();
-      notifyFlush();
+      flushNotifier.notifyFlush();
     } catch (IOException ex) {
       terminate(ex, 1);
     } catch (Throwable t) {
@@ -617,7 +629,7 @@ public final class OzoneManagerDoubleBuffer {
     try {
       while (currentBuffer.size() == 0) {
         wait(1000L);
-        notifyFlush();
+        flushNotifier.notifyFlush();
       }
       return true;
     }  catch (InterruptedException ex) {
@@ -657,21 +669,6 @@ public final class OzoneManagerDoubleBuffer {
     return ozoneManagerDoubleBufferMetrics;
   }
 
-  void awaitFlush() throws InterruptedException {
-
-    // wait until both the current and ready buffers are flushed
-    CountDownLatch latch = new CountDownLatch(2);
-    flushLatches.put(latch, latch);
-    latch.await();
-    flushLatches.remove(latch);
-  }
-
-  void notifyFlush() {
-    for (CountDownLatch l: flushLatches.keySet()) {
-      l.countDown();
-    }
-  }
-
   @VisibleForTesting
   int getCurrentBufferSize() {
     return currentBuffer.size();
@@ -686,5 +683,29 @@ public final class OzoneManagerDoubleBuffer {
   }
   void resume() {
     isRunning.set(true);
+  }
+
+  void awaitFlush() throws InterruptedException {
+    flushNotifier.await();
+  }
+
+  static class FlushNotifier {
+    private final ConcurrentHashMap<CountDownLatch, Object> flushLatches =
+        new ConcurrentHashMap<>();
+
+    void await() throws InterruptedException {
+
+      // wait until both the current and ready buffers are flushed
+      CountDownLatch latch = new CountDownLatch(2);
+      flushLatches.put(latch, latch);
+      latch.await();
+      flushLatches.remove(latch);
+    }
+
+    void notifyFlush() {
+      for (CountDownLatch l: flushLatches.keySet()) {
+        l.countDown();
+      }
+    }
   }
 }

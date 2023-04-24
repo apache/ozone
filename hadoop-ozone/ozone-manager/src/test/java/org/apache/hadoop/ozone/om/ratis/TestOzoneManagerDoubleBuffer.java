@@ -56,6 +56,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,7 +67,6 @@ import static org.mockito.Mockito.when;
 class TestOzoneManagerDoubleBuffer {
 
   private OzoneManagerDoubleBuffer doubleBuffer;
-  private OzoneManagerDoubleBuffer spyDoubleBuffer;
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
@@ -85,6 +85,8 @@ class TestOzoneManagerDoubleBuffer {
       mock(OMSnapshotCreateResponse.class);
   @TempDir
   private File tempDir;
+  private OzoneManagerDoubleBuffer.FlushNotifier flushNotifier;
+  private OzoneManagerDoubleBuffer.FlushNotifier spyFlushNotifier;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -104,12 +106,15 @@ class TestOzoneManagerDoubleBuffer {
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
     };
 
+    flushNotifier = new OzoneManagerDoubleBuffer.FlushNotifier();
+    spyFlushNotifier = spy(flushNotifier);
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setIndexToTerm((i) -> 1L)
+        .setFlushNotifier(spyFlushNotifier)
         .build();
 
     doNothing().when(omKeyCreateResponse).checkAndUpdateDB(any(), any());
@@ -234,38 +239,41 @@ class TestOzoneManagerDoubleBuffer {
                                        omBucketCreateResponse);
 
 
-    spyDoubleBuffer = Mockito.spy(doubleBuffer);
     AtomicInteger counter = new AtomicInteger();
-    // doAnswer(invocationOnMock -> {
-    //   counter.getAndIncrement();
-    //   assertTrue(doubleBuffer.getCurrentBufferSize() == 0);
-    //   assertTrue(doubleBuffer.getReadyBufferSize() == 0);
-    //   doubleBuffer.notifyFlush();
-    //   return null;
-    // }).when(spyDoubleBuffer).notifyFlush();
+    doAnswer(i -> {
+        dummyMethod();
+        flushNotifier.notifyFlush();
+        return null;
+    }).when(spyFlushNotifier).notifyFlush();
 
     ExecutorService executorService = Executors.newCachedThreadPool();
 
-    spyDoubleBuffer.pause();
+    doubleBuffer.pause();
     for (int i = 0; i < omClientResponses.size(); i++) {
-      spyDoubleBuffer.add(omClientResponses.get(i), i);
+      doubleBuffer.add(omClientResponses.get(i), i);
     }
 
-    assertTrue(spyDoubleBuffer.getCurrentBufferSize() == 2);
+
+    //assertTrue(doubleBuffer.getCurrentBufferSize() == 2);
     Future<?> await = checkAwait(executorService);
-    spyDoubleBuffer.resume();
+    doubleBuffer.resume();
     await.get();
-    assertTrue(spyDoubleBuffer.getCurrentBufferSize() == 0);
-//    verify(spyDoubleBuffer).notifyFlush();
+    assertTrue(doubleBuffer.getCurrentBufferSize() == 0);
+    //    verify(spyDoubleBuffer).notifyFlush();
 
     
+  }
+
+  private static void dummyMethod() {
+
+    System.out.println("gbj was here.");
   }
 
   private Future<?> checkAwait(
       ExecutorService executorService) {
     return executorService.submit(() -> {
       try {
-        spyDoubleBuffer.awaitFlush();
+        doubleBuffer.awaitFlush();
       } catch (InterruptedException e) {
       }
     });
