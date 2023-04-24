@@ -30,6 +30,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -650,8 +651,7 @@ public final class OzoneManagerDoubleBuffer {
    * Swaps the currentBuffer with readyBuffer so that the readyBuffer can be
    * used by sync thread to flush transactions to DB.
    */
-  @VisibleForTesting
-  synchronized void swapCurrentAndReadyBuffer() {
+  private synchronized void swapCurrentAndReadyBuffer() {
     Queue<DoubleBufferEntry<OMClientResponse>> temp = currentBuffer;
     currentBuffer = readyBuffer;
     readyBuffer = temp;
@@ -678,9 +678,13 @@ public final class OzoneManagerDoubleBuffer {
   int getReadyBufferSize() {
     return readyBuffer.size();
   }
+
+  @VisibleForTesting
   void pause() {
     isRunning.set(false);
   }
+
+  @VisibleForTesting
   void resume() {
     isRunning.set(true);
   }
@@ -702,10 +706,13 @@ public final class OzoneManagerDoubleBuffer {
       flushLatches.remove(latch);
     }
 
-    void notifyFlush() {
+    int notifyFlush() {
+      Set<CountDownLatch> latches = flushLatches.keySet();
+      int retval = latches.size();
       for (CountDownLatch l: flushLatches.keySet()) {
         l.countDown();
       }
+      return retval;
     }
   }
 }
