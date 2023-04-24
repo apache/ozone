@@ -427,7 +427,7 @@ public class ContainerEndpoint {
   }
 
   @GET
-  @Path("insights/containermismatch")
+  @Path("/mismatch")
   public Response getContainerMisMatchInsights() {
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         new ArrayList<>();
