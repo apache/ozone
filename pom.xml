@@ -100,7 +100,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.49.v20220914</jetty.version>
+    <jetty.version>9.4.51.v20230217</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <curator.version>4.2.0</curator.version>
     <test.exclude>_</test.exclude>

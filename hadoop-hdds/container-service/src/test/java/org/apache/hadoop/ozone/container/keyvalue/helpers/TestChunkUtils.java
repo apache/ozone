@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -198,6 +200,17 @@ public class TestChunkUtils {
     Assertions.assertFalse(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
+
+    try (FileChannel fileChannel =
+             FileChannel.open(tempFile, StandardOpenOption.READ)) {
+      Assertions.assertTrue(
+          ChunkUtils.validateChunkForOverwrite(fileChannel,
+              new ChunkInfo("chunk", 3, 5)));
+
+      Assertions.assertFalse(
+          ChunkUtils.validateChunkForOverwrite(fileChannel,
+              new ChunkInfo("chunk", 5, 5)));
+    }
   }
 
   @Test
