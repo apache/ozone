@@ -84,7 +84,7 @@ public class SnapshotChainManager {
     if (prevGlobalID != null &&
         !snapshotChainGlobal.containsKey(prevGlobalID)) {
       throw new IOException("Snapshot Chain corruption: "
-          + " previous snapshotID given but no associated snapshot "
+          + "previous snapshotID given but no associated snapshot "
           + "found in snapshot chain: SnapshotID "
           + prevGlobalID);
     }
@@ -93,7 +93,7 @@ public class SnapshotChainManager {
 
     // set state variable latestGlobal snapshot entry to this snapshotID
     latestGlobalSnapshotID = snapshotID;
-  };
+  }
 
   /**
    * Add snapshot to bucket snapshot chain(path based).
@@ -140,7 +140,7 @@ public class SnapshotChainManager {
 
     // set state variable latestPath snapshot entry to this snapshotID
     latestPathSnapshotID.put(snapshotPath, snapshotID);
-  };
+  }
 
   private boolean deleteSnapshotGlobal(String snapshotID) throws IOException {
     boolean status = true;

@@ -2130,7 +2130,7 @@ public class TestRootedOzoneFileSystem {
     long length = contentSummary.getLength();
     long spaceConsumed = contentSummary.getSpaceConsumed();
     long expectDiskUsage = QuotaUtil.getReplicatedSize(length,
-            new ECReplicationConfig(3, 2, RS, 1024));
+        new ECReplicationConfig(3, 2, RS, (int) OzoneConsts.MB));
     Assert.assertEquals(expectDiskUsage, spaceConsumed);
     //clean up
     ofs.delete(filePath, true);

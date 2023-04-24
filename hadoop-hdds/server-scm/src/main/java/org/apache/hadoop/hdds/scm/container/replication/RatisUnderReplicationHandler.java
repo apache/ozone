@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -35,9 +36,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This class handles Ratis containers that are under replicated. It should
@@ -108,13 +111,24 @@ public class RatisUnderReplicationHandler
     // find targets to send replicas to
     List<DatanodeDetails> targetDatanodes =
         getTargets(withUnhealthy, pendingOps);
-    if (targetDatanodes.isEmpty()) {
-      LOG.warn("Cannot replicate container {} because no eligible targets " +
-          "were found.", containerInfo);
-      return 0;
-    }
-    return sendReplicationCommands(
+
+    int commandsSent = sendReplicationCommands(
         containerInfo, sourceDatanodes, targetDatanodes);
+
+    if (targetDatanodes.size() < withUnhealthy.additionalReplicaNeeded()) {
+      // The placement policy failed to find enough targets to satisfy fix
+      // the under replication. There fore even though some commands were sent,
+      // we throw an exception to indicate that the container is still under
+      // replicated and should be re-queued for another attempt later.
+      LOG.debug("Placement policy failed to find enough targets to satisfy " +
+          "under replication for container {}. Targets found: {}, " +
+          "additional replicas needed: {}",
+          containerInfo, targetDatanodes.size(),
+          withUnhealthy.additionalReplicaNeeded());
+      throw new InsufficientDatanodesException(
+          withUnhealthy.additionalReplicaNeeded(), targetDatanodes.size());
+    }
+    return commandsSent;
   }
 
   /**
@@ -191,10 +205,10 @@ public class RatisUnderReplicationHandler
 
     /*
      * Return healthy datanodes which have a replica that satisfies the
-     * predicate and is not pending replica deletion. Sorted in descending
-     * order of sequence id.
+     * predicate and is not pending replica deletion
      */
-    return replicaCount.getReplicas().stream()
+    List<ContainerReplica> availableSources = replicaCount.getReplicas()
+        .stream()
         .filter(predicate)
         .filter(r -> {
           try {
@@ -205,8 +219,26 @@ public class RatisUnderReplicationHandler
           }
         })
         .filter(r -> !pendingDeletion.contains(r.getDatanodeDetails()))
-        .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
-        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+
+    // We should replicate only the max available sequence ID, as replicas with
+    // earlier sequence IDs may be stale copies.
+    // First we get the max sequence ID, if there is at least one replica with
+    // a non-null sequence.
+    OptionalLong maxSequenceId = availableSources.stream()
+        .filter(r -> r.getSequenceId() != null)
+        .mapToLong(ContainerReplica::getSequenceId)
+        .max();
+
+    // Filter out all but the max sequence ID, or keep all if there is no
+    // max.
+    Stream<ContainerReplica> replicaStream = availableSources.stream();
+    if (maxSequenceId.isPresent()) {
+      replicaStream = replicaStream
+          .filter(r -> r.getSequenceId() != null)
+          .filter(r -> r.getSequenceId() == maxSequenceId.getAsLong());
+    }
+    return replicaStream.map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
   }
 
@@ -228,15 +260,9 @@ public class RatisUnderReplicationHandler
             .collect(Collectors.toList());
     excludeList.addAll(pendingReplication);
 
-    /*
-    Ensure that target datanodes have enough space to hold a complete
-    container.
-    */
-    final long dataSizeRequired =
-        Math.max(replicaCount.getContainer().getUsedBytes(),
-            currentContainerSize);
-    return placementPolicy.chooseDatanodes(excludeList, null,
-        replicaCount.additionalReplicaNeeded(), 0, dataSizeRequired);
+    return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
+        replicaCount.additionalReplicaNeeded(), null, excludeList,
+        currentContainerSize, replicaCount.getContainer());
   }
 
   private int sendReplicationCommands(

@@ -282,7 +282,8 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS);
       try {
         snapshotDeletingService = new SnapshotDeletingService(
-            snapshotServiceInterval, snapshotServiceTimeout, ozoneManager);
+            snapshotServiceInterval, snapshotServiceTimeout,
+            ozoneManager, scmClient.getBlockClient());
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
@@ -404,6 +405,9 @@ public class KeyManagerImpl implements KeyManager {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
+        if (bucketLayout.isLegacy() && value != null && !value.isFile()) {
+          value = null; // Legacy buckets do not report key info for directories
+        }
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
@@ -619,7 +623,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
-    return metadataManager.getPendingDeletionKeys(count);
+    OmMetadataManagerImpl omMetadataManager =
+        (OmMetadataManagerImpl) metadataManager;
+    return omMetadataManager
+        .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
   }
 
   @Override

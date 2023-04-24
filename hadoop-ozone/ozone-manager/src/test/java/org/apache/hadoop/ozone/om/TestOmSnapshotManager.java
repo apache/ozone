@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,15 +28,28 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -111,6 +125,60 @@ public class TestOmSnapshotManager {
 
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();
+  }
+
+  @Test
+  @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH"})
+  public void testHardLinkCreation() throws IOException {
+    byte[] dummyData = {0};
+
+    // Create dummy files to be linked to.
+    File snapDir1 = new File(testDir.toString(),
+        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
+    if (!snapDir1.mkdirs()) {
+      throw new IOException("failed to make directory: " + snapDir1);
+    }
+    Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
+
+    File snapDir2 = new File(testDir.toString(),
+        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir2");
+    if (!snapDir2.mkdirs()) {
+      throw new IOException("failed to make directory: " + snapDir2);
+    }
+
+    File dbDir = new File(testDir.toString(), OM_DB_NAME);
+    Files.write(Paths.get(dbDir.toString(), "f1"), dummyData);
+
+    // Create map of links to dummy files.
+    File checkpointDir1 = new File(testDir.toString(),
+        OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
+    Map<Path, Path> hardLinkFiles = new HashMap<>();
+    hardLinkFiles.put(Paths.get(snapDir2.toString(), "f1"),
+        Paths.get(checkpointDir1.toString(), "f1"));
+    hardLinkFiles.put(Paths.get(snapDir2.toString(), "s1"),
+        Paths.get(snapDir1.toString(), "s1"));
+
+    // Create link list.
+    Path hardLinkList =
+        OmSnapshotUtils.createHardLinkList(
+            testDir.toString().length() + 1, hardLinkFiles);
+    Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
+
+    // Create links from list.
+    OmSnapshotUtils.createHardLinks(dbDir.toPath());
+
+    // Confirm expected links.
+    for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
+      Assert.assertTrue(entry.getKey().toFile().exists());
+      Path value = entry.getValue();
+      // Convert checkpoint path to om.db.
+      if (value.toString().contains(OM_CHECKPOINT_DIR)) {
+        value = Paths.get(dbDir.toString(),
+                          value.getFileName().toString());
+      }
+      Assert.assertEquals("link matches original file",
+          getINode(entry.getKey()), getINode(value));
+    }
   }
 
   private SnapshotInfo createSnapshotInfo() {

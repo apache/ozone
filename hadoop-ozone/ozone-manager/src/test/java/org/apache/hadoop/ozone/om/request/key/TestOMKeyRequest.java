@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -69,6 +70,7 @@ import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -143,6 +145,8 @@ public class TestOMKeyRequest {
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
+    setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
+
     scmClient = Mockito.mock(ScmClient.class);
     ozoneBlockTokenSecretManager =
         Mockito.mock(OzoneBlockTokenSecretManager.class);
@@ -208,6 +212,9 @@ public class TestOMKeyRequest {
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
+    when(ozoneManager.getOmSnapshotManager())
+        .thenReturn(omSnapshotManager);
   }
 
   @NotNull

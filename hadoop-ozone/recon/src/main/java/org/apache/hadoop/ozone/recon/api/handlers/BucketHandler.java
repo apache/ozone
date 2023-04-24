@@ -175,6 +175,12 @@ public abstract class BucketHandler {
           .equals(BucketLayout.LEGACY)) {
         return new LegacyBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.OBJECT_STORE)) {
+        // TODO: HDDS-7810 Write a handler for object store bucket
+        // We can use LegacyBucketHandler for OBS bucket for now.
+        return new LegacyBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
       } else {
         LOG.error("Unsupported bucket layout: " +
             bucketInfo.getBucketLayout());

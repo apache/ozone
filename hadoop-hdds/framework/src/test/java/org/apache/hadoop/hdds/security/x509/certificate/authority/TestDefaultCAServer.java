@@ -369,31 +369,32 @@ public class TestDefaultCAServer {
     setExternalPathsInConfig(tempDir, externalCaCertFileName);
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
-    SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf), null);
+    try (SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf), null)) {
 
-    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-        scmCertificateClient.getComponentName());
+      KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
+      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+          scmCertificateClient.getComponentName());
 
-    keyPEMWriter.writeKey(tempDir, keyPair, true);
-    X509CertificateHolder externalCert = generateExternalCert(keyPair);
+      keyPEMWriter.writeKey(tempDir, keyPair, true);
+      X509CertificateHolder externalCert = generateExternalCert(keyPair);
 
-    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
-        scmCertificateClient.getComponentName());
+      CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+          scmCertificateClient.getComponentName());
 
-    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
-        CertificateCodec.getPEMEncodedString(externalCert));
+      certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+          CertificateCodec.getPEMEncodedString(externalCert));
 
-    CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
-        new DefaultProfile(),
-        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
-    //When initializing a CA server with external cert
-    testCA.init(securityConfig, CAType.ROOT);
-    //Then the external cert is set as CA cert for the server.
-    assertEquals(externalCert, testCA.getCACertificate());
+      CertificateServer testCA = new DefaultCAServer("testCA",
+          RandomStringUtils.randomAlphabetic(4),
+          RandomStringUtils.randomAlphabetic(4), caStore,
+          new DefaultProfile(),
+          Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+      //When initializing a CA server with external cert
+      testCA.init(securityConfig, CAType.ROOT);
+      //Then the external cert is set as CA cert for the server.
+      assertEquals(externalCert, testCA.getCACertificate());
+    }
   }
 
   private void setExternalPathsInConfig(Path tempDir,
@@ -420,53 +421,54 @@ public class TestDefaultCAServer {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateApprover approver = new DefaultApprover(new DefaultCAProfile(),
         securityConfig);
-    SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf), null);
-    String scmId = RandomStringUtils.randomAlphabetic(4);
-    String clusterId = RandomStringUtils.randomAlphabetic(4);
-    KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
-    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-        scmCertificateClient.getComponentName());
+    try (SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf), null)) {
+      String scmId = RandomStringUtils.randomAlphabetic(4);
+      String clusterId = RandomStringUtils.randomAlphabetic(4);
+      KeyPair keyPair = new HDDSKeyGenerator(conf).generateKey();
+      KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
+          scmCertificateClient.getComponentName());
 
-    keyPEMWriter.writeKey(tempDir, keyPair, true);
-    LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
-    LocalDate endDate =
-        LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
-        .addDnsName("hadoop.apache.org")
-        .addIpAddress("8.8.8.8")
-        .addServiceName("OzoneMarketingCluster002")
-        .setCA(false)
-        .setClusterID(clusterId)
-        .setScmID(scmId)
-        .setSubject("Ozone Cluster")
-        .setConfiguration(conf)
-        .setKey(keyPair)
-        .build();
-    X509CertificateHolder externalCert = generateExternalCert(keyPair);
-    X509CertificateHolder signedCert = approver.sign(securityConfig,
-        keyPair.getPrivate(), externalCert,
-        java.sql.Date.valueOf(beginDate), java.sql.Date.valueOf(endDate), csr,
-        scmId, clusterId);
-    CertificateFactory certFactory = new CertificateFactory();
-    CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
-        scmCertificateClient.getComponentName());
+      keyPEMWriter.writeKey(tempDir, keyPair, true);
+      LocalDate beginDate = LocalDate.now().atStartOfDay().toLocalDate();
+      LocalDate endDate =
+          LocalDate.from(LocalDate.now().atStartOfDay().plusDays(10));
+      PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+          .addDnsName("hadoop.apache.org")
+          .addIpAddress("8.8.8.8")
+          .addServiceName("OzoneMarketingCluster002")
+          .setCA(false)
+          .setClusterID(clusterId)
+          .setScmID(scmId)
+          .setSubject("Ozone Cluster")
+          .setConfiguration(conf)
+          .setKey(keyPair)
+          .build();
+      X509CertificateHolder externalCert = generateExternalCert(keyPair);
+      X509CertificateHolder signedCert = approver.sign(securityConfig,
+          keyPair.getPrivate(), externalCert,
+          java.sql.Date.valueOf(beginDate), java.sql.Date.valueOf(endDate), csr,
+          scmId, clusterId);
+      CertificateFactory certFactory = new CertificateFactory();
+      CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
+          scmCertificateClient.getComponentName());
 
-    CertPath certPath = certFactory.engineGenerateCertPath(
-        ImmutableList.of(CertificateCodec.getX509Certificate(signedCert),
-            CertificateCodec.getX509Certificate(externalCert)));
-    certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
-        CertificateCodec.getPEMEncodedString(certPath));
+      CertPath certPath = certFactory.engineGenerateCertPath(
+          ImmutableList.of(CertificateCodec.getX509Certificate(signedCert),
+              CertificateCodec.getX509Certificate(externalCert)));
+      certificateCodec.writeCertificate(tempDir, externalCaCertFileName,
+          CertificateCodec.getPEMEncodedString(certPath));
 
-    CertificateServer testCA = new DefaultCAServer("testCA",
-        RandomStringUtils.randomAlphabetic(4),
-        RandomStringUtils.randomAlphabetic(4), caStore,
-        new DefaultProfile(),
-        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
-    //When initializing a CA server with external cert
-    testCA.init(securityConfig, CAType.ROOT);
-    //Then the external cert is set as CA cert for the server.
-    assertEquals(signedCert, testCA.getCACertificate());
+      CertificateServer testCA = new DefaultCAServer("testCA",
+          RandomStringUtils.randomAlphabetic(4),
+          RandomStringUtils.randomAlphabetic(4), caStore,
+          new DefaultProfile(),
+          Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+      //When initializing a CA server with external cert
+      testCA.init(securityConfig, CAType.ROOT);
+      //Then the external cert is set as CA cert for the server.
+      assertEquals(signedCert, testCA.getCACertificate());
+    }
   }
 
   @Test
@@ -484,66 +486,66 @@ public class TestDefaultCAServer {
     rootCA.init(new SecurityConfig(conf), CAType.ROOT);
 
 
-    SCMCertificateClient scmCertificateClient =
-        new SCMCertificateClient(new SecurityConfig(conf), null);
+    try (SCMCertificateClient scmCertificateClient =
+        new SCMCertificateClient(new SecurityConfig(conf), null)) {
 
-    CertificateClient.InitResponse response = scmCertificateClient.init();
-    assertEquals(CertificateClient.InitResponse.GETCERT, response);
+      CertificateClient.InitResponse response = scmCertificateClient.init();
+      assertEquals(CertificateClient.InitResponse.GETCERT, response);
 
-    // Generate cert
-    KeyPair keyPair =
-        new HDDSKeyGenerator(conf).generateKey();
-    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
-        .addDnsName("hadoop.apache.org")
-        .addIpAddress("8.8.8.8")
-        .setCA(false)
-        .setSubject("testCA")
-        .setConfiguration(conf)
-        .setKey(keyPair)
-        .build();
+      // Generate cert
+      KeyPair keyPair =
+          new HDDSKeyGenerator(conf).generateKey();
+      PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+          .addDnsName("hadoop.apache.org")
+          .addIpAddress("8.8.8.8")
+          .setCA(false)
+          .setSubject("testCA")
+          .setConfiguration(conf)
+          .setKey(keyPair)
+          .build();
 
-    Future<CertPath> holder = rootCA.requestCertificate(csr,
-        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
-    assertTrue(holder.isDone());
-    X509Certificate certificate =
-        CertificateCodec.firstCertificateFrom(holder.get());
-    X509CertificateHolder certificateHolder =
-        CertificateCodec.getCertificateHolder(certificate);
+      Future<CertPath> holder = rootCA.requestCertificate(csr,
+          CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+      assertTrue(holder.isDone());
+      X509Certificate certificate =
+          CertificateCodec.firstCertificateFrom(holder.get());
+      X509CertificateHolder certificateHolder =
+          CertificateCodec.getCertificateHolder(certificate);
 
-    assertNotNull(certificateHolder);
-    LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate();
-    LocalDate now = LocalDate.now();
-    assertEquals(0, invalidAfterDate.compareTo(now.plusDays(3650)));
+      assertNotNull(certificateHolder);
+      LocalDate invalidAfterDate = certificateHolder.getNotAfter().toInstant()
+          .atZone(ZoneId.systemDefault())
+          .toLocalDate();
+      LocalDate now = LocalDate.now();
+      assertEquals(0, invalidAfterDate.compareTo(now.plusDays(3650)));
 
-    X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
+      X509CertificateHolder rootCertHolder = rootCA.getCACertificate();
 
-    scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(rootCertHolder),
-        CAType.SUBORDINATE);
+      scmCertificateClient.storeCertificate(
+          CertificateCodec.getPEMEncodedString(rootCertHolder),
+          CAType.SUBORDINATE);
 
-    // Write to the location where Default CA Server reads from.
-    scmCertificateClient.storeCertificate(
-        CertificateCodec.getPEMEncodedString(certificateHolder), CAType.NONE);
+      // Write to the location where Default CA Server reads from.
+      scmCertificateClient.storeCertificate(
+          CertificateCodec.getPEMEncodedString(certificateHolder), CAType.NONE);
 
-    CertificateCodec certCodec =
-        new CertificateCodec(new SecurityConfig(conf),
-            scmCertificateClient.getComponentName());
-    certCodec.writeCertificate(certificateHolder);
+      CertificateCodec certCodec =
+          new CertificateCodec(new SecurityConfig(conf),
+              scmCertificateClient.getComponentName());
+      certCodec.writeCertificate(certificateHolder);
 
-    // The certificate generated by above cert client will be used by scmCA.
-    // Now scmCA init should be successful.
-    CertificateServer scmCA = new DefaultCAServer("scmCA",
-        clusterId, scmId, caStore, new DefaultProfile(),
-        scmCertificateClient.getComponentName());
+      // The certificate generated by above cert client will be used by scmCA.
+      // Now scmCA init should be successful.
+      CertificateServer scmCA = new DefaultCAServer("scmCA",
+          clusterId, scmId, caStore, new DefaultProfile(),
+          scmCertificateClient.getComponentName());
 
-    try {
-      scmCA.init(new SecurityConfig(conf), CAType.SUBORDINATE);
-    } catch (Exception e) {
-      fail("testIntermediaryCA failed during init");
+      try {
+        scmCA.init(new SecurityConfig(conf), CAType.SUBORDINATE);
+      } catch (Exception e) {
+        fail("testIntermediaryCA failed during init");
+      }
     }
-
   }
 
   private X509CertificateHolder generateExternalCert(KeyPair keyPair)

@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -2090,16 +2091,25 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
-
-    // Rename to empty string should fail.
+    BucketLayout bucketLayout = bucket.getBucketLayout();
     OMException oe = null;
     String toKeyName = "";
-    try {
+
+    if (!bucketLayout.isFileSystemOptimized()) {
+      // Rename to an empty string should fail only in non FSO buckets
+      try {
+        bucket.renameKey(fromKeyName, toKeyName);
+      } catch (OMException e) {
+        oe = e;
+      }
+      Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
+    } else {
+      // Rename to an empty key in FSO should be okay, as we are handling the
+      // empty dest key on the server side and the source key name will be used
       bucket.renameKey(fromKeyName, toKeyName);
-    } catch (OMException e) {
-      oe = e;
+      OzoneKey emptyRenameKey = bucket.getKey(fromKeyName);
+      Assert.assertEquals(fromKeyName, emptyRenameKey.getName());
     }
-    Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
@@ -4086,7 +4096,7 @@ public abstract class TestOzoneRpcClientAbstract {
             HddsProtos.ReplicationFactor.ONE),
         currentReplicationConfig);
     ECReplicationConfig ecReplicationConfig =
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+        new ECReplicationConfig(3, 2, EcCodec.RS, (int) OzoneConsts.MB);
     bucket.setReplicationConfig(ecReplicationConfig);
 
     // Get the bucket and check the updated config.

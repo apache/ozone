@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -47,12 +48,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -95,7 +98,7 @@ public class TestRatisUnderReplicationHandler {
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent);
+        replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
         commandsSent);
   }
@@ -210,6 +213,25 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
+  public void testInsufficientTargetsFoundBecauseOfPlacementPolicy() {
+    policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(
+        nodeManager, conf, 2);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    // Only one replica is available, so we need to create 2 new ones.
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0);
+
+    Assert.assertThrows(InsufficientDatanodesException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // One command should be sent to the replication manager as we could only
+    // fine one node rather than two.
+    Assert.assertEquals(1, commandsSent.size());
+  }
+
+  @Test
   public void testUnhealthyReplicasAreReplicatedWhenHealthyAreUnavailable()
       throws IOException {
     Set<ContainerReplica> replicas
@@ -239,6 +261,25 @@ public class TestRatisUnderReplicationHandler {
         .findFirst().get();
 
     Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
+  }
+
+  @Test
+  public void testOnlyHighestBcsidShouldBeASource() throws IOException {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1));
+    ContainerReplica valid = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED, 2);
+    replicas.add(valid);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+
+    // Ensure that the replica with SEQ=2 is the only source sent
+    Mockito.verify(replicationManager).sendThrottledReplicationCommand(
+        Mockito.any(ContainerInfo.class),
+        Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
+        Mockito.any(DatanodeDetails.class), anyInt());
   }
 
   /**

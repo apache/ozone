@@ -273,6 +273,18 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=true
 }
 
+@test "CI workflow change (ci.yaml)" {
+  run dev-support/ci/selective_ci_checks.sh c12d66f06e8e242fd2aa495b39ffb00ed9ff3bfc
+
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
+}
+
 @test "root README" {
   run dev-support/ci/selective_ci_checks.sh 8bbbf3f7d
 

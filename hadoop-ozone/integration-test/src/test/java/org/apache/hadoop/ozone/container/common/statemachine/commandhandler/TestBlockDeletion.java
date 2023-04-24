@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -186,6 +187,7 @@ public class TestBlockDeletion {
 
   @ParameterizedTest
   @MethodSource("replicationConfigs")
+  @Flaky("HDDS-8458")
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -304,6 +306,7 @@ public class TestBlockDeletion {
   }
 
   @Test
+  @Flaky("HDDS-8353")
   public void testContainerStatisticsAfterDelete() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

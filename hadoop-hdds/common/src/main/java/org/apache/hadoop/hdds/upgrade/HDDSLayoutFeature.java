@@ -35,7 +35,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   ERASURE_CODED_STORAGE_SUPPORT(3, "Ozone version with built in support for"
       + " Erasure Coded block data storage."),
   DATANODE_SCHEMA_V3(4, "Datanode RocksDB Schema Version 3 (one rocksdb " +
-      "per disk)");
+      "per disk)"),
+  RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS(5, "Adding the RATIS_DATASTREAM " +
+      "port to the DatanodeDetails."),
+  WEBUI_PORTS_IN_DATANODEDETAILS(6, "Adding HTTP and HTTPS ports " +
+      "to DatanodeDetails.");
 
   //////////////////////////////  //////////////////////////////
 
