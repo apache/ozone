@@ -316,9 +316,8 @@ public class TestDeletedBlockLog {
 
     // Create 30 TXs
     addTransactions(generateData(30), false);
-    // Since transactions are not yet flushed deleteTransactionId should be
-    // 0 for all containers
-    Assertions.assertEquals(0, getAllTransactions().size());
+    // Transaction are obtained from buffer transaction, 3 DN, so count 90
+    Assertions.assertEquals(90, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       Assertions.assertEquals(0, containerInfo.getDeleteTransactionId());
     }

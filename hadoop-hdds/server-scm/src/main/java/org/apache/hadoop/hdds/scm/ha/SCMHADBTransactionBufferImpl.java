@@ -27,6 +27,8 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
@@ -37,6 +39,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  * operation in DB.
  */
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SCMHADBTransactionBufferImpl.class);
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
   private TransactionInfo latestTrxInfo;
@@ -106,7 +110,6 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       transactionInfoTable.put(TRANSACTION_INFO_KEY, latestTrxInfo);
 
       metadataStore.getStore().flushLog(true);
-      metadataStore.getStore().flushDB();
       this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
 
       DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
@@ -149,6 +152,15 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public void close() throws IOException {
-    flush();
+    try {
+      if (metadataStore.getStore() != null
+          && !metadataStore.getStore().isClosed()) {
+        flush();
+      }
+    } catch (IOException ex) {
+      // Ignore as buffer is getting close
+      LOG.error("Ignore exception occurred in close of transaction buffer",
+          ex);
+    }
   }
 }
