@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -677,5 +678,117 @@ public class TestDeletedBlockLog {
     when(containerManager.getContainerReplicas(
         ContainerID.valueOf(containerID)))
         .thenReturn(replicaSet);
+  }
+
+
+  @Test
+  public void testSCMTransacationBufferPerfTest() throws Exception {
+    Table<ContainerID, ContainerInfo> tbl1
+        = scm.getScmMetadataStore().getContainerTable();
+
+    HddsProtos.ContainerInfoProto.Builder containerInfoBuilder
+        = HddsProtos.ContainerInfoProto
+        .newBuilder()
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setPipelineID(PipelineID.randomId().getProtobuf())
+        .setUsedBytes(0)
+        .setNumberOfKeys(0)
+        .setStateEnterTime(Time.now())
+        .setOwner("test")
+        .setContainerID(1)
+        .setDeleteTransactionId(0)
+        .setReplicationType(HddsProtos.ReplicationType.RATIS);
+    HddsProtos.ContainerInfoProto build = containerInfoBuilder.build();
+    long start = 0;
+    long end = 0;
+    long[] addTs = new long[8];
+    for (int i = 0; i < 8; ++i) {
+      addTs[i] = 0;
+    }
+    scm.getScmMetadataStore().getStore().flushLog(true);
+    scm.getScmMetadataStore().getStore().flushDB();
+    int itrLen = 10;
+    for (int k = 0; k < itrLen; ++k) {
+      start = System.nanoTime();
+      for (int i = 0; i < 100000; ++i) {
+        scm.getScmHAManager().getDBTransactionBuffer().addToBuffer(tbl1,
+            new ContainerID(i), ContainerInfo.fromProtobuf(build));
+      }
+      end = System.nanoTime();
+      System.out.println("Time taken Add: " + (end - start));
+      addTs[0] += (end - start);
+
+      start = System.nanoTime();
+      scm.getScmHAManager().getDBTransactionBuffer().close();
+      end = System.nanoTime();
+      System.out.println("Time taken Add Flush: " + (end - start));
+      addTs[1] += (end - start);
+
+      start = System.nanoTime();
+      for (int i = 0; i < 100000; ++i) {
+        scm.getScmHAManager().getDBTransactionBuffer().removeFromBuffer(tbl1,
+            new ContainerID(i));
+      }
+      end = System.nanoTime();
+      System.out.println("Time taken Delete: " + (end - start));
+      addTs[2] += (end - start);
+
+      start = System.nanoTime();
+      scm.getScmHAManager().getDBTransactionBuffer().close();
+      end = System.nanoTime();
+      System.out.println("Time taken Delete flush: " + (end - start));
+      addTs[3] += (end - start);
+
+      start = System.nanoTime();
+      for (int i = 0; i < 100000; ++i) {
+        scm.getScmHAManager().getDBTransactionBuffer().addToBuffer(tbl1,
+            new ContainerID(i), ContainerInfo.fromProtobuf(build));
+        scm.getScmHAManager().getDBTransactionBuffer().removeFromBuffer(tbl1,
+            new ContainerID(i));
+      }
+      end = System.nanoTime();
+      System.out.println("Time taken Add/Delete: " + (end - start));
+      addTs[4] += (end - start);
+
+      start = System.nanoTime();
+      scm.getScmHAManager().getDBTransactionBuffer().close();
+      end = System.nanoTime();
+      System.out.println("Time taken Add/Delete flush: " + (end - start));
+      addTs[5] += (end - start);
+
+      // Update test
+      start = System.nanoTime();
+      for (int i = 0; i < 100000; ++i) {
+        scm.getScmHAManager().getDBTransactionBuffer().addToBuffer(tbl1,
+            new ContainerID(i), ContainerInfo.fromProtobuf(build));
+        scm.getScmHAManager().getDBTransactionBuffer().addToBuffer(tbl1,
+            new ContainerID(i), ContainerInfo.fromProtobuf(build));
+      }
+      end = System.nanoTime();
+      System.out.println("Time taken Update: " + (end - start));
+      addTs[6] += (end - start);
+
+      start = System.nanoTime();
+      scm.getScmHAManager().getDBTransactionBuffer().close();
+      end = System.nanoTime();
+      System.out.println("Time taken Update Flush: " + (end - start));
+      addTs[7] += (end - start);
+
+      for (int i = 0; i < 100000; ++i) {
+        scm.getScmHAManager().getDBTransactionBuffer().removeFromBuffer(tbl1,
+            new ContainerID(i));
+      }
+      scm.getScmHAManager().getDBTransactionBuffer().close();
+    }
+
+    System.out.println("Average usages");
+    System.out.println("Time taken Add: " + addTs[0] / itrLen);
+    System.out.println("Time taken Add Flush: " + addTs[1] / itrLen);
+    System.out.println("Time taken Del: " + addTs[2] / itrLen);
+    System.out.println("Time taken Del Flush: " + addTs[3] / itrLen);
+    System.out.println("Time taken Add/Del: " + addTs[4] / itrLen);
+    System.out.println("Time taken Add/Del Flush: " + addTs[5] / itrLen);
+    System.out.println("Time taken Update: " + addTs[6] / itrLen);
+    System.out.println("Time taken Update Flush: " + addTs[7] / itrLen);
   }
 }
