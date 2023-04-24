@@ -309,7 +309,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
             }
 
             s3SecretManager
-                .updateCache(accessId, s3SecretValue, transactionLogIndex);
+                .updateCache(accessId, s3SecretValue);
             return null;
           });
 

@@ -42,12 +42,12 @@ public class S3InMemoryCache implements S3SecretCache {
   }
 
   @Override
-  public void put(String id, S3SecretValue secretValue, long txId) {
+  public void put(String id, S3SecretValue secretValue) {
     cache.put(id, secretValue);
   }
 
   @Override
-  public void invalidate(String id, long txId) {
+  public void invalidate(String id) {
     cache.invalidate(id);
   }
 

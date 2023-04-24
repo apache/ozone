@@ -26,16 +26,14 @@ public interface S3SecretCache {
    * Put secret value to cache.
    * @param id secret value identifier.
    * @param secretValue secret value.
-   * @param txId lifetime identifier.
    */
-  void put(String id, S3SecretValue secretValue, long txId);
+  void put(String id, S3SecretValue secretValue);
 
   /**
    * Invalidate secret value with provided secret identifier.
    * @param id secret identifier.
-   * @param txId lifetime identifier.
    */
-  void invalidate(String id, long txId);
+  void invalidate(String id);
 
   /**
    * Get value from cache.

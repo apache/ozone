@@ -59,7 +59,9 @@ public class S3SecretManagerImpl implements S3SecretManager {
       return new S3SecretValue(cacheValue.getKerberosID(),
           cacheValue.getAwsSecret());
     }
-    return s3SecretStore.getSecret(kerberosID);
+    S3SecretValue result = s3SecretStore.getSecret(kerberosID);
+    updateCache(kerberosID, result);
+    return result;
   }
 
   @Override
@@ -78,7 +80,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
       throw new OzoneSecurityException("S3 secret not found for " +
           "awsAccessKeyId " + awsAccessKey, S3_SECRET_NOT_FOUND);
     }
-
+    updateCache(awsAccessKey, s3Secret);
     return s3Secret.getAwsSecret();
   }
 
