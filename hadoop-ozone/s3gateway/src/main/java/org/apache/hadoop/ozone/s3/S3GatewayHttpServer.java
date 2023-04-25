@@ -76,12 +76,12 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
         String principalInConf =
             conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
-        if (Strings.isNullOrEmpty(principalInConf)) {
+        if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
               principalInConf, conf.get(OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY)));
         }
         String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
-        if (Strings.isNullOrEmpty(httpKeytab)) {
+        if (!Strings.isNullOrEmpty(httpKeytab)) {
           params.put("kerberos.keytab", httpKeytab);
         }
         params.put(AuthenticationFilter.AUTH_TYPE, "kerberos");
