@@ -49,7 +49,7 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
-  public static final String PREV_BLOCK_ID_PENDING_FOR_DELETION_DEFAULT_VALUE =
+  public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =
       "0";
   public static final String RECON_QUERY_LIMIT = "limit";
   public static final String RECON_QUERY_VOLUME = "volume";

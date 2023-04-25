@@ -68,7 +68,7 @@ public class TestSCMDBInsightEndPoint {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
@@ -97,15 +97,15 @@ public class TestSCMDBInsightEndPoint {
             .addBinding(SCMDBInsightEndPoint.class)
             .build();
 
-    ozoneStorageContainerManager =
-        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconStorageContainerManager =
+        reconTestInjector.getInstance(ReconStorageContainerManagerFacade.class);
     reconContainerManager = (ReconContainerManager)
-        ozoneStorageContainerManager.getContainerManager();
+        reconStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
-        ozoneStorageContainerManager.getPipelineManager();
+        reconStorageContainerManager.getPipelineManager();
     scmdbInsightEndPoint = reconTestInjector.getInstance(
         SCMDBInsightEndPoint.class);
-    scmDBStore = ozoneStorageContainerManager.getScmDBStore();
+    scmDBStore = reconStorageContainerManager.getScmDBStore();
     containerStateManager = reconContainerManager
         .getContainerStateManager();
   }
@@ -125,11 +125,18 @@ public class TestSCMDBInsightEndPoint {
         getTestContainer(HddsProtos.LifeCycleState.OPEN, 102L));
     reconContainerManager.addNewContainer(
         getTestContainer(HddsProtos.LifeCycleState.OPEN, 103L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 104L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 105L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 106L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 107L));
   }
 
   @Test
   public void testGetSCMDeletedContainers() throws Exception {
-
     reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
         HddsProtos.LifeCycleEvent.FINALIZE);
     reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
@@ -137,12 +144,10 @@ public class TestSCMDBInsightEndPoint {
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(102L),
             HddsProtos.LifeCycleEvent.DELETE);
-    Set<ContainerID> containerIDs = containerStateManager
-        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
     reconContainerManager
         .updateContainerState(ContainerID.valueOf(102L),
             HddsProtos.LifeCycleEvent.CLEANUP);
-    containerIDs = containerStateManager
+    Set<ContainerID> containerIDs = containerStateManager
         .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
     Assertions.assertEquals(1, containerIDs.size());
 
@@ -163,7 +168,7 @@ public class TestSCMDBInsightEndPoint {
     Assertions.assertEquals(2, containerIDs.size());
 
     Response scmDeletedContainers =
-        scmdbInsightEndPoint.getSCMDeletedContainers();
+        scmdbInsightEndPoint.getSCMDeletedContainers(2, 0);
     List<DeletedContainerInfo> deletedContainerInfoList =
         (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
     Assertions.assertEquals(2, deletedContainerInfoList.size());
@@ -175,6 +180,90 @@ public class TestSCMDBInsightEndPoint {
 
     deletedContainerInfo = deletedContainerInfoList.get(1);
     Assertions.assertEquals(103, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersLimitParam() throws Exception {
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        scmdbInsightEndPoint.getSCMDeletedContainers(1, 0);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(104, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersPrevKeyParam() throws Exception {
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        scmdbInsightEndPoint.getSCMDeletedContainers(1, 107);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(107, deletedContainerInfo.getContainerID());
     Assertions.assertEquals("DELETED",
         deletedContainerInfo.getContainerState());
   }

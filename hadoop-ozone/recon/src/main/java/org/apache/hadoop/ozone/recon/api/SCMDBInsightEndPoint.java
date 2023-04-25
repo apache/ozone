@@ -22,13 +22,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -46,7 +46,8 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_BLOCK_ID_PENDING_FOR_DELETION_DEFAULT_VALUE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
@@ -66,7 +67,7 @@ public class SCMDBInsightEndPoint {
   private final ReconContainerManager containerManager;
 
   @Inject
-  public SCMDBInsightEndPoint(OzoneStorageContainerManager reconSCM) {
+  public SCMDBInsightEndPoint(ReconStorageContainerManagerFacade reconSCM) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.scmDBStore = reconSCM.getScmDBStore();
@@ -92,15 +93,22 @@ public class SCMDBInsightEndPoint {
    * }
    * ]
    * }
+   * @param limit limits the number of deleted containers
+   * @param prevKey previous container Id to skip
    * @return Response of delete containers.
    */
   @GET
   @Path("/deletedContainers")
-  public Response getSCMDeletedContainers() {
+  public Response getSCMDeletedContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
     List<DeletedContainerInfo> deletedContainerInfoList = new ArrayList<>();
     try {
       List<ContainerInfo> containers =
-          containerManager.getContainers(HddsProtos.LifeCycleState.DELETED);
+          containerManager.getContainers(ContainerID.valueOf(prevKey), limit,
+              HddsProtos.LifeCycleState.DELETED);
       containers.forEach(containerInfo -> {
         DeletedContainerInfo deletedContainerInfo = new DeletedContainerInfo();
         deletedContainerInfo.setContainerID(containerInfo.getContainerID());
@@ -155,7 +163,7 @@ public class SCMDBInsightEndPoint {
   public Response getBlocksPendingDeletion(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
-      @DefaultValue(PREV_BLOCK_ID_PENDING_FOR_DELETION_DEFAULT_VALUE)
+      @DefaultValue(PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
     if (limit < 0 || prevKey < 0) {
       // Send back an empty response

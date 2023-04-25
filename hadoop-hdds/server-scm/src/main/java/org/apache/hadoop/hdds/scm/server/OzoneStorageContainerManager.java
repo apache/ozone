@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -60,5 +59,4 @@ public interface OzoneStorageContainerManager {
 
   SCMNodeDetails getScmNodeDetails();
 
-  DBStore getScmDBStore();
 }
