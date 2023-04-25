@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
@@ -73,12 +74,16 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +93,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -110,6 +116,8 @@ public class BasicRootedOzoneClientAdapterImpl
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
   private OzoneConfiguration config;
+
+  public static final String ACTIVE_FS_SNAPSHOT_NAME = ".";
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -1281,6 +1289,62 @@ public class BasicRootedOzoneClientAdapterImpl
     return proxy.createSnapshot(ofsPath.getVolumeName(),
             ofsPath.getBucketName(),
             snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException {
+    boolean takeTemporarySnapshot = false;
+    if (toSnapshot.equals(ACTIVE_FS_SNAPSHOT_NAME)) {
+      takeTemporarySnapshot = true;
+      toSnapshot = createSnapshot(snapshotDir.toString(),
+          "temp" + SnapshotInfo.generateName(Time.now()));
+    }
+    OFSPath ofsPath = new OFSPath(snapshotDir, config);
+    String volume = ofsPath.getVolumeName();
+    String bucket = ofsPath.getBucketName();
+    try {
+      SnapshotDiffReportOzone aggregated;
+      SnapshotDiffReportOzone report =
+          getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+              bucket, "");
+      aggregated = report;
+      while (!report.getToken().isEmpty()) {
+        LOG.info(
+            "Total Snapshot Diff length between snapshot {} and {} exceeds"
+                + " max page size, Performing another" +
+                " snapdiff with index at {}",
+            fromSnapshot, toSnapshot, report.getToken());
+        report =
+            getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+                bucket, report.getToken());
+        aggregated.aggregate(report);
+      }
+      return aggregated;
+    } finally {
+      // delete the temp snapshot
+      if (takeTemporarySnapshot) {
+        ozoneClient.getObjectStore()
+            .deleteSnapshot(ofsPath.getVolumeName(), ofsPath.getBucketName(),
+                toSnapshot);
+      }
+    }
+  }
+
+  private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
+      String fromSnapshot, String toSnapshot, String volume, String bucket,
+      String token) throws IOException, InterruptedException {
+    SnapshotDiffResponse snapshotDiffResponse = null;
+    do {
+      snapshotDiffResponse =
+          objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
+              token, -1, false);
+      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
+    } while (snapshotDiffResponse.getJobStatus() != DONE);
+    SnapshotDiffReportOzone report =
+        snapshotDiffResponse.getSnapshotDiffReport();
+    return report;
   }
 
   public boolean recoverLease(final Path f) throws IOException {

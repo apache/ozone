@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
  * POJO for Snapshot diff job.
  */
 public class SnapshotDiffJob {
+  private long creationTime;
   private String jobId;
   private JobStatus status;
   private String volume;
@@ -35,19 +37,24 @@ public class SnapshotDiffJob {
   private String fromSnapshot;
   private String toSnapshot;
   private boolean forceFullDiff;
+  private long totalDiffEntries;
 
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
 
   }
 
-  public SnapshotDiffJob(String jobId,
+  @SuppressWarnings("parameternumber")
+  public SnapshotDiffJob(long creationTime,
+                         String jobId,
                          JobStatus jobStatus,
                          String volume,
                          String bucket,
                          String fromSnapshot,
                          String toSnapshot,
-                         boolean forceFullDiff) {
+                         boolean forceFullDiff,
+                         long totalDiffEntries) {
+    this.creationTime = creationTime;
     this.jobId = jobId;
     this.status = jobStatus;
     this.volume = volume;
@@ -55,6 +62,7 @@ public class SnapshotDiffJob {
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.forceFullDiff = forceFullDiff;
+    this.totalDiffEntries = totalDiffEntries;
   }
 
   public String getJobId() {
@@ -111,6 +119,62 @@ public class SnapshotDiffJob {
 
   public void setForceFullDiff(boolean forceFullDiff) {
     this.forceFullDiff = forceFullDiff;
+  }
+
+  public long getCreationTime() {
+    return creationTime;
+  }
+
+  public void setCreationTime(long creationTime) {
+    this.creationTime = creationTime;
+  }
+
+  public long getTotalDiffEntries() {
+    return totalDiffEntries;
+  }
+
+  public void setTotalDiffEntries(long totalDiffEntries) {
+    this.totalDiffEntries = totalDiffEntries;
+  }
+
+  @Override
+  public String toString() {
+    return "creationTime : " + creationTime +
+        ", jobId: " + jobId +
+        ", status: " + status +
+        ", volume: " + volume +
+        ", bucket: " + bucket +
+        ", fromSnapshot: " + fromSnapshot +
+        ", toSnapshot: " + toSnapshot +
+        ", forceFullDiff: " + forceFullDiff +
+        ", totalDiffEntries: " + totalDiffEntries;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+
+    if (other instanceof SnapshotDiffJob) {
+      SnapshotDiffJob otherJob = (SnapshotDiffJob) other;
+      return Objects.equals(this.creationTime, otherJob.creationTime) &&
+          Objects.equals(this.jobId, otherJob.jobId) &&
+          Objects.equals(this.status, otherJob.status) &&
+          Objects.equals(this.volume, otherJob.volume) &&
+          Objects.equals(this.bucket, otherJob.bucket) &&
+          Objects.equals(this.fromSnapshot, otherJob.fromSnapshot) &&
+          Objects.equals(this.toSnapshot, otherJob.toSnapshot) &&
+          Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
+          Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries);
+    }
+    return false;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(creationTime, jobId, status, volume, bucket,
+        fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
   }
 
   /**

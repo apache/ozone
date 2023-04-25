@@ -92,14 +92,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
 
-    String srcKey = renameKeyArgs.getKeyName();
-    String dstKey = renameKeyRequest.getToKeyName();
-    if (getBucketLayout().isFileSystemOptimized()) {
-      srcKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-          srcKey, getBucketLayout());
-      dstKey = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-          dstKey, getBucketLayout());
-    }
+    String srcKey = extractSrcKey(renameKeyArgs);
+    String dstKey = extractDstKey(renameKeyRequest);
 
     // Set modification time & srcKeyName.
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
@@ -283,5 +277,28 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       }
     }
     return req;
+  }
+
+  /**
+   * Returns the source key name.
+   *
+   * @param keyArgs
+   * @return source key name
+   * @throws OMException
+   */
+  protected String extractSrcKey(KeyArgs keyArgs) throws OMException {
+    return keyArgs.getKeyName();
+  }
+
+  /**
+   * Returns the destination key name.
+   *
+   * @param renameKeyRequest
+   * @return destination key name
+   * @throws OMException
+   */
+  protected String extractDstKey(RenameKeyRequest renameKeyRequest)
+      throws OMException {
+    return renameKeyRequest.getToKeyName();
   }
 }

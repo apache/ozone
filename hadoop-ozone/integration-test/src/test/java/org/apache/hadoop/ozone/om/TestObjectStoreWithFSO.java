@@ -623,15 +623,12 @@ public class TestObjectStoreWithFSO {
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
 
-    // Rename to empty string should fail.
+    // Rename to an empty string means that we are moving the key to the bucket
+    // level and the toKeyName will be the source key name
     String toKeyName = "";
-    try {
-      bucket.renameKey(fromKeyName, toKeyName);
-      fail("Rename to empty string should fail!");
-    } catch (OMException ome) {
-      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-              ome.getResult());
-    }
+    bucket.renameKey(fromKeyName, toKeyName);
+    OzoneKey emptyKeyRename = bucket.getKey(fromKeyName);
+    Assert.assertEquals(fromKeyName, emptyKeyRename.getName());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
