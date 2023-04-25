@@ -370,8 +370,8 @@ public class TestBlockDeletion {
     // Wait for blocks to be deleted and container reports to be processed
     GenericTestUtils.waitFor(() ->
         scm.getContainerManager().getContainers().stream()
-            .allMatch(c -> c.getUsedBytes() == 0 && c.getNumberOfKeys() == 0)
-        , 500, 5000);
+            .allMatch(c -> c.getUsedBytes() == 0 && c.getNumberOfKeys() == 0),
+        500, 5000);
     Thread.sleep(5000);
     // Verify that pending block delete num are as expected with resent cmds
     cluster.getHddsDatanodes().forEach(dn -> {
