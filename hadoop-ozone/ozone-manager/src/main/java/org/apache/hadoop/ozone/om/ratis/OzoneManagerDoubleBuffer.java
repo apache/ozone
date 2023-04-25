@@ -271,7 +271,8 @@ public final class OzoneManagerDoubleBuffer {
    * Runs in a background thread and batches the transaction in currentBuffer
    * and commit to DB.
    */
-  private void flushTransactions() {
+  @VisibleForTesting
+  void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
     }
@@ -681,11 +682,6 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   int getReadyBufferSize() {
     return readyBuffer.size();
-  }
-
-  @VisibleForTesting
-  void pause() {
-    isRunning.set(false);
   }
 
   @VisibleForTesting

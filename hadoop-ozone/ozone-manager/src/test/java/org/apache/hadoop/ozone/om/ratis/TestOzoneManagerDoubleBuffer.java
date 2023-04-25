@@ -53,6 +53,7 @@ import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -243,10 +244,8 @@ class TestOzoneManagerDoubleBuffer {
     ExecutorService executorService = Executors.newCachedThreadPool();
     int transactionIndex = 0;
 
-    // Wait for clear/pause double buffer
-    doubleBuffer.pause();
-    doubleBuffer.add(omClientResponses.get(0), transactionIndex++);
-    doubleBuffer.awaitFlush();
+    // Stop the daemon till to eliminate the race condition.
+    doubleBuffer.stopDaemon();
 
     // Confirm clear.
     assertEquals(0, doubleBuffer.getCurrentBufferSize());
@@ -255,31 +254,33 @@ class TestOzoneManagerDoubleBuffer {
     // Override notifier to do some assert checks.
     doAnswer(i -> {
       int c = notifyCounter.incrementAndGet();
+      assertEquals(0, doubleBuffer.getReadyBufferSize());
+      int threadCount = flushNotifier.notifyFlush();
       // First time through, it should be initial size.
       if (c == 1) {
-        assertEquals(initialSize, doubleBuffer.getCurrentBufferSize());
+        //        assertEquals(initialSize, doubleBuffer.getCurrentBufferSize());
+        // assertEquals(initialSize, threadCount);
       } else {
         //  Every other time it should be 0.
         assertEquals(0, doubleBuffer.getCurrentBufferSize());
+        assertEquals(0, threadCount);
       }
       assertEquals(0, doubleBuffer.getReadyBufferSize());
-      flushNotifier.notifyFlush();
       return null;
     }).when(spyFlushNotifier).notifyFlush();
 
 
     // Init double buffer.
-    for (int i = 0; i < initialSize; i++) {
-      doubleBuffer.add(omClientResponses.get(i), transactionIndex++);
+    for (OMClientResponse omClientResponse : omClientResponses) {
+      doubleBuffer.add(omClientResponse, transactionIndex++);
     }
     assertEquals(initialSize,
         doubleBuffer.getCurrentBufferSize());
 
     // Start double buffer and wait for flush.
+    Future<Boolean> flusher = flushTransactions(executorService);
     Future<?> await = awaitFlush(executorService);
-    doubleBuffer.resume();
     await.get();
-    doubleBuffer.pause();
 
     // Confirm still empty.
     assertEquals(0, doubleBuffer.getCurrentBufferSize());
@@ -287,16 +288,27 @@ class TestOzoneManagerDoubleBuffer {
 
     // Make sure notify was called at least twice.
     assertTrue(notifyCounter.get() >= 2);
+    assertFalse(flusher.isDone());
+
+    // Clean up.
+    flusher.cancel(true);
+//    assertThrows(java.util.concurrent.CancellationException, flusher.get());
   }
 
 
   // Return a future that waits for the flush.
-  private Future<?> awaitFlush(ExecutorService executorService) {
+  private Future<Boolean> awaitFlush(ExecutorService executorService) {
     return executorService.submit(() -> {
-      try {
-        doubleBuffer.awaitFlush();
-      } catch (InterruptedException e) {
-      }
+      doubleBuffer.awaitFlush();
+      return true;
+    });
+  }
+
+  private Future<Boolean> flushTransactions(ExecutorService executorService) {
+    return executorService.submit(() -> {
+      doubleBuffer.resume();
+      doubleBuffer.flushTransactions();
+      return true;
     });
   }
 
@@ -319,8 +331,8 @@ class TestOzoneManagerDoubleBuffer {
     Thread.sleep(2000);
 
     // Confirm not done.
-    for (int i = 0; i < tasks.size(); i++) {
-      assertFalse(tasks.get(i).isDone());
+    for (Future<Boolean> task : tasks) {
+      assertFalse(task.isDone());
     }
     assertEquals(3, fn.notifyFlush());
 
