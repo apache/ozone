@@ -54,16 +54,19 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   private ContainerReplicator downloadReplicator;
 
   private ContainerReplicator pushReplicator;
+  private int maxQueueSize;
 
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
       ContainerReplicator downloadReplicator,
-      ContainerReplicator pushReplicator) {
+      ContainerReplicator pushReplicator,
+      int queueSize) {
     this.conf = conf;
     this.supervisor = supervisor;
     this.downloadReplicator = downloadReplicator;
     this.pushReplicator = pushReplicator;
+    this.maxQueueSize = queueSize;
   }
 
   @Override
@@ -80,6 +83,13 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     Preconditions.checkArgument(!sourceDatanodes.isEmpty() || target != null,
         "Replication command is received for container %s "
             + "without source or target datanodes.", containerID);
+    
+    if (supervisor.getQueueSize() > maxQueueSize) {
+      LOG.warn("Replication command is received for container %s "
+          + "is ignored as command queue reach max size %d.", containerID,
+          maxQueueSize);
+      return;
+    }
 
     ContainerReplicator replicator =
         replicateCommand.getTargetDatanode() == null ?

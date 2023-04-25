@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -54,11 +56,17 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private final AtomicLong totalTime = new AtomicLong(0);
   private final ExecutorService executor;
   private final Clock clock;
+  private int maxQueueSize;
 
-  public DeleteContainerCommandHandler(int threadPoolSize, Clock clock) {
-    this(clock, Executors.newFixedThreadPool(
-        threadPoolSize, new ThreadFactoryBuilder()
+  public DeleteContainerCommandHandler(
+      int threadPoolSize, Clock clock, int queueSize) {
+    this(clock, new ThreadPoolExecutor(
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
             .setNameFormat("DeleteContainerThread-%d").build()));
+    maxQueueSize = queueSize;
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
@@ -74,8 +82,14 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     final DeleteContainerCommand deleteContainerCommand =
         (DeleteContainerCommand) command;
     final ContainerController controller = ozoneContainer.getController();
-    executor.execute(() ->
-        handleInternal(command, context, deleteContainerCommand, controller));
+    try {
+      executor.execute(() ->
+          handleInternal(command, context, deleteContainerCommand, controller));
+    } catch (RejectedExecutionException ex) {
+      LOG.warn("Delete Container command is received for container %s "
+          + "is ignored as command queue reach max size %d.",
+          deleteContainerCommand.getContainerID(), maxQueueSize);
+    }
   }
 
   private void handleInternal(SCMCommand command, StateContext context,

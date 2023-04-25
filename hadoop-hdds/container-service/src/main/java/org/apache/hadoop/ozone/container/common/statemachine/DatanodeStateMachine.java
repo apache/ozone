@@ -210,7 +210,7 @@ public class DatanodeStateMachine implements Closeable {
     // a test. The test mocks it in a running mini-cluster.
     reconstructECContainersCommandHandler =
         new ReconstructECContainersCommandHandler(conf, supervisor,
-        ecReconstructionCoordinator);
+        ecReconstructionCoordinator, dnConf.getCommandQueueLimit());
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
@@ -219,10 +219,12 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
-            pullReplicatorWithMetrics, pushReplicatorWithMetrics))
+            pullReplicatorWithMetrics, pushReplicatorWithMetrics,
+            dnConf.getCommandQueueLimit()))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads(), clock))
+            dnConf.getContainerDeleteThreads(), clock,
+            dnConf.getCommandQueueLimit()))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf))

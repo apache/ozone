@@ -28,22 +28,30 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Command handler for reconstructing the lost EC containers.
  */
 public class ReconstructECContainersCommandHandler implements CommandHandler {
+  static final Logger LOG =
+      LoggerFactory.getLogger(ReconstructECContainersCommandHandler.class);
 
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
+  private int maxQueueSize;
   private final ConfigurationSource conf;
 
-  public ReconstructECContainersCommandHandler(ConfigurationSource conf,
+  public ReconstructECContainersCommandHandler(
+      ConfigurationSource conf,
       ReplicationSupervisor supervisor,
-      ECReconstructionCoordinator coordinator) {
+      ECReconstructionCoordinator coordinator,
+      int queueSize) {
     this.conf = conf;
     this.supervisor = supervisor;
     this.coordinator = coordinator;
+    maxQueueSize = queueSize;
   }
 
   @Override
@@ -53,6 +61,13 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
         (ReconstructECContainersCommand) command;
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
+    if (supervisor.getQueueSize() > maxQueueSize) {
+      LOG.warn("ECReconstruction command is received for container %s "
+              + "is ignored as command queue reach max size %d.",
+          reconstructionCommandInfo.getContainerID(),
+          maxQueueSize);
+      return;
+    }
     this.supervisor.addTask(new ECReconstructionCoordinatorTask(
         coordinator, reconstructionCommandInfo));
   }
