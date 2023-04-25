@@ -188,10 +188,8 @@ public class SCMDBInsightEndPoint {
             deletedBlocksTableIterator.seek(seekKey);
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
-        // In case of prevKeyPrefix greater than 0, all the keys are returned
-        if (seekKeyValue == null ||
-            (prevKey > 0 &&
-                !seekKeyValue.getKey().equals(prevKey))) {
+        // In case of prevKey greater than 0, all the keys are returned
+        if (seekKeyValue == null) {
           return Response.ok(containerStateBlockInfoListMap).build();
         }
       }
@@ -229,7 +227,8 @@ public class SCMDBInsightEndPoint {
               containerBlocksInfoWrappers);
         }
         containerBlocksInfoWrappers.add(containerBlocksInfoWrapper);
-        if (containerBlocksInfoWrappers.size() == limit) {
+        // limit is applied based on number of containers per state
+        if (containerBlocksInfoWrappers.size() >= limit) {
           break;
         }
       }

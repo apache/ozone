@@ -362,12 +362,12 @@ public class TestSCMDBInsightEndPoint {
 
     dtx =
         StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-            .newBuilder().setTxID(2).setContainerID(101L)
+            .newBuilder().setTxID(3).setContainerID(101L)
             .addAllLocalID(localIdList).setCount(4).build();
-    deletedBlocksTable.put(2L, dtx);
+    deletedBlocksTable.put(3L, dtx);
 
     Response blocksPendingDeletion =
-        scmdbInsightEndPoint.getBlocksPendingDeletion(1, 1);
+        scmdbInsightEndPoint.getBlocksPendingDeletion(1, 2);
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap =
         (Map<String, List<ContainerBlocksInfoWrapper>>)
@@ -382,7 +382,21 @@ public class TestSCMDBInsightEndPoint {
     Assertions.assertEquals(4, containerBlocksInfoWrapper.getLocalIDCount());
     Assertions.assertEquals(4,
         containerBlocksInfoWrapper.getLocalIDList().size());
-    Assertions.assertEquals(2, containerBlocksInfoWrapper.getTxID());
+    Assertions.assertEquals(3, containerBlocksInfoWrapper.getTxID());
+
+    blocksPendingDeletion =
+        scmdbInsightEndPoint.getBlocksPendingDeletion(1, 3);
+    containerStateBlockInfoListMap =
+        (Map<String, List<ContainerBlocksInfoWrapper>>)
+            blocksPendingDeletion.getEntity();
+    Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
+
+    blocksPendingDeletion =
+        scmdbInsightEndPoint.getBlocksPendingDeletion(1, 4);
+    containerStateBlockInfoListMap =
+        (Map<String, List<ContainerBlocksInfoWrapper>>)
+            blocksPendingDeletion.getEntity();
+    Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
   }
 
   protected ContainerWithPipeline getTestContainer(
