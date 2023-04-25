@@ -60,7 +60,9 @@ public class S3SecretManagerImpl implements S3SecretManager {
           cacheValue.getAwsSecret());
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
-    updateCache(kerberosID, result);
+    if (result != null) {
+      updateCache(kerberosID, result);
+    }
     return result;
   }
 
@@ -88,6 +90,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
   public void storeSecret(String kerberosId, S3SecretValue secretValue)
       throws IOException {
     s3SecretStore.storeSecret(kerberosId, secretValue);
+    updateCache(kerberosId, secretValue);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Secret for accessKey:{} stored", kerberosId);
     }
@@ -96,6 +99,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     s3SecretStore.revokeSecret(kerberosId);
+    invalidateCacheEntry(kerberosId);
   }
 
   @Override
