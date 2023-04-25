@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -27,6 +26,8 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
@@ -41,6 +42,32 @@ public final class SnapshotUtils {
     throw new IllegalStateException("SnapshotUtils should not be initialized.");
   }
 
+  public static void validateSnapshotsExistAndActive(
+      final OzoneManager ozoneManager,
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshotName,
+      final String toSnapshotName
+  ) throws IOException {
+    SnapshotInfo fromSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
+        bucketName, fromSnapshotName);
+    SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
+        bucketName, toSnapshotName);
+
+    if ((fromSnapInfo.getSnapshotStatus() !=
+        SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) ||
+        (toSnapInfo.getSnapshotStatus() !=
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+      // TODO: [SNAPSHOT] Throw custom snapshot exception.
+      throw new IOException("Cannot generate snapshot diff for non-active " +
+          "snapshots.");
+    }
+    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
+      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
+          " should be older than to toSnapshot:" + toSnapInfo.getName());
+    }
+  }
+
   public static SnapshotInfo getSnapshotInfo(final OzoneManager ozoneManager,
                                              final String volumeName,
                                              final String bucketName,
@@ -51,15 +78,15 @@ public final class SnapshotUtils {
   }
 
   public static SnapshotInfo getSnapshotInfo(final OzoneManager ozoneManager,
-                                             final String key)
+                                             final String snapshotKey)
       throws IOException {
     SnapshotInfo snapshotInfo;
     try {
       snapshotInfo = ozoneManager.getMetadataManager()
           .getSnapshotInfoTable()
-          .get(key);
+          .get(snapshotKey);
     } catch (IOException e) {
-      LOG.error("Snapshot {}: not found: {}", key, e);
+      LOG.error("Snapshot {}: not found.", snapshotKey, e);
       throw e;
     }
     if (snapshotInfo == null) {
