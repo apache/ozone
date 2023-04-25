@@ -79,7 +79,6 @@ OZONE-SITE.XML_ozone.httpfs.kerberos.keytab.file=/etc/security/keytabs/httpfs.ke
 OZONE-SITE.XML_ozone.httpfs.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
 
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
-OZONE-SITE.XML_hdds.scm.replication.enable.legacy=false
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
