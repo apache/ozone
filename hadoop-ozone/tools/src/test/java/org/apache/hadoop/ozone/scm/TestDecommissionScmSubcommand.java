@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.RemoveScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.admin.scm.DecommissionScmSubcommand;
@@ -28,12 +27,10 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import picocli.CommandLine;
 import org.mockito.Mockito;
-
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import picocli.CommandLine;
 
 /**
  * Unit tests to validate the TestScmDecommissionSubCommand class includes the
@@ -106,9 +103,6 @@ public class TestDecommissionScmSubcommand {
     }
   }
 
-  // TO DO : test decommission revoke certificate
-  @Test
-  public void testDecommissionScmCertRevokeErrors() throws Exception {
-  }
+  // TODO: test decommission revoke certificate
 
 }

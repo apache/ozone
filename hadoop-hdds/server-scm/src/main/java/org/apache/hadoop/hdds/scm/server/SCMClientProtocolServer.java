@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -1331,15 +1330,12 @@ public class SCMClientProtocolServer implements
   @Override
   public DecommissionScmResponseProto decommissionScm(
       String scmId) {
-    // TODO: update to use modified scm.removePeerFromHARing, HDDS-8452
-    RemoveSCMRequest removeScmRequest = new RemoveSCMRequest(
-        scm.getClusterId(), scmId, "");
     Builder decommissionScmResponseBuilder =
         DecommissionScmResponseProto.newBuilder();
 
     try {
       decommissionScmResponseBuilder
-          .setSuccess(scm.removePeerFromHARing(removeScmRequest));
+          .setSuccess(scm.removePeerFromHARing(scmId));
     } catch (IOException ex) {
       decommissionScmResponseBuilder
           .setSuccess(false)
