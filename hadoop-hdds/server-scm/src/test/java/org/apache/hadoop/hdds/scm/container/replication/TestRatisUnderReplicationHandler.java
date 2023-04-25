@@ -48,12 +48,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -96,7 +98,7 @@ public class TestRatisUnderReplicationHandler {
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent);
+        replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
         commandsSent);
   }
@@ -259,6 +261,25 @@ public class TestRatisUnderReplicationHandler {
         .findFirst().get();
 
     Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
+  }
+
+  @Test
+  public void testOnlyHighestBcsidShouldBeASource() throws IOException {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1));
+    ContainerReplica valid = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED, 2);
+    replicas.add(valid);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+
+    // Ensure that the replica with SEQ=2 is the only source sent
+    Mockito.verify(replicationManager).sendThrottledReplicationCommand(
+        Mockito.any(ContainerInfo.class),
+        Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
+        Mockito.any(DatanodeDetails.class), anyInt());
   }
 
   /**
