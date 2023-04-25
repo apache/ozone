@@ -896,8 +896,16 @@ public class BasicRootedOzoneClientAdapterImpl
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      List<OzoneFileStatus> statuses = bucket
-          .listStatus(keyName, recursive, startKey, numEntries);
+      List<OzoneFileStatus> statuses;
+      if (bucket.isSourcePathExist()) {
+        statuses = bucket
+            .listStatus(keyName, recursive, startKey, numEntries);
+      } else {
+        LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
+            "and returning empty list of files inside it", bucket.getName());
+        statuses = Collections.emptyList();
+      }
+      
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
