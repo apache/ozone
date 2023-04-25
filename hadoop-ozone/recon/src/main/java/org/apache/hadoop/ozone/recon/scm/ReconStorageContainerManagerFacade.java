@@ -250,7 +250,7 @@ public class ReconStorageContainerManagerFacade
         new ReconContainerReportHandler(nodeManager, containerManager);
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager, scmContext, containerSizeCountTask);
+            containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
             pipelineManager, containerManager, scmContext,

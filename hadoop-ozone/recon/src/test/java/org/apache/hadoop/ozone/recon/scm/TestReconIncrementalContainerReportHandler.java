@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -88,8 +87,6 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    ContainerSizeCountTask containerSizeCountTask =
-        mock(ContainerSizeCountTask.class);
     this.versionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(versionManager.getMetadataLayoutVersion())
@@ -105,8 +102,7 @@ public class TestReconIncrementalContainerReportHandler
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager, SCMContext.emptyContext(),
-            containerSizeCountTask);
+            containerManager, SCMContext.emptyContext());
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
@@ -137,8 +133,6 @@ public class TestReconIncrementalContainerReportHandler
           containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
       when(nodeManagerMock.getNodeByUuid(any())).thenReturn(datanodeDetails);
-      ContainerSizeCountTask containerSizeCountTask =
-          mock(ContainerSizeCountTask.class);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())
@@ -150,8 +144,7 @@ public class TestReconIncrementalContainerReportHandler
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
-              containerManager, SCMContext.emptyContext(),
-              containerSizeCountTask);
+              containerManager, SCMContext.emptyContext());
 
       reconIcr.onMessage(reportMock, mock(EventPublisher.class));
       assertTrue(containerManager.containerExist(containerID));
