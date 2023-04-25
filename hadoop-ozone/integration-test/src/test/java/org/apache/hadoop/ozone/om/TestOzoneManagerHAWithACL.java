@@ -20,10 +20,8 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.shell.bucket.GetAclBucketHandler;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
