@@ -233,62 +233,65 @@ class TestOzoneManagerDoubleBuffer {
   }
 
   @Test
-  public void testAwaitFlush ()
+  public void testAwaitFlush()
       throws ExecutionException, InterruptedException {
-    List<OMClientResponse> omClientResponses = Arrays.asList(omKeyCreateResponse,
-                                       omBucketCreateResponse);
+    List<OMClientResponse> omClientResponses =
+        Arrays.asList(omKeyCreateResponse,
+        omBucketCreateResponse);
     int initialSize = omClientResponses.size();
-    AtomicInteger counter = new AtomicInteger();
+    AtomicInteger notifyCounter = new AtomicInteger();
     ExecutorService executorService = Executors.newCachedThreadPool();
+    int transactionIndex = 0;
 
-    // wait for double buffer to clear, then pause
-    doubleBuffer.awaitFlush();
+    // Wait for clear/pause double buffer
     doubleBuffer.pause();
+    doubleBuffer.add(omClientResponses.get(0), transactionIndex++);
+    doubleBuffer.awaitFlush();
 
-    // confirm clear
+    // Confirm clear.
     assertEquals(0, doubleBuffer.getCurrentBufferSize());
     assertEquals(0, doubleBuffer.getReadyBufferSize());
 
-    // override flusher to do some assert checks
+    // Override notifier to do some assert checks.
     doAnswer(i -> {
-        int c = counter.incrementAndGet();
-        // First time through, it should be initial size
-        if (c == 1) {
-          assertEquals(initialSize, doubleBuffer.getCurrentBufferSize());
-        } else {
-          //  every other time it should be 0
-          assertEquals(0, doubleBuffer.getCurrentBufferSize());
-        }
-        assertEquals(0, doubleBuffer.getReadyBufferSize());
-        flushNotifier.notifyFlush();
-        return null;
-      }).when(spyFlushNotifier).notifyFlush();
+      int c = notifyCounter.incrementAndGet();
+      // First time through, it should be initial size.
+      if (c == 1) {
+        assertEquals(initialSize, doubleBuffer.getCurrentBufferSize());
+      } else {
+        //  Every other time it should be 0.
+        assertEquals(0, doubleBuffer.getCurrentBufferSize());
+      }
+      assertEquals(0, doubleBuffer.getReadyBufferSize());
+      flushNotifier.notifyFlush();
+      return null;
+    }).when(spyFlushNotifier).notifyFlush();
 
 
-    // init double buffer
+    // Init double buffer.
     for (int i = 0; i < initialSize; i++) {
-      doubleBuffer.add(omClientResponses.get(i), i);
+      doubleBuffer.add(omClientResponses.get(i), transactionIndex++);
     }
     assertEquals(initialSize,
         doubleBuffer.getCurrentBufferSize());
 
-    // start double buffer and wait for flush
-    Future<?> await = checkAwait(executorService);
+    // Start double buffer and wait for flush.
+    Future<?> await = awaitFlush(executorService);
     doubleBuffer.resume();
     await.get();
     doubleBuffer.pause();
 
-    // confirm still empty
+    // Confirm still empty.
     assertEquals(0, doubleBuffer.getCurrentBufferSize());
     assertEquals(0, doubleBuffer.getReadyBufferSize());
 
-    // make sure flush was called at least twice
-    assertTrue(counter.get() >= 2);
+    // Make sure notify was called at least twice.
+    assertTrue(notifyCounter.get() >= 2);
   }
 
 
-  private Future<?> checkAwait(
-      ExecutorService executorService) {
+  // Return a future that waits for the flush.
+  private Future<?> awaitFlush(ExecutorService executorService) {
     return executorService.submit(() -> {
       try {
         doubleBuffer.awaitFlush();
@@ -300,33 +303,47 @@ class TestOzoneManagerDoubleBuffer {
   @Test
   public void testFlushNotifier()
       throws InterruptedException, ExecutionException {
-    OzoneManagerDoubleBuffer.FlushNotifier flushNotifier =
+
+    OzoneManagerDoubleBuffer.FlushNotifier fn =
         new OzoneManagerDoubleBuffer.FlushNotifier();
-    assertEquals(0, flushNotifier.notifyFlush());
+
+    // Confirm nothing waiting yet.
+    assertEquals(0, fn.notifyFlush());
     ExecutorService executorService = Executors.newCachedThreadPool();
     List<Future<Boolean>> tasks = new ArrayList<>();
+
+    // Simulate 3 waiting.
     for (int i = 0; i < 3; i++) {
-      tasks.add(waitFN(flushNotifier, executorService));
+      tasks.add(waitFN(fn, executorService));
     }
     Thread.sleep(2000);
+
+    // Confirm not done.
     for (int i = 0; i < tasks.size(); i++) {
       assertFalse(tasks.get(i).isDone());
     }
-    assertEquals(3, flushNotifier.notifyFlush());
-    tasks.add(waitFN(flushNotifier, executorService));
+    assertEquals(3, fn.notifyFlush());
+
+    // Add a fourth.
+    tasks.add(waitFN(fn, executorService));
     Thread.sleep(2000);
-    assertEquals(4, flushNotifier.notifyFlush());
-    // Confirm the initial ones are done
+    assertEquals(4, fn.notifyFlush());
+
+    // Confirm the initial ones are done,
+    //  (it takes 2 calls to notify to release the waiting threads.)
     for (int i = 0; i < 3; i++) {
       assertTrue(tasks.get(i).get());
     }
     assertFalse(tasks.get(3).isDone());
-    assertEquals(1, flushNotifier.notifyFlush());
+
+    // Now finish the fourth.
+    assertEquals(1, fn.notifyFlush());
     assertTrue(tasks.get(3).get());
-    assertEquals(0, flushNotifier.notifyFlush());
+    assertEquals(0, fn.notifyFlush());
 
   }
 
+  // Have a thread wait until notified.
   private Future<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn,
       ExecutorService executorService) {
     return executorService.submit(() -> {

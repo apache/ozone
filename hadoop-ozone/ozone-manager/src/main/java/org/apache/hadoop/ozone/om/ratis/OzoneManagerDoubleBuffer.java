@@ -630,7 +630,11 @@ public final class OzoneManagerDoubleBuffer {
     try {
       while (currentBuffer.size() == 0) {
         wait(1000L);
-        flushNotifier.notifyFlush();
+        if  (currentBuffer.size() == 0) {
+          // Both buffers are empty, so notify twice
+          flushNotifier.notifyFlush();
+          flushNotifier.notifyFlush();
+        }
       }
       return true;
     }  catch (InterruptedException ex) {
@@ -699,7 +703,7 @@ public final class OzoneManagerDoubleBuffer {
 
     void await() throws InterruptedException {
 
-      // wait until both the current and ready buffers are flushed
+      // Wait until both the current and ready buffers are flushed.
       CountDownLatch latch = new CountDownLatch(2);
       flushLatches.put(latch, latch);
       latch.await();
