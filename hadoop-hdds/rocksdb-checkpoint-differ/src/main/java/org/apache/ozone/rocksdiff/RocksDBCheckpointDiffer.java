@@ -1062,7 +1062,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
-      LOG.info("Can't find SST '{}'", file, e);
+      LOG.info("Can't find SST '{}'", file);
     }
     CompactionNode fileNode = new CompactionNode(
         file, snapshotID, numKeys, seqNum);
