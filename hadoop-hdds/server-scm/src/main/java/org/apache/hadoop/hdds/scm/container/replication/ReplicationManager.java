@@ -1096,16 +1096,14 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "enable.legacy",
         type = ConfigType.BOOLEAN,
-        defaultValue = "true",
+        defaultValue = "false",
         tags = {SCM, OZONE},
-        description = "This configuration decides if " +
-            "LegacyReplicationManager should be used to handle RATIS " +
-            "containers. Default is true, which means " +
-            "LegacyReplicationManager will handle RATIS containers while " +
-            "ReplicationManager will handle EC containers. If false, " +
+        description =
+            "If true, LegacyReplicationManager will handle RATIS containers " +
+            "while ReplicationManager will handle EC containers. If false, " +
             "ReplicationManager will handle both RATIS and EC."
     )
-    private boolean enableLegacy = true;
+    private boolean enableLegacy;
 
     public boolean isLegacyEnabled() {
       return enableLegacy;
