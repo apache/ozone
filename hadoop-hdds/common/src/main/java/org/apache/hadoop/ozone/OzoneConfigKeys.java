@@ -179,9 +179,15 @@ public final class OzoneConfigKeys {
       "ozone.administrators.groups";
 
   public static final String OZONE_S3_ADMINISTRATORS =
-          "ozone.s3.administrators";
+      "ozone.s3.administrators";
   public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
-          "ozone.s3.administrators.groups";
+      "ozone.s3.administrators.groups";
+
+  public static final String OZONE_READONLY_ADMINISTRATORS =
+      "ozone.readonly.administrators";
+  public static final String OZONE_READONLY_ADMINISTRATORS_GROUPS =
+      "ozone.readonly.administrators.groups";
+
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
@@ -635,7 +641,11 @@ public final class OzoneConfigKeys {
       TimeDuration.valueOf(150, TimeUnit.SECONDS);
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
-  
+
+  public static final String OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE =
+      "ozone.om.snapdiff.max.page.size";
+  public static final int OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT = 1000;
+
   /**
    * There is no need to instantiate this class.
    */

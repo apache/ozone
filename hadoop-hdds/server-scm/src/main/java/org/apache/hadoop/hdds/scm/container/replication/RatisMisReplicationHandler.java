@@ -38,7 +38,7 @@ import java.util.Set;
 public class RatisMisReplicationHandler extends MisReplicationHandler {
 
   public RatisMisReplicationHandler(
-          PlacementPolicy<ContainerReplica> containerPlacement,
+          PlacementPolicy containerPlacement,
           ConfigurationSource conf, ReplicationManager replicationManager) {
     super(containerPlacement, conf, replicationManager);
   }

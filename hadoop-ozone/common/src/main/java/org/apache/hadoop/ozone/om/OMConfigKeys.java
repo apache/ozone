@@ -367,7 +367,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
-      false;
+      true;
   /**
    * Configuration properties for OMAdminProtcol service.
    */

@@ -164,10 +164,11 @@ public class TestContainerStateMachineFailureOnRead {
     Assert.assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
-    XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
-    xceiverClientRatis.connect();
-    TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    try (XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
+      xceiverClientRatis.connect();
+      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    }
 
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)

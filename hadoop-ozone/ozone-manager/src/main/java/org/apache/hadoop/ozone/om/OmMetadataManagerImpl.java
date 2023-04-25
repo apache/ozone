@@ -258,15 +258,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table userTable;
   private Table volumeTable;
   private Table bucketTable;
-  private Table keyTable;
+  private Table<String, OmKeyInfo> keyTable;
   private Table deletedTable;
   private Table openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table<String, S3SecretValue> s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
-  private Table dirTable;
-  private Table fileTable;
+  private Table<String, OmDirectoryInfo> dirTable;
+  private Table<String, OmKeyInfo> fileTable;
   private Table openFileTable;
   private Table transactionInfoTable;
   private Table metaTable;
@@ -968,7 +968,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return true;
   }
 
-
   /**
    * Checks if a key starting with a given keyPrefix exists in the table cache.
    *
@@ -976,22 +975,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param table     - table to be searched.
    * @return true if the key is present in the cache.
    */
-  private boolean isKeyPresentInTableCache(String keyPrefix,
-                                           Table table) {
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
+  private <T> boolean isKeyPresentInTableCache(String keyPrefix,
+                                           Table<String, T> table) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<T>>> iterator =
         table.cacheIterator();
     while (iterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+      Map.Entry<CacheKey<String>, CacheValue<T>> entry =
           iterator.next();
       String key = entry.getKey().getCacheKey();
-      OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
+      Object value = entry.getValue().getCacheValue();
+
       // Making sure that entry is not for delete key request.
-      if (key.startsWith(keyPrefix) && omKeyInfo != null) {
+      if (key.startsWith(keyPrefix) && value != null) {
         return true;
       }
     }
     return false;
   }
+
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *
@@ -1000,20 +1001,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return true if the key is present in the table
    * @throws IOException
    */
-  private boolean isKeyPresentInTable(String keyPrefix,
-                                      Table<String, OmKeyInfo> table)
+  private <T> boolean isKeyPresentInTable(String keyPrefix,
+                                      Table<String, T> table)
       throws IOException {
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, T>>
              keyIter = table.iterator()) {
-      KeyValue<String, OmKeyInfo> kv = keyIter.seek(keyPrefix);
+      KeyValue<String, T> kv = keyIter.seek(keyPrefix);
 
       // Iterate through all the entries in the table which start with
       // the current bucket's prefix.
       while (kv != null && kv.getKey().startsWith(keyPrefix)) {
         // Check the entry in db is not marked for delete. This can happen
         // while entry is marked for delete, but it is not flushed to DB.
-        CacheValue<OmKeyInfo> cacheValue =
-            table.getCacheValue(new CacheKey(kv.getKey()));
+        CacheValue<T> cacheValue =
+            table.getCacheValue(new CacheKey<>(kv.getKey()));
 
         // Case 1: We found an entry, but no cache entry.
         if (cacheValue == null) {

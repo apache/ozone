@@ -55,6 +55,7 @@ import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
@@ -206,6 +207,31 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     // Check and update the peer list in OzoneManager
     ozoneManager.updatePeerList(newPeerIds);
+  }
+
+  /**
+   * Called to notify state machine about the snapshot install result.
+   * Trigger the cleanup of candidate DB dir.
+   * @param result InstallSnapshotResult
+   * @param snapshotIndex the index of installed snapshot
+   * @param peer the peer which fini
+   */
+  @Override
+  public void notifySnapshotInstalled(RaftProtos.InstallSnapshotResult result,
+                                      long snapshotIndex, RaftPeer peer) {
+    LOG.info("Receive notifySnapshotInstalled event {} for the peer: {}" +
+        " snapshotIndex: {}.", result, peer.getId(), snapshotIndex);
+    switch (result) {
+    case SUCCESS:
+    case SNAPSHOT_UNAVAILABLE:
+      // Currently, only trigger for the one who installed snapshot
+      if (ozoneManager.getOmRatisServer().getServer().getPeer().equals(peer)) {
+        ozoneManager.getOmSnapshotProvider().init();
+      }
+      break;
+    default:
+      break;
+    }
   }
 
   /**
