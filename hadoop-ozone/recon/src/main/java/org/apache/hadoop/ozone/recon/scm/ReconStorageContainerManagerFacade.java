@@ -174,7 +174,9 @@ public class ReconStorageContainerManagerFacade
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
     this.scmContext = new SCMContext.Builder()
-        .setIsPreCheckComplete(true).setSCM(this).build();
+        .setIsPreCheckComplete(true)
+        .setSCM(this)
+        .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
@@ -206,7 +208,8 @@ public class ReconStorageContainerManagerFacade
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         conf, Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
-        dbStore, ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore,
+        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
@@ -215,17 +218,22 @@ public class ReconStorageContainerManagerFacade
     this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
+
     this.safeModeManager = safeModeManager;
     ReconPipelineReportHandler pipelineReportHandler =
         new ReconPipelineReportHandler(safeModeManager,
             pipelineManager, scmContext, conf, scmServiceProvider);
+
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext, conf);
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager, nodeManager, scmServiceProvider,
-        reconTaskStatusDao, reconTaskConfig);
+        pipelineManager,
+        nodeManager,
+        scmServiceProvider,
+        reconTaskStatusDao,
+        reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
         containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,

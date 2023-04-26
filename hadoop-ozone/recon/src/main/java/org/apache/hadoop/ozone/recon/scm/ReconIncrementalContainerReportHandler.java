@@ -46,7 +46,7 @@ public class ReconIncrementalContainerReportHandler
       ReconIncrementalContainerReportHandler.class);
 
   public ReconIncrementalContainerReportHandler(NodeManager nodeManager,
-                    ContainerManager containerManager, SCMContext scmContext) {
+             ContainerManager containerManager, SCMContext scmContext) {
     super(nodeManager, containerManager, scmContext);
   }
 

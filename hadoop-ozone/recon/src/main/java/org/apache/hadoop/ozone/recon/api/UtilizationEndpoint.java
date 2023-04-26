@@ -121,13 +121,13 @@ public class UtilizationEndpoint {
   @Path("/containerCount")
   public Response getContainerCounts(
       @QueryParam(RECON_QUERY_CONTAINER_SIZE)
-          long containerSize) {
+          long upperBound) {
     DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
     Long containerSizeUpperBound =
-        ReconUtils.getContainerSizeUpperBound(containerSize);
+        ReconUtils.getContainerSizeUpperBound(upperBound);
     List<ContainerCountBySize> resultSet;
     try {
-      if (containerSize > 0) {
+      if (upperBound > 0) {
         // Get the current count from database and update
         Record1<Long> recordToFind =
             dslContext.newRecord(
