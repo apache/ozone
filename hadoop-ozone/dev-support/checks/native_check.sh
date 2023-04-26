@@ -31,8 +31,8 @@ function init_native_maven_opts() {
     # If project version is 1.4.0-SNAPSHOT, VERSION_NUMBER = 1.4.0
     VERSION_NUMBER=$(echo "${PROJECT_VERSION}" | cut -f1 -d'-')
     # Adding rocks native sha after the version number in the project version.
-    # EXPECTED_ROCK_NATIVE_VERSION = 1.4.0.<rocks native git sha>-SNAPSHOT
-    EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}".${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
+    # EXPECTED_ROCK_NATIVE_VERSION = 1.4.0-<rocks native git sha>-SNAPSHOT
+    EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}"-${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
     echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
     mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
 
