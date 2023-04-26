@@ -85,8 +85,8 @@ public class DeleteContainerCommandHandler implements CommandHandler {
       executor.execute(() ->
           handleInternal(command, context, deleteContainerCommand, controller));
     } catch (RejectedExecutionException ex) {
-      LOG.warn("Delete Container command is received for container %s "
-          + "is ignored as command queue reach max size %d.",
+      LOG.warn("Delete Container command is received for container {} "
+          + "is ignored as command queue reach max size {}.",
           deleteContainerCommand.getContainerID(), maxQueueSize);
     }
   }

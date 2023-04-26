@@ -107,9 +107,9 @@ public class ReplicationSupervisor {
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
-    if (getQueueSize() > maxQueueSize) {
-      LOG.warn("Replication supervisor receive command for container %s "
-              + "is ignored as command queue reach max size %d.",
+    if (getQueueSize() >= maxQueueSize) {
+      LOG.warn("Replication supervisor receive command for container {} "
+              + "is ignored as command queue reach max size {}.",
           task.getContainerId(), maxQueueSize);
       return;
     }

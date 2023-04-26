@@ -129,4 +129,38 @@ public class ReplicationSupervisorScheduling {
         "Execution was too slow : " + executionTime + " ms");
   }
 
+  @Test
+  public void testMaxQueueSize() throws InterruptedException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+
+    Integer[] count = new Integer[1];
+    count[0] = 0;
+    ContainerReplicator replicator = task -> {
+      try {
+        count[0]++;
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+        // no log
+      }
+    };
+
+    ReplicationSupervisor rs = new ReplicationSupervisor(null,
+        replicationConfig, Clock.system(ZoneId.systemDefault()), 2);
+
+    //schedule 100 container replication
+    for (int i = 0; i < 100; i++) {
+      List<DatanodeDetails> sources = new ArrayList<>();
+      sources.add(datanodes.get(random.nextInt(datanodes.size())));
+      rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
+    }
+    rs.shutdownAfterFinish();
+    // range is checked to handle flaky if execution takes more time
+    // due to task addition slowness
+    Assertions.assertTrue(count[0] <= 20);
+  }
 }

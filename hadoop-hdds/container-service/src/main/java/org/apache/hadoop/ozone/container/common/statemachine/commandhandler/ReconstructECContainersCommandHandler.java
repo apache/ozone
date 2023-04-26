@@ -28,22 +28,16 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Command handler for reconstructing the lost EC containers.
  */
 public class ReconstructECContainersCommandHandler implements CommandHandler {
-  static final Logger LOG =
-      LoggerFactory.getLogger(ReconstructECContainersCommandHandler.class);
-
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;
 
-  public ReconstructECContainersCommandHandler(
-      ConfigurationSource conf,
+  public ReconstructECContainersCommandHandler(ConfigurationSource conf,
       ReplicationSupervisor supervisor,
       ECReconstructionCoordinator coordinator) {
     this.conf = conf;

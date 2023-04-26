@@ -800,8 +800,8 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
-      if (commandQueue.size() > maxCommandQueueLimit) {
-        LOG.warn("Ignore command as command queue crosses max limit %d.",
+      if (commandQueue.size() >= maxCommandQueueLimit) {
+        LOG.warn("Ignore command as command queue crosses max limit {}.",
             maxCommandQueueLimit);
         return;
       }
