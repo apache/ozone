@@ -37,7 +37,7 @@ Get and use Token in Secure Cluster
 
 Get Token in Unsecure Cluster
     ${output} =                  Execute             ozone sh token get -t /tmp/ozone.token
-    Should Contain               ${output}           ozone sh token get -t /tmp/ozone.token
+    Should Contain               ${output}           ozone sh token get
     Should Contain               ${output}           only when security is enabled
 
 # should be executed after Get Token
