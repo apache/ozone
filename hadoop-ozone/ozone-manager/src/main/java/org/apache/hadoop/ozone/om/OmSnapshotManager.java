@@ -150,8 +150,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final CodecRegistry codecRegistry;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
 
-  // TODO: [SNAPSHOT] create config for max allowed page size.
-  private final int maxPageSize = 1000;
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
