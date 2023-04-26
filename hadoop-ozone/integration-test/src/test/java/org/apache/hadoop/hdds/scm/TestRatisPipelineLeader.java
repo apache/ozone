@@ -96,15 +96,16 @@ public class TestRatisPipelineLeader {
       }
     }, 200, 20000);
     // Verify client connects to Leader without NotLeaderException
-    XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
     final Logger log = LoggerFactory.getLogger(
         "org.apache.ratis.grpc.server.GrpcClientProtocolService");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
-    xceiverClientRatis.connect();
-    ContainerProtocolCalls.createContainer(xceiverClientRatis, 1L, null);
+    try (XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
+      xceiverClientRatis.connect();
+      ContainerProtocolCalls.createContainer(xceiverClientRatis, 1L, null);
+    }
     logCapturer.stopCapturing();
     Assertions.assertFalse(
         logCapturer.getOutput().contains(

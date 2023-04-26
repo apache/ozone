@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -525,12 +526,17 @@ public final class HddsServerUtil {
   /**
    * Write DB Checkpoint to an output stream as a compressed file (tar).
    *
-   * @param checkpoint  checkpoint file
-   * @param destination destination output stream.
+   * @param checkpoint    checkpoint file
+   * @param destination   destination output stream.
+   * @param toExcludeList the files to be excluded
+   * @param excludedList  the files excluded
    * @throws IOException
    */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
+  public static void writeDBCheckpointToStream(
+      DBCheckpoint checkpoint,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList)
       throws IOException {
     try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination);
@@ -540,10 +546,14 @@ public final class HddsServerUtil {
           TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (Path path : files.collect(Collectors.toList())) {
         if (path != null) {
-          Path fileName = path.getFileName();
-          if (fileName != null) {
-            includeFile(path.toFile(), fileName.toString(),
-                archiveOutputStream);
+          Path fileNamePath = path.getFileName();
+          if (fileNamePath != null) {
+            String fileName = fileNamePath.toString();
+            if (!toExcludeList.contains(fileName)) {
+              includeFile(path.toFile(), fileName, archiveOutputStream);
+            } else {
+              excludedList.add(fileName);
+            }
           }
         }
       }

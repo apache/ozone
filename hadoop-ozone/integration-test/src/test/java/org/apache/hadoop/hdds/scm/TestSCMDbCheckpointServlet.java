@@ -120,7 +120,7 @@ public class TestSCMDbCheckpointServlet {
           Collections.emptyList(),
           false);
       doCallRealMethod().when(scmDbCheckpointServletMock)
-         .writeDbDataToStream(any(), any(), any());
+         .writeDbDataToStream(any(), any(), any(), any(), any());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);

@@ -29,8 +29,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.Arrays;
-import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,18 +43,18 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ManagedSSTDumpIterator.class);
+  // Since we don't have any restriction on the key, we are prepending
+  // the length of the pattern in the sst dump tool output.
+  // The first token in the pattern is the key.
+  // The second tells the sequence number of the key.
+  // The third token gives the type of key in the sst file.
   private static final String PATTERN_REGEX =
-      "'([^=>]+)' seq:([0-9]+), type:([0-9]+) => ";
-
+      "'([\\s\\S]+)' seq:([0-9]+), type:([0-9]+)";
   public static final int PATTERN_KEY_GROUP_NUMBER = 1;
   public static final int PATTERN_SEQ_GROUP_NUMBER = 2;
   public static final int PATTERN_TYPE_GROUP_NUMBER = 3;
   private static final Pattern PATTERN_MATCHER = Pattern.compile(PATTERN_REGEX);
   private BufferedReader processOutput;
-  private StringBuilder stdoutString;
-
-  private Matcher currentMatcher;
-  private int prevMatchEndIndex;
   private KeyValue currentKey;
   private char[] charBuffer;
   private KeyValue nextKey;
@@ -80,16 +80,55 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
+  /**
+   * Parses next occuring number in the stream.
+   *
+   * @return Optional of the integer empty if no integer exists
+   */
+  private Optional<Integer> getNextNumberInStream() throws IOException {
+    StringBuilder value = new StringBuilder();
+    int val;
+    while ((val = processOutput.read()) != -1) {
+      if (val >= '0' && val <= '9') {
+        value.append((char) val);
+      } else if (value.length() > 0) {
+        break;
+      }
+    }
+    return value.length() > 0 ? Optional.of(Integer.valueOf(value.toString()))
+        : Optional.empty();
+  }
+
+  /**
+   * Reads the next n chars from the stream & makes a string.
+   *
+   * @param numberOfChars
+   * @return String of next chars read
+   * @throws IOException
+   */
+  private String readNextNumberOfCharsFromStream(int numberOfChars)
+      throws IOException {
+    StringBuilder value = new StringBuilder();
+    while (numberOfChars > 0) {
+      int noOfCharsRead = processOutput.read(charBuffer, 0,
+          Math.min(numberOfChars, charBuffer.length));
+      if (noOfCharsRead == -1) {
+        break;
+      }
+      value.append(charBuffer, 0, noOfCharsRead);
+      numberOfChars -= noOfCharsRead;
+    }
+
+    return value.toString();
+  }
+
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
                     ManagedOptions options)
       throws NativeLibraryNotLoadedException {
     String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
-    processOutput = new BufferedReader(
-        new InputStreamReader(sstDumpToolTask.getPipedOutput(),
-            StandardCharsets.UTF_8));
-    stdoutString = new StringBuilder();
-    currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
+    processOutput = new BufferedReader(new InputStreamReader(
+        sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
     charBuffer = new char[8192];
     open = new AtomicBoolean(true);
     next();
@@ -142,37 +181,33 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     checkSanityOfProcess();
     currentKey = nextKey;
     nextKey = null;
-    while (!currentMatcher.find()) {
+    boolean keyFound = false;
+    while (!keyFound) {
       try {
-        if (prevMatchEndIndex != 0) {
-          stdoutString = new StringBuilder(
-              stdoutString.substring(prevMatchEndIndex, stdoutString.length()));
-          prevMatchEndIndex = 0;
-          currentMatcher = PATTERN_MATCHER.matcher(stdoutString);
+        Optional<Integer> keyLength = getNextNumberInStream();
+        if (!keyLength.isPresent()) {
+          return getTransformedValue(currentKey);
         }
-        int numberOfCharsRead = processOutput.read(charBuffer);
-        if (numberOfCharsRead < 0) {
-          if (currentKey != null) {
-            currentKey.setValue(stdoutString.substring(0,
-                Math.max(stdoutString.length() - 1, 0)));
-            return getTransformedValue(currentKey);
+        String keyStr = readNextNumberOfCharsFromStream(keyLength.get());
+        Matcher matcher = PATTERN_MATCHER.matcher(keyStr);
+        if (keyStr.length() == keyLength.get() && matcher.find()) {
+          Optional<Integer> valueLength = getNextNumberInStream();
+          if (valueLength.isPresent()) {
+            String valueStr = readNextNumberOfCharsFromStream(
+                valueLength.get());
+            if (valueStr.length() == valueLength.get()) {
+              keyFound = true;
+              nextKey = new KeyValue(matcher.group(PATTERN_KEY_GROUP_NUMBER),
+                  matcher.group(PATTERN_SEQ_GROUP_NUMBER),
+                  matcher.group(PATTERN_TYPE_GROUP_NUMBER),
+                  valueStr);
+            }
           }
-          throw new NoSuchElementException("No more elements found");
         }
-        stdoutString.append(charBuffer, 0, numberOfCharsRead);
-        currentMatcher.reset();
       } catch (IOException e) {
         throw new RuntimeIOException(e);
       }
     }
-    if (currentKey != null) {
-      currentKey.setValue(stdoutString.substring(prevMatchEndIndex,
-          currentMatcher.start() - 1));
-    }
-    prevMatchEndIndex = currentMatcher.end();
-    nextKey = new KeyValue(currentMatcher.group(PATTERN_KEY_GROUP_NUMBER),
-        currentMatcher.group(PATTERN_SEQ_GROUP_NUMBER),
-        currentMatcher.group(PATTERN_TYPE_GROUP_NUMBER));
     return getTransformedValue(currentKey);
   }
 
@@ -215,13 +250,11 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
     private String value;
 
-    private KeyValue(String key, String sequence, String type) {
+    private KeyValue(String key, String sequence, String type,
+                     String value) {
       this.key = key;
       this.sequence = Integer.valueOf(sequence);
       this.type = Integer.valueOf(type);
-    }
-
-    private void setValue(String value) {
       this.value = value;
     }
 
