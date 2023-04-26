@@ -64,14 +64,15 @@ public class DeleteContainerCommandHandler implements CommandHandler {
         0L, TimeUnit.MILLISECONDS,
         new LinkedBlockingQueue<>(queueSize),
         new ThreadFactoryBuilder()
-            .setNameFormat("DeleteContainerThread-%d").build()));
-    maxQueueSize = queueSize;
+            .setNameFormat("DeleteContainerThread-%d").build()),
+        queueSize);
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
-      ExecutorService executor) {
+      ExecutorService executor, int queueSize) {
     this.executor = executor;
     this.clock = clock;
+    maxQueueSize = queueSize;
   }
   @Override
   public void handle(final SCMCommand command,

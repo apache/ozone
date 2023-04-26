@@ -25,6 +25,7 @@ import org.apache.ozone.test.TestClock;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -33,6 +34,9 @@ import java.time.ZoneId;
 import java.util.OptionalLong;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -61,7 +65,7 @@ public class TestDeleteContainerCommandHandler {
 
   @Test
   public void testExpiredCommandsAreNotProcessed() throws IOException {
-    DeleteContainerCommandHandler handler = createSubject(clock);
+    DeleteContainerCommandHandler handler = createSubject(clock, 1000);
 
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
     command1.setDeadline(clock.millis() + 10000);
@@ -123,13 +127,41 @@ public class TestDeleteContainerCommandHandler {
         .deleteContainer(1L, false);
   }
 
-  private static DeleteContainerCommandHandler createSubject() {
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    return createSubject(clock);
+  @Test
+  public void testQueueSize() throws IOException {
+    DeleteContainerCommandHandler handler = createSubjectWithPoolSize(
+        clock, 1);
+    DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
+    Mockito.doAnswer(invocation -> {
+      try {
+        Thread.sleep(2000);
+      } catch (Exception ex) {
+      }
+      return null;
+    }).when(controller).deleteContainer(1, false);
+    for (int i = 0; i < 50; ++i) {
+      handler.handle(command1, ozoneContainer, null, null);
+    }
+    
+    // 10 is provided to handle flaky
+    Mockito.verify(controller, atMost(10))
+        .deleteContainer(1L, false);
   }
 
-  private static DeleteContainerCommandHandler createSubject(TestClock clock) {
-    return new DeleteContainerCommandHandler(clock, newDirectExecutorService());
+  private static DeleteContainerCommandHandler createSubject() {
+    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    return createSubject(clock, 1000);
+  }
+
+  private static DeleteContainerCommandHandler createSubject(
+      TestClock clock, int queueSize) {
+    return new DeleteContainerCommandHandler(clock,
+        newDirectExecutorService(), queueSize);
+  }
+
+  private static DeleteContainerCommandHandler createSubjectWithPoolSize(
+      TestClock clock, int queueSize) {
+    return new DeleteContainerCommandHandler(1, clock, queueSize);
   }
 
 }
