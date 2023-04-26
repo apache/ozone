@@ -186,7 +186,7 @@ public final class OzoneManagerDoubleBuffer {
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
       Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
-                                   FlushNotifier flushNotifier) {
+      FlushNotifier flushNotifier) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
