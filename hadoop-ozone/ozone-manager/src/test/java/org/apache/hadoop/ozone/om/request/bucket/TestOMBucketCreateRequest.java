@@ -246,10 +246,10 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         testAcceptS3CompliantBucketNameCreationRegardlessOfStrictS3Setting()
         throws Exception {
     String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
     boolean[] omStrictS3Configs = {true, false};
     for (boolean isStrictS3 : omStrictS3Configs) {
       when(ozoneManager.isStrictS3()).thenReturn(isStrictS3);
+      String bucketName = UUID.randomUUID().toString();
       acceptBucketCreationHelper(volumeName, bucketName);
     }
   }
