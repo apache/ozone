@@ -54,7 +54,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import org.apache.commons.io.file.PathUtils;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -385,7 +384,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   @NotNull
   private static OFSPath getSnapshotRootPath(String volume, String bucket) {
-    Path bucketPath = new Path(
+    org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
     OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
     return path;
