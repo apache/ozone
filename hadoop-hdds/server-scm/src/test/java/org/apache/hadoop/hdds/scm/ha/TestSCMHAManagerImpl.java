@@ -21,6 +21,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +53,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -128,6 +133,51 @@ class TestSCMHAManagerImpl {
     }
   }
 
+  private StorageContainerManager testsetup() throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
+    File dir = GenericTestUtils.getRandomizedTestDir();
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setSCMHAManager(primarySCMHAManager);
+    StorageContainerManager scm = HddsTestUtils.getScm(config, configurator);
+
+    return scm;
+  }
+  @Test
+  public void testHARingRemovalErrors() throws IOException,
+      AuthenticationException {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
+    File dir = GenericTestUtils.getRandomizedTestDir();
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setSCMHAManager(primarySCMHAManager);
+    final StorageContainerManager scm2 = HddsTestUtils
+        .getScm(config, configurator);
+
+    try {
+      // try removing scmid from ratis group not amongst peer list
+      String randomScmId = UUID.randomUUID().toString();
+      IOException ex;
+      ex = assertThrows(IOException.class, () ->
+          scm2.removePeerFromHARing(randomScmId));
+      assertTrue(ex.getMessage().contains("Peer"));
+
+      // TODO: try removing primordial node from ratis ring
+
+      // try removing leader scm from ratis ring
+      ex = assertThrows(IOException.class, () ->
+          scm2.removePeerFromHARing(scm2.getScmId()));
+      assertTrue(ex.getMessage().contains("leader"));
+    } finally {
+      scm2.getScmHAManager().getRatisServer().stop();
+    }
+  }
   @Test
   public void testRemoveSCM() throws IOException, InterruptedException {
     Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()

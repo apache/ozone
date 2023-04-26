@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -148,7 +148,7 @@ public class TestSnapshotDiffCleanupService {
     // Integers are used for indexing persistent list.
     codecRegistry.addCodec(Integer.class, new IntegerCodec());
     // DiffReportEntry codec for Diff Report.
-    codecRegistry.addCodec(SnapshotDiffReport.DiffReportEntry.class,
+    codecRegistry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
     codecRegistry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
