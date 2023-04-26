@@ -702,8 +702,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Bucket or Volume name has an unsupported" +
-            " character : #",
+        "Invalid bucket name: invalid#bucket",
         () -> volume.createBucket(bucketName));
   }
 
