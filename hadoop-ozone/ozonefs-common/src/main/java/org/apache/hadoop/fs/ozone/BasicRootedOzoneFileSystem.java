@@ -1491,11 +1491,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getLinkTarget(Path f) throws IOException {
     OFSPath ofsPath = new OFSPath(f,
         OzoneConfiguration.of(getConfSource()));
-    OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
-    if (bucket.isLink()) {
-      return new Path(OZONE_URI_DELIMITER +
-          bucket.getSourceVolume() + OZONE_URI_DELIMITER +
-          bucket.getSourceBucket());
+    if (ofsPath.isBucket()) {  // only support bucket links
+      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+      if (bucket.isLink()) {
+        return new Path(OZONE_URI_DELIMITER +
+            bucket.getSourceVolume() + OZONE_URI_DELIMITER +
+            bucket.getSourceBucket());
+      }
     }
     return f;
   }
