@@ -572,6 +572,29 @@ class TestRatisContainerReplicaCount {
     validate(withUnhealthy, true, 0, false);
   }
 
+  /**
+   * Scenario: A CLOSED RATIS container with 2 CLOSED and 1 UNHEALTHY replicas.
+   * Expectation: If considerUnhealthy is false, this container is not
+   * sufficiently replicated and replicaDelta is 1.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            false);
+    validate(withoutUnhealthy, false, 1, false);
+  }
+
   @Test
   void testIsHealthyWithMaintReplicaIsHealthy() {
     Set<ContainerReplica> replica =
