@@ -767,4 +767,34 @@ public class TestSCMContainerPlacementRackAware {
         datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
         datanodeDetails.get(1).getUuid());
   }
+  @ParameterizedTest
+  @ValueSource(ints = {11, 12, 13, 14, 15})
+  public void testNoFallbackWithUsedNodes(int datanodeCount) {
+    assumeTrue(datanodeCount > (NODE_PER_RACK * 2) &&
+        (datanodeCount <= NODE_PER_RACK * 3));
+    setup(datanodeCount);
+
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    usedNodes.add(datanodes.get(0));
+
+    // 5 replicas. there are only 3 racks. policy prohibit fallback should fail.
+    int nodeNum = 5;
+    try {
+      policyNoFallback.chooseDatanodes(usedNodes, null, null, nodeNum, 0, 15);
+      fail("Fallback prohibited, this call should fail");
+    } catch (Exception e) {
+      assertEquals("SCMException", e.getClass().getSimpleName());
+    }
+
+    // get metrics
+    long totalRequest = metrics.getDatanodeRequestCount();
+    long successCount = metrics.getDatanodeChooseSuccessCount();
+    long tryCount = metrics.getDatanodeChooseAttemptCount();
+    long compromiseCount = metrics.getDatanodeChooseFallbackCount();
+
+    Assertions.assertEquals(nodeNum, totalRequest);
+    Assertions.assertTrue(successCount >= 1, "Not enough success count");
+    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    Assertions.assertEquals(0, compromiseCount);
+  }
 }
