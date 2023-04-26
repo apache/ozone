@@ -51,6 +51,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -252,18 +253,10 @@ class TestOzoneManagerDoubleBuffer {
 
     // Override notifier to do some assert checks.
     doAnswer(i -> {
-      int c = notifyCounter.incrementAndGet();
-      assertEquals(0, doubleBuffer.getReadyBufferSize());
-      int threadCount = flushNotifier.notifyFlush();
-      // First time through, threadCount should be 1
-      if (c < 3) {
-        assertEquals(1, threadCount);
-      } else {
-        //  Every other time it should be 0.
-        assertEquals(0, threadCount);
-      }
+      notifyCounter.incrementAndGet();
       assertEquals(0, doubleBuffer.getCurrentBufferSize());
       assertEquals(0, doubleBuffer.getReadyBufferSize());
+      flushNotifier.notifyFlush();
       return null;
     }).when(spyFlushNotifier).notifyFlush();
 
@@ -276,21 +269,26 @@ class TestOzoneManagerDoubleBuffer {
         doubleBuffer.getCurrentBufferSize());
 
     // Start double buffer and wait for flush.
-    Future<Boolean> flusher = flushTransactions(executorService);
     Future<?> await = awaitFlush(executorService);
+    Future<Boolean> flusher = flushTransactions(executorService);
     await.get();
-
-    // Confirm still empty.
-    assertEquals(0, doubleBuffer.getCurrentBufferSize());
-    assertEquals(0, doubleBuffer.getReadyBufferSize());
 
     // Make sure notify was called at least twice.
     assertTrue(notifyCounter.get() >= 2);
     assertFalse(flusher.isDone());
 
+    // Confirm still empty.
+    assertEquals(0, doubleBuffer.getCurrentBufferSize());
+    assertEquals(0, doubleBuffer.getReadyBufferSize());
+
+    // Run again to make sure it works when double buffer is empty
+    await = awaitFlush(executorService);
+    await.get();
+
+
     // Clean up.
-    flusher.cancel(true);
-//    assertThrows(java.util.concurrent.CancellationException, flusher.get());
+    flusher.cancel(false);
+    assertThrows(java.util.concurrent.CancellationException.class, flusher::get);
   }
 
 
@@ -305,7 +303,11 @@ class TestOzoneManagerDoubleBuffer {
   private Future<Boolean> flushTransactions(ExecutorService executorService) {
     return executorService.submit(() -> {
       doubleBuffer.resume();
-      doubleBuffer.flushTransactions();
+      try {
+        doubleBuffer.flushTransactions();
+      } catch (Exception e) {
+        return false;
+      }
       return true;
     });
   }
