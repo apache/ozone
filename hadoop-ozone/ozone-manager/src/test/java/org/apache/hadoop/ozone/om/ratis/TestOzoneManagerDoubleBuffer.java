@@ -260,7 +260,6 @@ class TestOzoneManagerDoubleBuffer {
       return null;
     }).when(spyFlushNotifier).notifyFlush();
 
-
     // Init double buffer.
     for (OMClientResponse omClientResponse : omClientResponses) {
       doubleBuffer.add(omClientResponse, transactionIndex++);
@@ -285,10 +284,10 @@ class TestOzoneManagerDoubleBuffer {
     await = awaitFlush(executorService);
     await.get();
 
-
     // Clean up.
     flusher.cancel(false);
-    assertThrows(java.util.concurrent.CancellationException.class, flusher::get);
+    assertThrows(java.util.concurrent.CancellationException.class,
+        flusher::get);
   }
 
 
