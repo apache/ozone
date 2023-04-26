@@ -53,7 +53,6 @@ import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -244,7 +243,7 @@ class TestOzoneManagerDoubleBuffer {
     ExecutorService executorService = Executors.newCachedThreadPool();
     int transactionIndex = 0;
 
-    // Stop the daemon till to eliminate the race condition.
+    // Stop the daemon to eliminate race conditions.
     doubleBuffer.stopDaemon();
 
     // Confirm clear.
@@ -256,15 +255,14 @@ class TestOzoneManagerDoubleBuffer {
       int c = notifyCounter.incrementAndGet();
       assertEquals(0, doubleBuffer.getReadyBufferSize());
       int threadCount = flushNotifier.notifyFlush();
-      // First time through, it should be initial size.
-      if (c == 1) {
-        //        assertEquals(initialSize, doubleBuffer.getCurrentBufferSize());
-        // assertEquals(initialSize, threadCount);
+      // First time through, threadCount should be 1
+      if (c < 3) {
+        assertEquals(1, threadCount);
       } else {
         //  Every other time it should be 0.
-        assertEquals(0, doubleBuffer.getCurrentBufferSize());
         assertEquals(0, threadCount);
       }
+      assertEquals(0, doubleBuffer.getCurrentBufferSize());
       assertEquals(0, doubleBuffer.getReadyBufferSize());
       return null;
     }).when(spyFlushNotifier).notifyFlush();
