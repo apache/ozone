@@ -115,7 +115,9 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
       LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending "
-          + "is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
+              + "is [{}]. Reason for mis replication is [{}].", container,
+          misRepHealth.isReplicatedOkAfterPending(),
+          misRepHealth.getMisReplicatedReason());
       return true;
     }
     // Should not get here, but in case it does the container is not healthy,
@@ -175,7 +177,8 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           replicas, container.getReplicationConfig().getRequiredNodes(),
           request.getPendingOps());
       return new ContainerHealthResult.MisReplicatedHealthResult(
-          container, placementAfterPending.isPolicySatisfied());
+          container, placementAfterPending.isPolicySatisfied(),
+          placementAfterPending.misReplicatedReason());
     }
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);

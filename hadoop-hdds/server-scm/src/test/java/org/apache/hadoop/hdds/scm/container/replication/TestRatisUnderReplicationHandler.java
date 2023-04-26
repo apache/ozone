@@ -81,8 +81,11 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = Mockito.mock(ReplicationManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     Mockito.when(replicationManager.getConfig())
-        .thenReturn(new ReplicationManagerConfiguration());
+        .thenReturn(ozoneConfiguration.getObject(
+            ReplicationManagerConfiguration.class));
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -255,12 +258,33 @@ public class TestRatisUnderReplicationHandler {
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         testProcessing(replicas, Collections.emptyList(),
-            getUnderReplicatedHealthResult(), 2, 1);
-    Assert.assertEquals(1, commands.size());
-    Pair<DatanodeDetails, SCMCommand<?>> command = commands.stream()
-        .findFirst().get();
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
 
-    Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
+  /**
+   * Tests that a CLOSED RATIS container with 2 CLOSED replicas and 1
+   * UNHEALTHY replica is correctly seen as under replicated. And, under
+   * replication is fixed by sending a command to replicate either of the
+   * CLOSED replicas.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    commands.forEach(
+        command -> Assert.assertNotEquals(unhealthyReplica.getDatanodeDetails(),
+            command.getKey()));
   }
 
   @Test
