@@ -53,7 +53,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -104,7 +103,7 @@ public class TestBlockManagerImpl {
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(
-            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,

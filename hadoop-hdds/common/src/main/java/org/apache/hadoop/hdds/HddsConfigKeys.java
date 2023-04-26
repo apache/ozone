@@ -62,10 +62,10 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
-  public static final String HDDS_DATANODE_VOLUME_UTILISATION_LIMIT =
-      "hdds.datanode.volume.utilisation.limit";
-  public static final float HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT =
-      0.9f;
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
+      "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
+      "5GB";
 
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 

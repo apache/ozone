@@ -175,14 +175,15 @@ public class TestHddsDispatcher {
     String testDir = GenericTestUtils.getTempPath(
         TestHddsDispatcher.class.getSimpleName());
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT, 0.8f);
+    conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        100.0, StorageUnit.BYTES);
     DatanodeDetails dd = randomDatanodeDetails();
 
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDir).datanodeUuid(dd.getUuidString())
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    // state of cluster : used/capacity(0.72) < 0.8 ,datanode volume utilisation
-    // threshold not yet reached. container creates are successful.
+    // state of cluster : capacity-used (140) > 100  ,datanode volume
+    // utilisation threshold not yet reached. container creates are successful.
     SpaceUsageSource spaceUsage = fixed(500, 140, 360);
 
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(

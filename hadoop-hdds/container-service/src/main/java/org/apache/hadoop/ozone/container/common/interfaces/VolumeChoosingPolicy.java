@@ -39,13 +39,15 @@ public interface VolumeChoosingPolicy {
    * @param volumes - a list of available volumes.
    * @param maxContainerSize - the maximum size of the container for which a
    *                         volume is sought.
-   * @param volumeUtilisationThreshold - volume used/capacity threshold, if
-   *          volume crosses this container wont be allocated in this volume.
+   * @param volumeFreeSpace - Free space to spare on the volume ie when
+   *                        (capacity-used) reaches volumeFreeSpace, the volume
+   *                        should be ineligible for container allocation.
+   *
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
-      float volumeUtilisationThreshold) throws IOException;
+      long volumeFreeSpace) throws IOException;
 
   @VisibleForTesting
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)

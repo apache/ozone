@@ -46,12 +46,12 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
-    return chooseVolume(volumes, maxContainerSize, 1.0f);
+    return chooseVolume(volumes, maxContainerSize, 0L);
   }
 
   @Override
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize, float volumeUtilisationThreshold)
+      long maxContainerSize, long volumeFreeSpace)
       throws IOException {
 
     // No volumes available to choose from
@@ -60,7 +60,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
     }
 
     AvailableSpaceFilter filter =
-        new AvailableSpaceFilter(maxContainerSize, volumeUtilisationThreshold);
+        new AvailableSpaceFilter(maxContainerSize, volumeFreeSpace);
 
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds

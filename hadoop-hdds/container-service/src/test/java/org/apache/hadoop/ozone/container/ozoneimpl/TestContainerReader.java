@@ -61,7 +61,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -118,7 +117,7 @@ public class TestContainerReader {
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(
-            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyLong()))
         .thenReturn(hddsVolume);
 
     for (int i = 0; i < 2; i++) {
@@ -277,7 +276,7 @@ public class TestContainerReader {
         null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy1.chooseVolume(
-        anyList(), anyLong(), anyFloat()))
+        anyList(), anyLong(), anyLong()))
         .thenReturn(hddsVolume1);
 
     int containerCount = 3;

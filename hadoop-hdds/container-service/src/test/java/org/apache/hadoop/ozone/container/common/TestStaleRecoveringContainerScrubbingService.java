@@ -64,7 +64,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -116,7 +115,7 @@ public class TestStaleRecoveringContainerScrubbingService {
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(
-            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyLong()))
         .thenReturn(hddsVolume);
   }
 

@@ -32,24 +32,23 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
       new HashMap<>();
   private long mostAvailableSpace = Long.MIN_VALUE;
 
-  private float volumeUtilisationThreshold;
+  private long volumeFreeSpace;
 
-  AvailableSpaceFilter(long requiredSpace, float volumeUtilisationThreshold) {
+  AvailableSpaceFilter(long requiredSpace, long volumeFreeSpace) {
     this.requiredSpace = requiredSpace;
-    this.volumeUtilisationThreshold = volumeUtilisationThreshold;
+    this.volumeFreeSpace = volumeFreeSpace;
   }
 
   @Override
   public boolean test(HddsVolume vol) {
     float volumeUsed = vol.getUsedSpace();
     float volumeCapacity = vol.getCapacity();
-    double volumeUsedPercentage = (volumeUsed / volumeCapacity);
     long free = vol.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
     boolean hasEnoughSpace =
         (available > requiredSpace) &&
-            (volumeUsedPercentage <= volumeUtilisationThreshold);
+            (volumeCapacity - volumeUsed > volumeFreeSpace);
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 

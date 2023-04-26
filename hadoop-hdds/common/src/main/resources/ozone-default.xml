@@ -205,14 +205,14 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.volume.utilisation.limit</name>
-    <value>0.9f</value>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>5GB</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>
-      This determines the threshold to be used for closing containers
-      When the volume used percentage reaches this threshold,
-      containers that reside on this volume will be closed.
-      percentage in float notation (X.Yf), with 1.0f meaning 100%.
+      This determines the free space to be used for closing containers
+      When the difference between volume capacity and used reaches this number,
+      containers that reside on this volume will be closed and no new containers
+      would be allocated on this volume.
     </description>
   </property>
   <property>

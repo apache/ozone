@@ -95,7 +95,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -150,7 +149,7 @@ public class TestKeyValueContainer {
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(
-            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -260,7 +259,7 @@ public class TestKeyValueContainer {
 
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1,
-          1.0f);
+          0L);
 
       container.populatePathFields(scmId, containerVolume);
       try (FileInputStream fis = new FileInputStream(folderToExport)) {
@@ -303,7 +302,7 @@ public class TestKeyValueContainer {
 
       containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1,
-          1.0f);
+          0L);
       container.populatePathFields(scmId, containerVolume);
       try {
         FileInputStream fis = new FileInputStream(folderToExport);
@@ -430,7 +429,7 @@ public class TestKeyValueContainer {
   public void testDiskFullExceptionCreateContainer() throws Exception {
 
     Mockito.when(
-            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyFloat()))
+            volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), anyLong()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
     try {
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -693,7 +692,7 @@ public class TestKeyValueContainer {
     List<File> exportFiles = new ArrayList<>();
     for (HddsVolume volume: volumeList) {
       Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(),
-              anyLong(), anyFloat()))
+              anyLong(), anyLong()))
           .thenReturn(volume);
       for (int index = 0; index < count; index++, containerId++) {
         // Create new container

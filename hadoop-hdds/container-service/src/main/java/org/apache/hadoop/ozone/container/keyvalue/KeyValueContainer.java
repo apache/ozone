@@ -38,6 +38,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -137,14 +138,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     File containerMetaDataPath = null;
     //acquiring volumeset read lock
     long maxSize = containerData.getMaxSize();
-    float volumeUtilisationLimit =
-        config.getFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT,
-            HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT);
+    long volumeFreeSpaceToSpare = (long) config.getStorageSize(
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+        StorageUnit.BYTES);
     volumeSet.readLock();
     try {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          maxSize, volumeUtilisationLimit);
+          maxSize, volumeFreeSpaceToSpare);
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       // Set volume before getContainerDBFile(), because we may need the
       // volume to deduce the db file.

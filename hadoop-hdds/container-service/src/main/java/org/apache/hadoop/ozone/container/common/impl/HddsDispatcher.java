@@ -24,6 +24,7 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -556,18 +557,18 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     boolean isOpen = Optional.ofNullable(container)
         .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
         .orElse(Boolean.FALSE);
-    float volumeUtilisationThreshold =
-        conf.getFloat(HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT,
-            HddsConfigKeys.HDDS_DATANODE_VOLUME_UTILISATION_LIMIT_DEFAULT);
+    long volumeFreeSpaceToSpare = (long) conf.getStorageSize(
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+        StorageUnit.BYTES);
     if (isOpen) {
       ContainerData containerData = container.getContainerData();
       double containerUsedPercentage =
           1.0f * containerData.getBytesUsed() / containerData.getMaxSize();
       float volumeUsed = containerData.getVolume().getUsedSpace();
       float volumeCapacity = containerData.getVolume().getCapacity();
-      double volumeUsedPercentage = (volumeUsed / volumeCapacity);
       return (containerUsedPercentage >= containerCloseThreshold) ||
-          (volumeUsedPercentage >= volumeUtilisationThreshold);
+          (volumeCapacity - volumeUsed <= volumeFreeSpaceToSpare);
     } else {
       return false;
     }
