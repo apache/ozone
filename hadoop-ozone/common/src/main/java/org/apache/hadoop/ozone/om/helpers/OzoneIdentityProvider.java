@@ -23,12 +23,19 @@ import org.apache.hadoop.ipc.IdentityProvider;
 import org.apache.hadoop.ipc.Schedulable;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Objects;
 
 /**
  * Ozone implementation of IdentityProvider used by
  * Hadoop DecayRpcScheduler.
  */
 public class OzoneIdentityProvider implements IdentityProvider {
+
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OzoneIdentityProvider.class);
 
   public OzoneIdentityProvider() {
   }
@@ -44,11 +51,15 @@ public class OzoneIdentityProvider implements IdentityProvider {
   @Override
   public String makeIdentity(Schedulable schedulable) {
     UserGroupInformation ugi = schedulable.getUserGroupInformation();
-    if (schedulable instanceof Server.Call) {
+    try {
       CallerContext callerContext = schedulable.getCallerContext();
-      if (!StringUtil.isNullOrEmpty(callerContext.getContext())) {
+      if (Objects.nonNull(callerContext) &&
+          !StringUtil.isNullOrEmpty(callerContext.getContext())) {
         return callerContext.getContext();
       }
+    } catch (UnsupportedOperationException ex) {
+      LOG.error("Trying to access CallerContext from a Schedulable " +
+          "implementation that's not instance of Server.Call");
     }
     return ugi.getShortUserName() == null ? null : ugi.getShortUserName();
   }

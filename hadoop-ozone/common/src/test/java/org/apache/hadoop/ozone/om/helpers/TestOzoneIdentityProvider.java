@@ -19,14 +19,10 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Schedulable;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
-import static org.mockito.Mockito.when;
 
 /**
  * Test class for {@link OzoneIdentityProvider}.
@@ -35,6 +31,9 @@ public class TestOzoneIdentityProvider {
   private static OzoneIdentityProvider identityProvider;
   private static final String ACCESS_ID = "testuser";
 
+  /**
+   * Schedulable that doesn't override getCallerContext().
+   */
   private static final Schedulable DEFAULT_SCHEDULABLE = new Schedulable() {
     @Override
     public UserGroupInformation getUserGroupInformation() {
@@ -47,6 +46,27 @@ public class TestOzoneIdentityProvider {
     }
   };
 
+  /**
+   * Schedulable that overrides getCallerContext().
+   */
+  private static final Schedulable CALLER_CONTEXT_SCHEDULABLE =
+      new Schedulable() {
+        @Override
+        public UserGroupInformation getUserGroupInformation() {
+          return UserGroupInformation.createRemoteUser("s3g");
+        }
+
+        @Override
+        public CallerContext getCallerContext() {
+          return new CallerContext.Builder(ACCESS_ID).build();
+        }
+
+        @Override
+        public int getPriorityLevel() {
+          return 0;
+        }
+      };
+
   @BeforeAll
   public static void setUp() {
     identityProvider = new OzoneIdentityProvider();
@@ -54,17 +74,10 @@ public class TestOzoneIdentityProvider {
 
   @Test
   public void testGetUserFromCallerContext() {
-    Schedulable callerContextSchedulable = Mockito.mock(Server.Call.class);
-
-    CallerContext callerContext =
-        new CallerContext.Builder(
-            ACCESS_ID).build();
-
-    when(callerContextSchedulable.getCallerContext())
-        .thenReturn(callerContext);
-
-    String identity = identityProvider.makeIdentity(callerContextSchedulable);
-    String usernameFromContext = callerContext.getContext();
+    String identity = identityProvider
+        .makeIdentity(CALLER_CONTEXT_SCHEDULABLE);
+    String usernameFromContext = CALLER_CONTEXT_SCHEDULABLE
+        .getCallerContext().getContext();
 
     Assertions.assertEquals(usernameFromContext, identity);
   }
