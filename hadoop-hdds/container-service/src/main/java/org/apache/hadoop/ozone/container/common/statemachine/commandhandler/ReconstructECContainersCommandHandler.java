@@ -40,18 +40,15 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
-  private int maxQueueSize;
   private final ConfigurationSource conf;
 
   public ReconstructECContainersCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
-      ECReconstructionCoordinator coordinator,
-      int queueSize) {
+      ECReconstructionCoordinator coordinator) {
     this.conf = conf;
     this.supervisor = supervisor;
     this.coordinator = coordinator;
-    maxQueueSize = queueSize;
   }
 
   @Override
@@ -61,13 +58,6 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
         (ReconstructECContainersCommand) command;
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
-    if (supervisor.getQueueSize() > maxQueueSize) {
-      LOG.warn("ECReconstruction command is received for container %s "
-              + "is ignored as command queue reach max size %d.",
-          reconstructionCommandInfo.getContainerID(),
-          maxQueueSize);
-      return;
-    }
     this.supervisor.addTask(new ECReconstructionCoordinatorTask(
         coordinator, reconstructionCommandInfo));
   }

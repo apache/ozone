@@ -161,7 +161,8 @@ public class DatanodeConfiguration {
       type = ConfigType.INT,
       defaultValue = "5000",
       tags = {DATANODE},
-      description = "The maximum number of commands queued on a datanode"
+      description = "The default maximum number of commands in the queue " +
+          "and command type's sub-queue on a datanode"
   )
   private int cmdQueueLimit = 5000;
 

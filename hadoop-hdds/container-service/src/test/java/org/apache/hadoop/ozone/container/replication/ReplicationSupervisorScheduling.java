@@ -111,7 +111,7 @@ public class ReplicationSupervisorScheduling {
     };
 
     ReplicationSupervisor rs = new ReplicationSupervisor(null,
-        replicationConfig, Clock.system(ZoneId.systemDefault()));
+        replicationConfig, Clock.system(ZoneId.systemDefault()), 1000);
 
     final long start = System.currentTimeMillis();
 

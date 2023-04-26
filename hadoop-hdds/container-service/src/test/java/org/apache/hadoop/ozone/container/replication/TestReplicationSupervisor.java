@@ -282,7 +282,8 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, newDirectExecutorService(), clock);
+        new ReplicationSupervisor(context, newDirectExecutorService(),
+            clock, 1000);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -397,7 +398,7 @@ public class TestReplicationSupervisor {
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     repConf.setReplicationMaxStreams(1);
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(null, repConf, clock);
+        new ReplicationSupervisor(null, repConf, clock, 1000);
 
     final CountDownLatch indicateRunning = new CountDownLatch(1);
     final CountDownLatch completeRunning = new CountDownLatch(1);
@@ -511,7 +512,7 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, executor, clock);
+        new ReplicationSupervisor(context, executor, clock, 1000);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }

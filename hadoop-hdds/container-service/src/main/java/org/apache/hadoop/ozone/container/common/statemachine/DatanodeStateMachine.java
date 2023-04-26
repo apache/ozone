@@ -196,7 +196,8 @@ public class DatanodeStateMachine implements Closeable {
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
-    supervisor = new ReplicationSupervisor(context, replicationConfig, clock);
+    supervisor = new ReplicationSupervisor(context, replicationConfig, clock,
+        dnConf.getCommandQueueLimit());
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -210,7 +211,7 @@ public class DatanodeStateMachine implements Closeable {
     // a test. The test mocks it in a running mini-cluster.
     reconstructECContainersCommandHandler =
         new ReconstructECContainersCommandHandler(conf, supervisor,
-        ecReconstructionCoordinator, dnConf.getCommandQueueLimit());
+        ecReconstructionCoordinator);
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
@@ -219,8 +220,7 @@ public class DatanodeStateMachine implements Closeable {
             conf, dnConf.getBlockDeleteThreads(),
             dnConf.getBlockDeleteQueueLimit()))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
-            pullReplicatorWithMetrics, pushReplicatorWithMetrics,
-            dnConf.getCommandQueueLimit()))
+            pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock,
