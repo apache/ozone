@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -25,7 +27,6 @@ import org.apache.ozone.test.TestClock;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -34,9 +35,7 @@ import java.time.ZoneId;
 import java.util.OptionalLong;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atMost;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -132,20 +131,29 @@ public class TestDeleteContainerCommandHandler {
     DeleteContainerCommandHandler handler = createSubjectWithPoolSize(
         clock, 1);
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
+    Lock lock = new ReentrantLock();
     Mockito.doAnswer(invocation -> {
       try {
-        Thread.sleep(2000);
-      } catch (Exception ex) {
+        lock.lock();
+      } finally {
+        lock.unlock();
       }
       return null;
     }).when(controller).deleteContainer(1, false);
-    for (int i = 0; i < 50; ++i) {
-      handler.handle(command1, ozoneContainer, null, null);
-    }
+
+    lock.lock();
+    try {
+      for (int i = 0; i < 50; ++i) {
+        handler.handle(command1, ozoneContainer, null, null);
+      }
     
-    // 10 is provided to handle flaky
-    Mockito.verify(controller, atMost(10))
-        .deleteContainer(1L, false);
+      // one is waiting in execution as thread count 1, so count 1
+      // and one in queue, others ignored
+      Mockito.verify(controller, times(1))
+          .deleteContainer(1L, false);
+    } finally {
+      lock.unlock();
+    }
   }
 
   private static DeleteContainerCommandHandler createSubject() {
