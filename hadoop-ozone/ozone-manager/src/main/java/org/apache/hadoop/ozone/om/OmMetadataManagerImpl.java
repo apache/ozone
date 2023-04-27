@@ -197,10 +197,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
-   * | snapshotRenamedTable  | /volumeName/bucketName/objectID ->              |
-   * |                       |     /volumeId/bucketId/parentId/dirName         |
-   * |                       |     /volumeId/bucketId/parentId/fileName        |
-   * |                       |     /volumeName/bucketName/keyName              |
+   * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
+   * |                       |  1. /volumeId/bucketId/parentId/dirName         |
+   * |                       |  2. /volumeId/bucketId/parentId/fileName        |
+   * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
    */
 

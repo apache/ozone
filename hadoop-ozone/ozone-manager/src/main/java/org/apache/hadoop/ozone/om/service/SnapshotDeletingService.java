@@ -209,6 +209,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           // or keep it in current snapshot deleted table.
           List<SnapshotMoveKeyInfos> toReclaimList = new ArrayList<>();
           List<SnapshotMoveKeyInfos> toNextDBList = new ArrayList<>();
+          // A list of renamed keys/files/dirs
           List<HddsProtos.KeyValue> renamedList = new ArrayList<>();
           List<String> dirsToMove = new ArrayList<>();
 
@@ -470,15 +471,15 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       snapshotRenamedTable: /volumeName/bucketName/objectID ->
           /volumeId/bucketId/parentId/dirName
        */
-      String renamedKey = renamedTable.getIfExist(dbRenameKey);
+      String dbKeyBeforeRename = renamedTable.getIfExist(dbRenameKey);
       String prevDbKey = null;
 
-      if (renamedKey != null) {
-        prevDbKey = renamedKey;
+      if (dbKeyBeforeRename != null) {
+        prevDbKey = dbKeyBeforeRename;
         HddsProtos.KeyValue renamedDir = HddsProtos.KeyValue
             .newBuilder()
             .setKey(dbRenameKey)
-            .setValue(renamedKey)
+            .setValue(dbKeyBeforeRename)
             .build();
         renamedList.add(renamedDir);
       } else {

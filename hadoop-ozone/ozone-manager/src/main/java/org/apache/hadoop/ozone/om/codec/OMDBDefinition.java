@@ -241,7 +241,7 @@ public class OMDBDefinition implements DBDefinition {
    * (or fileTable).
    */
   public static final DBColumnFamilyDefinition<String, String>
-      SNAPSHOT_RENAMED_KEY_TABLE =
+      SNAPSHOT_RENAMED_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE,
           String.class,  // /volumeName/bucketName/objectID
@@ -268,7 +268,7 @@ public class OMDBDefinition implements DBDefinition {
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_KEY_TABLE};
+        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_TABLE};
   }
 }
 
