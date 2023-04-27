@@ -345,7 +345,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
    * to validateContainerPlacement, then it will return an invalid placement.
    */
   private static class MockPlacementPolicy implements
-          PlacementPolicy<ContainerReplica> {
+          PlacementPolicy {
 
     private UUID misRepWhenDnPresent = null;
 

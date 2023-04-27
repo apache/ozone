@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -51,6 +51,8 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -58,10 +60,12 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -74,7 +78,6 @@ public class TestOMSnapshotDAG {
   private static OzoneConfiguration conf;
   private static ObjectStore store;
   private static OzoneClient client;
-  private final File metaDir = OMStorage.getOmDbDir(conf);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -122,9 +125,7 @@ public class TestOMSnapshotDAG {
   }
 
   private String getDBCheckpointAbsolutePath(SnapshotInfo snapshotInfo) {
-    return metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+    return OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
   }
 
   private static String getSnapshotDBKey(String volumeName, String bucketName,
@@ -179,7 +180,7 @@ public class TestOMSnapshotDAG {
         "--num-of-buckets", "1",
         "--num-of-keys", "500",
         "--num-of-threads", "1",
-        "--key-size", "0",  // zero size keys. since we don't need to test DNs
+        "--key-size", "0",  // zero-byte keys since we don't test DNs here
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
@@ -268,6 +269,52 @@ public class TestOMSnapshotDAG {
 
     List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
     Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
+  }
+
+  @Test
+  public void testSkipTrackingWithZeroSnapshot() {
+    // Verify that the listener correctly skips compaction tracking
+    // when there is no snapshot in SnapshotInfoTable.
+
+    // Generate keys
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator(cluster.getConf());
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    // 1000 keys are enough to trigger compaction with 256KB DB CF write buffer
+    cmd.execute("--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1000",
+        "--num-of-threads", "1",
+        "--key-size", "0",  // zero-byte keys since we don't test DNs here
+        "--factor", "THREE",
+        "--type", "RATIS",
+        "--validate-writes"
+    );
+
+    Assertions.assertEquals(1000L, randomKeyGenerator.getNumberOfKeysAdded());
+    Assertions.assertEquals(1000L,
+        randomKeyGenerator.getSuccessfulValidationCount());
+
+    String omMetadataDir =
+        cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
+    // Verify that no compaction log entry has been written
+    Path logPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
+        DB_COMPACTION_LOG_DIR);
+    File[] fileList = logPath.toFile().listFiles();
+    // fileList can be null when compaction log directory is not even created
+    if (fileList != null) {
+      for (File file : fileList) {
+        if (file != null && file.isFile() && file.getName().endsWith(".log")) {
+          Assertions.assertEquals(0L, file.length());
+        }
+      }
+    }
+    // Verify that no SST has been backed up
+    Path sstBackupPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
+        DB_COMPACTION_SST_BACKUP_DIR);
+    fileList = sstBackupPath.toFile().listFiles();
+    Assertions.assertNotNull(fileList);
+    Assertions.assertEquals(0L, fileList.length);
   }
 
 }

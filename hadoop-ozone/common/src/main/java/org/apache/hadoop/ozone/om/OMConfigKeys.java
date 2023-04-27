@@ -28,6 +28,17 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE =
+      "ozone.om.snapshot.sst_dumptool.pool.size";
+  public static final int
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
+      "ozone.om.snapshot.sst_dumptool.buffer.size";
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT = "8KB";
+
   /**
    * Never constructed.
    */
@@ -85,6 +96,10 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
+      "ozone.snapshot.key.deleting.limit.per.task";
+  public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
+      = 20000;
 
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.key.cleanup.service.interval";
@@ -352,7 +367,13 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
-      false;
+      true;
+
+  public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
+      "ozone.om.namespace.s3.strict";
+  public static final boolean OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT =
+      true;
+
   /**
    * Configuration properties for OMAdminProtcol service.
    */

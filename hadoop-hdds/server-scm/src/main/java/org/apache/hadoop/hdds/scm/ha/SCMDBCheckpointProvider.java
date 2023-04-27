@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 
 // TODO: define a generic interface for this
 /**
@@ -66,7 +67,8 @@ public class SCMDBCheckpointProvider {
       }
 
       Instant start = Instant.now();
-      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream);
+      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream,
+          new ArrayList<>(), new ArrayList<>());
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -39,6 +40,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
@@ -55,7 +57,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException,
-      AllSourcesOverloadedException, NotLeaderException {
+      CommandTargetOverloadedException, NotLeaderException {
     RatisReplicationConfig repConfig = RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE);
     setup(repConfig);
@@ -177,16 +179,16 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
-    Mockito.doThrow(new AllSourcesOverloadedException("Overloaded"))
+    Mockito.doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
             anyList(), any(), anyInt());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
-    assertThrows(AllSourcesOverloadedException.class,
-        () -> testMisReplication(availableReplicas, Collections.emptyList(),
-            0, 1, 1));
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
+            Collections.emptyList(), 0, 1, 1, 0));
   }
 
   @Override
@@ -194,6 +196,13 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new RatisMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
+  }
+
+  @Override
+  protected void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex) {
+    Assertions.assertEquals(0, actualReplicaIndex);
   }
 }

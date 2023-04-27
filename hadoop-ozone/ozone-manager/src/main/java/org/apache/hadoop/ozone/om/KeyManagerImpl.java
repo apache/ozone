@@ -101,6 +101,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 
+import static java.lang.String.format;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -282,7 +283,8 @@ public class KeyManagerImpl implements KeyManager {
           TimeUnit.MILLISECONDS);
       try {
         snapshotDeletingService = new SnapshotDeletingService(
-            snapshotServiceInterval, snapshotServiceTimeout, ozoneManager);
+            snapshotServiceInterval, snapshotServiceTimeout,
+            ozoneManager, scmClient.getBlockClient());
         snapshotDeletingService.start();
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
@@ -404,16 +406,18 @@ public class KeyManagerImpl implements KeyManager {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
+        if (bucketLayout.isLegacy() && value != null && !value.isFile()) {
+          value = null; // Legacy buckets do not report key info for directories
+        }
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         throw ex;
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Get key failed for volume:{} bucket:{} key:{}", volumeName,
-                bucketName, keyName, ex);
-      }
-      throw new OMException(ex.getMessage(), KEY_NOT_FOUND);
+      throw new OMException(
+          format("Error reading key metadata: /%s/%s/%s",
+              volumeName, bucketName, keyName),
+          ex, INTERNAL_ERROR);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
@@ -619,7 +623,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
-    return metadataManager.getPendingDeletionKeys(count);
+    OmMetadataManagerImpl omMetadataManager =
+        (OmMetadataManagerImpl) metadataManager;
+    return omMetadataManager
+        .getPendingDeletionKeys(count, ozoneManager.getOmSnapshotManager());
   }
 
   @Override

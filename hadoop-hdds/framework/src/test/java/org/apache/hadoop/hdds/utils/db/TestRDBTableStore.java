@@ -51,6 +51,7 @@ import org.rocksdb.StatsLevel;
  * Tests for RocksDBTable Store.
  */
 public class TestRDBTableStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -113,7 +114,8 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = new RDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
   @AfterEach
@@ -426,9 +428,10 @@ public class TestRDBTableStore {
     // Remove without next removes first entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.removeFromDB();
+      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+          testTable.iterator()) {
+        iterator.removeFromDB();
+      }
       Assertions.assertNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNotNull(testTable.get(bytesOf[3]));
@@ -437,10 +440,11 @@ public class TestRDBTableStore {
     // Remove after seekToLast removes lastEntry
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seekToLast();
-      iterator.removeFromDB();
+      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+               testTable.iterator()) {
+        iterator.seekToLast();
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNull(testTable.get(bytesOf[3]));
@@ -449,10 +453,11 @@ public class TestRDBTableStore {
     // Remove after seek deletes that entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seek(bytesOf[3]);
-      iterator.removeFromDB();
+      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+               testTable.iterator()) {
+        iterator.seek(bytesOf[3]);
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNull(testTable.get(bytesOf[3]));
@@ -461,11 +466,12 @@ public class TestRDBTableStore {
     // Remove after next() deletes entry that was returned by next.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seek(bytesOf[2]);
-      iterator.next();
-      iterator.removeFromDB();
+      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+          testTable.iterator()) {
+        iterator.seek(bytesOf[2]);
+        iterator.next();
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNull(testTable.get(bytesOf[2]));
       Assertions.assertNotNull(testTable.get(bytesOf[3]));

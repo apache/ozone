@@ -310,6 +310,8 @@ public final class OmUtils {
     case CreateSnapshot:
     case DeleteSnapshot:
     case SnapshotMoveDeletedKeys:
+    case SnapshotPurge:
+    case RecoverLease:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -497,10 +499,10 @@ public final class OmUtils {
   /**
    * Verify bucket name is a valid DNS name.
    */
-  public static void validateBucketName(String bucketName)
+  public static void validateBucketName(String bucketName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName);
+      HddsClientUtils.verifyResourceName(bucketName, isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);

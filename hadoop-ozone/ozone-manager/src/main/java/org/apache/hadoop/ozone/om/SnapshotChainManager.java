@@ -49,7 +49,7 @@ public class SnapshotChainManager {
       snapshotChainPath;
   private Map<String, String> latestPathSnapshotID;
   private String latestGlobalSnapshotID;
-  private Map<String, String> snapshotPathToTableKey;
+  private Map<String, String> snapshotIdToTableKey;
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);
 
@@ -58,7 +58,7 @@ public class SnapshotChainManager {
     snapshotChainGlobal = new LinkedHashMap<>();
     snapshotChainPath = new HashMap<>();
     latestPathSnapshotID = new HashMap<>();
-    snapshotPathToTableKey = new HashMap<>();
+    snapshotIdToTableKey = new HashMap<>();
     latestGlobalSnapshotID = null;
     loadFromSnapshotInfoTable(metadataManager);
   }
@@ -84,7 +84,7 @@ public class SnapshotChainManager {
     if (prevGlobalID != null &&
         !snapshotChainGlobal.containsKey(prevGlobalID)) {
       throw new IOException("Snapshot Chain corruption: "
-          + " previous snapshotID given but no associated snapshot "
+          + "previous snapshotID given but no associated snapshot "
           + "found in snapshot chain: SnapshotID "
           + prevGlobalID);
     }
@@ -93,15 +93,14 @@ public class SnapshotChainManager {
 
     // set state variable latestGlobal snapshot entry to this snapshotID
     latestGlobalSnapshotID = snapshotID;
-  };
+  }
 
   /**
    * Add snapshot to bucket snapshot chain(path based).
    */
   private void addSnapshotPath(String snapshotPath,
                                String snapshotID,
-                               String prevPathID,
-                               String snapTableKey) throws IOException {
+                               String prevPathID) throws IOException {
     // set previous snapshotID to null if it is "" for
     // internal in-mem structure
     if (prevPathID != null && prevPathID.isEmpty()) {
@@ -139,11 +138,9 @@ public class SnapshotChainManager {
         .put(snapshotID,
             new SnapshotChainInfo(snapshotID, prevPathID, null));
 
-    // store snapshot ID to snapshot DB table key in the map
-    snapshotPathToTableKey.put(snapshotID, snapTableKey);
     // set state variable latestPath snapshot entry to this snapshotID
     latestPathSnapshotID.put(snapshotPath, snapshotID);
-  };
+  }
 
   private boolean deleteSnapshotGlobal(String snapshotID) throws IOException {
     boolean status = true;
@@ -265,21 +262,22 @@ public class SnapshotChainManager {
           throws IOException {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
-    TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
-        keyIter = metadataManager.getSnapshotInfoTable().iterator();
-    Map<Long, SnapshotInfo> snaps = new TreeMap<>();
-    Table.KeyValue< String, SnapshotInfo > kv;
-    snapshotChainGlobal.clear();
-    snapshotChainPath.clear();
-    latestPathSnapshotID.clear();
-    snapshotPathToTableKey.clear();
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
+      Map<Long, SnapshotInfo> snaps = new TreeMap<>();
+      Table.KeyValue<String, SnapshotInfo> kv;
+      snapshotChainGlobal.clear();
+      snapshotChainPath.clear();
+      latestPathSnapshotID.clear();
+      snapshotIdToTableKey.clear();
 
-    while (keyIter.hasNext()) {
-      kv = keyIter.next();
-      snaps.put(kv.getValue().getCreationTime(), kv.getValue());
-    }
-    for (SnapshotInfo sinfo : snaps.values()) {
-      addSnapshot(sinfo);
+      while (keyIter.hasNext()) {
+        kv = keyIter.next();
+        snaps.put(kv.getValue().getCreationTime(), kv.getValue());
+      }
+      for (SnapshotInfo sinfo : snaps.values()) {
+        addSnapshot(sinfo);
+      }
     }
   }
 
@@ -292,8 +290,9 @@ public class SnapshotChainManager {
         sinfo.getGlobalPreviousSnapshotID());
     addSnapshotPath(sinfo.getSnapshotPath(),
         sinfo.getSnapshotID(),
-        sinfo.getPathPreviousSnapshotID(),
-        sinfo.getTableKey());
+        sinfo.getPathPreviousSnapshotID());
+    // store snapshot ID to snapshot DB table key in the map
+    snapshotIdToTableKey.put(sinfo.getSnapshotID(), sinfo.getTableKey());
   }
 
   /**
@@ -304,9 +303,12 @@ public class SnapshotChainManager {
   public boolean deleteSnapshot(SnapshotInfo sinfo) throws IOException {
     boolean status;
 
-    status = deleteSnapshotGlobal(sinfo.getSnapshotID());
-    return status && deleteSnapshotPath(sinfo.getSnapshotPath(),
-        sinfo.getSnapshotID());
+    status = deleteSnapshotGlobal(sinfo.getSnapshotID()) &&
+        deleteSnapshotPath(sinfo.getSnapshotPath(), sinfo.getSnapshotID());
+    if (status) {
+      snapshotIdToTableKey.remove(sinfo.getSnapshotID());
+    }
+    return status;
   }
 
   /**
@@ -521,8 +523,8 @@ public class SnapshotChainManager {
         .getPreviousSnapshotID();
   }
 
-  public String getTableKey(String snapshotPath) {
-    return snapshotPathToTableKey.get(snapshotPath);
+  public String getTableKey(String snapshotId) {
+    return snapshotIdToTableKey.get(snapshotId);
   }
 
   @VisibleForTesting

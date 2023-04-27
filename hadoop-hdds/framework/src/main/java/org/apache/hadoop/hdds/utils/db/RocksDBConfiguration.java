@@ -20,8 +20,11 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
 /**
  * Holds configuration items for OM RocksDB.
@@ -32,25 +35,41 @@ public class RocksDBConfiguration {
   @Config(key = "rocksdb.logging.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
-      tags = {ConfigTag.OM},
+      tags = {OM, SCM, DATANODE},
       description = "Enable/Disable RocksDB logging for OM.")
   private boolean rocksdbLogEnabled;
 
   @Config(key = "rocksdb.logging.level",
       type = ConfigType.STRING,
       defaultValue = "INFO",
-      tags = {ConfigTag.OM},
+      tags = {OM, SCM, DATANODE},
       description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
   private String rocksdbLogLevel;
 
   @Config(key = "rocksdb.writeoption.sync",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
-      tags = {ConfigTag.OM},
+      tags = {OM, SCM, DATANODE},
       description = "Enable/Disable Sync option. If true write will be " +
           "considered complete, once flushed to persistent storage. If false," +
           " writes are flushed asynchronously.")
   private boolean syncOption;
+
+  @Config(key = "rocksdb.WAL_ttl_seconds",
+      type = ConfigType.LONG,
+      defaultValue = "1200",
+      tags = {OM, SCM, DATANODE},
+      description = "The lifetime of WAL log files. Default 1200 seconds.")
+  private long walTTL = 1200;
+
+  @Config(key = "rocksdb.WAL_size_limit_MB",
+      type = ConfigType.SIZE,
+      defaultValue = "0MB",
+      tags = {OM, SCM, DATANODE},
+      description = "The total size limit of WAL log files. Once the total log"
+          + " file size exceeds this limit, the earliest files will be deleted."
+          + "Default 0 means no limit.")
+  private long walSizeLimit = 0;
 
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
@@ -76,4 +95,19 @@ public class RocksDBConfiguration {
     return syncOption;
   }
 
+  public void setWalTTL(long ttl) {
+    this.walTTL = ttl;
+  }
+
+  public long getWalTTL() {
+    return walTTL;
+  }
+
+  public void setWalSizeLimit(long limit) {
+    this.walSizeLimit = limit;
+  }
+
+  public long getWalSizeLimit() {
+    return walSizeLimit;
+  }
 }

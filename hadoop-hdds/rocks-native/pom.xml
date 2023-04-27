@@ -48,7 +48,7 @@
                 </property>
             </activation>
             <properties>
-                <cmake.standards>23</cmake.standards>
+                <cmake.standards>20</cmake.standards>
                 <sstDump.include>true</sstDump.include>
             </properties>
             <build>
@@ -274,6 +274,7 @@
                                             <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
                                         </exec>
                                         <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                                            <arg line="DEBUG_LEVEL=0"/>
                                             <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                             <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
                                             <arg line="-j${system.numCores}"/>
@@ -383,13 +384,31 @@
         <profile>
             <id>java-11</id>
             <activation>
-                <jdk>11</jdk>
+                <jdk>[11,]</jdk>
                 <property>
                     <name>rocks_tools_native</name>
                 </property>
             </activation>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-jars</id>
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
@@ -403,8 +422,8 @@
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
-                                        <argument>-classpath</argument>
-                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>-cp</argument>
+                                        <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
                                         <argument>-h</argument>
                                         <argument>${project.build.directory}/native/javah</argument>
                                         <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>

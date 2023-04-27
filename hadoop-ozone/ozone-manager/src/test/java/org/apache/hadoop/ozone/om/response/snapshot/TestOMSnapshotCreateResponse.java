@@ -47,9 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
  * This class tests OMSnapshotCreateResponse.
@@ -61,11 +59,11 @@ public class TestOMSnapshotCreateResponse {
   
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
-  private String fsPath;
+  private OzoneConfiguration ozoneConfiguration;
   @Before
   public void setup() throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    fsPath = folder.newFolder().getAbsolutePath();
+    ozoneConfiguration = new OzoneConfiguration();
+    String fsPath = folder.newFolder().getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
@@ -112,9 +110,7 @@ public class TestOMSnapshotCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Confirm snapshot directory was created
-    String snapshotDir = fsPath + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName();
+    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
     Assert.assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
