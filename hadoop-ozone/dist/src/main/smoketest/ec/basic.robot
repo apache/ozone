@@ -34,6 +34,28 @@ Create Key In EC Bucket
     Key Should Match Local File    ${key}      ${file}
     Verify Key EC Replication Config    ${key}    RS    3    2    1048576
 
+Get Disk Usage of File with EC RS Replication
+                                     [arguments]    ${fileLength}    ${dataChunkCount}    ${parityChunkCount}    ${ecChunkSize}
+    ${ecChunkSize} =                 Evaluate   ${ecChunkSize} * 1024
+    # the formula comes from https://github.com/apache/ozone/blob/master/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/QuotaUtil.java#L42-L60
+    ${dataStripeSize} =              Evaluate   ${dataChunkCount} * ${ecChunkSize} * 1024
+    ${fullStripes} =                 Evaluate   ${fileLength}/${dataStripeSize}
+    ${fullStripes} =                 Convert To Integer   ${fullStripes}
+    # rounds to ones digit
+    ${fullStripes} =                 Convert to Number    ${fullStripes}    0
+    ${partialFirstChunk} =           Evaluate   ${fileLength} % ${dataStripeSize}
+    ${ecChunkSize} =                 Convert To Integer   ${ecChunkSize}
+    ${partialFirstChunk} =           Convert To Integer   ${partialFirstChunk}
+    ${partialFirstChunkOptions} =    Create List   ${ecChunkSize}   ${partialFirstChunk}
+    ${partialFirstChunk} =           Evaluate   min(${partialFirstChunkOptions})
+    ${replicationOverhead} =         Evaluate   ${fullStripes} * 2 * 1024 * 1024 + ${partialFirstChunk} * 2
+    ${expectedDiskUsage} =           Evaluate   ${fileLength} + ${replicationOverhead}
+    # Convert float to int
+    ${expectedDiskUsage} =           Convert To Integer    ${expectedDiskUsage}
+    ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
+                                     [return]             ${expectedDiskUsage}
+
+
 *** Test Cases ***
 Test Bucket Creation
     ${result} =     Execute             ozone sh volume create /${VOLUME}
@@ -108,3 +130,16 @@ Invalid Replication With Misconfigured Client
     # 1024 is unsupported EC chunk size
     ${message} =    Execute And Ignore Error    ozone sh -Dozone.replication.allowed-configs="" key put --replication=rs-3-2-1024 --type=EC /${VOLUME}/ecbucket/invalid /tmp/1mb
                     Should contain              ${message}          INVALID_REQUEST Invalid replication config
+
+Check disk usage after create a file which uses EC replication type
+                   ${vol} =    Generate Random String   8  [LOWER]
+                ${bucket} =    Generate Random String   8  [LOWER]
+                               Execute                  ozone sh volume create /${vol}
+                               Execute                  ozone sh bucket create /${vol}/${bucket} --type EC --replication rs-3-2-1024k
+                               Execute                  ozone fs -put NOTICE.txt /${vol}/${bucket}/PUTFILE2.txt
+    ${expectedFileLength} =    Execute                  stat -c %s NOTICE.txt
+     ${expectedDiskUsage} =    Get Disk Usage of File with EC RS Replication    ${expectedFileLength}    3    2    1024
+                ${result} =    Execute                  ozone fs -du /${vol}/${bucket}
+                               Should contain           ${result}         PUTFILE2.txt
+                               Should contain           ${result}         ${expectedFileLength}
+                               Should contain           ${result}         ${expectedDiskUsage}
