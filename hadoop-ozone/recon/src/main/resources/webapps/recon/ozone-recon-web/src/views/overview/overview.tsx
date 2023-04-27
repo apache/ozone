@@ -232,7 +232,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers !== undefined && deletedContainers.toString()} icon='delete' />
+            <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
         </Row>
       </div>
