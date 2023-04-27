@@ -318,8 +318,6 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(1, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
@@ -359,8 +357,6 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(1, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
 
@@ -372,6 +368,8 @@ public class TestReplicationManager {
     handler.processAndSendCommands(replicas, Collections.emptyList(),
         repQueue.dequeueOverReplicatedContainer(), 2);
     Assert.assertTrue(commandsSent.iterator().hasNext());
+
+    // unhealthy replica can't be deleted because it has a unique origin DN
     Assert.assertNotEquals(unhealthy.getDatanodeDetails().getUuid(),
         commandsSent.iterator().next().getKey());
     Assert.assertEquals(SCMCommandProto.Type.deleteContainerCommand,

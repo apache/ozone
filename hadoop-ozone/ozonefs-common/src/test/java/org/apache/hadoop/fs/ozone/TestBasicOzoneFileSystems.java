@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -72,6 +73,16 @@ public class TestBasicOzoneFileSystems {
     assertDefaultBlockSize(toBytes(customValue));
   }
 
+  // test for filesystem pseduo-posix symlink support
+  @Test
+  public void testFileSystemPosixSymlinkSupport() {
+    if (subject.getClass() == BasicRootedOzoneFileSystem.class) {
+      Assert.assertTrue(subject.supportsSymlinks());
+    } else {
+      Assert.assertFalse(subject.supportsSymlinks());
+    }
+  }
+
   private void assertDefaultBlockSize(long expected) {
     assertEquals(expected, subject.getDefaultBlockSize());
 
@@ -86,4 +97,5 @@ public class TestBasicOzoneFileSystems {
     StorageSize blockSize = StorageSize.parse(value);
     return (long) blockSize.getUnit().toBytes(blockSize.getValue());
   }
+
 }

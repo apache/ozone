@@ -1636,6 +1636,24 @@
   </property>
 
   <property>
+    <name>ozone.readonly.administrators</name>
+    <value/>
+    <description>
+      Ozone read only admin users delimited by the comma.
+      If set, This is the list of users are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.readonly.administrators.groups</name>
+    <value/>
+    <description>
+      Ozone read only admin groups delimited by the comma.
+      If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -3514,6 +3532,15 @@
       will create intermediate directories.
     </description>
   </property>
+    <property>
+    <name>ozone.om.namespace.s3.strict</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Ozone namespace should follow S3 naming rule by default.
+      However this parameter allows the namespace to support non-S3 compatible characters.
+    </description>
+  </property>
   <property>
     <name>ozone.om.snapshot.cache.max.size</name>
     <value>10</value>
@@ -3755,6 +3782,14 @@
     <tag>OZONE, OM</tag>
     <description>
       Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapdiff.max.page.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of entries that a single snapDiff RPC would return.
     </description>
   </property>
 </configuration>
