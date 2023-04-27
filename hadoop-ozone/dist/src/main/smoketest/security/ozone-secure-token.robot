@@ -24,10 +24,10 @@ Test Timeout        5 minutes
 *** Keywords ***
 Get and use Token in Secure Cluster
     Run Keyword   Kinit test user     testuser     testuser.keytab
-    Execute                      ozone sh token get -t /tmp/ozone.token
-    File Should Not Be Empty     /tmp/ozone.token
+    Execute                      ozone sh token get -t ./ozone.token
+    File Should Not Be Empty     ./ozone.token
     Execute                      kdestroy
-    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    /tmp/ozone.token
+    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    ./ozone.token
     ${output} =                  Execute             ozone sh volume list /
     Should not contain           ${output}           Client cannot authenticate
     Remove Environment Variable  HADOOP_TOKEN_FILE_LOCATION
@@ -36,7 +36,7 @@ Get and use Token in Secure Cluster
     Run Keyword                  Kinit test user     testuser  testuser.keytab
 
 Get Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token get -t /tmp/ozone.token
+    ${output} =                  Execute             ozone sh token get -t ./ozone.token
     Should Contain               ${output}           ozone sh token get
     Should Contain               ${output}           only when security is enabled
 
