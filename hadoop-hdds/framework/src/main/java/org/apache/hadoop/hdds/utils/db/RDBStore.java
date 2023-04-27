@@ -44,6 +44,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -111,7 +112,7 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
