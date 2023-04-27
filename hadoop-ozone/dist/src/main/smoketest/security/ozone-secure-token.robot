@@ -42,7 +42,7 @@ Get Token in Unsecure Cluster
 
 # should be executed after Get Token
 Print Valid Token File
-    ${output} =                  Execute             ozone sh token print
+    ${output} =                  Execute             ozone sh token print -t ./ozone.token
     Should Not Be Empty          ${output}
 
 Print Nonexistent Token File
@@ -50,20 +50,20 @@ Print Nonexistent Token File
     Should Contain               ${output}           operation failed as token file: /asdf
 
 Renew Token in Secure Cluster
-    ${output} =                  Execute             ozone sh token renew
+    ${output} =                  Execute             ozone sh token renew -t ./ozone.token
     Should contain               ${output}           Token renewed successfully
 
 Renew Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token renew
+    ${output} =                  Execute             ozone sh token renew -t ./ozone.token
     Should Contain               ${output}           ozone sh token renew
     Should Contain               ${output}           only when security is enabled
 
 Cancel Token in Secure Cluster
-    ${output} =                  Execute             ozone sh token cancel
+    ${output} =                  Execute             ozone sh token cancel -t ./ozone.token
     Should contain               ${output}           Token canceled successfully
 
 Cancel Token in Unsecure Cluster
-    ${output} =                  Execute             ozone sh token cancel
+    ${output} =                  Execute             ozone sh token cancel -t ./ozone.token
     Should Contain               ${output}           ozone sh token cancel
     Should Contain               ${output}           only when security is enabled
 
