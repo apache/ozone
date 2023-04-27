@@ -111,7 +111,7 @@ public final class SCMContainerPlacementRackAware
       throws SCMException {
     Map<String, Long> mapSizeRequired = new HashMap<>();
     mapSizeRequired.put(META_DATA_SIZE_REQUIRED, metadataSizeRequired);
-    mapSizeRequired.put(DATA_SIZE_REQUIRED, metadataSizeRequired);
+    mapSizeRequired.put(DATA_SIZE_REQUIRED, dataSizeRequired);
 
     if (!usedNodesPassed(usedNodes)) {
       // If interface is called without used nodes
