@@ -832,6 +832,35 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(StorageType.SSD, newBucket.getStorageType());
   }
 
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteBucketWithTheSamePrefix(BucketLayout bucketLayout)
+      throws Exception {
+    /*
+    * This test case simulates the following operations:
+    * 1. (op1) Create a bucket named "bucket1".
+    * 2. (op2) Create another bucket named "bucket11",
+    *          which has the same prefix as "bucket1".
+    * 3. (op3) Put a key in the "bucket11".
+    * 4. (op4) Delete the "bucket1". This operation should succeed.
+    * */
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName1 = "bucket1";
+    String bucketName2 = "bucket11";
+    String keyName = "key";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName1, bucketArgs);
+    volume.createBucket(bucketName2, bucketArgs);
+    OzoneBucket bucket2 = volume.getBucket(bucketName2);
+    bucket2.createKey(keyName, 1).close();
+    volume.deleteBucket(bucketName1);
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(bucketName1));
+  }
+
   @Test
   public void testDeleteBucket()
       throws Exception {
