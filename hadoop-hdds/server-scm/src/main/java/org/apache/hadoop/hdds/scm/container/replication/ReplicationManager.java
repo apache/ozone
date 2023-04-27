@@ -82,6 +82,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -172,8 +173,8 @@ public class ReplicationManager implements SCMService {
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
   private final EventPublisher eventPublisher;
-  private final ReentrantLock lock = new ReentrantLock();
-  private ReplicationQueue replicationQueue;
+  private final AtomicReference<ReplicationQueue> replicationQueue
+      = new AtomicReference<>(new ReplicationQueue());
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final ECMisReplicationHandler ecMisReplicationHandler;
@@ -237,7 +238,6 @@ public class ReplicationManager implements SCMService {
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
-    this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
@@ -386,7 +386,7 @@ public class ReplicationManager implements SCMService {
       }
     }
     report.setComplete();
-    setQueue(newRepQueue);
+    replicationQueue.set(newRepQueue);
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
@@ -1013,22 +1013,8 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-  private void setQueue(ReplicationQueue newRepQueue) {
-    lock.lock();
-    try {
-      replicationQueue = newRepQueue;
-    } finally {
-      lock.unlock();
-    }
-  }
-
   ReplicationQueue getQueue() {
-    lock.lock();
-    try {
-      return replicationQueue;
-    } finally {
-      lock.unlock();
-    }
+    return replicationQueue.get();
   }
 
   /**
