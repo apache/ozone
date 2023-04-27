@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -30,7 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
@@ -224,5 +227,28 @@ public class NSSummaryTaskDbEventHandler {
       return flushAndCommitNSToDB(nsSummaryMap);
     }
     return true;
+  }
+
+  protected void buildOrphanCandidateSet(
+      WithParentObjectId fileDirInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      Map<Long, Set<Long>> orphanCandidateSet) throws IOException {
+    long objectID = fileDirInfo.getObjectID();
+    long parentObjectID = fileDirInfo.getParentObjectID();
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectID);
+    if (nsSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectID);
+    }
+    if (null == nsSummary) {
+      Set<Long> childIds = orphanCandidateSet.get(parentObjectID);
+      if (null == childIds) {
+        childIds = new HashSet<>();
+      }
+      childIds.add(objectID);
+      orphanCandidateSet.put(parentObjectID, childIds);
+    } else {
+      orphanCandidateSet.remove(parentObjectID);
+    }
   }
 }

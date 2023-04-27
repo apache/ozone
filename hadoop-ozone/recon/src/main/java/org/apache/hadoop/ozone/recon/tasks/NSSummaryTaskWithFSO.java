@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -67,6 +68,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    Map<Long, Set<Long>> orphanMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -93,21 +95,25 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
             break;
 
           case DELETE:
             handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+              buildOrphanCandidateSet(oldKeyInfo, nsSummaryMap, orphanMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
             }
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
             break;
 
           default:
@@ -125,21 +131,29 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
+                orphanMap);
             break;
 
           case DELETE:
             handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
+                orphanMap);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
               handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+              buildOrphanCandidateSet(oldDirectoryInfo, nsSummaryMap,
+                  orphanMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
             }
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
+                orphanMap);
             break;
 
           default:
@@ -168,6 +182,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    Map<Long, Set<Long>> orphanMap = new HashMap<>();
 
     try {
       Table<String, OmDirectoryInfo> dirTable =
@@ -185,6 +200,16 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         }
       }
 
+      try (TableIterator<String,
+          ? extends Table.KeyValue<String, OmDirectoryInfo>>
+               dirTableIter = dirTable.iterator()) {
+        while (dirTableIter.hasNext()) {
+          Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
+          OmDirectoryInfo directoryInfo = kv.getValue();
+          buildOrphanCandidateSet(directoryInfo, nsSummaryMap, orphanMap);
+        }
+      }
+
       // Get fileTable used by FSO
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getFileTable();
@@ -198,6 +223,15 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;
           }
+        }
+      }
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+               keyTableIter = keyTable.iterator()) {
+        while (keyTableIter.hasNext()) {
+          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
+          OmKeyInfo keyInfo = kv.getValue();
+          buildOrphanCandidateSet(keyInfo, nsSummaryMap, orphanMap);
         }
       }
 
