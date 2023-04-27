@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
@@ -121,8 +122,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
@@ -1519,6 +1521,194 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(fs.delete(volumePath3, true));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
+  }
+
+  private void createSymlinkSrcDestPaths(String srcVol,
+      String srcBucket, String destVol, String destBucket) throws IOException {
+    // src srcVol/srcBucket
+    Path volumeSrcPath = new Path(OZONE_URI_DELIMITER + srcVol);
+    Path bucketSrcPath = Path.mergePaths(volumeSrcPath,
+        new Path(OZONE_URI_DELIMITER + srcBucket));
+    fs.mkdirs(volumeSrcPath);
+    OzoneVolume volume = objectStore.getVolume(srcVol);
+    Assert.assertEquals(srcVol, volume.getName());
+    fs.mkdirs(bucketSrcPath);
+    OzoneBucket bucket = volume.getBucket(srcBucket);
+    Assert.assertEquals(srcBucket, bucket.getName());
+
+    // dest link destVol/destBucket -> srcVol/srcBucket
+    Path volumeLinkPath = new Path(OZONE_URI_DELIMITER + destVol);
+    fs.mkdirs(volumeLinkPath);
+    volume = objectStore.getVolume(destVol);
+    Assert.assertEquals(destVol, volume.getName());
+    createLinkBucket(destVol, destBucket, srcVol, srcBucket);
+  }
+
+  @Test
+  public void testSymlinkList() throws Exception {
+    OzoneFsShell shell = new OzoneFsShell(conf);
+    // setup symlink, destVol/destBucket -> srcVol/srcBucket
+    String srcVolume = getRandomNonExistVolumeName();
+    final String srcBucket = "bucket";
+    String destVolume = getRandomNonExistVolumeName();
+    createSymlinkSrcDestPaths(srcVolume, srcBucket, destVolume, srcBucket);
+
+    try {
+      // test symlink -ls -R destVol/destBucket -> srcVol/srcBucket
+      // srcBucket no keys
+      // run toolrunner ozone fs shell commands
+      try (GenericTestUtils.SystemOutCapturer capture =
+               new GenericTestUtils.SystemOutCapturer()) {
+        String linkPathStr = rootPath + destVolume;
+        ToolRunner.run(shell, new String[]{"-ls", "-R", linkPathStr});
+        Assert.assertTrue(capture.getOutput().contains("drwxrwxrwx"));
+        Assert.assertTrue(capture.getOutput().contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket));
+      } finally {
+        shell.close();
+      }
+
+      // add key in source bucket
+      final String key = "object-dir/object-name1";
+      try (OzoneOutputStream outputStream = objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket)
+          .createKey(key, 1)) {
+        outputStream.write(RandomUtils.nextBytes(1));
+      }
+      Assert.assertEquals(objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket).getKey(key).getName(), key);
+
+      // test ls -R /destVol/destBucket, srcBucket with key (non-empty)
+      try (GenericTestUtils.SystemOutCapturer capture =
+               new GenericTestUtils.SystemOutCapturer()) {
+        String linkPathStr = rootPath + destVolume;
+        ToolRunner.run(shell, new String[]{"-ls", "-R",
+            linkPathStr + OZONE_URI_DELIMITER + srcBucket});
+        Assert.assertTrue(capture.getOutput().contains("drwxrwxrwx"));
+        Assert.assertTrue(capture.getOutput().contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket));
+        Assert.assertTrue(capture.getOutput().contains("-rw-rw-rw-"));
+        Assert.assertTrue(capture.getOutput().contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket + OZONE_URI_DELIMITER + key));
+      } finally {
+        shell.close();
+      }
+    } finally {
+      // cleanup; note must delete link before link src bucket
+      // due to bug - HDDS-7884
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume +
+          OZONE_URI_DELIMITER + srcBucket));
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), true);
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), true);
+    }
+  }
+
+  @Test
+  public void testSymlinkPosixDelete() throws Exception {
+    OzoneFsShell shell = new OzoneFsShell(conf);
+    // setup symlink, destVol/destBucket -> srcVol/srcBucket
+    String srcVolume = getRandomNonExistVolumeName();
+    final String srcBucket = "bucket";
+    String destVolume = getRandomNonExistVolumeName();
+    createSymlinkSrcDestPaths(srcVolume, srcBucket, destVolume, srcBucket);
+
+    try {
+      // test symlink destVol/destBucket -> srcVol/srcBucket exists
+      Assert.assertTrue(fs.exists(new Path(OZONE_URI_DELIMITER +
+          destVolume + OZONE_URI_DELIMITER + srcBucket)));
+
+      // add key to srcBucket
+      final String key = "object-dir/object-name1";
+      try (OzoneOutputStream outputStream = objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket)
+          .createKey(key, 1)) {
+        outputStream.write(RandomUtils.nextBytes(1));
+      }
+      Assert.assertEquals(objectStore.getVolume(srcVolume)
+          .getBucket(srcBucket).getKey(key).getName(), key);
+
+      // test symlink -rm destVol/destBucket -> srcVol/srcBucket
+      // should delete only link, srcBucket and key unaltered
+      // run toolrunner ozone fs shell commands
+      try {
+        String linkPathStr = rootPath + destVolume + OZONE_URI_DELIMITER +
+            srcBucket;
+        int res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash",
+            linkPathStr});
+        Assert.assertEquals(0, res);
+
+        try {
+          objectStore.getVolume(destVolume).getBucket(srcBucket);
+          Assert.fail("Bucket should not exist, should throw OMException");
+        } catch (OMException ex) {
+          Assert.assertEquals(BUCKET_NOT_FOUND, ex.getResult());
+        }
+
+        Assert.assertEquals(srcBucket, objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getName());
+        Assert.assertEquals(key, objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getKey(key).getName());
+
+        // re-create symlink
+        createLinkBucket(destVolume, srcBucket, srcVolume, srcBucket);
+        Assert.assertTrue(fs.exists(new Path(OZONE_URI_DELIMITER +
+            destVolume + OZONE_URI_DELIMITER + srcBucket)));
+
+        // test symlink -rm -R -f destVol/destBucket/ -> srcVol/srcBucket
+        // should delete only link contents (src bucket contents),
+        // link and srcBucket unaltered
+        // run toolrunner ozone fs shell commands
+        linkPathStr = rootPath + destVolume + OZONE_URI_DELIMITER + srcBucket;
+        res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash",
+            "-f", "-R", linkPathStr + OZONE_URI_DELIMITER});
+        Assert.assertEquals(0, res);
+
+        Assert.assertEquals(srcBucket, objectStore.getVolume(destVolume)
+            .getBucket(srcBucket).getName());
+        Assert.assertEquals(true, objectStore.getVolume(destVolume)
+            .getBucket(srcBucket).isLink());
+        Assert.assertEquals(srcBucket, objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getName());
+        try {
+          objectStore.getVolume(srcVolume).getBucket(srcBucket).getKey(key);
+          Assert.fail("Key should be deleted under srcBucket, " +
+              "OMException expected");
+        } catch (OMException ex) {
+          Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+        }
+
+        // test symlink -rm -R -f destVol/destBucket -> srcVol/srcBucket
+        // should delete only link
+        // run toolrunner ozone fs shell commands
+        linkPathStr = rootPath + destVolume + OZONE_URI_DELIMITER + srcBucket;
+        res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash",
+            "-f", "-R", linkPathStr});
+        Assert.assertEquals(0, res);
+
+        Assert.assertEquals(srcBucket, objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getName());
+        // test link existence
+        try {
+          objectStore.getVolume(destVolume).getBucket(srcBucket);
+          Assert.fail("link should not exist, " +
+              "OMException expected");
+        } catch (OMException ex) {
+          Assert.assertEquals(BUCKET_NOT_FOUND, ex.getResult());
+        }
+        // test src bucket existence
+        Assert.assertEquals(objectStore.getVolume(srcVolume)
+            .getBucket(srcBucket).getName(), srcBucket);
+      } finally {
+        shell.close();
+      }
+    } finally {
+      // cleanup; note must delete link before link src bucket
+      // due to bug - HDDS-7884
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume + OZONE_URI_DELIMITER
+          + srcBucket));
+      fs.delete(new Path(OZONE_URI_DELIMITER + srcVolume), true);
+      fs.delete(new Path(OZONE_URI_DELIMITER + destVolume), true);
+    }
   }
 
   @Test

@@ -92,7 +92,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
  * from older hadoop version. For newer hadoop version use the full featured
- * BasicRootedOzoneFileSystem.
+ * RootedOzoneFileSystem.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -696,8 +696,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    // remove link bucket directly
-    if (isLinkBucket(f, ofsPath)) {
+    // handling posix symlink delete behaviours
+    // i.) rm [-r] <symlink path>, delete symlink not target bucket contents
+    // ii.) rm -r <symlink path>/, delete target bucket contents not symlink
+    boolean handleTrailingSlash = f.toString().endsWith(OZONE_URI_DELIMITER);
+    // remove link bucket directly if link and
+    // rm path does not have trailing slash
+    if (isLinkBucket(f, ofsPath) && !handleTrailingSlash) {
       deleteBucketFromVolume(f, ofsPath);
       return true;
     }
@@ -705,8 +710,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     // delete inner content of bucket
     boolean result = innerDelete(f, recursive);
 
-    // Handle delete bucket
-    deleteBucketFromVolume(f, ofsPath);
+    // check if rm path does not have trailing slash
+    // if so, the contents of bucket were deleted and skip delete bucket
+    // otherwise, Handle delete bucket
+    if (!handleTrailingSlash) {
+      deleteBucketFromVolume(f, ofsPath);
+    }
     return result;
   }
 
@@ -1473,6 +1482,26 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         spaceConsumed(summary[1]).build();
   }
 
+  @Override
+  public boolean supportsSymlinks() {
+    return true;
+  }
+
+  @Override
+  public Path getLinkTarget(Path f) throws IOException {
+    OFSPath ofsPath = new OFSPath(f,
+        OzoneConfiguration.of(getConfSource()));
+    if (ofsPath.isBucket()) {  // only support bucket links
+      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+      if (bucket.isLink()) {
+        return new Path(OZONE_URI_DELIMITER +
+            bucket.getSourceVolume() + OZONE_URI_DELIMITER +
+            bucket.getSourceBucket());
+      }
+    }
+    return f;
+  }
+  
   public SnapshotDiffReport getSnapshotDiffReport(final Path snapshotDir,
       final String fromSnapshot, final String toSnapshot)
       throws IOException, InterruptedException {
