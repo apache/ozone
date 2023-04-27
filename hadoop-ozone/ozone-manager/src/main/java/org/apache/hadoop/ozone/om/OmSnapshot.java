@@ -262,10 +262,13 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   protected void finalize() throws Throwable {
-    // Close the DB if it hasn't been closed when this OmSnapshot instance is
-    // garbage-collected by the JVM to avoid handle leaks.
+    // Verify that the DB handle has been closed, log warning otherwise
+    // https://softwareengineering.stackexchange.com/a/288724
     if (!omMetadataManager.getStore().isClosed()) {
-      omMetadataManager.getStore().close();
+      LOG.warn("{} is not closed properly. snapshotName: {}",
+          // Print hash code for debugging
+          omMetadataManager.getStore().toString(),
+          snapshotName);
     }
     super.finalize();
   }

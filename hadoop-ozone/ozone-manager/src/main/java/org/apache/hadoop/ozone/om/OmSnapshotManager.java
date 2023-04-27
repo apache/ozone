@@ -57,8 +57,6 @@ import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
@@ -84,8 +82,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
 /**
@@ -210,15 +208,19 @@ public final class OmSnapshotManager implements AutoCloseable {
         final OmSnapshot omSnapshot = notification.getValue();
         if (omSnapshot != null) {
           // close snapshot's rocksdb on eviction
-          LOG.debug("Closing OmSnapshot '{}'", snapshotTableKey);
+          LOG.debug("Closing OmSnapshot '{}' due to {}",
+              snapshotTableKey, notification.getCause());
           omSnapshot.close();
         } else {
-          // Assuming the value becomes null when soft ref is GC'ed by JVM.
-          LOG.debug("OmSnapshot '{}' was already garbage collected by JVM.",
-              snapshotTableKey);
+          // Cache value would never be null in RemovalListener.
+
+          // When a soft reference is GC'ed by the JVM, this RemovalListener
+          // would be called. But the cache value should still exist at that
+          // point. Thus in-theory this condition won't be triggered by JVM GC
+          throw new IllegalStateException("Unexpected: OmSnapshot is null");
         }
       } catch (IOException e) {
-        LOG.error("Failed to close snapshot: {}", notification.getKey(), e);
+        LOG.error("Failed to close OmSnapshot: {}", notification.getKey(), e);
       }
     };
 
@@ -253,30 +255,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.snapshotDiffCleanupService.start();
   }
 
-  /**
-   * Throws OMException FILE_NOT_FOUND if snapshot is not in active status.
-   * @param snapshotTableKey snapshot table key
-   */
-  public void checkSnapshotActive(String snapshotTableKey) throws IOException {
-    checkSnapshotActive(getSnapshotInfo(snapshotTableKey));
-  }
-
-  private void checkSnapshotActive(SnapshotInfo snapInfo) throws OMException {
-
-    if (!snapInfo.getSnapshotStatus().equals(SnapshotStatus.SNAPSHOT_ACTIVE)) {
-      if (isCalledFromSnapshotDeletingService()) {
-        LOG.debug("Permitting {} to load snapshot {} even in status: {}",
-            SnapshotDeletingService.class.getSimpleName(),
-            snapInfo.getTableKey(),
-            snapInfo.getSnapshotStatus());
-      } else {
-        throw new OMException("Unable to load snapshot. " +
-            "Snapshot with table key '" + snapInfo.getTableKey() +
-            "' is no longer active", FILE_NOT_FOUND);
-      }
-    }
-  }
-
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
     return new CacheLoader<String, OmSnapshot>() {
       @Override
@@ -309,7 +287,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
               snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
         } catch (IOException e) {
-          LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
+          LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
           throw e;
         }
 
@@ -341,24 +319,6 @@ public final class OmSnapshotManager implements AutoCloseable {
         new SnapshotDiffJob.SnapshotDiffJobCodec());
 
     return registry;
-  }
-
-  /**
-   * Helper method to check whether the loader is called from
-   * SnapshotDeletingTask (return true) or not (return false).
-   */
-  private boolean isCalledFromSnapshotDeletingService() {
-
-    StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-    for (StackTraceElement elem : stackTrace) {
-      // Allow as long as loader is called from SDS. e.g. SnapshotDeletingTask
-      if (elem.getClassName().startsWith(
-          SnapshotDeletingService.class.getName())) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   /**
@@ -518,7 +478,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName, snapshotName);
 
       // Block FS API reads when snapshot is not active.
-      checkSnapshotActive(snapshotTableKey);
+      checkSnapshotActive(ozoneManager, snapshotTableKey);
 
       // Warn if actual cache size exceeds the soft limit already.
       if (snapshotCache.size() > softCacheSize) {
@@ -584,10 +544,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     final String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
     final String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
     try {
-      // Block SnapDiff if either one of the snapshot is not active.
-      checkSnapshotActive(fsKey);
-      checkSnapshotActive(tsKey);
-
       final OmSnapshot fs = snapshotCache.get(fsKey);
       final OmSnapshot ts = snapshotCache.get(tsKey);
       return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
@@ -600,12 +556,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   private void verifySnapshotInfoForSnapDiff(final SnapshotInfo fromSnapshot,
                                              final SnapshotInfo toSnapshot)
       throws IOException {
-    if ((fromSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) ||
-        (toSnapshot.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE)) {
-      // TODO: [SNAPSHOT] Throw custom snapshot exception.
-      throw new IOException("Cannot generate snapshot diff for non-active " +
-          "snapshots.");
-    }
+    // Block SnapDiff if either of the snapshots is not active.
+    checkSnapshotActive(fromSnapshot);
+    checkSnapshotActive(toSnapshot);
+    // Check snapshot creation time
     if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
           " should be older than to toSnapshot:" + toSnapshot.getName());

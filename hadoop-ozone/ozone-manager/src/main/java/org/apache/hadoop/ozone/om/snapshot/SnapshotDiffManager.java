@@ -85,6 +85,7 @@ import java.util.concurrent.SynchronousQueue;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -1057,8 +1058,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
 
     // Block SnapDiff if either one of the snapshots is not active
-    ozoneManager.getOmSnapshotManager().checkSnapshotActive(fsKey);
-    ozoneManager.getOmSnapshotManager().checkSnapshotActive(tsKey);
+    checkSnapshotActive(ozoneManager, fsKey);
+    checkSnapshotActive(ozoneManager, tsKey);
 
     try {
       submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
