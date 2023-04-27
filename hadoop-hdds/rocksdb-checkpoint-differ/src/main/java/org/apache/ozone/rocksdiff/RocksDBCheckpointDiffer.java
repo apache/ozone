@@ -24,7 +24,6 @@ import com.google.common.graph.MutableGraph;
 import java.io.FileNotFoundException;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -171,17 +170,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
 
   /**
-   * Dummy object that acts as a read and write lock to achieve synchronization
-   * between update to compaction DAG and snapDiff jobs.
-   * Dummy object is used instead of an actual {@link ReadWriteLock} to keep it
-   * simple since all the processes using compaction DAG are background jobs.
-   * They are either RocksDB compaction listener (to add new compaction entries
-   * to DAG), compaction DAG pruning job (to removes older snapshot's from DAG)
-   * or a snap diff job (reads compaction DAG).
-   */
-  private final Object compactionDagLock = new Object();
-
-  /**
    * This is a package private constructor and should not be used other than
    * testing. Caller should use RocksDBCheckpointDifferHolder#getInstance() to
    * get RocksDBCheckpointDiffer instance.
@@ -318,7 +306,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
   @Override
   public void close() {
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       if (!closed) {
         closed = true;
         if (executor != null) {
@@ -373,7 +361,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       throw new RuntimeException("Compaction log path not set");
     }
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       try (BufferedWriter bw = Files.newBufferedWriter(
           Paths.get(currentCompactionLogPath),
           StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
@@ -487,7 +475,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         // Note the current compaction listener implementation does not
         // differentiate which column family each SST store. It is tracking
         // all SST files.
-        synchronized (compactionDagLock) {
+        synchronized (this) {
           if (closed) {
             return;
           }
@@ -572,7 +560,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
         String content = sb.toString();
 
-        synchronized (compactionDagLock) {
+        synchronized (this) {
           if (closed) {
             return;
           }
@@ -739,7 +727,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     LOG.debug("Processing line: {}", line);
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       if (line.startsWith("#")) {
         // Skip comments
         LOG.debug("Comment line, skipped");
@@ -792,9 +780,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * This only needs to be done once during OM startup.
    */
   public void loadAllCompactionLogs() {
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       if (compactionLogDir == null) {
-        throw new RuntimeException("Compaction log directory must be set first");
+        throw new RuntimeException("Compaction log directory must be set " +
+            "first");
       }
       reconstructionSnapshotGeneration = 0L;
       try {
@@ -862,7 +851,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       String sstFilesDirForSnapDiffJob
   ) throws IOException {
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       List<String> sstDiffList = getSSTDiffList(src, dest);
 
       return sstDiffList.stream()
@@ -1258,7 +1247,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       startNodes.add(infileNode);
     }
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       pruneBackwardDag(backwardCompactionDAG, startNodes);
       Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG,
           startNodes);
@@ -1279,7 +1268,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = startNodes;
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       while (!currentLevel.isEmpty()) {
         Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
@@ -1307,7 +1296,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = new HashSet<>(startNodes);
 
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       while (!currentLevel.isEmpty()) {
         Set<CompactionNode> nextLevel = new HashSet<>();
         for (CompactionNode current : currentLevel) {
@@ -1459,7 +1448,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    */
   public void pruneSstFiles() {
     Set<String> nonLeafSstFiles;
-    synchronized (compactionDagLock) {
+    synchronized (this) {
       nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
           .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
           .map(node -> node.getFileName())
