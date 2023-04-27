@@ -626,7 +626,7 @@ public class TestSCMContainerPlacementRackAware {
     // New replica should be either on rack0 or rack1
     Assertions.assertTrue(cluster.isSameParent(
         datanodes.get(0), datanodeDetails.get(0)) ||
-        cluster.isSameParent(datanodes.get(1), datanodeDetails.get(0)));
+        cluster.isSameParent(datanodes.get(5), datanodeDetails.get(0)));
   }
 
   @Test
