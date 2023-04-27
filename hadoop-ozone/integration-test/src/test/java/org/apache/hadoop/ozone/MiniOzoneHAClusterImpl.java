@@ -705,9 +705,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             "127.0.0.1:" + blockPort);
 
-        if (i <= numOfActiveSCMs) {
-          scmPorts.release(scmNodeId);
-        }
+        scmPorts.release(scmNodeId);
         scmRpcPorts.release(scmNodeId);
       }
 
