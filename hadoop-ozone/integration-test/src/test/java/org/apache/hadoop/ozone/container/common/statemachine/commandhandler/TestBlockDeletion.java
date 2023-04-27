@@ -246,17 +246,19 @@ public class TestBlockDeletion {
     Assertions.assertEquals(0L, metrics.getNumBlockDeletionTransactionSent());
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
-    Thread.sleep(2000);
-    // make sure the containers are closed on the dn
-    omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
-      locationInfo.forEach(
-          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-              .getContainer().getContainerSet()
-              .getContainer(info.getContainerID()).getContainerData()
-              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
-    });
 
+    // The blocks should be deleted in the DN.
+    GenericTestUtils.waitFor(() -> {
+      return !(omKeyLocationInfoGroupList.stream().filter((group) -> 
+        group.getLocationList().stream().filter(
+            (info) -> cluster.getHddsDatanodes().get(0)
+                .getDatanodeStateMachine().getContainer().getContainerSet()
+                .getContainer(info.getContainerID()).getContainerData()
+                .getState() != ContainerProtos.ContainerDataProto.State.CLOSED)
+            .findFirst().isPresent()
+      ).findFirst().isPresent());
+    }, 1000, 30000);
+    
     // The blocks should be deleted in the DN.
     GenericTestUtils.waitFor(() -> {
       try {
