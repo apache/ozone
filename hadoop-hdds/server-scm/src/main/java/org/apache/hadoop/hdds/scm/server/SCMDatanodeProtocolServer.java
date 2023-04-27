@@ -26,16 +26,20 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.OptionalLong;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReregisterCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -44,6 +48,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -66,6 +72,8 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -73,6 +81,7 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -84,10 +93,12 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.createPipelineCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.refreshVolumeUsageInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.setNodeOperationalStateCommand;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
@@ -95,6 +106,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,9 +133,12 @@ public class SCMDatanodeProtocolServer implements
   private final EventPublisher eventPublisher;
   private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
 
+  private final SCMContext scmContext;
+
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
-                                   EventPublisher eventPublisher)
+                                   EventPublisher eventPublisher,
+                                   SCMContext scmContext)
       throws IOException {
 
     // This constructor has broken down to smaller methods so that Recon's
@@ -133,11 +148,13 @@ public class SCMDatanodeProtocolServer implements
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
+    this.scmContext = scmContext;
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(
+        conf, scm.getScmNodeDetails());
 
     protocolMessageMetrics = getProtocolMessageMetrics();
 
@@ -168,12 +185,15 @@ public class SCMDatanodeProtocolServer implements
         false)) {
       datanodeRpcServer.refreshServiceAcl(conf, getPolicyProvider());
     }
+
+    HddsServerUtil.addSuppressedLoggingExceptions(datanodeRpcServer);
   }
 
   public void start() {
     LOG.info(
         StorageContainerManager.buildRpcServerStartMessage(
-            "RPC server for DataNodes", datanodeRpcAddress));
+            "ScmDatanodeProtocol RPC server for DataNodes",
+            datanodeRpcAddress));
     protocolMessageMetrics.register();
     datanodeRpcServer.start();
   }
@@ -196,7 +216,7 @@ public class SCMDatanodeProtocolServer implements
           buildAuditMessageForFailure(SCMAction.GET_VERSION, null, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(SCMAction.GET_VERSION, null));
       }
@@ -208,7 +228,8 @@ public class SCMDatanodeProtocolServer implements
       HddsProtos.ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
-          PipelineReportsProto pipelineReportsProto)
+      PipelineReportsProto pipelineReportsProto,
+      LayoutVersionProto layoutInfo)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
@@ -218,7 +239,8 @@ public class SCMDatanodeProtocolServer implements
 
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
-        .register(datanodeDetails, nodeReport, pipelineReportsProto);
+        .register(datanodeDetails, nodeReport, pipelineReportsProto,
+            layoutInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,
@@ -239,7 +261,7 @@ public class SCMDatanodeProtocolServer implements
           buildAuditMessageForFailure(SCMAction.REGISTER, auditMap, ex));
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.REGISTER, auditMap));
       }
@@ -254,19 +276,24 @@ public class SCMDatanodeProtocolServer implements
 
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
-      SCMHeartbeatRequestProto heartbeat) throws IOException {
+      SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
     for (SCMCommand cmd : heartbeatDispatcher.dispatch(heartbeat)) {
-      cmdResponses.add(getCommandResponse(cmd));
+      cmdResponses.add(getCommandResponse(cmd, scm));
     }
+    final OptionalLong term = getTermIfLeader();
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeUUID", heartbeat.getDatanodeDetails().getUuid());
     auditMap.put("command", flatten(cmdResponses.toString()));
+    term.ifPresent(t -> auditMap.put("term", String.valueOf(t)));
     try {
-      return SCMHeartbeatResponseProto.newBuilder()
-          .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
-          .addAllCommands(cmdResponses).build();
+      SCMHeartbeatResponseProto.Builder builder =
+          SCMHeartbeatResponseProto.newBuilder()
+              .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
+              .addAllCommands(cmdResponses);
+      term.ifPresent(builder::setTerm);
+      return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
@@ -274,12 +301,23 @@ public class SCMDatanodeProtocolServer implements
       );
       throw ex;
     } finally {
-      if(auditSuccess) {
+      if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(SCMAction.SEND_HEARTBEAT, auditMap)
         );
       }
     }
+  }
+
+  private OptionalLong getTermIfLeader() {
+    if (scmContext != null && scmContext.isLeader()) {
+      try {
+        return OptionalLong.of(scmContext.getTermOfLeader());
+      } catch (NotLeaderException e) {
+        // only leader should distribute current term
+      }
+    }
+    return OptionalLong.empty();
   }
 
   /**
@@ -290,10 +328,18 @@ public class SCMDatanodeProtocolServer implements
    * @throws IOException
    */
   @VisibleForTesting
-  public SCMCommandProto getCommandResponse(SCMCommand cmd)
-      throws IOException {
-    SCMCommandProto.Builder builder =
-        SCMCommandProto.newBuilder();
+  public static SCMCommandProto getCommandResponse(SCMCommand cmd,
+      OzoneStorageContainerManager scm) throws IOException, TimeoutException {
+    SCMCommandProto.Builder builder = SCMCommandProto.newBuilder()
+        .setEncodedToken(cmd.getEncodedToken());
+
+    // In HA mode, it is the term of current leader SCM.
+    // In non-HA mode, it is the default value 0.
+    builder.setTerm(cmd.getTerm());
+    // The default deadline is 0, which means no deadline. Individual commands
+    // may have a deadline set.
+    builder.setDeadlineMsSinceEpoch(cmd.getDeadline());
+
     switch (cmd.getType()) {
     case reregisterCommand:
       return builder
@@ -302,20 +348,10 @@ public class SCMDatanodeProtocolServer implements
               .getDefaultInstance())
           .build();
     case deleteBlocksCommand:
-      // Once SCM sends out the deletion message, increment the count.
-      // this is done here instead of when SCM receives the ACK, because
-      // DN might not be able to response the ACK for sometime. In case
-      // it times out, SCM needs to re-send the message some more times.
-      List<Long> txs =
-          ((DeleteBlocksCommand) cmd)
-              .blocksTobeDeleted()
-              .stream()
-              .map(tx -> tx.getTxID())
-              .collect(Collectors.toList());
-      scm.getScmBlockManager().getDeletedBlockLog().incrementCount(txs);
       return builder
           .setCommandType(deleteBlocksCommand)
-          .setDeleteBlocksCommandProto(((DeleteBlocksCommand) cmd).getProto())
+          .setDeleteBlocksCommandProto(
+              ((DeleteBlocksCommand) cmd).getProto())
           .build();
     case closeContainerCommand:
       return builder
@@ -334,6 +370,12 @@ public class SCMDatanodeProtocolServer implements
           .setReplicateContainerCommandProto(
               ((ReplicateContainerCommand)cmd).getProto())
           .build();
+    case reconstructECContainersCommand:
+      return builder
+          .setCommandType(reconstructECContainersCommand)
+          .setReconstructECContainersCommandProto(
+              (ReconstructECContainersCommandProto) cmd.getProto())
+          .build();
     case createPipelineCommand:
       return builder
           .setCommandType(createPipelineCommand)
@@ -348,10 +390,23 @@ public class SCMDatanodeProtocolServer implements
           .build();
     case setNodeOperationalStateCommand:
       return builder
-          .setCommandType(setNodeOperationalStateCommand)
-          .setSetNodeOperationalStateCommandProto(
-              ((SetNodeOperationalStateCommand)cmd).getProto())
+            .setCommandType(setNodeOperationalStateCommand)
+            .setSetNodeOperationalStateCommandProto(
+                ((SetNodeOperationalStateCommand)cmd).getProto())
+            .build();
+    case finalizeNewLayoutVersionCommand:
+      return builder
+            .setCommandType(finalizeNewLayoutVersionCommand)
+            .setFinalizeNewLayoutVersionCommandProto(
+                ((FinalizeNewLayoutVersionCommand)cmd).getProto())
+            .build();
+    case refreshVolumeUsageInfo:
+      return builder
+          .setCommandType(refreshVolumeUsageInfo)
+          .setRefreshVolumeUsageCommandProto(
+              ((RefreshVolumeUsageCommand)cmd).getProto())
           .build();
+
     default:
       throw new IllegalArgumentException("Scm command " +
           cmd.getType().toString() + " is not implemented");
@@ -425,7 +480,7 @@ public class SCMDatanodeProtocolServer implements
    * @return
    */
   protected String getDatanodeAddressKey() {
-    return OZONE_SCM_DATANODE_ADDRESS_KEY;
+    return this.scm.getScmNodeDetails().getDatanodeAddressKey();
   }
 
   /**
@@ -433,8 +488,9 @@ public class SCMDatanodeProtocolServer implements
    * @param conf ozone configuration
    * @return InetSocketAddress
    */
-  protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
-    return HddsServerUtil.getScmDataNodeBindAddress(conf);
+  protected InetSocketAddress getDataNodeBindAddress(
+      OzoneConfiguration conf, SCMNodeDetails scmNodeDetails) {
+    return scmNodeDetails.getDatanodeProtocolServerAddress();
   }
 
   /**

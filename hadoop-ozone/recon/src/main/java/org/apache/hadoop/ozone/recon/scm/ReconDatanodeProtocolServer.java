@@ -23,10 +23,11 @@ import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -45,7 +46,7 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
                                      OzoneStorageContainerManager scm,
                                      EventPublisher eventPublisher)
       throws IOException {
-    super(conf, scm, eventPublisher);
+    super(conf, scm, eventPublisher, null);
   }
 
   @Override
@@ -62,7 +63,8 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
   }
 
   @Override
-  public InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
+  public InetSocketAddress getDataNodeBindAddress(
+      OzoneConfiguration conf, SCMNodeDetails scmNodeDetails) {
     return HddsServerUtil.getReconDataNodeBindAddress(conf);
   }
 

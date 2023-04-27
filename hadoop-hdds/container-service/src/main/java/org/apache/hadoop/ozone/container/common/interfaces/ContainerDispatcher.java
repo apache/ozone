@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.ratis.statemachine.StateMachine;
 
 import java.util.Map;
 
@@ -79,8 +80,18 @@ public interface ContainerDispatcher {
   Handler getHandler(ContainerProtos.ContainerType containerType);
 
   /**
-   * If scmId is not set, this will set scmId, otherwise it is a no-op.
-   * @param scmId
+   * If cluster ID is not set, this will set cluster ID, otherwise it is a
+   * no-op.
+   * @param clusterId
    */
-  void setScmId(String scmId);
+  void setClusterId(String clusterId);
+
+  /**
+   * When uploading using stream, get StreamDataChannel.
+   */
+  default StateMachine.DataChannel getStreamDataChannel(
+      ContainerCommandRequestProto msg) throws StorageContainerException {
+    throw new UnsupportedOperationException(
+        "getStreamDataChannel not supported.");
+  }
 }

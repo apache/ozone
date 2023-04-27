@@ -33,7 +33,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
 public class DatanodeRatisGrpcConfig {
   @Config(key = "message.size.max",
       defaultValue = "32MB",
-      type = ConfigType.INT,
+      type = ConfigType.SIZE,
       tags = {OZONE, CLIENT, PERFORMANCE},
       description = "Maximum message size allowed to be received by Grpc " +
           "Channel (Server)."
@@ -50,7 +50,7 @@ public class DatanodeRatisGrpcConfig {
 
   @Config(key = "flow.control.window",
       defaultValue = "5MB",
-      type = ConfigType.INT,
+      type = ConfigType.SIZE,
       tags =  {OZONE, CLIENT, PERFORMANCE},
       description = "This parameter tells how much data grpc client can send " +
           "to grpc server with out receiving any ack(WINDOW_UPDATE) packet " +

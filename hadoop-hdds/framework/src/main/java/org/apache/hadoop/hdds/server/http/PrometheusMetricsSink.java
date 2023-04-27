@@ -17,22 +17,19 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PREFIX;
-
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
-
-import org.apache.commons.lang3.StringUtils;
+import java.util.TreeMap;
+import org.apache.commons.configuration2.SubsetConfiguration;
+import org.apache.hadoop.hdds.utils.PrometheusMetricsSinkUtil;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsSink;
 import org.apache.hadoop.metrics2.MetricsTag;
-
-import org.apache.commons.configuration2.SubsetConfiguration;
 
 /**
  * Metrics sink for prometheus exporter.
@@ -44,93 +41,90 @@ public class PrometheusMetricsSink implements MetricsSink {
   /**
    * Cached output lines for each metrics.
    */
-  private final Map<String, String> metricLines = new ConcurrentHashMap<>();
+  private Map<String, Map<String, String>> metricLines =
+      Collections.synchronizedSortedMap(new TreeMap<>());
+  private Map<String, Map<String, String>> nextMetricLines =
+      Collections.synchronizedSortedMap(new TreeMap<>());
+  private final String servername;
 
-  private static final Pattern SPLIT_PATTERN =
-      Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
-
-  private static final Pattern REPLACE_PATTERN =
-      Pattern.compile("[^a-zA-Z0-9]+");
-
-  public PrometheusMetricsSink() {
+  public PrometheusMetricsSink(String servername) {
+    this.servername = servername;
   }
 
   @Override
   public void putMetrics(MetricsRecord metricsRecord) {
-    for (AbstractMetric metrics : metricsRecord.metrics()) {
-      if (metrics.type() == MetricType.COUNTER
-          || metrics.type() == MetricType.GAUGE) {
+    for (AbstractMetric metric : metricsRecord.metrics()) {
+      if (metric.type() == MetricType.COUNTER
+          || metric.type() == MetricType.GAUGE) {
 
-        String key = prometheusName(
-            metricsRecord.name(), metrics.name());
+        String metricName =
+            PrometheusMetricsSinkUtil.getMetricName(metricsRecord.name(),
+                metric.name());
 
-        StringBuilder builder = new StringBuilder();
-        builder.append("# TYPE ")
-            .append(key)
-            .append(" ")
-            .append(metrics.type().toString().toLowerCase())
-            .append("\n");
+        // If there is no username this should be null
+        String username =
+            PrometheusMetricsSinkUtil.getUsername(metricsRecord.name(),
+                metric.name());
 
-        StringBuilder prometheusMetricKey = new StringBuilder();
-        prometheusMetricKey.append(key)
-            .append("{");
-        String sep = "";
+        String key = PrometheusMetricsSinkUtil.prometheusName(
+            metricsRecord.name(), metricName);
 
-        //add tags
-        for (MetricsTag tag : metricsRecord.tags()) {
-          String tagName = tag.name().toLowerCase();
+        String prometheusMetricKeyAsString =
+            getPrometheusMetricKeyAsString(metricsRecord, key, username);
 
-          //ignore specific tag which includes sub-hierarchy
-          if (!tagName.equals("numopenconnectionsperuser")) {
-            prometheusMetricKey.append(sep)
-                .append(tagName)
-                .append("=\"")
-                .append(tag.value())
-                .append("\"");
-            sep = ",";
-          }
+        String metricKey = "# TYPE "
+            + key
+            + " "
+            + metric.type().toString().toLowerCase();
+
+        synchronized (this) {
+          nextMetricLines.computeIfAbsent(metricKey,
+                  any -> Collections.synchronizedSortedMap(new TreeMap<>()))
+              .put(prometheusMetricKeyAsString, String.valueOf(metric.value()));
         }
-        prometheusMetricKey.append("}");
-
-        String prometheusMetricKeyAsString = prometheusMetricKey.toString();
-        builder.append(prometheusMetricKeyAsString);
-        builder.append(" ");
-        builder.append(metrics.value());
-        builder.append("\n");
-        metricLines.put(prometheusMetricKeyAsString, builder.toString());
-
       }
     }
   }
 
-  /**
-   * Convert CamelCase based names to lower-case names where the separator
-   * is the underscore, to follow prometheus naming conventions.
-   */
-  public String prometheusName(String recordName,
-      String metricName) {
+  private String getPrometheusMetricKeyAsString(MetricsRecord metricsRecord,
+      String key, String username) {
+    StringBuilder prometheusMetricKey = new StringBuilder();
+    prometheusMetricKey.append(key)
+        .append("{");
+    String sep = "";
 
-    // RocksDB metric names already have underscores as delimiters,
-    // but record name is from DB file name and '.' (as in 'om.db') is invalid
-    if (StringUtils.isNotEmpty(recordName) &&
-        recordName.startsWith(ROCKSDB_CONTEXT_PREFIX)) {
-      return normalizeName(recordName) + "_" + metricName.toLowerCase();
+    List<MetricsTag> metricsTags =
+        PrometheusMetricsSinkUtil.addTags(key, username, servername,
+            metricsRecord.tags());
+
+    //add tags
+    for (MetricsTag tag : metricsTags) {
+      String tagName = tag.name().toLowerCase();
+
+      //ignore specific tag which includes sub-hierarchy
+      if (tagName.equals("numopenconnectionsperuser")) {
+        continue;
+      }
+
+      prometheusMetricKey.append(sep)
+          .append(tagName)
+          .append("=\"")
+          .append(tag.value())
+          .append("\"");
+      sep = ",";
     }
+    prometheusMetricKey.append("}");
 
-    String baseName = StringUtils.capitalize(recordName)
-        + StringUtils.capitalize(metricName);
-    return normalizeName(baseName);
-  }
-
-  public static String normalizeName(String baseName) {
-    String[] parts = SPLIT_PATTERN.split(baseName);
-    String result = String.join("_", parts).toLowerCase();
-    return REPLACE_PATTERN.matcher(result).replaceAll("_");
+    return prometheusMetricKey.toString();
   }
 
   @Override
   public void flush() {
-
+    synchronized (this) {
+      metricLines = nextMetricLines;
+      nextMetricLines = Collections
+          .synchronizedSortedMap(new TreeMap<>());
+    }
   }
 
   @Override
@@ -138,9 +132,16 @@ public class PrometheusMetricsSink implements MetricsSink {
 
   }
 
-  public void writeMetrics(Writer writer) throws IOException {
-    for (String line : metricLines.values()) {
-      writer.write(line);
+  public synchronized void writeMetrics(Writer writer)
+      throws IOException {
+    for (Map.Entry<String, Map<String, String>> metricsEntry
+        : metricLines.entrySet()) {
+      writer.write(metricsEntry.getKey() + "\n");
+
+      for (Map.Entry<String, String> metrics
+          : metricsEntry.getValue().entrySet()) {
+        writer.write(metrics.getKey() + " " + metrics.getValue() + "\n");
+      }
     }
   }
 }

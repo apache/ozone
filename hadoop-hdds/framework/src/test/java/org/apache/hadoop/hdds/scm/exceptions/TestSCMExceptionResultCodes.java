@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.exceptions;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.protocol.proto.
     ScmBlockLocationProtocolProtos.Status;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test Result code mappping between SCMException and the protobuf definitions.
@@ -32,20 +32,17 @@ public class TestSCMExceptionResultCodes {
   public void codeMapping() {
     // ResultCode = SCMException definition
     // Status = protobuf definition
-    Assert.assertEquals(ResultCodes.values().length, Status.values().length);
+    Assertions.assertEquals(ResultCodes.values().length,
+        Status.values().length);
     for (int i = 0; i < ResultCodes.values().length; i++) {
       ResultCodes codeValue = ResultCodes.values()[i];
       Status protoBufValue = Status.values()[i];
-      Assert.assertTrue(String
-          .format("Protobuf/Enum constant name mismatch %s %s", codeValue,
-              protoBufValue), sameName(codeValue.name(), protoBufValue.name()));
+      Assertions.assertEquals(codeValue.name(), protoBufValue.name(),
+          String.format("Protobuf/Enum constant name mismatch %s %s",
+              codeValue, protoBufValue));
       ResultCodes converted = ResultCodes.values()[protoBufValue.ordinal()];
-      Assert.assertEquals(codeValue, converted);
+      Assertions.assertEquals(codeValue, converted);
     }
-  }
-
-  private boolean sameName(String codeValue, String protoBufValue) {
-    return codeValue.equals(protoBufValue);
   }
 
 }

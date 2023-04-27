@@ -15,6 +15,9 @@
    limitations under the License.
 -->
 <FindBugsFilter>
+  <Match>
+    <Package name="org.apache.hadoop.hdds.protocol.proto"/>
+  </Match>
   <!-- Test -->
   <Match>
     <Class name="org.apache.hadoop.hdds.scm.TestHddsServerUtil" />
@@ -43,5 +46,9 @@
   <Match>
     <Class name="org.apache.hadoop.hdds.scm.server.TestSCMSecurityProtocolServer" />
     <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.scm.metadata.TestSCMTransactionInfoCodec"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
   </Match>
 </FindBugsFilter>

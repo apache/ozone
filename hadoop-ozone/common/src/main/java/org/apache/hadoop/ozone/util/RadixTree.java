@@ -129,7 +129,7 @@ public class RadixTree<T> {
       return false;
     }
 
-    if (removePrefixPathInternal(node, path, level+1)) {
+    if (removePrefixPathInternal(node, path, level + 1)) {
       current.getChildren().remove(name);
       return current.hasChildren();
     }

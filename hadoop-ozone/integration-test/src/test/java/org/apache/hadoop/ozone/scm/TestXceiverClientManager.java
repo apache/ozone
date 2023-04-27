@@ -31,14 +31,13 @@ import org.apache.hadoop.hdds.scm.protocolPB
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import java.io.IOException;
 import java.util.UUID;
 
@@ -47,23 +46,16 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 /**
  * Test for XceiverClientManager caching and eviction.
  */
+@Timeout(300)
 public class TestXceiverClientManager {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-  private OzoneConfiguration config;
-  private MiniOzoneCluster cluster;
-  private StorageContainerLocationProtocolClientSideTranslatorPB
+  private static OzoneConfiguration config;
+  private static MiniOzoneCluster cluster;
+  private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Before
-  public void init() throws Exception {
+  @BeforeAll
+  public static void init() throws Exception {
     config = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(config)
         .setNumDatanodes(3)
@@ -73,8 +65,8 @@ public class TestXceiverClientManager {
         .getStorageContainerLocationClient();
   }
 
-  @After
-  public void shutdown() {
+  @AfterAll
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -88,34 +80,35 @@ public class TestXceiverClientManager {
         TestXceiverClientManager.class.getName() + UUID.randomUUID());
     conf.set(HDDS_METADATA_DIR_NAME, metaDir);
 
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
+    try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 
-    ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            OzoneConsts.OZONE);
-    XceiverClientSpi client1 = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, client1.getRefcount());
+      ContainerWithPipeline container1 = storageContainerLocationClient
+          .allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client1 = clientManager
+          .acquireClient(container1.getPipeline());
+      Assertions.assertEquals(1, client1.getRefcount());
 
-    ContainerWithPipeline container2 = storageContainerLocationClient
-        .allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            OzoneConsts.OZONE);
-    XceiverClientSpi client2 = clientManager
-        .acquireClient(container2.getPipeline());
-    Assert.assertEquals(1, client2.getRefcount());
+      ContainerWithPipeline container2 = storageContainerLocationClient
+          .allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.THREE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client2 = clientManager
+          .acquireClient(container2.getPipeline());
+      Assertions.assertEquals(1, client2.getRefcount());
 
-    XceiverClientSpi client3 = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(2, client3.getRefcount());
-    Assert.assertEquals(2, client1.getRefcount());
-    Assert.assertEquals(client1, client3);
-    clientManager.releaseClient(client1, false);
-    clientManager.releaseClient(client2, false);
-    clientManager.releaseClient(client3, false);
+      XceiverClientSpi client3 = clientManager
+          .acquireClient(container1.getPipeline());
+      Assertions.assertEquals(2, client3.getRefcount());
+      Assertions.assertEquals(2, client1.getRefcount());
+      Assertions.assertEquals(client1, client3);
+      clientManager.releaseClient(client1, false);
+      clientManager.releaseClient(client2, false);
+      clientManager.releaseClient(client3, false);
+    }
   }
 
   @Test
@@ -126,56 +119,54 @@ public class TestXceiverClientManager {
     String metaDir = GenericTestUtils.getTempPath(
         TestXceiverClientManager.class.getName() + UUID.randomUUID());
     conf.set(HDDS_METADATA_DIR_NAME, metaDir);
-    XceiverClientManager clientManager =
-        new XceiverClientManager(conf, clientConfig, null);
-    Cache<String, XceiverClientSpi> cache =
-        clientManager.getClientCache();
+    try (XceiverClientManager clientManager =
+        new XceiverClientManager(conf, clientConfig, null)) {
+      Cache<String, XceiverClientSpi> cache =
+          clientManager.getClientCache();
 
-    ContainerWithPipeline container1 =
-        storageContainerLocationClient.allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            HddsProtos.ReplicationFactor.ONE,
-            OzoneConsts.OZONE);
-    XceiverClientSpi client1 = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, client1.getRefcount());
-    Assert.assertEquals(container1.getPipeline(),
-        client1.getPipeline());
+      ContainerWithPipeline container1 =
+          storageContainerLocationClient.allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client1 = clientManager
+          .acquireClient(container1.getPipeline());
+      Assertions.assertEquals(1, client1.getRefcount());
+      Assertions.assertEquals(container1.getPipeline(),
+          client1.getPipeline());
 
-    ContainerWithPipeline container2 =
-        storageContainerLocationClient.allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            HddsProtos.ReplicationFactor.ONE,
-            OzoneConsts.OZONE);
-    XceiverClientSpi client2 = clientManager
-        .acquireClient(container2.getPipeline());
-    Assert.assertEquals(1, client2.getRefcount());
-    Assert.assertNotEquals(client1, client2);
+      ContainerWithPipeline container2 =
+          storageContainerLocationClient.allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.THREE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client2 = clientManager
+          .acquireClient(container2.getPipeline());
+      Assertions.assertEquals(1, client2.getRefcount());
+      Assertions.assertNotEquals(client1, client2);
 
-    // least recent container (i.e containerName1) is evicted
-    XceiverClientSpi nonExistent1 = cache.getIfPresent(
-        container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType());
-    Assert.assertEquals(null, nonExistent1);
-    // However container call should succeed because of refcount on the client.
-    ContainerProtocolCalls.createContainer(client1,
-        container1.getContainerInfo().getContainerID(), null);
-
-    // After releasing the client, this connection should be closed
-    // and any container operations should fail
-    clientManager.releaseClient(client1, false);
-
-    String expectedMessage = "This channel is not connected.";
-    try {
+      // least recent container (i.e containerName1) is evicted
+      XceiverClientSpi nonExistent1 = cache.getIfPresent(
+          container1.getContainerInfo().getPipelineID().getId().toString()
+              + container1.getContainerInfo().getReplicationType());
+      Assertions.assertEquals(null, nonExistent1);
+      // However container call should succeed because of refcount on the client
       ContainerProtocolCalls.createContainer(client1,
           container1.getContainerInfo().getContainerID(), null);
-      Assert.fail("Create container should throw exception on closed"
-          + "client");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getClass(), IOException.class);
-      Assert.assertTrue(e.getMessage().contains(expectedMessage));
+
+      // After releasing the client, this connection should be closed
+      // and any container operations should fail
+      clientManager.releaseClient(client1, false);
+
+      // Create container should throw exception on closed client
+      Throwable t = Assertions.assertThrows(IOException.class,
+          () -> ContainerProtocolCalls.createContainer(client1,
+              container1.getContainerInfo().getContainerID(), null));
+      Assertions.assertTrue(
+          t.getMessage().contains("This channel is not connected"));
+
+      clientManager.releaseClient(client2, false);
     }
-    clientManager.releaseClient(client2, false);
   }
 
   @Test
@@ -186,51 +177,48 @@ public class TestXceiverClientManager {
     String metaDir = GenericTestUtils.getTempPath(
         TestXceiverClientManager.class.getName() + UUID.randomUUID());
     conf.set(HDDS_METADATA_DIR_NAME, metaDir);
-    XceiverClientManager clientManager =
-        new XceiverClientManager(conf, clientConfig, null);
-    Cache<String, XceiverClientSpi> cache =
-        clientManager.getClientCache();
+    try (XceiverClientManager clientManager =
+        new XceiverClientManager(conf, clientConfig, null)) {
+      Cache<String, XceiverClientSpi> cache =
+          clientManager.getClientCache();
 
-    ContainerWithPipeline container1 =
-        storageContainerLocationClient.allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            OzoneConsts.OZONE);
-    XceiverClientSpi client1 = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, client1.getRefcount());
+      ContainerWithPipeline container1 =
+          storageContainerLocationClient.allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client1 = clientManager
+          .acquireClient(container1.getPipeline());
+      Assertions.assertEquals(1, client1.getRefcount());
 
-    clientManager.releaseClient(client1, false);
-    Assert.assertEquals(0, client1.getRefcount());
+      clientManager.releaseClient(client1, false);
+      Assertions.assertEquals(0, client1.getRefcount());
 
-    ContainerWithPipeline container2 =
-        storageContainerLocationClient.allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            OzoneConsts.OZONE);
-    XceiverClientSpi client2 = clientManager
-        .acquireClient(container2.getPipeline());
-    Assert.assertEquals(1, client2.getRefcount());
-    Assert.assertNotEquals(client1, client2);
+      ContainerWithPipeline container2 =
+          storageContainerLocationClient.allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              HddsProtos.ReplicationFactor.THREE,
+              OzoneConsts.OZONE);
+      XceiverClientSpi client2 = clientManager
+          .acquireClient(container2.getPipeline());
+      Assertions.assertEquals(1, client2.getRefcount());
+      Assertions.assertNotEquals(client1, client2);
 
-    // now client 1 should be evicted
-    XceiverClientSpi nonExistent = cache.getIfPresent(
-        container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType());
-    Assert.assertEquals(null, nonExistent);
+      // now client 1 should be evicted
+      XceiverClientSpi nonExistent = cache.getIfPresent(
+          container1.getContainerInfo().getPipelineID().getId().toString()
+              + container1.getContainerInfo().getReplicationType());
+      Assertions.assertEquals(null, nonExistent);
 
-    // Any container operation should now fail
-    String expectedMessage = "This channel is not connected.";
-    try {
-      ContainerProtocolCalls.createContainer(client1,
-          container1.getContainerInfo().getContainerID(), null);
-      Assert.fail("Create container should throw exception on closed"
-          + "client");
-    } catch (Exception e) {
-      Assert.assertEquals(e.getClass(), IOException.class);
-      Assert.assertTrue(e.getMessage().contains(expectedMessage));
+      // Any container operation should now fail
+      Throwable t = Assertions.assertThrows(IOException.class,
+          () -> ContainerProtocolCalls.createContainer(client1,
+              container1.getContainerInfo().getContainerID(), null));
+      Assertions.assertTrue(
+          t.getMessage().contains("This channel is not connected"));
+
+      clientManager.releaseClient(client2, false);
     }
-    clientManager.releaseClient(client2, false);
   }
 
   @Test
@@ -238,40 +226,46 @@ public class TestXceiverClientManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
-    XceiverClientManager clientManager =
-        new XceiverClientManager(conf, clientConfig, null);
-    Cache<String, XceiverClientSpi> cache =
-        clientManager.getClientCache();
+    try (XceiverClientManager clientManager =
+        new XceiverClientManager(conf, clientConfig, null)) {
+      Cache<String, XceiverClientSpi> cache =
+          clientManager.getClientCache();
 
-    // client is added in cache
-    ContainerWithPipeline container1 =
-        storageContainerLocationClient.allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
-            OzoneConsts.OZONE);
-    XceiverClientSpi client1 =
-        clientManager.acquireClient(container1.getPipeline());
-    clientManager.acquireClient(container1.getPipeline());
-    Assert.assertEquals(2, client1.getRefcount());
+      // client is added in cache
+      ContainerWithPipeline container1 =
+          storageContainerLocationClient.allocateContainer(
+              SCMTestUtils.getReplicationType(conf),
+              SCMTestUtils.getReplicationFactor(conf),
+              OzoneConsts.OZONE);
+      XceiverClientSpi client1 =
+          clientManager.acquireClient(container1.getPipeline());
+      XceiverClientSpi client1SecondRef =
+          clientManager.acquireClient(container1.getPipeline());
+      Assertions.assertEquals(2, client1.getRefcount());
 
-    // client should be invalidated in the cache
-    clientManager.releaseClient(client1, true);
-    Assert.assertEquals(1, client1.getRefcount());
-    Assert.assertNull(cache.getIfPresent(
-        container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType()));
+      // client should be invalidated in the cache
+      clientManager.releaseClient(client1, true);
+      Assertions.assertEquals(1, client1.getRefcount());
+      Assertions.assertNull(cache.getIfPresent(
+          container1.getContainerInfo().getPipelineID().getId().toString()
+              + container1.getContainerInfo().getReplicationType()));
 
-    // new client should be added in cache
-    XceiverClientSpi client2 =
-        clientManager.acquireClient(container1.getPipeline());
-    Assert.assertNotEquals(client1, client2);
-    Assert.assertEquals(1, client2.getRefcount());
+      // new client should be added in cache
+      XceiverClientSpi client2 =
+          clientManager.acquireClient(container1.getPipeline());
+      Assertions.assertNotEquals(client1, client2);
+      Assertions.assertEquals(1, client2.getRefcount());
 
-    // on releasing the old client the entry in cache should not be invalidated
-    clientManager.releaseClient(client1, true);
-    Assert.assertEquals(0, client1.getRefcount());
-    Assert.assertNotNull(cache.getIfPresent(
-        container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType()));
+      // on releasing the old client the cache entry should not be invalidated
+      clientManager.releaseClient(client1, true);
+      Assertions.assertEquals(0, client1.getRefcount());
+      Assertions.assertNotNull(cache.getIfPresent(
+          container1.getContainerInfo().getPipelineID().getId().toString()
+              + container1.getContainerInfo().getReplicationType()));
+
+      // cleanup
+      clientManager.releaseClient(client1SecondRef, false);
+      clientManager.releaseClient(client2, false);
+    }
   }
 }

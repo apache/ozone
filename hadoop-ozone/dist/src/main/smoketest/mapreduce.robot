@@ -38,6 +38,7 @@ Execute PI calculation
     ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
                     ${output} =      Execute                 yarn jar ${exampleJar} pi -D fs.defaultFS=${root} 3 3
                     Should Contain   ${output}               completed successfully
+                    Should Not Contain   ${output}           multiple SLF4J bindings
 
 Execute WordCount
                     ${exampleJar}    Find example jar

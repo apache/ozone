@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.common;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
 
+/**
+ * {@link ChecksumByteBuffer} implementation based on {@link Checksum}.
+ */
 public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   private Checksum checksum;

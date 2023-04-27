@@ -16,34 +16,55 @@
  */
 
 package org.apache.hadoop.ozone.om;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.File;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -52,38 +73,37 @@ public class TestOmMetadataManager {
 
   private OMMetadataManager omMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
+  @TempDir
+  private File folder;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
 
-
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
-        folder.getRoot().getAbsolutePath());
+        folder.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
   }
 
   @Test
   public void testTransactionTable() throws Exception {
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new OMTransactionInfo.Builder().setCurrentTerm(1)
+        new TransactionInfo.Builder().setCurrentTerm(1)
             .setTransactionIndex(100).build());
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new OMTransactionInfo.Builder().setCurrentTerm(2)
+        new TransactionInfo.Builder().setCurrentTerm(2)
             .setTransactionIndex(200).build());
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new OMTransactionInfo.Builder().setCurrentTerm(3)
+        new TransactionInfo.Builder().setCurrentTerm(3)
             .setTransactionIndex(250).build());
 
-    OMTransactionInfo omTransactionInfo =
+    TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
 
-    Assert.assertEquals(3, omTransactionInfo.getTerm());
-    Assert.assertEquals(250, omTransactionInfo.getTransactionIndex());
+    assertEquals(3, transactionInfo.getTerm());
+    assertEquals(250, transactionInfo.getTransactionIndex());
 
 
   }
@@ -103,8 +123,8 @@ public class TestOmMetadataManager {
           .setVolume(volName)
           .build();
 
-      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
-      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+      OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      OMRequestTestUtils.addUserToDB(volName, ownerName, omMetadataManager);
     }
 
     // Test list volumes with setting startVolume that
@@ -117,7 +137,7 @@ public class TestOmMetadataManager {
     String startVolume = "vol" + startOrder;
     List<OmVolumeArgs> volumeList = omMetadataManager.listVolumes(ownerName,
         prefix, startVolume, 100);
-    Assert.assertEquals(volumeList.size(), totalVol - startOrder - 1);
+    assertEquals(volumeList.size(), totalVol - startOrder - 1);
   }
 
   @Test
@@ -131,16 +151,16 @@ public class TestOmMetadataManager {
       volName = "vola" + i;
       OmVolumeArgs omVolumeArgs = argsBuilder.
           setOwnerName(ownerName).setVolume(volName).build();
-      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
-      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+      OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      OMRequestTestUtils.addUserToDB(volName, ownerName, omMetadataManager);
     }
     for (int i = 0; i < 50; i++) {
       ownerName = "owner" + i;
       volName = "volb" + i;
       OmVolumeArgs omVolumeArgs = argsBuilder.
           setOwnerName(ownerName).setVolume(volName).build();
-      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
-      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+      OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      OMRequestTestUtils.addUserToDB(volName, ownerName, omMetadataManager);
     }
 
     String prefix = "";
@@ -149,13 +169,13 @@ public class TestOmMetadataManager {
     // Test list all volumes
     List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
         prefix, startKey, 1000);
-    Assert.assertEquals(volListA.size(), 100);
+    assertEquals(volListA.size(), 100);
 
     // Test list all volumes with prefix
     prefix = "volb";
     List<OmVolumeArgs> volListB = omMetadataManager.listVolumes(null,
         prefix, startKey, 1000);
-    Assert.assertEquals(volListB.size(), 50);
+    assertEquals(volListB.size(), 50);
 
     // Test list all volumes with setting startVolume
     // that was not part of result.
@@ -165,7 +185,7 @@ public class TestOmMetadataManager {
     startKey = "volb" + startOrder;
     List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
         prefix, startKey, 1000);
-    Assert.assertEquals(volListC.size(), totalVol - startOrder - 1);
+    assertEquals(volListC.size(), totalVol - startOrder - 1);
   }
 
   @Test
@@ -175,7 +195,7 @@ public class TestOmMetadataManager {
     String prefixBucketNameWithOzoneOwner = "ozoneBucket";
     String prefixBucketNameWithHadoopOwner = "hadoopBucket";
 
-    TestOMRequestUtils.addVolumeToDB(volumeName1, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName1, omMetadataManager);
 
 
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
@@ -199,7 +219,7 @@ public class TestOmMetadataManager {
     String volumeName2 = "volumeB";
     TreeSet<String> volumeBBucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
-    TestOMRequestUtils.addVolumeToDB(volumeName2, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName2, omMetadataManager);
 
     // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
     volumeBBucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
@@ -224,10 +244,10 @@ public class TestOmMetadataManager {
     // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
     // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
-    Assert.assertEquals(omBucketInfoList.size(), 50);
+    assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
-      Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
+      assertTrue(omBucketInfo.getBucketName().startsWith(
           prefixBucketNameWithOzoneOwner));
     }
 
@@ -238,7 +258,7 @@ public class TestOmMetadataManager {
             startBucket, prefixBucketNameWithOzoneOwner,
             100);
 
-    Assert.assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
+    assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
         startBucket).size() - 1, omBucketInfoList.size());
 
     startBucket = prefixBucketNameWithOzoneOwner + 38;
@@ -247,13 +267,13 @@ public class TestOmMetadataManager {
             startBucket, prefixBucketNameWithOzoneOwner,
             100);
 
-    Assert.assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
+    assertEquals(volumeABucketsPrefixWithOzoneOwner.tailSet(
         startBucket).size() - 1, omBucketInfoList.size());
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
-      Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
+      assertTrue(omBucketInfo.getBucketName().startsWith(
           prefixBucketNameWithOzoneOwner));
-      Assert.assertFalse(omBucketInfo.getBucketName().equals(
+      assertFalse(omBucketInfo.getBucketName().equals(
           prefixBucketNameWithOzoneOwner + 10));
     }
 
@@ -265,10 +285,10 @@ public class TestOmMetadataManager {
     // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
     // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
-    Assert.assertEquals(omBucketInfoList.size(), 50);
+    assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
-      Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
+      assertTrue(omBucketInfo.getBucketName().startsWith(
           prefixBucketNameWithHadoopOwner));
     }
 
@@ -276,29 +296,29 @@ public class TestOmMetadataManager {
     // volumeB with prefixBucketNameWithHadoopOwner.
     startBucket = null;
     TreeSet<String> expectedBuckets = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
           startBucket, prefixBucketNameWithHadoopOwner, 10);
 
-      Assert.assertEquals(omBucketInfoList.size(), 10);
+      assertEquals(omBucketInfoList.size(), 10);
 
       for (OmBucketInfo omBucketInfo : omBucketInfoList) {
         expectedBuckets.add(omBucketInfo.getBucketName());
-        Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
+        assertTrue(omBucketInfo.getBucketName().startsWith(
             prefixBucketNameWithHadoopOwner));
         startBucket =  omBucketInfo.getBucketName();
       }
     }
 
 
-    Assert.assertEquals(volumeBBucketsPrefixWithHadoopOwner, expectedBuckets);
+    assertEquals(volumeBBucketsPrefixWithHadoopOwner, expectedBuckets);
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
         startBucket, prefixBucketNameWithHadoopOwner, 10);
 
-    Assert.assertEquals(omBucketInfoList.size(), 0);
+    assertEquals(omBucketInfoList.size(), 0);
 
   }
 
@@ -314,7 +334,7 @@ public class TestOmMetadataManager {
 
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1));
+        CacheValue.get(1, omBucketInfo));
   }
 
   @Test
@@ -327,8 +347,8 @@ public class TestOmMetadataManager {
     String ozoneTestBucket = "ozoneBucket-Test";
 
     // Create volumes and buckets.
-    TestOMRequestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeNameB, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeNameB, omMetadataManager);
     addBucketsToCache(volumeNameA, ozoneBucket);
     addBucketsToCache(volumeNameB, hadoopBucket);
     addBucketsToCache(volumeNameA, ozoneTestBucket);
@@ -339,14 +359,12 @@ public class TestOmMetadataManager {
     TreeSet<String> keysASet = new TreeSet<>();
     TreeSet<String> keysBSet = new TreeSet<>();
     TreeSet<String> keysCSet = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
-        keysASet.add(
-            prefixKeyA + i);
+        keysASet.add(prefixKeyA + i);
         addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
       } else {
-        keysBSet.add(
-            prefixKeyB + i);
+        keysBSet.add(prefixKeyB + i);
         addKeysToOM(volumeNameA, hadoopBucket, prefixKeyB + i, i);
       }
     }
@@ -355,7 +373,7 @@ public class TestOmMetadataManager {
 
     TreeSet<String> keysAVolumeBSet = new TreeSet<>();
     TreeSet<String> keysBVolumeBSet = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysAVolumeBSet.add(
             prefixKeyA + i);
@@ -373,10 +391,10 @@ public class TestOmMetadataManager {
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
             null, prefixKeyA, 100);
 
-    Assert.assertEquals(omKeyInfoList.size(),  50);
+    assertEquals(omKeyInfoList.size(),  50);
 
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
-      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+      assertTrue(omKeyInfo.getKeyName().startsWith(
           prefixKeyA));
     }
 
@@ -386,7 +404,7 @@ public class TestOmMetadataManager {
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
             startKey, prefixKeyA, 100);
 
-    Assert.assertEquals(keysASet.tailSet(
+    assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
 
     startKey = prefixKeyA + 38;
@@ -394,13 +412,13 @@ public class TestOmMetadataManager {
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
             startKey, prefixKeyA, 100);
 
-    Assert.assertEquals(keysASet.tailSet(
+    assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
 
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
-      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+      assertTrue(omKeyInfo.getKeyName().startsWith(
           prefixKeyA));
-      Assert.assertFalse(omKeyInfo.getBucketName().equals(
+      assertFalse(omKeyInfo.getBucketName().equals(
           prefixKeyA + 38));
     }
 
@@ -409,10 +427,10 @@ public class TestOmMetadataManager {
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
         null, prefixKeyB, 100);
 
-    Assert.assertEquals(omKeyInfoList.size(),  50);
+    assertEquals(omKeyInfoList.size(),  50);
 
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
-      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+      assertTrue(omKeyInfo.getKeyName().startsWith(
           prefixKeyB));
     }
 
@@ -420,22 +438,22 @@ public class TestOmMetadataManager {
     // volumeB/ozoneBucket with "key-a".
     startKey = null;
     TreeSet<String> expectedKeys = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
           startKey, prefixKeyB, 10);
 
-      Assert.assertEquals(10, omKeyInfoList.size());
+      assertEquals(10, omKeyInfoList.size());
 
       for (OmKeyInfo omKeyInfo : omKeyInfoList) {
         expectedKeys.add(omKeyInfo.getKeyName());
-        Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+        assertTrue(omKeyInfo.getKeyName().startsWith(
             prefixKeyB));
         startKey =  omKeyInfo.getKeyName();
       }
     }
 
-    Assert.assertEquals(expectedKeys, keysBVolumeBSet);
+    assertEquals(expectedKeys, keysBVolumeBSet);
 
 
     // As now we have iterated all 50 buckets, calling next time should
@@ -443,14 +461,14 @@ public class TestOmMetadataManager {
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
         startKey, prefixKeyB, 10);
 
-    Assert.assertEquals(omKeyInfoList.size(), 0);
+    assertEquals(omKeyInfoList.size(), 0);
 
     // List all keys with empty prefix
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
         null, null, 100);
-    Assert.assertEquals(50, omKeyInfoList.size());
+    assertEquals(50, omKeyInfoList.size());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
-      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+      assertTrue(omKeyInfo.getKeyName().startsWith(
           prefixKeyA));
     }
   }
@@ -461,7 +479,7 @@ public class TestOmMetadataManager {
     String ozoneBucket = "ozoneBucket";
 
     // Create volumes and bucket.
-    TestOMRequestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
 
     addBucketsToCache(volumeNameA, ozoneBucket);
 
@@ -470,7 +488,7 @@ public class TestOmMetadataManager {
     TreeSet<String> deleteKeySet = new TreeSet<>();
 
 
-    for (int i=1; i<= 100; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
         keysASet.add(
             prefixKeyA + i);
@@ -480,9 +498,9 @@ public class TestOmMetadataManager {
         String key = omMetadataManager.getOzoneKey(volumeNameA,
             ozoneBucket, prefixKeyA + i);
         // Mark as deleted in cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
             new CacheKey<>(key),
-            new CacheValue<>(Optional.absent(), 100L));
+            CacheValue.get(100L));
         deleteKeySet.add(key);
       }
     }
@@ -493,38 +511,38 @@ public class TestOmMetadataManager {
             null, prefixKeyA, 100);
 
     // As in total 100, 50 are marked for delete. It should list only 50 keys.
-    Assert.assertEquals(50, omKeyInfoList.size());
+    assertEquals(50, omKeyInfoList.size());
 
     TreeSet<String> expectedKeys = new TreeSet<>();
 
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       expectedKeys.add(omKeyInfo.getKeyName());
-      Assert.assertTrue(omKeyInfo.getKeyName().startsWith(prefixKeyA));
+      assertTrue(omKeyInfo.getKeyName().startsWith(prefixKeyA));
     }
 
-    Assert.assertEquals(expectedKeys, keysASet);
+    assertEquals(expectedKeys, keysASet);
 
 
     // Now get key count by 10.
     String startKey = null;
     expectedKeys = new TreeSet<>();
-    for (int i=0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
           startKey, prefixKeyA, 10);
 
       System.out.println(i);
-      Assert.assertEquals(10, omKeyInfoList.size());
+      assertEquals(10, omKeyInfoList.size());
 
       for (OmKeyInfo omKeyInfo : omKeyInfoList) {
         expectedKeys.add(omKeyInfo.getKeyName());
-        Assert.assertTrue(omKeyInfo.getKeyName().startsWith(
+        assertTrue(omKeyInfo.getKeyName().startsWith(
             prefixKeyA));
         startKey =  omKeyInfo.getKeyName();
       }
     }
 
-    Assert.assertEquals(keysASet, expectedKeys);
+    assertEquals(keysASet, expectedKeys);
 
 
     // As now we have iterated all 50 buckets, calling next time should
@@ -532,95 +550,226 @@ public class TestOmMetadataManager {
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
         startKey, prefixKeyA, 10);
 
-    Assert.assertEquals(omKeyInfoList.size(), 0);
+    assertEquals(omKeyInfoList.size(), 0);
 
 
 
   }
 
+  private static BucketLayout getDefaultBucketLayout() {
+    return BucketLayout.DEFAULT;
+  }
+
   @Test
   public void testGetExpiredOpenKeys() throws Exception {
-    final String bucketName = "bucket";
-    final String volumeName = "volume";
+    testGetExpiredOpenKeys(BucketLayout.DEFAULT);
+  }
+
+  @Test
+  public void testGetExpiredOpenKeysFSO() throws Exception {
+    testGetExpiredOpenKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  private void testGetExpiredOpenKeys(BucketLayout bucketLayout)
+      throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    // Add volume, bucket, key entries to DB.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
     final long clientID = 1000L;
-    // To create expired keys, they will be assigned a creation time twice as
+    // To create expired keys, they will be assigned a creation time as
     // old as the minimum expiration time.
-    final long minExpiredTimeSeconds = ozoneConfiguration.getInt(
-            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
-            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
-    final long expiredAgeMillis =
-            Instant.now().minus(minExpiredTimeSeconds * 2,
-                    ChronoUnit.SECONDS).toEpochMilli();
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+
+    final long expiredOpenKeyCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the
     // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredKeys = new HashSet<>();
-    for (int i = 0; i < numExpiredOpenKeys; i++) {
-      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-              bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE, 0L, expiredAgeMillis);
+    for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
+      final long creationTime = i < numExpiredOpenKeys ?
+          expiredOpenKeyCreationTime : Time.now();
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, 0L, creationTime);
 
-      TestOMRequestUtils.addKeyToTable(true, false,
-              keyInfo, clientID, 0L, omMetadataManager);
-
-      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
-              keyInfo.getKeyName(), clientID);
-      expiredKeys.add(groupID);
-    }
-
-    // Add unexpired keys to open key table.
-    for (int i = 0; i < numUnexpiredOpenKeys; i++) {
-      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-              bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE);
-
-      TestOMRequestUtils.addKeyToTable(true, false,
-              keyInfo, clientID, 0L, omMetadataManager);
+      final String dbOpenKeyName;
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfo.setParentObjectID(i);
+        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+        OMRequestTestUtils.addFileToKeyTable(true, false,
+            keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            keyInfo.getParentObjectID(), keyInfo.getFileName(), clientID);
+      } else {
+        OMRequestTestUtils.addKeyToTable(true, false,
+            keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+            keyInfo.getKeyName(), clientID);
+      }
+      expiredKeys.add(dbOpenKeyName);
     }
 
     // Test retrieving fewer expired keys than actually exist.
-    List<String> someExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys - 1);
-
-    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
-    for (String key: someExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+    final Collection<OpenKeyBucket.Builder> someExpiredKeys =
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys - 1, bucketLayout).getOpenKeyBuckets();
+    List<String> names = getOpenKeyNames(someExpiredKeys);
+    assertEquals(numExpiredOpenKeys - 1, names.size());
+    assertTrue(expiredKeys.containsAll(names));
 
     // Test attempting to retrieving more expired keys than actually exist.
-    List<String> allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys + 1);
-
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+    Collection<OpenKeyBucket.Builder> allExpiredKeys =
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys + 1, bucketLayout).getOpenKeyBuckets();
+    names = getOpenKeyNames(allExpiredKeys);
+    assertEquals(numExpiredOpenKeys, names.size());
+    assertTrue(expiredKeys.containsAll(names));
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys);
+        omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredOpenKeys, bucketLayout).getOpenKeyBuckets();
+    names = getOpenKeyNames(allExpiredKeys);
+    assertEquals(numExpiredOpenKeys, names.size());
+    assertTrue(expiredKeys.containsAll(names));
+  }
 
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
-    for (String key: allExpiredKeys) {
-      Assert.assertTrue(expiredKeys.contains(key));
-    }
+  private List<String> getOpenKeyNames(
+      Collection<OpenKeyBucket.Builder> openKeyBuckets) {
+    return openKeyBuckets.stream()
+        .map(OpenKeyBucket.Builder::getKeysList)
+        .flatMap(List::stream)
+        .map(OpenKey::getName)
+        .collect(Collectors.toList());
   }
 
   private void addKeysToOM(String volumeName, String bucketName,
       String keyName, int i) throws Exception {
 
-    if (i%2== 0) {
-      TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    if (i % 2 == 0) {
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
           1000L, HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     } else {
-      TestOMRequestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
+      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
           HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
           omMetadataManager);
     }
   }
 
+  @Test
+  public void testAllTablesAreProperInOMMetadataManagerImpl() {
+    Set<String> tablesByDefinition =
+        new HashSet<>(Arrays.asList(OmMetadataManagerImpl.ALL_TABLES));
+    Set<String> tablesInManager = omMetadataManager.listTableNames();
+
+    assertEquals(tablesByDefinition, tablesInManager);
+  }
+
+  @Test
+  public void testListSnapshot() throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+    String snapshotName = "snapshot";
+
+    for (int i = 1; i <= 10; i++) {
+      if (i % 2 == 0) {
+        OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
+            snapshotName + i, omMetadataManager);
+      }
+    }
+
+    //Test listing all snapshots.
+    List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1);
+    assertEquals(10, snapshotInfos.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      assertTrue(snapshotInfo.getName().startsWith(snapshotName));
+    }
+
+  }
+
+  @ParameterizedTest
+  @MethodSource("listSnapshotWithInvalidPathCases")
+  public void testListSnapshotWithInvalidPath(String volume,
+                                              String bucket,
+                                              ResultCodes expectedResultCode)
+      throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+
+    OMException oe = assertThrows(OMException.class,
+        () -> omMetadataManager.listSnapshot(volume, bucket));
+    assertEquals(expectedResultCode, oe.getResult());
+  }
+
+  private static Stream<Arguments> listSnapshotWithInvalidPathCases() {
+    return Stream.of(
+        arguments(null, null, VOLUME_NOT_FOUND),
+        arguments("vol1", null, BUCKET_NOT_FOUND),
+        arguments("vol1", "nonexistentBucket", BUCKET_NOT_FOUND)
+    );
+  }
+
+  @Test
+  public void testListSnapshotDoesNotListOtherBucketSnapshots()
+          throws Exception {
+    String vol1 = "vol1";
+    String bucket1 = "bucket1";
+    String bucket2 = "bucket2";
+
+    OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
+    addBucketsToCache(vol1, bucket1);
+    addBucketsToCache(vol1, bucket2);
+    String snapshotName1 = "snapshot1-";
+    String snapshotName2 = "snapshot2-";
+
+    for (int i = 1; i <= 2; i++) {
+      OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
+              snapshotName1 + i, omMetadataManager);
+    }
+
+    for (int i = 1; i <= 5; i++) {
+      OMRequestTestUtils.addSnapshotToTable(vol1, bucket2,
+              snapshotName2 + i, omMetadataManager);
+    }
+
+    //Test listing snapshots only lists snapshots of specified bucket
+    List<SnapshotInfo> snapshotInfos1 = omMetadataManager.listSnapshot(vol1,
+            bucket1);
+    assertEquals(2, snapshotInfos1.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos1) {
+      assertTrue(snapshotInfo.getName().startsWith(snapshotName1));
+    }
+
+    List<SnapshotInfo> snapshotInfos2 = omMetadataManager.listSnapshot(vol1,
+            bucket2);
+    assertEquals(5, snapshotInfos2.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos2) {
+      assertTrue(snapshotInfo.getName().startsWith(snapshotName2));
+    }
+  }
 }

@@ -7,9 +7,6 @@ menu:
    main:
       parent: 安全
 icon: user
-menu:
-   main:
-      parent: 特点
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more

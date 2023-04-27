@@ -18,9 +18,8 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import java.util.ArrayList;
@@ -38,7 +37,7 @@ public final class RocksDBUtils {
   public static List<ColumnFamilyDescriptor> getColumnFamilyDescriptors(
       String dbPath) throws RocksDBException {
     List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
-    List<byte[]> cfList = RocksDB.listColumnFamilies(new Options(), dbPath);
+    List<byte[]> cfList = RocksDatabase.listColumnFamiliesEmptyOptions(dbPath);
     if (cfList != null) {
       for (byte[] b : cfList) {
         cfs.add(new ColumnFamilyDescriptor(b));

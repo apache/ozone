@@ -24,7 +24,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -44,6 +46,9 @@ public interface OzoneClientAdapter {
   OzoneFSOutputStream createFile(String key, short replication,
       boolean overWrite, boolean recursive) throws IOException;
 
+  OzoneFSDataStreamOutput createStreamFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException;
+
   void renameKey(String key, String newKeyName) throws IOException;
 
   // Users should use rename instead of renameKey in OFS.
@@ -51,7 +56,9 @@ public interface OzoneClientAdapter {
 
   boolean createDirectory(String keyName) throws IOException;
 
-  boolean deleteObject(String keyName);
+  boolean deleteObject(String keyName) throws IOException;
+
+  boolean deleteObject(String keyName, boolean recursive) throws IOException;
 
   boolean deleteObjects(List<String> keyName);
 
@@ -75,4 +82,13 @@ public interface OzoneClientAdapter {
   FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName) throws IOException;
 
+  boolean isFSOptimizedBucket();
+
+  FileChecksum getFileChecksum(String keyName, long length) throws IOException;
+
+  String createSnapshot(String pathStr, String snapshotName) throws IOException;
+
+  SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException;
 }

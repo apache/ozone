@@ -23,9 +23,10 @@ import java.io.IOException;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -36,13 +37,20 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  * Response for Bucket acl request.
  */
 @CleanupTableInfo(cleanupTables = KEY_TABLE)
-public class OMKeyAclResponse extends OMClientResponse {
+public class OMKeyAclResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;
 
   public OMKeyAclResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo) {
     super(omResponse);
+    this.omKeyInfo = omKeyInfo;
+  }
+
+  public OMKeyAclResponse(@Nonnull OMResponse omResponse,
+                          @Nonnull OmKeyInfo omKeyInfo,
+                          @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.omKeyInfo = omKeyInfo;
   }
 
@@ -54,15 +62,23 @@ public class OMKeyAclResponse extends OMClientResponse {
     super(omResponse);
   }
 
+  public OMKeyAclResponse(@Nonnull OMResponse omResponse,
+                          @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     String dbKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dbKey,
-        omKeyInfo);
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, dbKey, omKeyInfo);
   }
 
+  public OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
 }
 

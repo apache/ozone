@@ -73,7 +73,7 @@ Write Test File
     ${testFilePath} =       Set Variable            ${TEMPDIR}/${fileName}
                             Copy File               ${TEST_FILE}            ${testFilePath}
                             Execute                 ozone fs -copyFromLocal ${testFilePath} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
-    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.[].name'
                             Should contain          ${result}               ${fileName}
                             Remove File             ${testFilePath}
 
@@ -90,17 +90,6 @@ Put Multiple Keys
             LOG             ${tmpKey}
             Put Key         ${FILE}                 ${tmpKey}
     END
-
-Get OM Leader Node
-    ${result} =             Execute                 ozone admin om roles --service-id=omservice
-                            LOG                     ${result}
-                            Should Contain          ${result}               LEADER              1
-                            Should Contain          ${result}               FOLLOWER            2
-    ${omLine} =             Get Lines Containing String                     ${result}           LEADER
-    ${split1}               ${split2}               Split String            ${omLine}           :
-    ${leaderOM} =           Strip String            ${split1}
-                            LOG                     Leader OM: ${leaderOM}
-    [return]                ${leaderOM}
 
 Get Ratis Logs
     [arguments]             ${OM_HOST}
@@ -181,5 +170,3 @@ Restart OM and Verify Ratis Logs
 
     # Verify that the logs match with the Leader OMs logs
     List Should Contain Sub List    ${logsAfter}        ${logsLeader}
-
-

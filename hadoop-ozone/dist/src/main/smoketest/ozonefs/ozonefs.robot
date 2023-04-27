@@ -16,6 +16,7 @@
 *** Settings ***
 Documentation       Ozone FS tests
 Library             OperatingSystem
+Library             String
 Resource            ../commonlib.robot
 Resource            setup.robot
 Test Timeout        5 minutes
@@ -38,36 +39,60 @@ List non-existent bucket
 
 Create dir with parents
                    Execute               ozone fs -mkdir -p ${DEEP_URL}
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         ${DEEP_DIR}
 
 Copy from local
                    Execute               ozone fs -copyFromLocal NOTICE.txt ${DEEP_URL}/
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         NOTICE.txt
-    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationFactor'
-                   Should Be Equal       ${result}         3
+    ${result} =    Execute               ozone sh key info ${VOLUME}/${BUCKET}/${DEEP_DIR}/NOTICE.txt | jq -r '.replicationConfig.replicationFactor'
+                   Should Be Equal       ${result}         THREE
 
 Put
-                   Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone fs -put NOTICE.txt ${DEEP_URL}/PUTFILE.txt
+                   Should Be Empty       ${result}
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         PUTFILE.txt
+
+
+Check disk usage after create a file which uses RATIS replication type
+                  ${vol} =      Generate Random String  8  [LOWER]
+               ${bucket} =      Generate Random String  8  [LOWER]
+                                Execute                 ozone sh volume create /${vol}
+                                Execute                 ozone sh bucket create /${vol}/${bucket} --type RATIS --replication 3 
+                                Execute                 ozone fs -put NOTICE.txt /${vol}/${bucket}/PUTFILE1.txt
+     ${expectedFileLength} =    Execute                 stat -c %s NOTICE.txt
+     ${expectedDiskUsage} =     Get Disk Usage of File with RATIS Replication    ${expectedFileLength}    3
+     ${result} =                Execute                 ozone fs -du /${vol}/${bucket}
+                                Should contain          ${result}         PUTFILE1.txt
+                                Should contain          ${result}         ${expectedFileLength}
+                                Should contain          ${result}         ${expectedDiskUsage}
+
+
+Put with Streaming
+    ${result} =    Execute               ozone fs -D ozone.fs.datastream.enabled=true -put NOTICE.txt ${DEEP_URL}/STREAMING.txt
+                   Should Be Empty       ${result}
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
+                   Should contain        ${result}         STREAMING.txt
+
 
 List
     ${result} =    Execute               ozone fs -ls ${DEEP_URL}/
                    Should contain        ${result}         NOTICE.txt
                    Should contain        ${result}         PUTFILE.txt
+                   Should contain        ${result}         STREAMING.txt
 
 Move
                    Execute               ozone fs -mv ${DEEP_URL}/NOTICE.txt ${DEEP_URL}/MOVED.TXT
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         MOVED.TXT
                    Should not contain    ${result}       NOTICE.txt
 
 Copy within FS
     [Setup]        Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir1
                    Execute               ozone fs -cp ${DEEP_URL}/MOVED.TXT ${DEEP_URL}/subdir1/NOTICE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}         subdir1/NOTICE.txt
 
     ${result} =    Execute               ozone fs -ls ${DEEP_URL}/subdir1/
@@ -79,17 +104,17 @@ Cat file
 
 Delete file
                    Execute               ozone fs -rm -skipTrash ${DEEP_URL}/subdir1/NOTICE.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       NOTICE.txt
 
 Delete dir
     ${result} =    Execute               ozone fs -rmdir ${DEEP_URL}/subdir1/
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       subdir1
 
 Touch file
                    Execute               ozone fs -touch ${DEEP_URL}/TOUCHFILE-${SCHEME}.txt
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should contain        ${result}       TOUCHFILE-${SCHEME}.txt
 
 Delete file with Trash
@@ -97,13 +122,13 @@ Delete file with Trash
                    Execute               ozone fs -rm ${DEEP_URL}/testFile.txt
     ${result} =    Execute               ozone fs -ls -R ${BASE_URL}/
                    Should not contain    ${result}     ${DEEP_URL}/testFile.txt
-                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser/scm@EXAMPLE.COM    .Trash/root
+                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}     ${DEEP_DIR}/testFile.txt
 
 Delete recursively
                    Execute               ozone fs -mkdir -p ${DEEP_URL}/subdir2
                    Execute               ozone fs -rm -skipTrash -r ${DEEP_URL}/subdir2
-    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.name'
+    ${result} =    Execute               ozone sh key list ${VOLUME}/${BUCKET} | jq -r '.[].name'
                    Should not contain    ${result}       ${DEEP_DIR}/subdir2
 
 List recursively
@@ -147,3 +172,13 @@ Setup localdir1
                    Execute               ozone fs -mkdir -p ${BASE_URL}testdir1
                    Execute               ozone fs -copyFromLocal /tmp/localdir1 ${BASE_URL}testdir1/
                    Execute               ozone fs -put NOTICE.txt ${BASE_URL}testdir1/NOTICE.txt
+
+
+
+Get Disk Usage of File with RATIS Replication
+                                     [arguments]          ${fileLength}    ${replicationFactor}
+    # the formula comes from https://github.com/apache/ozone/blob/master/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/QuotaUtil.java#L42-L60
+    ${expectedDiskUsage} =           Evaluate             ${fileLength} * ${replicationFactor}
+    ${expectedDiskUsage} =           Convert To String    ${expectedDiskUsage}
+                                     [return]             ${expectedDiskUsage}
+

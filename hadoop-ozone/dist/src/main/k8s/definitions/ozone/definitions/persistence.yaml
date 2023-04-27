@@ -29,7 +29,7 @@ description: Add real PVC based persistence
           accessModes: [ "ReadWriteOnce" ]
           resources:
             requests:
-              storage: 2Gi
+              storage: 20Gi
 - type: Add
   trigger:
      metadata:

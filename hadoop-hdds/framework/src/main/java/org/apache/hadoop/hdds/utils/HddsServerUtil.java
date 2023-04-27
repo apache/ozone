@@ -18,30 +18,42 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsException;
@@ -53,11 +65,15 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getSingleSCMAddress;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
@@ -71,7 +87,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -102,37 +121,6 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Retrieve the socket address that should be used by DataNodes to connect
-   * to the SCM.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
-   */
-  public static InetSocketAddress getScmAddressForDataNodes(
-      ConfigurationSource conf) {
-    // We try the following settings in decreasing priority to retrieve the
-    // target host.
-    // - OZONE_SCM_DATANODE_ADDRESS_KEY
-    // - OZONE_SCM_CLIENT_ADDRESS_KEY
-    // - OZONE_SCM_NAMES
-    //
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
-  }
-
-  /**
    * Retrieve the socket address that should be used by clients to connect
    * to the SCM.
    *
@@ -147,7 +135,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -167,7 +156,8 @@ public final class HddsServerUtil {
 
     final int port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+        .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
     return NetUtils.createSocketAddr(host + ":" + port);
   }
@@ -213,7 +203,8 @@ public final class HddsServerUtil {
 
     return NetUtils.createSocketAddr(
         host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
+            port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
 
@@ -260,6 +251,18 @@ public final class HddsServerUtil {
   public static long getScmHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
+        HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -386,6 +389,26 @@ public final class HddsServerUtil {
     return rawLocations;
   }
 
+  public static Collection<String> getDatanodeStorageDirs(
+      ConfigurationSource conf) {
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_KEY);
+    if (rawLocations.isEmpty()) {
+      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+    }
+    if (rawLocations.isEmpty()) {
+      throw new IllegalArgumentException("No location configured in either "
+          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
+    }
+    return rawLocations;
+  }
+
+  public static Collection<String> getDatanodeDbDirs(
+      ConfigurationSource conf) {
+    // No fallback here, since this config is optional.
+    return conf.getTrimmedStringCollection(HDDS_DATANODE_CONTAINER_DB_DIR);
+  }
+
   /**
    * Get the path for datanode id file.
    *
@@ -394,8 +417,8 @@ public final class HddsServerUtil {
    */
   public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
-        conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-    if (dataNodeIDDirPath == null) {
+        conf.getTrimmed(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
+    if (Strings.isNullOrEmpty(dataNodeIDDirPath)) {
       File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
       if (metaDirPath == null) {
         // this means meta data is not found, in theory should not happen at
@@ -418,53 +441,55 @@ public final class HddsServerUtil {
    * @throws IOException
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
-      OzoneConfiguration conf) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress address =
-        getScmAddressForSecurityProtocol(conf);
-    RetryPolicy retryPolicy =
-        RetryPolicies.retryForeverWithFixedSleep(
-            1000, TimeUnit.MILLISECONDS);
+      ConfigurationSource conf) throws IOException {
     return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProtocolProxy(SCMSecurityProtocolPB.class, scmVersion,
-            address, UserGroupInformation.getCurrentUser(),
-            conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf), retryPolicy).getProxy());
+        new SCMSecurityProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser()));
   }
 
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
+      UserGroupInformation ugi) throws IOException {
+    // Certificate from SCM is required for DN startup to succeed, so retry
+    // for ever. In this way DN start up is resilient to SCM service running
+    // status.
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    SCMClientConfig scmClientConfig =
+        conf.getObject(SCMClientConfig.class);
+    int retryCount = Integer.MAX_VALUE;
+    scmClientConfig.setRetryCount(retryCount);
+    configuration.setFromObject(scmClientConfig);
 
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for
-   * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol}. If
-   * {@link ScmConfigKeys#OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined or invalid
-   */
-  public static InetSocketAddress getScmAddressForSecurityProtocol(
-      ConfigurationSource conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SCMSecurityProtocolFailoverProxyProvider(configuration,
+            ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
+  }
 
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
+      throws IOException {
+    // As for OM during init, we need to wait for specific duration so that
+    // we can give response to user performed operation init in a definite
+    // period, instead of stuck for ever.
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
+        OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
+    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
+    int retryCount =
+        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
+
+    // If duration is set to lesser value, fall back to actual default
+    // retry count.
+    if (retryCount > scmClientConfig.getRetryCount()) {
+      scmClientConfig.setRetryCount(retryCount);
+      configuration.setFromObject(scmClientConfig);
     }
 
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SCMSecurityProtocolFailoverProxyProvider(configuration,
+            UserGroupInformation.getCurrentUser()));
   }
+
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
@@ -473,17 +498,11 @@ public final class HddsServerUtil {
    */
   public static SCMSecurityProtocol getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress scmSecurityProtoAdd =
-        getScmAddressForSecurityProtocol(conf);
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
-            scmSecurityProtoAdd, ugi, conf,
-            NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)));
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        new SCMSecurityProtocolClientSideTranslatorPB(
+            new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
+    return TracingUtil.createProxy(scmSecurityClient,
+        SCMSecurityProtocol.class, conf);
   }
 
   /**
@@ -505,6 +524,55 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Write DB Checkpoint to an output stream as a compressed file (tar).
+   *
+   * @param checkpoint    checkpoint file
+   * @param destination   destination output stream.
+   * @param toExcludeList the files to be excluded
+   * @param excludedList  the files excluded
+   * @throws IOException
+   */
+  public static void writeDBCheckpointToStream(
+      DBCheckpoint checkpoint,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList)
+      throws IOException {
+    try (TarArchiveOutputStream archiveOutputStream =
+            new TarArchiveOutputStream(destination);
+        Stream<Path> files =
+            Files.list(checkpoint.getCheckpointLocation())) {
+      archiveOutputStream.setBigNumberMode(
+          TarArchiveOutputStream.BIGNUMBER_POSIX);
+      for (Path path : files.collect(Collectors.toList())) {
+        if (path != null) {
+          Path fileNamePath = path.getFileName();
+          if (fileNamePath != null) {
+            String fileName = fileNamePath.toString();
+            if (!toExcludeList.contains(fileName)) {
+              includeFile(path.toFile(), fileName, archiveOutputStream);
+            } else {
+              excludedList.add(fileName);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  public static void includeFile(File file, String entryName,
+                                 ArchiveOutputStream archiveOutputStream)
+      throws IOException {
+    ArchiveEntry archiveEntry =
+        archiveOutputStream.createArchiveEntry(file, entryName);
+    archiveOutputStream.putArchiveEntry(archiveEntry);
+    try (FileInputStream fis = new FileInputStream(file)) {
+      IOUtils.copy(fis, archiveOutputStream);
+    }
+    archiveOutputStream.closeArchiveEntry();
+  }
+
+  /**
    * Converts RocksDB exception to IOE.
    * @param msg  - Message to add to exception.
    * @param e - Original Exception.
@@ -520,4 +588,11 @@ public final class HddsServerUtil {
     return new IOException(output, e);
   }
 
+  /**
+   * Add exception classes which server won't log at all.
+   * @param server
+   */
+  public static void addSuppressedLoggingExceptions(RPC.Server server) {
+    server.addSuppressedLoggingExceptions(ServerNotLeaderException.class);
+  }
 }

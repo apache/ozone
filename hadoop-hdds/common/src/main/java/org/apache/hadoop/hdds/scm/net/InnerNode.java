@@ -61,6 +61,13 @@ public interface InnerNode extends Node {
   int getNumOfNodes(int level);
 
   /**
+   * @return all nodes at level <i>level</i>. Here level is a relative level.
+   * If level is 1, means node itself. If level is 2, means its direct
+   * children, and so on.
+   **/
+  List<Node> getNodes(int level);
+
+  /**
    * Get <i>leafIndex</i> leaf of this subtree.
    *
    * @param leafIndex an indexed leaf of the node

@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.fsck;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -34,7 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 
@@ -43,14 +44,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
  */
 
 public class ContainerMapper {
-
-
-  private static Table getMetaTable(OzoneConfiguration configuration)
-      throws IOException {
-    OmMetadataManagerImpl metadataManager =
-        new OmMetadataManagerImpl(configuration);
-    return metadataManager.getKeyTable();
-  }
 
   public static void main(String[] args) throws IOException {
     String path = args[0];
@@ -83,8 +76,12 @@ public class ContainerMapper {
     String path = configuration.get(OZONE_OM_DB_DIRS);
     if (path == null || path.isEmpty()) {
       throw new IOException(OZONE_OM_DB_DIRS + "should be set ");
-    } else {
-      Table keyTable = getMetaTable(configuration);
+    }
+    OmMetadataManagerImpl metadataManager =
+        new OmMetadataManagerImpl(configuration);
+    try {
+      Table<String, OmKeyInfo> keyTable =
+          metadataManager.getKeyTable(getBucketLayout());
       Map<Long, List<Map<Long, BlockIdDetails>>> dataMap = new HashMap<>();
 
       if (keyTable != null) {
@@ -94,7 +91,8 @@ public class ContainerMapper {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
-            byte[] value = omKeyInfo.getProtobuf(true, CURRENT_VERSION)
+            byte[] value = omKeyInfo
+                .getProtobuf(true, ClientVersion.CURRENT_VERSION)
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
@@ -129,7 +127,13 @@ public class ContainerMapper {
 
       return dataMap;
 
+    } finally {
+      metadataManager.stop();
     }
+  }
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.DEFAULT;
   }
 }
 

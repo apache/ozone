@@ -49,18 +49,6 @@ public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
   T seek(KEY key) throws IOException;
 
   /**
-   * Returns the key value at the current position.
-   * @return KEY
-   */
-  KEY key() throws IOException;
-
-  /**
-   * Returns the VALUE at the current position.
-   * @return VALUE
-   */
-  T value();
-
-  /**
    * Remove the actual value of the iterator from the database table on
    * which the iterator is working on.
    *

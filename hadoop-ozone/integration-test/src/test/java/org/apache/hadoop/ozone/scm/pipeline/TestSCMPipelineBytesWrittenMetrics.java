@@ -25,28 +25,28 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
@@ -58,18 +58,14 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the SCM pipeline bytesWritten metrics.
  */
+@Timeout(300)
 public class TestSCMPipelineBytesWrittenMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
+  private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
@@ -82,10 +78,11 @@ public class TestSCMPipelineBytesWrittenMetrics {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   private void writeNumBytes(int numBytes) throws Exception {
-    ObjectStore store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    ObjectStore store = client.getObjectStore();
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -106,11 +103,11 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
     builder.setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(keyName).setRefreshPipeline(true);
+        .setKeyName(keyName);
 
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, keyDetails.getName());
-    Assert.assertEquals(value.getBytes(UTF_8).length, keyDetails
+    Assertions.assertEquals(keyName, keyDetails.getName());
+    Assertions.assertEquals(value.getBytes(UTF_8).length, keyDetails
         .getOzoneKeyLocations().get(0).getLength());
   }
 
@@ -129,7 +126,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines();
 
-    Assert.assertEquals(1, pipelines.size());
+    Assertions.assertEquals(1, pipelines.size());
     Pipeline pipeline = pipelines.get(0);
 
     final String metricName =
@@ -141,8 +138,9 @@ public class TestSCMPipelineBytesWrittenMetrics {
     }, 500, 300000);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
+    IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
 }

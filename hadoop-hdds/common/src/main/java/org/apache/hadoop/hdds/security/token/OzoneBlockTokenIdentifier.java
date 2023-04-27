@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,23 +19,21 @@
 package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.Builder;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.Token.TrivialRenewer;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Block token identifier for Ozone/HDDS. Ozone block access token is similar
@@ -45,56 +43,49 @@ import java.util.EnumSet;
  * Block access token should be cached only in memory and never write to disk.
  */
 @InterfaceAudience.Private
-public class OzoneBlockTokenIdentifier extends TokenIdentifier {
+public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   static final Text KIND_NAME = new Text("HDDS_BLOCK_TOKEN");
-  private long expiryDate;
-  private String ownerId;
+
   private String blockId;
   private EnumSet<AccessModeProto> modes;
-  private String omCertSerialId;
   private long maxLength;
+
+  public static String getTokenService(BlockID blockID) {
+    return String.valueOf(blockID.getContainerBlockID());
+  }
 
   public OzoneBlockTokenIdentifier() {
   }
 
-  public OzoneBlockTokenIdentifier(String ownerId, String blockId,
-      EnumSet<AccessModeProto> modes, long expiryDate, String omCertSerialId,
+  public OzoneBlockTokenIdentifier(String ownerId, BlockID blockId,
+      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
       long maxLength) {
-    this.ownerId = ownerId;
+    this(ownerId, getTokenService(blockId), modes, expiryDate, omCertSerialId,
+        maxLength);
+  }
+
+  public OzoneBlockTokenIdentifier(String ownerId, String blockId,
+      Set<AccessModeProto> modes, long expiryDate, String omCertSerialId,
+      long maxLength) {
+    super(ownerId, Instant.ofEpochMilli(expiryDate), omCertSerialId);
     this.blockId = blockId;
-    this.expiryDate = expiryDate;
-    this.modes = modes == null ? EnumSet.noneOf(AccessModeProto.class) : modes;
-    this.omCertSerialId = omCertSerialId;
+    this.modes = modes == null
+        ? EnumSet.noneOf(AccessModeProto.class) : EnumSet.copyOf(modes);
     this.maxLength = maxLength;
   }
 
   @Override
-  public UserGroupInformation getUser() {
-    if (Strings.isNullOrEmpty(this.getOwnerId())) {
-      return UserGroupInformation.createRemoteUser(blockId);
-    }
-    return UserGroupInformation.createRemoteUser(ownerId);
-  }
-
-  public long getExpiryDate() {
-    return expiryDate;
-  }
-
-  public String getOwnerId() {
-    return ownerId;
-  }
-
-  public String getBlockId() {
+  public String getService() {
     return blockId;
   }
 
-  public EnumSet<AccessModeProto> getAccessModes() {
-    return modes;
+  public long getExpiryDate() {
+    return getExpiry().toEpochMilli();
   }
 
-  public String getOmCertSerialId(){
-    return omCertSerialId;
+  public Set<AccessModeProto> getAccessModes() {
+    return modes;
   }
 
   public long getMaxLength() {
@@ -108,15 +99,10 @@ public class OzoneBlockTokenIdentifier extends TokenIdentifier {
 
   @Override
   public String toString() {
-    return "block_token_identifier (expiryDate=" + this.getExpiryDate()
-        + ", ownerId=" + this.getOwnerId()
-        + ", omCertSerialId=" + this.getOmCertSerialId()
-        + ", blockId=" + this.getBlockId() + ", access modes="
-        + this.getAccessModes() + ", maxLength=" + this.getMaxLength() + ")";
-  }
-
-  static boolean isEqual(Object a, Object b) {
-    return a == null ? b == null : a.equals(b);
+    return "block_token_identifier (" + super.toString()
+        + ", blockId=" + blockId + ", access modes=" + modes
+        + ", maxLength=" + maxLength
+        + ")";
   }
 
   @Override
@@ -124,31 +110,20 @@ public class OzoneBlockTokenIdentifier extends TokenIdentifier {
     if (obj == this) {
       return true;
     }
-
-    if (obj instanceof OzoneBlockTokenIdentifier) {
-      OzoneBlockTokenIdentifier that = (OzoneBlockTokenIdentifier) obj;
-      return new EqualsBuilder()
-          .append(this.expiryDate, that.expiryDate)
-          .append(this.ownerId, that.ownerId)
-          .append(this.blockId, that.blockId)
-          .append(this.modes, that.modes)
-          .append(this.omCertSerialId, that.omCertSerialId)
-          .append(this.maxLength, that.maxLength)
-          .build();
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
     }
-    return false;
+
+    OzoneBlockTokenIdentifier that = (OzoneBlockTokenIdentifier) obj;
+    return super.equals(that)
+        && Objects.equals(blockId, that.blockId)
+        && Objects.equals(modes, that.modes)
+        && maxLength == that.maxLength;
   }
 
   @Override
   public int hashCode() {
-    return new HashCodeBuilder(133, 567)
-        .append(this.expiryDate)
-        .append(this.blockId)
-        .append(this.ownerId)
-        .append(this.modes)
-        .append(this.omCertSerialId)
-        .append(this.maxLength)
-        .build();
+    return Objects.hash(super.hashCode(), maxLength, blockId, modes);
   }
 
   @Override
@@ -157,42 +132,37 @@ public class OzoneBlockTokenIdentifier extends TokenIdentifier {
     if (!dis.markSupported()) {
       throw new IOException("Could not peek first byte.");
     }
-    BlockTokenSecretProto tokenPtoto =
+    BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
-    this.ownerId = tokenPtoto.getOwnerId();
-    this.blockId = tokenPtoto.getBlockId();
-    this.modes = EnumSet.copyOf(tokenPtoto.getModesList());
-    this.expiryDate = tokenPtoto.getExpiryDate();
-    this.omCertSerialId = tokenPtoto.getOmCertSerialId();
-    this.maxLength = tokenPtoto.getMaxLength();
+    setOwnerId(token.getOwnerId());
+    setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
+    setCertSerialId(token.getOmCertSerialId());
+    this.blockId = token.getBlockId();
+    this.modes = EnumSet.copyOf(token.getModesList());
+    this.maxLength = token.getMaxLength();
   }
 
   @VisibleForTesting
   public static OzoneBlockTokenIdentifier readFieldsProtobuf(DataInput in)
       throws IOException {
-    BlockTokenSecretProto tokenPtoto =
+    BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
-    return new OzoneBlockTokenIdentifier(tokenPtoto.getOwnerId(),
-        tokenPtoto.getBlockId(), EnumSet.copyOf(tokenPtoto.getModesList()),
-        tokenPtoto.getExpiryDate(), tokenPtoto.getOmCertSerialId(),
-        tokenPtoto.getMaxLength());
+    return new OzoneBlockTokenIdentifier(token.getOwnerId(),
+        token.getBlockId(), EnumSet.copyOf(token.getModesList()),
+        token.getExpiryDate(), token.getOmCertSerialId(),
+        token.getMaxLength());
   }
 
   @Override
   public void write(DataOutput out) throws IOException {
-    writeProtobuf(out);
-  }
-
-  @VisibleForTesting
-  void writeProtobuf(DataOutput out) throws IOException {
-    Builder builder = BlockTokenSecretProto.newBuilder()
-        .setBlockId(this.getBlockId())
-        .setOwnerId(this.getOwnerId())
-        .setOmCertSerialId(this.getOmCertSerialId())
-        .setExpiryDate(this.getExpiryDate())
-        .setMaxLength(this.getMaxLength());
+    BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
+        .setBlockId(blockId)
+        .setOwnerId(getOwnerId())
+        .setOmCertSerialId(getCertSerialId())
+        .setExpiryDate(getExpiryDate())
+        .setMaxLength(maxLength);
     // Add access mode allowed
-    for (AccessModeProto mode : this.getAccessModes()) {
+    for (AccessModeProto mode : modes) {
       builder.addModes(AccessModeProto.valueOf(mode.name()));
     }
     out.write(builder.build().toByteArray());

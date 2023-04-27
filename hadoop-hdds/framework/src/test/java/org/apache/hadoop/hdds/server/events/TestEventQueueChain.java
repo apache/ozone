@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * More realistic event test with sending event from one listener.
