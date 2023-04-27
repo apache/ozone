@@ -50,6 +50,9 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
+import org.bouncycastle.asn1.x509.X509Name;
+import org.bouncycastle.jce.PrincipalUtil;
+import org.bouncycastle.jce.X509Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +67,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Vector;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -481,20 +487,51 @@ public final class HAUtils {
     }
   }
 
+  /**
+   * Get SCM certificate count from list of SCM certs returning only
+   * number of unique certificate subject CNs.
+   * Duplicate certificate subject CNs should be revoked if
+   * unneeded.
+   * @param CA list.
+   * @return int number of unique subject CN certs.
+   */
+  private static int getCACertCount(List<String> certs) {
+    Set<String> cns = new HashSet<>();
+    X509Certificate cert;
+    X509Principal principal;
+    Vector<?> values;
+    for (String certPemStr : certs) {
+      try {
+        cert = CertificateCodec.getX509Certificate(certPemStr);
+        principal = PrincipalUtil.getSubjectX509Principal(cert);
+        values = principal.getValues(X509Name.CN);
+        cns.add((String) values.get(0));
+      } catch (Exception ex) {
+        LOG.error("Failed to parse certificate.");
+      }
+    }
+    return cns.size();
+  }
+
   private static List<String> waitForCACerts(
       final SupplierWithIOException<List<String>> applyFunction,
       int expectedCount) throws IOException {
-    // TODO: If SCMs are bootstrapped later, then listCA need to be
-    //  refetched if listCA size is less than scm ha config node list size.
-    // For now when Client of SCM's are started we compare their node list
-    // size and ca list size if it is as expected, we return the ca list.
     List<String> caCertPemList = applyFunction.get();
-    boolean caListUpToDate = caCertPemList.size() == expectedCount;
+    int certSize = getCACertCount(caCertPemList);
+    if (expectedCount < caCertPemList.size()) {
+      LOG.warn("Configured with {} nodes, expected {} certificates, found " +
+          "{} certificates.  Revoke unnecessary certificates",
+          expectedCount - 1, expectedCount, caCertPemList.size());
+    }
+    boolean caListUpToDate = certSize == expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
-          "{}.", expectedCount, caCertPemList.size());
+          "{} and CA with uniques subject CNs {}.", expectedCount,
+          caCertPemList.size(), certSize);
       throw new SCMSecurityException("Expected CA list size " + expectedCount
-          + " is not matching actual count " + caCertPemList.size());
+          + " is not matching actual count " + caCertPemList.size() +
+          "nor number of certificates with unique subject CNs " +
+          certSize);
     }
     return caCertPemList;
   }
