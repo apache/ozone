@@ -489,7 +489,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK
       = "ozone.om.snapshot.diff.max.jobs.purge.per.task";
   public static final int OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT
-      = 1000;
+      = 100;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME
       = "ozone.om.snapshot.diff.job.report.persistent.time";

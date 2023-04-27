@@ -76,8 +76,6 @@ import javax.annotation.Nonnull;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
@@ -566,9 +564,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     verifySnapshotInfoForSnapDiff(fsInfo, tsInfo);
 
     int index = getIndexFromToken(token);
-    int maxPageSize = ozoneManager.getConfiguration()
-        .getInt(OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE,
-            OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }

@@ -632,10 +632,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
 
-  public static final String OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE =
-      "ozone.om.snapdiff.max.page.size";
-  public static final int OZONE_OM_SNAPDIFF_MAX_PAGE_SIZE_DEFAULT = 1000;
-
   /**
    * There is no need to instantiate this class.
    */

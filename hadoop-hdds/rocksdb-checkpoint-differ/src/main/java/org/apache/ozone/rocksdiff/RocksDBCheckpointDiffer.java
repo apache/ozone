@@ -1498,16 +1498,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         String sstBackupDirName,
         String compactionLogDirName,
         String activeDBLocationName,
-        long maxTimeAllowedForSnapshotInDagInMs,
-        long pruneCompactionDagDaemonRunIntervalInMs
+        ConfigurationSource configuration
     ) {
       return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
           new RocksDBCheckpointDiffer(metadataDirName,
               sstBackupDirName,
               compactionLogDirName,
               activeDBLocationName,
-              maxTimeAllowedForSnapshotInDagInMs,
-              pruneCompactionDagDaemonRunIntervalInMs));
+              configuration));
     }
   }
 }
