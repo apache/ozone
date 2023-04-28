@@ -458,6 +458,54 @@ public final class OMConfigKeys {
       = "ozone.om.enable.ofs.shared.tmp.dir";
   public static final boolean OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT
       = false;
+
+  public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
+      "ozone.om.snapshot.cache.max.size";
+  public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
+
+  public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
+      "ozone.om.snapshot.force.full.diff";
+
+  public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
+
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
       = "ozone.om.snapshot.diff.db.dir";
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
+      = "ozone.om.snapshot.diff.max.page.size";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
+      = 1000;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
+      = "ozone.om.snapshot.diff.thread.pool.size";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT
+      = 10;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME
+      = "ozone.om.snapshot.diff.job.default.wait.time";
+  public static final long OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT
+      = TimeUnit.MINUTES.toMillis(1);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK
+      = "ozone.om.snapshot.diff.max.jobs.purge.per.task";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT
+      = 100;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME
+      = "ozone.om.snapshot.diff.job.report.persistent.time";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT
+      = TimeUnit.DAYS.toMillis(7);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL
+      = "ozone.om.snapshot.diff.cleanup.service.run.internal";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.HOURS.toMillis(1);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.snapshot.diff.cleanup.service.timeout";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
 }
