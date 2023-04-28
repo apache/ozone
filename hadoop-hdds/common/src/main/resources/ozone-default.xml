@@ -3604,6 +3604,16 @@
   </property>
 
   <property>
+    <name>ozone.recon.orphankeys.metadata.flush.db.max.threshold</name>
+    <value>150000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for orphan keys metadata in hashmap before flushing to
+      recon rocks DB orphanKeysTable
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
