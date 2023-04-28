@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
+
 import org.bouncycastle.asn1.x509.X509Name;
 import org.bouncycastle.jce.PrincipalUtil;
 import org.bouncycastle.jce.X509Principal;
@@ -62,6 +63,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -499,14 +501,18 @@ public final class HAUtils {
     Set<String> cns = new HashSet<>();
     X509Certificate cert;
     X509Principal principal;
-    Vector<?> values;
+    Vector<String> values;
     for (String certPemStr : certs) {
       try {
         cert = CertificateCodec.getX509Certificate(certPemStr);
         principal = PrincipalUtil.getSubjectX509Principal(cert);
         values = principal.getValues(X509Name.CN);
-        cns.add((String) values.get(0));
-      } catch (Exception ex) {
+        if (values.size() > 0) {
+          cns.add(values.get(0));
+        } else {
+          LOG.error("could not get CN from certificate {}", cert);
+        }
+      } catch (CertificateException | IOException ex) {
         LOG.error("Failed to parse certificate.");
       }
     }
