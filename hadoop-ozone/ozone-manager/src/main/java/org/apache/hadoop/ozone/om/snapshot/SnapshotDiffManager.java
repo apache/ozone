@@ -64,7 +64,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -462,7 +461,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           totalDiffEntries);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
       throw new IOException("Report integrity check failed. Retry after: " +
-          OmSnapshotManager.getDiffCleanupServiceInterval());
+          ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
     }
   }
 

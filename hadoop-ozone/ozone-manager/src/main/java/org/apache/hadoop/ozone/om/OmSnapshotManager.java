@@ -148,7 +148,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
 
-  private static long diffCleanupServiceInterval;
+  private final long diffCleanupServiceInterval;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
@@ -750,7 +750,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
-  public static long getDiffCleanupServiceInterval() {
+  public long getDiffCleanupServiceInterval() {
     return diffCleanupServiceInterval;
   }
 }
