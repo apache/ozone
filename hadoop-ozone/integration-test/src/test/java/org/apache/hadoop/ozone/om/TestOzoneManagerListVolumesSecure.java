@@ -55,12 +55,12 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +76,8 @@ public class TestOzoneManagerListVolumesSecure {
 
   @Rule
   public Timeout timeout = Timeout.seconds(1200);
+  @Rule
+  public TemporaryFolder folder = new TemporaryFolder();
 
   private String realm;
   private OzoneConfiguration conf;
@@ -108,7 +110,7 @@ public class TestOzoneManagerListVolumesSecure {
     conf.set(OZONE_SECURITY_ENABLED_KEY, "true");
     conf.set("hadoop.security.authentication", "kerberos");
 
-    this.workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+    this.workDir = folder.newFolder();
 
     startMiniKdc();
     this.realm = miniKdc.getRealm();

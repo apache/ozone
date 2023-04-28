@@ -35,15 +35,14 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
 
   @Override
   protected ContainerHealthResult.OverReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueOverReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueOverReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.OverReplicatedHealthResult healthResult) {
-    replicationManager.requeueOverReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.OverReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
   }
   @Override
   protected int sendDatanodeCommands(

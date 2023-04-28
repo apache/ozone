@@ -111,6 +111,13 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return true;
     }
 
+    /*
+    If we reach here, it's assumed that under replication without considering
+    UNHEALTHY replicas has been checked first. This means that a CLOSED
+    container with 2 CLOSED and 2 UNHEALTHY replicas is called under
+    replicated and not over replicated because only the 2 CLOSED replicas
+    are 'healthy' and have the expected data.
+    */
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       report.incrementAndSample(
@@ -120,6 +127,14 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending() &&
           !overHealth.hasMismatchedReplicas()) {
+        /*
+        A mis matched replica is one whose state does not match the
+        container's state and the state is not UNHEALTHY.
+        For example, a CLOSED container with 1 CLOSED, 2 CLOSING, and 1
+        UNHEALTHY replica has 2 mis matched replicas (the 2 CLOSING ones).
+        We want to CLOSE the mis matched replicas first before queuing the
+        container for over replication.
+         */
         request.getReplicationQueue().enqueue(overHealth);
       }
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
@@ -139,8 +154,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       if (!misRepHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
-      LOG.debug("Container {} is Mid Replicated. isReplicatedOkAfterPending" +
-          " is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
+      LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending" +
+              " is [{}]. Reason for mis replication is [{}].", container,
+          misRepHealth.isReplicatedOkAfterPending(),
+          misRepHealth.getMisReplicatedReason());
       return true;
     }
     // Should not get here, but in case it does the container is not healthy,
@@ -157,10 +174,16 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     // Note that this setting is minReplicasForMaintenance. For EC the variable
     // is defined as remainingRedundancy which is subtly different.
     int minReplicasForMaintenance = request.getMaintenanceRedundancy();
+
+    /*
+    When checking for under replication, don't consider UNHEALTHY replicas.
+    This means that a CLOSED container with 1 CLOSED and 2 UNHEALTHY replicas
+    is under replicated and needs 2 more healthy replicas because we're not
+    counting the UNHEALTHY ones.
+     */
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
             minReplicasForMaintenance, false);
-
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
@@ -174,15 +197,25 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return result;
     }
 
-    boolean isOverReplicated = replicaCount.isOverReplicated(false);
+    /*
+    When checking for over replication, consider UNHEALTHY replicas. This means
+    that other than checking over replication of healthy replicas (such as 4
+    CLOSED replicas of a CLOSED container), we're also checking for an excess
+    of UNHEALTHY replicas (such as 3 CLOSED and 1 UNHEALTHY replicas of a
+    CLOSED container).
+     */
+    RatisContainerReplicaCount consideringUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
+            minReplicasForMaintenance, true);
+    boolean isOverReplicated = consideringUnhealthy.isOverReplicated(false);
     if (isOverReplicated) {
-      boolean repOkWithPending = !replicaCount.isOverReplicated(true);
+      boolean repOkWithPending = !consideringUnhealthy.isOverReplicated(true);
       ContainerHealthResult.OverReplicatedHealthResult result =
           new ContainerHealthResult.OverReplicatedHealthResult(
-              container, replicaCount.getExcessRedundancy(false),
+              container, consideringUnhealthy.getExcessRedundancy(false),
               repOkWithPending);
       result.setHasMismatchedReplicas(
-          replicaCount.getMisMatchedReplicaCount() > 0);
+          consideringUnhealthy.getMisMatchedReplicaCount() > 0);
       return result;
     }
 
@@ -196,7 +229,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
       }
       return new ContainerHealthResult.MisReplicatedHealthResult(
-          container, placementStatusWithPending.isPolicySatisfied());
+          container, placementStatusWithPending.isPolicySatisfied(),
+          placementStatusWithPending.misReplicatedReason());
     }
 
     if (replicaCount.getUnhealthyReplicaCount() != 0) {

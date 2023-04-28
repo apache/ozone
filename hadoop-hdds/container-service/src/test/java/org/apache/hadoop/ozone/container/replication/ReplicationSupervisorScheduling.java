@@ -111,7 +111,7 @@ public class ReplicationSupervisorScheduling {
     };
 
     ReplicationSupervisor rs = new ReplicationSupervisor(null,
-        replicationConfig, Clock.system(ZoneId.systemDefault()));
+        replicationConfig, Clock.system(ZoneId.systemDefault()), 1000);
 
     final long start = System.currentTimeMillis();
 
@@ -128,5 +128,4 @@ public class ReplicationSupervisorScheduling {
     Assertions.assertTrue(executionTime < 100_000,
         "Execution was too slow : " + executionTime + " ms");
   }
-
 }
