@@ -23,13 +23,15 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import javax.inject.Inject;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
-
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.ORPHAN_KEYS_METADATA;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 /**
  * Wrapper functions for DB operations on recon namespace summary metadata.
@@ -38,6 +40,7 @@ public class ReconNamespaceSummaryManagerImpl
         implements ReconNamespaceSummaryManager {
 
   private Table<Long, NSSummary> nsSummaryTable;
+  private Table<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataTable;
   private DBStore namespaceDbStore;
 
   @Inject
@@ -45,6 +48,8 @@ public class ReconNamespaceSummaryManagerImpl
           throws IOException {
     namespaceDbStore = reconDBProvider.getDbStore();
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
+    this.orphanKeysMetaDataTable =
+        ORPHAN_KEYS_METADATA.getTable(namespaceDbStore);
   }
 
   @Override
@@ -79,6 +84,15 @@ public class ReconNamespaceSummaryManagerImpl
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
+  }
+
+  @Override
+  public void batchStoreOrphanKeysMetaData(
+      BatchOperation batch, long objectId,
+      OrphanKeysMetaDataSet orphanKeysMetaDataSet)
+      throws IOException {
+    orphanKeysMetaDataTable.putWithBatch(batch, objectId,
+        orphanKeysMetaDataSet);
   }
 
   public Table getNSSummaryTable() {

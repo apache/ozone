@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -37,6 +39,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 
 /**
  * Class for holding all NSSummaryTask methods
@@ -52,6 +56,8 @@ public class NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
+  private final long orphanKeysFlushToDBMaxThreshold;
+
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
@@ -63,6 +69,9 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    orphanKeysFlushToDBMaxThreshold = ozoneConfiguration.getLong(
+        OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD,
+        OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -80,6 +89,24 @@ public class NSSummaryTaskDbEventHandler {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               key, nsSummaryMap.get(key));
+        } catch (IOException e) {
+          LOG.error("Unable to write Namespace Summary data in Recon DB.",
+              e);
+        }
+      });
+      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+    }
+  }
+
+  protected void writeOrphanKeysMetaDataToDB(
+      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap)
+      throws IOException {
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      orphanKeysMetaDataSetMap.keySet().forEach((Long key) -> {
+        try {
+          reconNamespaceSummaryManager.batchStoreOrphanKeysMetaData(
+              rdbBatchOperation,
+              key, orphanKeysMetaDataSetMap.get(key));
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.",
               e);
@@ -229,10 +256,33 @@ public class NSSummaryTaskDbEventHandler {
     return true;
   }
 
+  protected boolean flushAndCommitOrphanKeysMetaDataToDB(
+      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap) {
+    try {
+      writeOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap);
+      orphanKeysMetaDataSetMap.clear();
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return false;
+    }
+    return true;
+  }
+
+  protected boolean checkOrphanDataAndCallFlushToDB(
+      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap) {
+    // if map contains more than entries, flush to DB and clear the map
+    if (null != orphanKeysMetaDataSetMap && orphanKeysMetaDataSetMap.size() >=
+        orphanKeysFlushToDBMaxThreshold) {
+      return flushAndCommitOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap);
+    }
+    return true;
+  }
+
   protected void buildOrphanCandidateSet(
       WithParentObjectId fileDirInfo,
       Map<Long, NSSummary> nsSummaryMap,
-      Map<Long, Set<Long>> orphanCandidateSet) throws IOException {
+      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap)
+      throws IOException {
     long objectID = fileDirInfo.getObjectID();
     long parentObjectID = fileDirInfo.getParentObjectID();
     NSSummary nsSummary = nsSummaryMap.get(parentObjectID);
@@ -241,14 +291,19 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectID);
     }
     if (null == nsSummary) {
-      Set<Long> childIds = orphanCandidateSet.get(parentObjectID);
-      if (null == childIds) {
-        childIds = new HashSet<>();
+      OrphanKeysMetaDataSet orphanKeysMetaDataSet =
+          orphanKeysMetaDataSetMap.get(parentObjectID);
+      Set<OrphanKeyMetaData> orphanKeyMetaDataSet;
+      if (null == orphanKeysMetaDataSet) {
+        orphanKeyMetaDataSet = new HashSet<>();
+        orphanKeysMetaDataSet = new OrphanKeysMetaDataSet(orphanKeyMetaDataSet);
       }
-      childIds.add(objectID);
-      orphanCandidateSet.put(parentObjectID, childIds);
+      orphanKeyMetaDataSet = orphanKeysMetaDataSet.getList();
+      OrphanKeyMetaData orphanKeyMetaData = new OrphanKeyMetaData(objectID);
+      orphanKeyMetaDataSet.add(orphanKeyMetaData);
+      orphanKeysMetaDataSetMap.put(parentObjectID, orphanKeysMetaDataSet);
     } else {
-      orphanCandidateSet.remove(parentObjectID);
+      orphanKeysMetaDataSetMap.remove(parentObjectID);
     }
   }
 }

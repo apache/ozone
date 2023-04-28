@@ -17,6 +17,7 @@
  *
  */
 package org.apache.hadoop.ozone.recon.spi.impl;
+
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
@@ -24,10 +25,12 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
+import org.apache.hadoop.ozone.recon.codec.OrphanKeyMetaDataSetCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 
 /**
  * RocksDB definition for the DB internal to Recon.
@@ -93,6 +96,15 @@ public class ReconDBDefinition implements DBDefinition {
           new LongCodec(),
           ContainerReplicaHistoryList.class,
           new ContainerReplicaHistoryListCodec());
+
+  public static final DBColumnFamilyDefinition
+      <Long, OrphanKeysMetaDataSet> ORPHAN_KEYS_METADATA =
+      new DBColumnFamilyDefinition<Long, OrphanKeysMetaDataSet>(
+          "orphan_keys_metadata",
+          Long.class,
+          new LongCodec(),
+          OrphanKeysMetaDataSet.class,
+          new OrphanKeyMetaDataSetCodec());
 
   @Override
   public String getName() {

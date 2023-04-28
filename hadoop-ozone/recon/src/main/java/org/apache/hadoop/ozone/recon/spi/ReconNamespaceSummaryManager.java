@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 
 import java.io.IOException;
+import java.util.Set;
 
 /**
  * Interface for DB operations on NSSummary.
@@ -44,5 +46,9 @@ public interface ReconNamespaceSummaryManager {
   NSSummary getNSSummary(long objectId) throws IOException;
 
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
+      throws IOException;
+
+  void batchStoreOrphanKeysMetaData(BatchOperation batch, long objectId,
+                                    OrphanKeysMetaDataSet orphanKeysMetaDataSet)
       throws IOException;
 }

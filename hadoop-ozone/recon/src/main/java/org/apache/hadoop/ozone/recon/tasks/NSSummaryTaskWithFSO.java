@@ -25,6 +25,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -68,7 +70,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-    Map<Long, Set<Long>> orphanMap = new HashMap<>();
+    Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -95,25 +97,29 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap,
+                orphanKeysMetaDataSetMap);
             break;
 
           case DELETE:
             handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap,
+                orphanKeysMetaDataSetMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-              buildOrphanCandidateSet(oldKeyInfo, nsSummaryMap, orphanMap);
+              buildOrphanCandidateSet(oldKeyInfo, nsSummaryMap,
+                  orphanKeysMetaDataSetMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
             }
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap, orphanMap);
+            buildOrphanCandidateSet(updatedKeyInfo, nsSummaryMap,
+                orphanKeysMetaDataSetMap);
             break;
 
           default:
@@ -132,13 +138,13 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           case PUT:
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
-                orphanMap);
+                orphanKeysMetaDataSetMap);
             break;
 
           case DELETE:
             handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
             buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
-                orphanMap);
+                orphanKeysMetaDataSetMap);
             break;
 
           case UPDATE:
@@ -146,14 +152,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
               // delete first, then put
               handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
               buildOrphanCandidateSet(oldDirectoryInfo, nsSummaryMap,
-                  orphanMap);
+                  orphanKeysMetaDataSetMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
             }
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
             buildOrphanCandidateSet(updatedDirectoryInfo, nsSummaryMap,
-                orphanMap);
+                orphanKeysMetaDataSetMap);
             break;
 
           default:
@@ -182,7 +188,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-    Map<Long, Set<Long>> orphanMap = new HashMap<>();
+    Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap = new HashMap<>();
 
     try {
       Table<String, OmDirectoryInfo> dirTable =
@@ -206,7 +212,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         while (dirTableIter.hasNext()) {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
           OmDirectoryInfo directoryInfo = kv.getValue();
-          buildOrphanCandidateSet(directoryInfo, nsSummaryMap, orphanMap);
+          buildOrphanCandidateSet(directoryInfo, nsSummaryMap,
+              orphanKeysMetaDataSetMap);
+          if (!checkOrphanDataAndCallFlushToDB(orphanKeysMetaDataSetMap)) {
+            return false;
+          }
         }
       }
 
@@ -231,7 +241,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
-          buildOrphanCandidateSet(keyInfo, nsSummaryMap, orphanMap);
+          buildOrphanCandidateSet(keyInfo, nsSummaryMap,
+              orphanKeysMetaDataSetMap);
+          if (!checkOrphanDataAndCallFlushToDB(orphanKeysMetaDataSetMap)) {
+            return false;
+          }
         }
       }
 

@@ -478,3 +478,11 @@ message DeletedBlocksTransactionInfo {
     repeated int64 localID = 3;
     optional int32 count = 4;
 }
+
+message OrphanKeysMetaDataSetProto {
+    repeated OrphanKeyMetaDataProto orphanKeyMetaData = 1;
+}
+
+message OrphanKeyMetaDataProto {
+    required int64 objectId = 1;
+}
