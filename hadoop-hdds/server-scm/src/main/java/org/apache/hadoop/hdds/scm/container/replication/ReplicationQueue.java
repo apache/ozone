@@ -22,6 +22,8 @@ import java.util.LinkedList;
 import java.util.PriorityQueue;
 import java.util.Queue;
 
+import com.google.common.collect.Queues;
+
 /**
  * Object to encapsulate the under and over replication queues used by
  * replicationManager.
@@ -34,12 +36,12 @@ public class ReplicationQueue {
       overRepQueue;
 
   public ReplicationQueue() {
-    underRepQueue = new PriorityQueue<>(
+    underRepQueue = Queues.synchronizedQueue(new PriorityQueue<>(
         Comparator.comparing(ContainerHealthResult
             .UnderReplicatedHealthResult::getWeightedRedundancy)
         .thenComparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getRequeueCount));
-    overRepQueue = new LinkedList<>();
+            .UnderReplicatedHealthResult::getRequeueCount)));
+    overRepQueue = Queues.synchronizedQueue(new LinkedList<>());
   }
 
   /**
