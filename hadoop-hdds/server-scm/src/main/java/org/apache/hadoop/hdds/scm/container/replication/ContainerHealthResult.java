@@ -260,14 +260,19 @@ public class ContainerHealthResult {
      * replication queue.
      */
     private static final int MIS_REP_REDUNDANCY = 6;
+    private final String misReplicatedReason;
 
     public MisReplicatedHealthResult(ContainerInfo containerInfo,
-        boolean replicatedOkAfterPending) {
+        boolean replicatedOkAfterPending, String misReplicatedReason) {
       super(containerInfo, MIS_REP_REDUNDANCY, false,
           replicatedOkAfterPending, false,
           HealthState.MIS_REPLICATED);
+      this.misReplicatedReason = misReplicatedReason;
     }
 
+    public String getMisReplicatedReason() {
+      return misReplicatedReason;
+    }
   }
 
   /**

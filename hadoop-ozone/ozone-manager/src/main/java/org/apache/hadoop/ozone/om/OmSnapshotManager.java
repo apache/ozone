@@ -23,10 +23,10 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
@@ -51,7 +52,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -80,7 +80,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
@@ -99,7 +107,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
   private final LoadingCache<String, OmSnapshot> snapshotCache;
-  private ManagedRocksDB snapshotDiffDb;
+  private final ManagedRocksDB snapshotDiffDb;
 
   public static final String DELIMITER = "-";
 
@@ -144,11 +152,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
-  private final CodecRegistry codecRegistry;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
 
-  // TODO: [SNAPSHOT] create config for max allowed page size.
-  private final int maxPageSize = 1000;
+  private final int maxPageSize;
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
     this.options = new ManagedDBOptions();
@@ -156,7 +162,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
     this.columnFamilyDescriptors = new ArrayList<>();
     this.columnFamilyHandles = new ArrayList<>();
-    this.codecRegistry = createCodecRegistryForSnapDiff();
+    CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
+    this.maxPageSize = ozoneManager.getConfiguration().getInt(
+        OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
+        OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
+    );
 
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
@@ -196,8 +206,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // size of lru cache
     int cacheSize = ozoneManager.getConfiguration().getInt(
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
+        OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
+        OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
 
     CacheLoader<String, OmSnapshot> loader = createCacheLoader();
 
@@ -224,13 +234,19 @@ public final class OmSnapshotManager implements AutoCloseable {
         ozoneManager, snapshotCache, snapDiffJobCf, snapDiffReportCf,
         columnFamilyOptions, codecRegistry);
 
-    // TODO: [SNAPSHOT] Move this to config.
-    long runInterval = Duration.ofMinutes(15).toMillis();
-    long timeout = Duration.ofSeconds(3).toMillis();
+    long diffCleanupServiceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL,
+            OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
+
+    long diffCleanupServiceTimeout = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT,
+            OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
-        runInterval,
-        timeout,
+        diffCleanupServiceInterval,
+        diffCleanupServiceTimeout,
         ozoneManager,
         snapshotDiffDb,
         snapDiffJobCf,
@@ -318,7 +334,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Integers are used for indexing persistent list.
     registry.addCodec(Integer.class, new IntegerCodec());
     // DiffReportEntry codec for Diff Report.
-    registry.addCodec(SnapshotDiffReport.DiffReportEntry.class,
+    registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());

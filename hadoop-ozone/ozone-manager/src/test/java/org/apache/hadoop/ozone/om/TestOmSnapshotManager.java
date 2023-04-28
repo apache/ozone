@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -74,7 +73,7 @@ public class TestOmSnapshotManager {
 
     // Only allow one entry in cache so each new one causes an eviction
     configuration.setInt(
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
+        OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();

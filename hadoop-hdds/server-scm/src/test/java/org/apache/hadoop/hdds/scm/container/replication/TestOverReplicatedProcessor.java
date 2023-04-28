@@ -26,11 +26,12 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Ov
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 
 /**
@@ -53,17 +54,6 @@ public class TestOverReplicatedProcessor {
 
     // use real queue
     queue = new ReplicationQueue();
-    Mockito.when(replicationManager.dequeueOverReplicatedContainer())
-        .thenAnswer(inv -> queue.dequeueOverReplicatedContainer());
-    ArgumentCaptor<OverReplicatedHealthResult> captor =
-        ArgumentCaptor.forClass(OverReplicatedHealthResult.class);
-    Mockito.doAnswer(inv -> {
-      queue.enqueue(captor.getValue());
-      return null;
-    })
-        .when(replicationManager)
-            .requeueOverReplicatedContainer(captor.capture());
-
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
         replicationManager, rmConf.getOverReplicatedInterval());
@@ -79,26 +69,27 @@ public class TestOverReplicatedProcessor {
 
     Mockito.when(replicationManager.processOverReplicatedContainer(any()))
         .thenReturn(1);
-    overReplicatedProcessor.processAll();
-    Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueOverReplicatedContainer(any());
+    overReplicatedProcessor.processAll(queue);
+
+    assertEquals(0, queue.overReplicatedQueueSize());
   }
 
   @Test
   public void testMessageRequeuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    queue.enqueue(new OverReplicatedHealthResult(
-        container, 3, false));
+    OverReplicatedHealthResult result = new OverReplicatedHealthResult(
+        container, 3, false);
+    queue.enqueue(result);
 
     Mockito.when(replicationManager
             .processOverReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"))
         .thenThrow(new AssertionError("Should process only one item"));
-    overReplicatedProcessor.processAll();
 
-    Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueOverReplicatedContainer(any());
+    overReplicatedProcessor.processAll(queue);
 
+    assertEquals(1, queue.overReplicatedQueueSize());
+    assertSame(result, queue.dequeueOverReplicatedContainer());
   }
 }
