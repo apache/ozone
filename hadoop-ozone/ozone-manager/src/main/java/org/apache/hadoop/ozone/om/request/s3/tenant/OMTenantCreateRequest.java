@@ -150,7 +150,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Volume name defaults to tenant name if unspecified in the request
     final String volumeName = request.getVolumeName();
     // Validate volume name
-    OmUtils.validateVolumeName(volumeName);
+    OmUtils.validateVolumeName(volumeName, ozoneManager.isStrictS3());
 
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
