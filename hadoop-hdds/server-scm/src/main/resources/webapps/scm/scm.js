@@ -35,85 +35,87 @@
             var protocol = "";
             var portNo = "";
 
-                $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
-                    .then(function (result) {
+            $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
+                .then(function (result) {
                     const URLScheme = location.protocol.replace(":" , "");
                     ctrl.nodemanagermetrics = result.data.beans[0];
 
-                $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatusInfo &&
-                    ctrl.nodemanagermetrics.NodeStatusInfo.map(({ key, value }) => {
-                        value.map(({key, value}) => {
-                            if(key == "HTTP") {
-                                protocol = key;
-                                portNo = value;
-                            }
-                            if(key == "HTTPS"){
-                                protocol = key.toLowerCase() === URLScheme ? key : "HTTP";
-                                portNo = value;
-                            }
-                        });
-                    return {
-                        hostname: key,
-                        opstate: value && value.find((element) => element.key == "OPSTATE").value,
-                        comstate: value && value.find((element) => element.key == "COMSTATE").value,
-                        portno: portNo,
-                        portval: protocol
-                    }});
-                nodeStatusCopy = [...$scope.nodeStatus];
-                $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                    $scope.nodeStatus = ctrl.nodemanagermetrics
+                        && ctrl.nodemanagermetrics.NodeStatusInfo
+                        && ctrl.nodemanagermetrics.NodeStatusInfo.map(
+                            ({ key, value }) => {
+                                value.map(({key, value}) => {
+                                    if (key == "HTTP") {
+                                        protocol = key;
+                                        portNo = value;
+                                    }
+                                    if (key == "HTTPS"){
+                                        protocol = key.toLowerCase() === URLScheme ? key : "HTTP";
+                                        portNo = value;
+                                    }
+                                });
+                                return {
+                                    hostname: key,
+                                    opstate: value && value.find((element) => element.key == "OPSTATE").value,
+                                    comstate: value && value.find((element) => element.key == "COMSTATE").value,
+                                    portno: portNo,
+                                    portval: protocol
+                                }
+                            });
+
+                    nodeStatusCopy = [...$scope.nodeStatus];
+                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                 });
-                /*if option is 'All' display all records else display specified record on page*/
-                $scope.UpdateRecordsToShow = () => {
-                    if($scope.RecordsToDisplay == 'All') {
-                        $scope.lastIndex = 1;
-                        $scope.nodeStatus = nodeStatusCopy;
-                    } else {
-                        $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                        $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
-                   }
+            /*if option is 'All' display all records else display specified record on page*/
+            $scope.UpdateRecordsToShow = () => {
+                if($scope.RecordsToDisplay == 'All') {
+                    $scope.lastIndex = 1;
+                    $scope.nodeStatus = nodeStatusCopy;
+                } else {
+                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                }
                 $scope.currentPage = 1;
+            }
+            /* Page Slicing  logic */
+            $scope.handlePagination = (pageIndex, isDisabled) => {
+                if(!isDisabled) {
+                    let startIndex = 0, endIndex = 0;
+                    $scope.currentPage = pageIndex;
+                    startIndex = (pageIndex * $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
+                    endIndex = startIndex + parseInt($scope.RecordsToDisplay);
+                    $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
                 }
-                /* Page Slicing  logic */
-                $scope.handlePagination = (pageIndex, isDisabled) => {
-                    if(!isDisabled) {
-                        let startIndex = 0, endIndex = 0;
-                        $scope.currentPage = pageIndex;
-                        startIndex = (pageIndex * $scope.RecordsToDisplay) - $scope.RecordsToDisplay;
-                        endIndex = startIndex + parseInt($scope.RecordsToDisplay);
-                        $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
-                   }
-                }
-                 /*column sort logic*/
-                $scope.columnSort = (colName) => {
-                    $scope.columnName = colName;
-                    $scope.reverse = !$scope.reverse;
-                }
-               const nodeOpStateSortOrder = {
-                   "IN_SERVICE": "a",
-                   "DECOMMISSIONING": "b",
-                   "DECOMMISSIONED": "c",
-                   "ENTERING_MAINTENANCE": "d",
-                   "IN_MAINTENANCE": "e"
-               };
-               ctrl.nodeOpStateOrder = function (v1, v2) {
-                   //status with non defined sort order will be "undefined"
-                   return ("" + nodeOpStateSortOrder[v1.value])
-                       .localeCompare("" + nodeOpStateSortOrder[v2.value])
-               }
+            }
+            /*column sort logic*/
+            $scope.columnSort = (colName) => {
+                $scope.columnName = colName;
+                $scope.reverse = !$scope.reverse;
+            }
+            const nodeOpStateSortOrder = {
+                "IN_SERVICE": "a",
+                "DECOMMISSIONING": "b",
+                "DECOMMISSIONED": "c",
+                "ENTERING_MAINTENANCE": "d",
+                "IN_MAINTENANCE": "e"
+            };
+            ctrl.nodeOpStateOrder = function (v1, v2) {
+                //status with non defined sort order will be "undefined"
+                return ("" + nodeOpStateSortOrder[v1.value])
+                    .localeCompare("" + nodeOpStateSortOrder[v2.value])
+            }
 
-               const nodeStateSortOrder = {
-                   "HEALTHY": "a",
-                   "STALE": "b",
-                   "DEAD": "c"
-               };
-               ctrl.nodeStateOrder = function (v1, v2) {
-                   //status with non defined sort order will be "undefined"
-                   return ("" + nodeStateSortOrder[v1.value])
-                       .localeCompare("" + nodeStateSortOrder[v2.value])
-               }
-
+            const nodeStateSortOrder = {
+                "HEALTHY": "a",
+                "STALE": "b",
+                "DEAD": "c"
+            };
+            ctrl.nodeStateOrder = function (v1, v2) {
+                //status with non defined sort order will be "undefined"
+                return ("" + nodeStateSortOrder[v1.value])
+                    .localeCompare("" + nodeStateSortOrder[v2.value])
+            }
         }
     });
-
 })();
