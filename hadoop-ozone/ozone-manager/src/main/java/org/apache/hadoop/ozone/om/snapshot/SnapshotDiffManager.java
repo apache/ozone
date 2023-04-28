@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -386,13 +387,14 @@ public class SnapshotDiffManager implements AutoCloseable {
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
               null), FAILED, defaultWaitTime);
     case DONE:
-      SnapshotDiffReport report = createPageResponse(snapDiffJob, volume,
+      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
           bucket, fromSnapshot, toSnapshot, index, pageSize);
       return new SnapshotDiffResponse(report, DONE, 0L);
     case REJECTED:
-      return new SnapshotDiffResponse(new SnapshotDiffReport(volume, bucket,
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
           fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+          null), REJECTED, defaultWaitTime);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
@@ -403,18 +405,18 @@ public class SnapshotDiffManager implements AutoCloseable {
   private static OFSPath getSnapshotRootPath(String volume, String bucket) {
     org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
-    OFSPath path = new OFSPath(bucketPath, new OzoneConfiguration());
-    return path;
+    return new OFSPath(bucketPath, new OzoneConfiguration());
   }
 
-  private SnapshotDiffReport createPageResponse(SnapshotDiffJob snapDiffJob,
-                                                final String volume,
-                                                final String bucket,
-                                                final OmSnapshot fromSnapshot,
-                                                final OmSnapshot toSnapshot,
-                                                final int index,
-                                                final int pageSize)
-      throws IOException {
+  private SnapshotDiffReportOzone createPageResponse(
+      final SnapshotDiffJob snapDiffJob,
+      final String volume,
+      final String bucket,
+      final OmSnapshot fromSnapshot,
+      final OmSnapshot toSnapshot,
+      final int index,
+      final int pageSize
+  ) throws IOException {
     List<DiffReportEntry> diffReportList = new ArrayList<>();
 
     OFSPath path = getSnapshotRootPath(volume, bucket);
@@ -450,7 +452,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    * If check fails, it marks the job failed so that it is GC-ed by clean up
    * service and throws the exception to client.
    */
-  private void checkReportsIntegrity(SnapshotDiffJob diffJob,
+  private void checkReportsIntegrity(final SnapshotDiffJob diffJob,
                                      final int totalDiffEntries)
       throws IOException {
     if (diffJob.getTotalDiffEntries() != totalDiffEntries) {
@@ -459,10 +461,8 @@ public class SnapshotDiffManager implements AutoCloseable {
           diffJob.getTotalDiffEntries(),
           totalDiffEntries);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
-      // TODO: [SNAPSHOT] Change time to clean up service run interval when
-      //  HDDS-8322 is merged.
       throw new IOException("Report integrity check failed. Retry after: " +
-          Duration.ofMinutes(15));
+          OmSnapshotManager.getDiffCleanupServiceInterval());
     }
   }
 
@@ -502,7 +502,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (snapDiffJob.getStatus() != QUEUED) {
       // Same request is submitted by another thread and already completed.
       if (snapDiffJob.getStatus() == DONE) {
-        SnapshotDiffReport report = createPageResponse(snapDiffJob, volume,
+        SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
             bucket, fromSnapshot, toSnapshot, index, pageSize);
         return new SnapshotDiffResponse(report, DONE, 0L);
       } else {
@@ -754,10 +754,17 @@ public class SnapshotDiffManager implements AutoCloseable {
           objectIdToKeyNameMapForToSnapshot);
 
       updateJobStatusToDone(jobKey, totalDiffEntries);
+    } catch (IOException | RocksDBException exception) {
+      updateJobStatus(jobKey, IN_PROGRESS, FAILED);
+      LOG.error("Caught checked exception during diff report generation for " +
+              "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+          volume, bucket, fsInfo.getName(), tsInfo.getName(), exception);
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
     } catch (Exception exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
-      LOG.error("Failure in snap diff report generation for volume: {} " +
-              "bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+      LOG.error("Caught unchecked exception during diff report generation " +
+              "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volume, bucket, fsInfo.getName(), tsInfo.getName(), exception);
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
