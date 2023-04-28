@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 
 import java.io.IOException;
-import java.util.Set;
 
 /**
  * Interface for DB operations on NSSummary.
