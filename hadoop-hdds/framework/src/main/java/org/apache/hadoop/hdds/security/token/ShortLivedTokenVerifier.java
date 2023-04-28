@@ -111,7 +111,7 @@ public abstract class
     ManagedSecretKey secretKey = secretKeyClient.getSecretKey(
         tokenId.getSecretKeyId());
     if (secretKey == null) {
-      throw new BlockTokenException("Can't find the signer secret key " +
+      throw new BlockTokenException("Can't find the signing secret key " +
           tokenId.getSecretKeyId() + " of the token for user: " +
           tokenId.getUser());
     }

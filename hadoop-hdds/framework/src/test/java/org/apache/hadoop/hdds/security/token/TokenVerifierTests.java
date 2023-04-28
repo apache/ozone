@@ -153,7 +153,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     BlockTokenException ex = assertThrows(BlockTokenException.class, () ->
         subject.verify("anyUser", token, cmd));
     assertThat(ex.getMessage(),
-        containsString("Can't find the signer secret key"));
+        containsString("Can't find the signing secret key"));
   }
 
   @Test

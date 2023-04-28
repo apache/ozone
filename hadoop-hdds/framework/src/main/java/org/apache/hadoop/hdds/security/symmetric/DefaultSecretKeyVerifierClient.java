@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,27 +39,38 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 
 /**
  * Default implementation of {@link SecretKeyVerifierClient} that fetches
- * SecretKeys remotely via {@link SCMSecurityProtocol}.
+ * SecretKeys remotely via {@link SCMSecurityProtocol} and cache them locally.
  */
 public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeyVerifierClient.class);
 
-  private final LoadingCache<UUID, ManagedSecretKey> cache;
+  private final LoadingCache<UUID, Optional<ManagedSecretKey>> cache;
 
   DefaultSecretKeyVerifierClient(SCMSecurityProtocol scmSecurityProtocol,
                                  ConfigurationSource conf) {
     Duration expiryDuration = parseExpiryDuration(conf);
     Duration rotateDuration = parseRotateDuration(conf);
-    long cacheSize = expiryDuration.toMillis() / rotateDuration.toMillis() + 1;
 
-    CacheLoader<UUID, ManagedSecretKey> loader =
-        new CacheLoader<UUID, ManagedSecretKey>() {
+    // if rotation is 1d, and each keys is valid for 7d before expiring,
+    // the expected number valid keys at any time is 7.
+    final long expectedValidKeys =
+        expiryDuration.toMillis() / rotateDuration.toMillis() + 1;
+    // However, we want to cache some expired keys as well, to avoid requesting
+    // SCM for recently expire secret keys. It makes sense to extend the
+    // secret keys cache by twice (e.g. 7 valid one and 7 recent expired).
+    final int secretKeyCacheMultiplier = 2;
+    long cacheSize = expectedValidKeys * secretKeyCacheMultiplier;
+    Duration cacheExpiry = expiryDuration.multipliedBy(
+        secretKeyCacheMultiplier);
+
+    CacheLoader<UUID, Optional<ManagedSecretKey>> loader =
+        new CacheLoader<UUID, Optional<ManagedSecretKey>>() {
           @Override
-          public ManagedSecretKey load(UUID id) throws Exception {
+          public Optional<ManagedSecretKey> load(UUID id) throws Exception {
             ManagedSecretKey secretKey = scmSecurityProtocol.getSecretKey(id);
             LOG.info("Secret key fetched from SCM: {}", secretKey);
-            return secretKey;
+            return Optional.ofNullable(secretKey);
           }
         };
 
@@ -66,7 +78,7 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
         cacheSize, expiryDuration);
     cache = CacheBuilder.newBuilder()
         .maximumSize(cacheSize)
-        .expireAfterWrite(expiryDuration.toMillis(), TimeUnit.MILLISECONDS)
+        .expireAfterWrite(cacheExpiry.toMillis(), TimeUnit.MILLISECONDS)
         .recordStats()
         .build(loader);
   }
@@ -74,7 +86,7 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
   @Override
   public ManagedSecretKey getSecretKey(UUID id) throws SCMSecurityException {
     try {
-      return cache.get(id);
+      return cache.get(id).orElse(null);
     } catch (ExecutionException e) {
       // handle cache load exception.
       if (e.getCause() instanceof IOException) {
