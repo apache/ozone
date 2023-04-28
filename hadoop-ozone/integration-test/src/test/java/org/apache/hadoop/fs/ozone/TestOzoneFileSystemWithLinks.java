@@ -227,11 +227,9 @@ public class TestOzoneFileSystemWithLinks {
 
     try {
       FileSystem.get(conf);
-      Assert.fail("Should throw Exception due to loop in Link Buckets");
     } catch (OMException oe) {
       // Expected exception
-      Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
-          oe.getResult());
+      Assert.fail("Should not throw Exception and show orphan buckets");
     }
   }
 

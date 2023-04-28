@@ -44,6 +44,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -111,7 +112,7 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
             dbLocation.toString(),
@@ -390,9 +391,11 @@ public class RDBStore implements DBStore {
           long currSequenceNumber = result.sequenceNumber();
           if (checkValidStartingSeqNumber &&
               currSequenceNumber > 1 + sequenceNumber) {
-            throw new SequenceNumberNotFoundException("Unable to read data from"
-                + " RocksDB wal to get delta updates. It may have already been"
-                + " flushed to SSTs.");
+            throw new SequenceNumberNotFoundException("Unable to read full data"
+                + " from RocksDB wal to get delta updates. It may have"
+                + " partially been flushed to SSTs. Requested sequence number"
+                + " is " + sequenceNumber + " and first available sequence" +
+                " number is " + currSequenceNumber + " in wal.");
           }
           // If the above condition was not satisfied, then it is OK to reset
           // the flag.
@@ -428,6 +431,12 @@ public class RDBStore implements DBStore {
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
       dbUpdatesWrapper.setDBUpdateSuccess(false);
+    } finally {
+      if (dbUpdatesWrapper.getData().size() > 0) {
+        rdbMetrics.incWalUpdateDataSize(cumulativeDBUpdateLogBatchSize);
+        rdbMetrics.incWalUpdateSequenceCount(
+            dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
+      }
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;

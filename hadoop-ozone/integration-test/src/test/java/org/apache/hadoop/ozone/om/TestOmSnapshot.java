@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -498,7 +498,8 @@ public class TestOmSnapshot {
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
 
-    SnapshotDiffReport diff1 = getSnapDiffReport(volume, bucket, snap1, snap2);
+    SnapshotDiffReportOzone
+        diff1 = getSnapDiffReport(volume, bucket, snap1, snap2);
     Assert.assertTrue(diff1.getDiffList().isEmpty());
     // Create Key2 and delete Key1, take snapshot
     String key2 = "key-2-";
@@ -508,14 +509,15 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap3);
 
     // Diff should have 2 entries
-    SnapshotDiffReport diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
+    SnapshotDiffReportOzone
+        diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
     Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, key2)));
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReportOzone.DiffType.CREATE, key2)));
     Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.DELETE, key1)));
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReportOzone.DiffType.DELETE, key1)));
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
@@ -523,11 +525,12 @@ public class TestOmSnapshot {
     String snap4 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap4);
 
-    SnapshotDiffReport diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
+    SnapshotDiffReportOzone
+        diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.RENAME, key2, key2Renamed)));
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReportOzone.DiffType.RENAME, key2, key2Renamed)));
 
 
     // Create a directory
@@ -535,7 +538,8 @@ public class TestOmSnapshot {
     bucket1.createDirectory(dir1);
     String snap5 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap5);
-    SnapshotDiffReport diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
+    SnapshotDiffReportOzone
+        diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     Assert.assertEquals(1, diff4.getDiffList().size());
     // for non-fso, directories are a special type of key with "/" appended
     // at the end.
@@ -543,12 +547,12 @@ public class TestOmSnapshot {
       dir1 = dir1 + OM_KEY_PREFIX;
     }
     Assert.assertTrue(diff4.getDiffList().contains(
-        SnapshotDiffReport.DiffReportEntry
-            .of(SnapshotDiffReport.DiffType.CREATE, dir1)));
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReportOzone.DiffType.CREATE, dir1)));
 
   }
 
-  private SnapshotDiffReport getSnapDiffReport(String volume,
+  private SnapshotDiffReportOzone getSnapDiffReport(String volume,
                                                String bucket,
                                                String fromSnapshot,
                                                String toSnapshot)
@@ -683,7 +687,7 @@ public class TestOmSnapshot {
     createFileKey(bucket2, key1);
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucketName1, snap2);
-    SnapshotDiffReport diff1 =
+    SnapshotDiffReportOzone diff1 =
         getSnapDiffReport(volume, bucketName1, snap1, snap2);
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
@@ -730,7 +734,7 @@ public class TestOmSnapshot {
     String snap2 = "snap" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
-    SnapshotDiffReport diff1 =
+    SnapshotDiffReportOzone diff1 =
         store.snapshotDiff(volumeName1, bucketName1, snap1, snap2,
                 null, 0, false)
             .getSnapshotDiffReport();

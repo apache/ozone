@@ -161,6 +161,55 @@ public class TestClosingContainerHandler {
     assertAndVerify(request, true, 1);
   }
 
+  @Test
+  public void testClosingContainerStateIsNotUpdatedWhenThereAreReplicas() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 0, 0);
+    ContainerReplica openReplica = ReplicationTestUtil.createContainerReplica(
+        containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE,
+        ContainerReplicaProto.State.OPEN);
+    containerReplicas.add(openReplica);
+
+    ReplicationManagerReport report = new ReplicationManagerReport();
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    assertAndVerify(request, true, 3);
+    report.getStats().forEach((k, v) -> Assertions.assertEquals(0L, v));
+  }
+
+  @Test
+  public void testClosingContainerStateIsUpdatedWhenThereAreNotReplicas() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    assertAndVerify(request, true, 0);
+    report.getStats().forEach((k, v) -> {
+      if (k.equals("MISSING")) {
+        Assertions.assertEquals(1L, v);
+      } else {
+        Assertions.assertEquals(0L, v);
+      }
+    });
+  }
+
   /**
    * Close commands should be sent for Open or Closing replicas.
    */
