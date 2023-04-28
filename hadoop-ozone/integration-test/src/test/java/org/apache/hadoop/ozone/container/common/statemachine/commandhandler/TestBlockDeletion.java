@@ -187,7 +187,6 @@ public class TestBlockDeletion {
 
   @ParameterizedTest
   @MethodSource("replicationConfigs")
-  @Flaky("HDDS-8458")
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -247,16 +246,19 @@ public class TestBlockDeletion {
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
-    // The blocks should be deleted in the DN.
+    // If any container present as not closed, i.e. matches some entry 
+    // not closed, then return false for wait
     GenericTestUtils.waitFor(() -> {
-      return !(omKeyLocationInfoGroupList.stream().filter((group) -> 
-        group.getLocationList().stream().filter(
-            (info) -> cluster.getHddsDatanodes().get(0)
-                .getDatanodeStateMachine().getContainer().getContainerSet()
-                .getContainer(info.getContainerID()).getContainerData()
-                .getState() != ContainerProtos.ContainerDataProto.State.CLOSED)
-            .findFirst().isPresent()
-      ).findFirst().isPresent());
+      return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
+        group.getLocationList().stream().anyMatch((info) -> {
+          ContainerData containerData = cluster.getHddsDatanodes().get(0)
+              .getDatanodeStateMachine().getContainer().getContainerSet()
+              .getContainer(info.getContainerID()).getContainerData();
+          // wait till container is closed, if any not closed, return those
+          return containerData.getState()
+            != ContainerProtos.ContainerDataProto.State.CLOSED;
+        })
+      ));
     }, 1000, 30000);
     
     // The blocks should be deleted in the DN.
