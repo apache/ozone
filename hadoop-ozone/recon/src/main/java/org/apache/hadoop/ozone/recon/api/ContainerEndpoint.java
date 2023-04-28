@@ -435,8 +435,6 @@ public class ContainerEndpoint {
       Map<Long, ContainerMetadata> omContainers =
           reconContainerMetadataManager.getContainers(-1, -1);
       List<Long> scmAllContainers = containerManager.getContainers().stream()
-          .filter(containerInfo -> !(containerInfo.getState() ==
-              HddsProtos.LifeCycleState.DELETED))
           .map(containerInfo -> containerInfo.getContainerID()).collect(
               Collectors.toList());
       List<Long> scmNonDeletedContainers =
