@@ -248,16 +248,14 @@ public class TestBlockDeletion {
 
     // If any container present as not closed, i.e. matches some entry 
     // not closed, then return false for wait
+    ContainerSet containerSet = cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) -> {
-          ContainerData containerData = cluster.getHddsDatanodes().get(0)
-              .getDatanodeStateMachine().getContainer().getContainerSet()
-              .getContainer(info.getContainerID()).getContainerData();
-          // wait till container is closed, if any not closed, return those
-          return containerData.getState()
-            != ContainerProtos.ContainerDataProto.State.CLOSED;
-        })
+        group.getLocationList().stream().anyMatch((info) -> 
+          containerSet.getContainer(info.getContainerID()).getContainerData()
+              .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
+        )
       ));
     }, 1000, 30000);
     
