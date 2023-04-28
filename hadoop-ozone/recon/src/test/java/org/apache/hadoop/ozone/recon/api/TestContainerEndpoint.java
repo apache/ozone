@@ -108,7 +108,6 @@ public class TestContainerEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
@@ -175,8 +174,6 @@ public class TestContainerEndpoint {
 
     ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    reconStorageContainerManager =
-        reconTestInjector.getInstance(ReconStorageContainerManagerFacade.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
     reconPipelineManager = (ReconPipelineManager)
