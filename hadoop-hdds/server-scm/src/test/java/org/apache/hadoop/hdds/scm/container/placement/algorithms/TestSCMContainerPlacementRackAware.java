@@ -588,4 +588,213 @@ public class TestSCMContainerPlacementRackAware {
       dnInfos.get(index).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
     }
   }
+
+  @ParameterizedTest
+  @ValueSource(ints = {NODE_PER_RACK + 1, 2 * NODE_PER_RACK + 1})
+  public void chooseNodeWithUsedNodesMultipleRack(int datanodeCount)
+      throws SCMException {
+    assumeTrue(datanodeCount > NODE_PER_RACK);
+    setup(datanodeCount);
+    int nodeNum = 1;
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+
+    // 2 replicas, two existing datanodes on same rack
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // New DN should be on different rack than DN0 & DN1
+    Assertions.assertTrue(!cluster.isSameParent(
+        datanodes.get(0), datanodeDetails.get(0)) &&
+        !cluster.isSameParent(datanodes.get(1), datanodeDetails.get(0)));
+
+    // 2 replicas, two existing datanodes on different rack
+    usedNodes.clear();
+    // 1st Replica on rack0
+    usedNodes.add(datanodes.get(0));
+    // 2nd Replica on rack1
+    usedNodes.add(datanodes.get(5));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // New replica should be either on rack0 or rack1
+    Assertions.assertTrue(cluster.isSameParent(
+        datanodes.get(0), datanodeDetails.get(0)) ||
+        cluster.isSameParent(datanodes.get(5), datanodeDetails.get(0)));
+  }
+
+  @Test
+  public void chooseSingleNodeRackWithUsedAndExcludeNodes()
+      throws SCMException {
+    int datanodeCount = 5;
+    setup(datanodeCount);
+    int nodeNum = 1;
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+
+    // 2 replicas, two existing datanodes on same rack
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+    excludedNodes.add(datanodes.get(2));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    Assertions.assertTrue(cluster.isSameParent(
+        datanodes.get(0), datanodeDetails.get(0)) &&
+        cluster.isSameParent(datanodes.get(1), datanodeDetails.get(0)) &&
+        excludedNodes.get(0).getUuid() != datanodeDetails.get(0).getUuid());
+
+    // Required 2 DN for 2 replica
+    nodeNum = 2;
+    // One replica exist
+    usedNodes.clear();
+    // 1st Replica on rack0
+    usedNodes.add(datanodes.get(0));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() &&
+        excludedNodes.get(0).getUuid() != datanodeDetails.get(1).getUuid());
+
+    nodeNum = 3;
+    // No replica exist
+    usedNodes.clear();
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() &&
+        excludedNodes.get(0).getUuid() != datanodeDetails.get(1).getUuid());
+  }
+
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithUsedAndExcludeNodesMultipleRack(int datanodeCount)
+      throws SCMException {
+    assumeTrue(datanodeCount > NODE_PER_RACK);
+    setup(datanodeCount);
+    int nodeNum = 2;
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+
+    // 1 replica
+    usedNodes.add(datanodes.get(0));
+    // 1 exclude node
+    excludedNodes.add(datanodes.get(1));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Exclude node should not be returned
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(1).getUuid());
+
+    usedNodes.clear();
+    excludedNodes.clear();
+    // 1 replica
+    // Multiple exclude nodes
+    usedNodes.add(datanodes.get(0));
+    excludedNodes.add(datanodes.get(1));
+    excludedNodes.add(datanodes.get(2));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        excludedNodes, null, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
+        datanodeDetails.get(0).getUuid());
+
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(1).getUuid() && excludedNodes.get(1).getUuid() !=
+        datanodeDetails.get(1).getUuid());
+  }
+
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithOnlyExcludeAndNoUsedNodes(int datanodeCount)
+      throws SCMException {
+    assumeTrue(datanodeCount > NODE_PER_RACK);
+    setup(datanodeCount);
+    int nodeNum = 3;
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+    // 1 exclude node
+    excludedNodes.add(datanodes.get(1));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(null,
+        excludedNodes, null, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Exclude node should not be returned
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(1).getUuid());
+
+    excludedNodes.clear();
+    // Multiple exclude nodes
+    excludedNodes.add(datanodes.get(1));
+    excludedNodes.add(datanodes.get(2));
+
+    datanodeDetails = policy.chooseDatanodes(null,
+        excludedNodes, null, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Exclude node should not be returned
+    Assertions.assertTrue(excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
+        datanodeDetails.get(1).getUuid());
+
+    Assertions.assertTrue(excludedNodes.get(1).getUuid() !=
+        datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
+        datanodeDetails.get(1).getUuid());
+  }
+  @ParameterizedTest
+  @ValueSource(ints = {11, 12, 13, 14, 15})
+  public void testNoFallbackWithUsedNodes(int datanodeCount) {
+    assumeTrue(datanodeCount > (NODE_PER_RACK * 2) &&
+        (datanodeCount <= NODE_PER_RACK * 3));
+    setup(datanodeCount);
+
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    usedNodes.add(datanodes.get(0));
+
+    // 5 replicas. there are only 3 racks. policy prohibit fallback should fail.
+    int nodeNum = 5;
+    try {
+      policyNoFallback.chooseDatanodes(usedNodes, null, null, nodeNum, 0, 15);
+      fail("Fallback prohibited, this call should fail");
+    } catch (Exception e) {
+      assertEquals("SCMException", e.getClass().getSimpleName());
+    }
+
+    // get metrics
+    long totalRequest = metrics.getDatanodeRequestCount();
+    long successCount = metrics.getDatanodeChooseSuccessCount();
+    long tryCount = metrics.getDatanodeChooseAttemptCount();
+    long compromiseCount = metrics.getDatanodeChooseFallbackCount();
+
+    Assertions.assertEquals(nodeNum, totalRequest);
+    Assertions.assertTrue(successCount >= 1, "Not enough success count");
+    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    Assertions.assertEquals(0, compromiseCount);
+  }
 }
