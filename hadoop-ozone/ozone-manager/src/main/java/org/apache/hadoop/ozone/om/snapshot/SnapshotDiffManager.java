@@ -230,8 +230,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
 
     this.snapshotForceFullDiff = ozoneManager.getConfiguration().getBoolean(
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
+        OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+        OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
   }
 
   private boolean initSSTDumpTool(OzoneConfiguration conf) {
@@ -380,13 +380,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     case IN_PROGRESS:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), IN_PROGRESS, defaultWaitTime);
+              fromSnapshot, toSnapshot, new ArrayList<>(), null),
+          IN_PROGRESS, defaultWaitTime);
     case FAILED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), FAILED, defaultWaitTime);
+              fromSnapshot, toSnapshot, new ArrayList<>(), null),
+          FAILED, defaultWaitTime);
     case DONE:
       SnapshotDiffReportOzone report =
           createPageResponse(snapDiffJob.getJobId(), volume, bucket,
@@ -463,7 +463,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(),
               volume, bucket, fromSnapshot, toSnapshot, new ArrayList<>(),
-              new ArrayList<>(), null), REJECTED, defaultWaitTime);
+              null), REJECTED, defaultWaitTime);
     }
 
     // Check again that request is still in queued status. If it is not queued,
@@ -686,7 +686,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Map<String, String> tablePrefixes,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-      final PersistentSet<byte[]> objectIDsToCheck
+      final PersistentSet<byte[]> objectIDsToCheck,
       final String diffDir 
   ) throws IOException, RocksDBException {
 
@@ -798,6 +798,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     return keyInfo.getKeyName();
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
                                     OmSnapshot toSnapshot,
                                     List<String> tablesToLookUp,
