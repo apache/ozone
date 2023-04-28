@@ -26,11 +26,12 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Un
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 
 /**
@@ -53,17 +54,6 @@ public class TestUnderReplicatedProcessor {
 
     // use real queue
     queue = new ReplicationQueue();
-    Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
-        .thenAnswer(inv -> queue.dequeueUnderReplicatedContainer());
-    ArgumentCaptor<UnderReplicatedHealthResult> captor =
-        ArgumentCaptor.forClass(UnderReplicatedHealthResult.class);
-    Mockito.doAnswer(inv -> {
-      queue.enqueue(captor.getValue());
-      return null;
-    })
-        .when(replicationManager)
-        .requeueUnderReplicatedContainer(captor.capture());
-
     repConfig = new ECReplicationConfig(3, 2);
     underReplicatedProcessor = new UnderReplicatedProcessor(
         replicationManager, rmConf.getUnderReplicatedInterval());
@@ -81,26 +71,26 @@ public class TestUnderReplicatedProcessor {
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenReturn(1);
-    underReplicatedProcessor.processAll();
+    underReplicatedProcessor.processAll(queue);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueUnderReplicatedContainer(any());
+    assertEquals(0, queue.underReplicatedQueueSize());
   }
 
   @Test
   public void testMessageRequeuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    queue.enqueue(new UnderReplicatedHealthResult(
-            container, 3, false, false, false));
+    UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
+        container, 3, false, false, false);
+    queue.enqueue(result);
 
     Mockito.when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"))
         .thenThrow(new AssertionError("Should process only one item"));
-    underReplicatedProcessor.processAll();
+    underReplicatedProcessor.processAll(queue);
 
-    Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueUnderReplicatedContainer(any());
+    assertEquals(1, queue.underReplicatedQueueSize());
+    assertSame(result, queue.dequeueUnderReplicatedContainer());
   }
 }

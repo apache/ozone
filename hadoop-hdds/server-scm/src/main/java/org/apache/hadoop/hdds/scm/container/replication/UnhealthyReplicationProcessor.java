@@ -50,20 +50,19 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
   }
 
   /**
-   * Read messages from the respective queue from ReplicationManager
+   * Read messages from the respective replication queue
    * for processing the health result.
-   * @return next HealthResult from the replication manager
+   * @return next HealthResult from the replication queue
    */
   protected abstract HealthResult dequeueHealthResultFromQueue(
-          ReplicationManager rm);
+          ReplicationQueue queue);
 
   /**
    * Requeue HealthResult to ReplicationManager
    * for reprocessing the health result.
-   * @return next HealthResult from the replication manager
    */
-  protected abstract void requeueHealthResultFromQueue(
-          ReplicationManager rm, HealthResult healthResult);
+  protected abstract void requeueHealthResult(
+          ReplicationQueue queue, HealthResult healthResult);
 
   /**
    * Read messages from the ReplicationManager under replicated queue and,
@@ -74,7 +73,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
    * version will need to limit the amount of messages assigned to each
    * datanode, so they are not assigned too much work.
    */
-  public void processAll() {
+  public void processAll(ReplicationQueue queue) {
     int processed = 0;
     int failed = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
@@ -85,7 +84,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         break;
       }
       HealthResult healthResult =
-              dequeueHealthResultFromQueue(replicationManager);
+              dequeueHealthResultFromQueue(queue);
       if (healthResult == null) {
         break;
       }
@@ -103,8 +102,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
       }
     }
 
-    failedOnes.forEach(result ->
-        requeueHealthResultFromQueue(replicationManager, result));
+    failedOnes.forEach(result -> requeueHealthResult(queue, result));
 
     if (processed > 0 || failed > 0) {
       LOG.info("Processed {} containers with health state counts {}, " +
@@ -133,7 +131,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     try {
       while (!Thread.currentThread().isInterrupted()) {
         if (replicationManager.shouldRun()) {
-          processAll();
+          processAll(replicationManager.getQueue());
         }
         synchronized (this) {
           if (!runImmediately) {
