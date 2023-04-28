@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -120,7 +119,6 @@ public class TestContainerEndpoint {
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ContainerID containerID = ContainerID.valueOf(1L);
-  private DBStore scmDBStore;
   private Pipeline pipeline;
   private PipelineID pipelineID;
   private long keyCount = 5L;
@@ -192,7 +190,6 @@ public class TestContainerEndpoint {
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
-    scmDBStore = reconStorageContainerManager.getScmDBStore();
     containerStateManager = reconContainerManager
         .getContainerStateManager();
   }

@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -68,9 +67,7 @@ public class TestBlocksEndPoint {
 
   private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private ReconContainerManager reconContainerManager;
-  private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
-  private ContainerEndpoint containerEndpoint;
   private BlocksEndPoint blocksEndPoint;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -105,10 +102,7 @@ public class TestBlocksEndPoint {
         reconStorageContainerManager.getPipelineManager();
     blocksEndPoint = reconTestInjector.getInstance(
         BlocksEndPoint.class);
-    containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     scmDBStore = reconStorageContainerManager.getScmDBStore();
-    containerStateManager = reconContainerManager
-        .getContainerStateManager();
   }
 
   @Before
