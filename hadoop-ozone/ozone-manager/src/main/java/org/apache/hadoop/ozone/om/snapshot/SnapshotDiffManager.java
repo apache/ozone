@@ -27,7 +27,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,7 +58,6 @@ import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -91,6 +89,12 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.SynchronousQueue;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -124,11 +128,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final LoadingCache<String, OmSnapshot> snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
-
   // TODO: [SNAPSHOT] Use different wait time based of job status.
-  private static final Duration DEFAULT_WAIT_TIME = Duration.ofSeconds(1);
-  // TODO: [SNAPSHOT] Move this to config file.
-  private static final int DEFAULT_THREAD_POOL_SIZE = 10;
+  private final long defaultWaitTime;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -173,6 +174,16 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.snapshotCache = snapshotCache;
     this.familyOptions = familyOptions;
     this.codecRegistry = codecRegistry;
+    this.defaultWaitTime = ozoneManager.getConfiguration().getTimeDuration(
+        OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME,
+        OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS
+    );
+
+    int threadPoolSize = ozoneManager.getConfiguration().getInt(
+        OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
+        OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT
+    );
 
     this.snapDiffJobTable = new RocksDbPersistentMap<>(db,
         snapDiffJobCfh,
@@ -186,11 +197,11 @@ public class SnapshotDiffManager implements AutoCloseable {
         byte[].class,
         byte[].class);
 
-    this.executorService = new ThreadPoolExecutor(DEFAULT_THREAD_POOL_SIZE,
-        DEFAULT_THREAD_POOL_SIZE,
+    this.executorService = new ThreadPoolExecutor(threadPoolSize,
+        threadPoolSize,
         0,
         TimeUnit.SECONDS,
-        new ArrayBlockingQueue<>(DEFAULT_THREAD_POOL_SIZE)
+        new ArrayBlockingQueue<>(threadPoolSize)
     );
 
     Path path = Paths.get(differ.getMetadataDir(), "snapDiff");
@@ -365,12 +376,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+              null), IN_PROGRESS, defaultWaitTime);
     case FAILED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), FAILED, DEFAULT_WAIT_TIME.toMillis());
+              null), FAILED, defaultWaitTime);
     case DONE:
       SnapshotDiffReportOzone report =
           createPageResponse(snapDiffJob.getJobId(), volume, bucket,
@@ -450,7 +461,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(),
               volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
-              new ArrayList<>(), null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+              new ArrayList<>(), null), REJECTED, defaultWaitTime);
     }
 
     // Check again that request is still in queued status. If it is not queued,
@@ -467,7 +478,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         return new SnapshotDiffResponse(
             new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
                 fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-                null), snapDiffJob.getStatus(), DEFAULT_WAIT_TIME.toMillis());
+                null), snapDiffJob.getStatus(), defaultWaitTime);
       }
     }
 
@@ -505,7 +516,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), IN_PROGRESS, DEFAULT_WAIT_TIME.toMillis());
+              null), IN_PROGRESS, defaultWaitTime);
     } catch (RejectedExecutionException exception) {
       // Remove the entry from job table so that client can retry.
       // If entry is not removed, client has to wait till cleanup service
@@ -513,11 +524,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       // before the cleanup kicks in.
       snapDiffJobTable.remove(jobKey);
       LOG.info("Exceeded the snapDiff parallel requests progressing " +
-          "limit. Please retry after {}.", DEFAULT_WAIT_TIME);
+          "limit. Please retry after {}.", defaultWaitTime);
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
               fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), REJECTED, DEFAULT_WAIT_TIME.toMillis());
+              null), REJECTED, defaultWaitTime);
     }
   }
 
@@ -605,8 +616,8 @@ public class SnapshotDiffManager implements AutoCloseable {
           toSnapshot.getMetadataManager().getKeyTable(bucketLayout);
 
       boolean useFullDiff = ozoneManager.getConfiguration().getBoolean(
-          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
-          OzoneConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
+          OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
+          OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
       if (forceFullDiff) {
         useFullDiff = true;
       }

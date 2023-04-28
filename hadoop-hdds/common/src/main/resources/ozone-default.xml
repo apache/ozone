@@ -3683,12 +3683,87 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.cache.max.size</name>
+    <value>10</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of entries allowed in the snapshot cache.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.force.full.diff</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
     <description>
-      If true, snapshot diff will always perform full diff (can be slow)
-      without using the optimised DAG based pruning approach
+      Flag to always perform full snapshot diff (can be slow) without using the optimised compaction DAG.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.max.page.size</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+       Maximum number of entries to be returned in a single page of snap diff report.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.thread.pool.size</name>
+    <value>10</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum numbers of concurrent snapshot diff jobs are allowed.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.job.default.wait.time</name>
+    <value>1m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Default wait time returned to client to wait before retrying snap diff request.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.max.jobs.purge.per.task</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of snapshot diff jobs to be purged per snapDiff clean up run.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.job.report.persistent.time</name>
+    <value>7d</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum time a successful snapshot diff job and its report will be persisted.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
+    <value>60m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval at which snapshot diff clean up service will run.
+      Uses millisecond by default when no time unit is specified.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.cleanup.service.timeout</name>
+    <value>5m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Timeout for snapshot diff clean up service.
+      Uses millisecond by default when no time unit is specified.
     </description>
   </property>
 
@@ -3707,14 +3782,6 @@
     <tag>OZONE, OM</tag>
     <description>
       Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.snapdiff.max.page.size</name>
-    <value>1000</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Maximum number of entries that a single snapDiff RPC would return.
     </description>
   </property>
 </configuration>
