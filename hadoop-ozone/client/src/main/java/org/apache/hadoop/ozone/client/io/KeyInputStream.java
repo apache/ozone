@@ -74,6 +74,17 @@ public class KeyInputStream extends MultipartInputStream {
       // BlockInputStream is only created here and not initialized. The
       // BlockInputStream is initialized when a read operation is performed on
       // the block for the first time.
+      Function<BlockID, BlockLocationInfo> retry;
+      if (retryFunction != null) {
+        retry = keyBlockID -> {
+          OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
+          return getBlockLocationInfo(newKeyInfo,
+              omKeyLocationInfo.getBlockID());
+        };
+      } else {
+        retry = null;
+      }
+
       BlockExtendedInputStream stream =
           blockStreamFactory.create(
               keyInfo.getReplicationConfig(),
@@ -82,11 +93,7 @@ public class KeyInputStream extends MultipartInputStream {
               omKeyLocationInfo.getToken(),
               verifyChecksum,
               xceiverClientFactory,
-              keyBlockID -> {
-                OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
-                return getBlockLocationInfo(newKeyInfo,
-                    omKeyLocationInfo.getBlockID());
-              });
+              retry);
       partStreams.add(stream);
     }
     return partStreams;

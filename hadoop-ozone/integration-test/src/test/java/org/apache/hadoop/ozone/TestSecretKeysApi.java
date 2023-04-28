@@ -85,7 +85,7 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(1600);
+  public Timeout timeout = Timeout.seconds(180);
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -94,7 +94,6 @@ public final class TestSecretKeysApi {
   private File spnegoKeytab;
   private File testUserKeytab;
   private String testUserPrincipal;
-  private String host;
   private String clusterId;
   private String scmId;
   private MiniOzoneHAClusterImpl cluster;
@@ -146,7 +145,7 @@ public final class TestSecretKeysApi {
 
   private void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
         .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
