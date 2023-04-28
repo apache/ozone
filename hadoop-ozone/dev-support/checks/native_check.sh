@@ -36,12 +36,12 @@ function init_native_maven_opts() {
     echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
     mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
 
-    EXPECTED_ROCKS_NATIVE_VERSION_EXISTS=$?
-    if [[ "${EXPECTED_ROCKS_NATIVE_VERSION_EXISTS}" == "0" ]]; then
-      echo "Build using hdds-rocks-native version: ${EXPECTED_ROCKS_NATIVE_VERSION}"
+    MVN_GET_ROCKS_NATIVE_EXIT_CODE=$?
+    if [[ "${MVN_GET_ROCKS_NATIVE_EXIT_CODE}" == "0" ]]; then
+      echo "Using existing hdds-rocks-native artifact version: ${EXPECTED_ROCKS_NATIVE_VERSION}"
       NATIVE_MAVEN_OPTIONS="-Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
     else
-      echo "Building hdds-rocks-native module as version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found"
+      echo "Building hdds-rocks-native from scratch as version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found in the given Maven repos"
       NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
     fi
     readonly NATIVE_MAVEN_OPTIONS

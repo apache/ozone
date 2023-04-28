@@ -27,7 +27,7 @@ else
 fi
 
 if [[ "${CANCEL_NATIVE_VERSION_CHECK}" != "true" ]]; then
-        NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
+  NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
   . "$DIR/native_check.sh"
   init_native_maven_opts
   MAVEN_OPTIONS="${MAVEN_OPTIONS} ${NATIVE_MAVEN_OPTIONS}"
