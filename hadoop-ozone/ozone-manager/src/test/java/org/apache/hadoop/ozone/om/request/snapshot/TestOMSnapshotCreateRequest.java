@@ -320,8 +320,8 @@ public class TestOMSnapshotCreateRequest {
 
   private void renameKey(String fromKey, String toKey, long offset)
       throws IOException {
-    OmKeyInfo toKeyInfo = addKey(fromKey, offset + 1L);
-    OmKeyInfo fromKeyInfo = addKey(toKey, offset + 2L);
+    OmKeyInfo toKeyInfo = addKey(toKey, offset + 1L);
+    OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 2L);
 
     OMResponse omResponse = OMResponse
         .newBuilder()
@@ -345,8 +345,8 @@ public class TestOMSnapshotCreateRequest {
         bucketName, fromKeyParentName, HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE, 100L);
 
-    OmKeyInfo toKeyInfo = addKey(fromKey, offset + 4L);
-    OmKeyInfo fromKeyInfo = addKey(toKey, offset + 5L);
+    OmKeyInfo toKeyInfo = addKey(toKey, offset + 4L);
+    OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 5L);
     OMResponse omResponse = OMResponse
         .newBuilder()
         .setRenameKeyResponse(
