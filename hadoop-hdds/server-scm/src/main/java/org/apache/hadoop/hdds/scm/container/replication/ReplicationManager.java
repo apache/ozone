@@ -82,6 +82,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -172,8 +173,8 @@ public class ReplicationManager implements SCMService {
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
   private final EventPublisher eventPublisher;
-  private final ReentrantLock lock = new ReentrantLock();
-  private ReplicationQueue replicationQueue;
+  private final AtomicReference<ReplicationQueue> replicationQueue
+      = new AtomicReference<>(new ReplicationQueue());
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final ECMisReplicationHandler ecMisReplicationHandler;
@@ -237,7 +238,6 @@ public class ReplicationManager implements SCMService {
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
-    this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
@@ -386,48 +386,11 @@ public class ReplicationManager implements SCMService {
       }
     }
     report.setComplete();
-    lock.lock();
-    try {
-      replicationQueue = newRepQueue;
-    } finally {
-      lock.unlock();
-    }
+    replicationQueue.set(newRepQueue);
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
-  }
-
-  /**
-   * Retrieve the new highest priority container to be replicated from the
-   * under replicated queue.
-   * @return The new underReplicated container to be processed, or null if the
-   *         queue is empty.
-   */
-  public ContainerHealthResult.UnderReplicatedHealthResult
-      dequeueUnderReplicatedContainer() {
-    lock.lock();
-    try {
-      return replicationQueue.dequeueUnderReplicatedContainer();
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
-   * Retrieve the new highest priority container to be replicated from the
-   * under replicated queue.
-   * @return The next over-replicated container to be processed, or null if the
-   *         queue is empty.
-   */
-  public ContainerHealthResult.OverReplicatedHealthResult
-      dequeueOverReplicatedContainer() {
-    lock.lock();
-    try {
-      return replicationQueue.dequeueOverReplicatedContainer();
-    } finally {
-      lock.unlock();
-    }
   }
 
   public void sendCloseContainerEvent(ContainerID containerID) {
@@ -757,42 +720,6 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-
-  /**
-   * Add an under replicated container back to the queue if it was unable to
-   * be processed. Its retry count will be incremented before it is re-queued,
-   * reducing its priority.
-   * Note that the queue could have been rebuilt and replaced after this
-   * message was removed but before it is added back. This will result in a
-   * duplicate entry on the queue. However, when it is processed again, the
-   * result of the processing will end up with pending replicas scheduled. If
-   * instance 1 is processed and creates the pending replicas, when instance 2
-   * is processed, it will find the pending containers and know it has no work
-   * to do, and be discarded. Additionally, the queue will be refreshed
-   * periodically removing any duplicates.
-   * @param underReplicatedHealthResult
-   */
-  public void requeueUnderReplicatedContainer(ContainerHealthResult
-      .UnderReplicatedHealthResult underReplicatedHealthResult) {
-    underReplicatedHealthResult.incrementRequeueCount();
-    lock.lock();
-    try {
-      replicationQueue.enqueue(underReplicatedHealthResult);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  public void requeueOverReplicatedContainer(ContainerHealthResult
-      .OverReplicatedHealthResult overReplicatedHealthResult) {
-    lock.lock();
-    try {
-      replicationQueue.enqueue(overReplicatedHealthResult);
-    } finally {
-      lock.unlock();
-    }
-  }
-
   int processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
@@ -1084,6 +1011,10 @@ public class ReplicationManager implements SCMService {
     default:
       return false;
     }
+  }
+
+  ReplicationQueue getQueue() {
+    return replicationQueue.get();
   }
 
   /**
