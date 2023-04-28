@@ -18,15 +18,12 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
-import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 
@@ -47,92 +44,27 @@ import java.util.Map;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
 /**
- * Endpoint to get following information about containers and blocks under SCM
- * DB Insight page of Recon.
- * 1. Number of DELETED containers.
- * 2. Number of blocks pending deletion.
+ * Endpoint to get following information about blocks metadata.
+ * Number of blocks pending deletion.
  *     - Blocks pending deletion for open/closing containers.
  *     - Blocks pending deletion for closed containers.
  */
-@Path("/containers")
+@Path("/blocks")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
-public class SCMDBInsightEndPoint {
+public class BlocksEndPoint {
   private final DBStore scmDBStore;
   private final ReconContainerManager containerManager;
 
   @Inject
-  public SCMDBInsightEndPoint(ReconStorageContainerManagerFacade reconSCM) {
+  public BlocksEndPoint(ReconStorageContainerManagerFacade reconSCM) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.scmDBStore = reconSCM.getScmDBStore();
-  }
-
-  /**
-   * This API will return all DELETED containers in SCM in below JSON format.
-   * {
-   * containers: [
-   * {
-   *  containerId: 1,
-   *  state: DELETED,
-   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-   *  numOfKeys: 3,
-   *  inStateSince: <stateEnterTime>
-   * },
-   * {
-   *  containerId: 2,
-   *  state: DELETED,
-   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-   *  numOfKeys: 6,
-   *  inStateSince: <stateEnterTime>
-   * }
-   * ]
-   * }
-   * @param limit limits the number of deleted containers
-   * @param prevKey previous container Id to skip
-   * @return Response of delete containers.
-   */
-  @GET
-  @Path("/deletedContainers")
-  public Response getSCMDeletedContainers(
-      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-      int limit,
-      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
-      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
-    List<DeletedContainerInfo> deletedContainerInfoList = new ArrayList<>();
-    try {
-      List<ContainerInfo> containers =
-          containerManager.getContainers(ContainerID.valueOf(prevKey), limit,
-              HddsProtos.LifeCycleState.DELETED);
-      containers.forEach(containerInfo -> {
-        DeletedContainerInfo deletedContainerInfo = new DeletedContainerInfo();
-        deletedContainerInfo.setContainerID(containerInfo.getContainerID());
-        deletedContainerInfo.setPipelineID(containerInfo.getPipelineID());
-        deletedContainerInfo.setNumberOfKeys(containerInfo.getNumberOfKeys());
-        deletedContainerInfo.setContainerState(containerInfo.getState().name());
-        deletedContainerInfo.setStateEnterTime(
-            containerInfo.getStateEnterTime().toEpochMilli());
-        deletedContainerInfo.setLastUsed(
-            containerInfo.getLastUsed().toEpochMilli());
-        deletedContainerInfo.setUsedBytes(containerInfo.getUsedBytes());
-        deletedContainerInfo.setReplicationConfig(
-            containerInfo.getReplicationConfig());
-        deletedContainerInfo.setReplicationFactor(
-            containerInfo.getReplicationFactor().name());
-        deletedContainerInfoList.add(deletedContainerInfo);
-      });
-    } catch (IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
-    } catch (Exception ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-    return Response.ok(deletedContainerInfoList).build();
   }
 
   /**
@@ -159,7 +91,7 @@ public class SCMDBInsightEndPoint {
    * @return list of blocks grouped by container state (OPEN/CLOSING/CLOSED)
    */
   @GET
-  @Path("/blocks/deletePending")
+  @Path("/deletePending")
   public Response getBlocksPendingDeletion(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
@@ -188,7 +120,6 @@ public class SCMDBInsightEndPoint {
             deletedBlocksTableIterator.seek(seekKey);
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
-        // In case of prevKey greater than 0, all the keys are returned
         if (seekKeyValue == null) {
           return Response.ok(containerStateBlockInfoListMap).build();
         }
