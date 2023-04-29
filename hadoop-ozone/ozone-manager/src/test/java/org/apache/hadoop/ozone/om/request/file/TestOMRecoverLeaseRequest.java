@@ -41,19 +41,15 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -76,8 +72,11 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   @Test
   public void testRecoverHsyncFile() throws Exception {
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(anyString(), any(IAccessAuthorizer.ACLType.class), any(
-        OzoneObj.ResourceType.class))).thenReturn("user");
+    when(ozoneManager.getVolumeOwner(
+        anyString(),
+        any(IAccessAuthorizer.ACLType.class), any(
+        OzoneObj.ResourceType.class)))
+        .thenReturn("user");
     InetSocketAddress address = new InetSocketAddress("localhost", 10000);
     when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true);
