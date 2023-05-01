@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -194,7 +195,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      RepeatedOmKeyInfo oldKeyVersionsToDelete = null;
+      Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap
+          = new HashMap<>();
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
@@ -229,11 +231,14 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
-        oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(dbOzoneKey,
             keyToDelete, omMetadataManager,
             trxnLogIndex, ozoneManager.isRatisEnabled());
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
+        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+            keyToDelete.getObjectID(), dbOzoneKey);
+        oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -246,11 +251,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
           omKeyInfo);
       if (pseudoKeyInfo != null) {
-        if (oldKeyVersionsToDelete != null) {
-          oldKeyVersionsToDelete.addOmKeyInfo(pseudoKeyInfo);
-        } else {
-          oldKeyVersionsToDelete = new RepeatedOmKeyInfo(pseudoKeyInfo);
-        }
+        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+            trxnLogIndex, dbOzoneKey);
+        oldKeyVersionsToDeleteMap.put(delKeyName,
+            new RepeatedOmKeyInfo(pseudoKeyInfo));
       }
 
       // Add to cache of open key table and key table.
@@ -266,7 +270,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDelete, isHSync);
+          oldKeyVersionsToDeleteMap, isHSync);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

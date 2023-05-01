@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.util.Time;
@@ -248,14 +250,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    List<OmKeyInfo> toDeleteKeyList = ((OMKeyCommitResponse) omClientResponse).
-        getKeysToDelete().cloneOmKeyInfoList();
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyList
+        = ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
 
     // This is the first time to commit key, only the allocated but uncommitted
     // blocks should be deleted.
     Assert.assertEquals(1, toDeleteKeyList.size());
-    Assert.assertEquals(2, toDeleteKeyList.get(0).
-        getKeyLocationVersions().get(0).getLocationList().size());
+    Assert.assertEquals(2, toDeleteKeyList.values().stream().findFirst().get()
+        .cloneOmKeyInfoList().get(0).getKeyLocationVersions().get(0)
+        .getLocationList().size());
 
     // Entry should be deleted from openKey Table.
     omKeyInfo =

@@ -115,7 +115,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
    *  file table (which is in prefix format) and adds the fullKey
    *  into the deletedTable
    * @param keyName     (format: objectId/key)
-   * @param deleteKeyName (format: vol/buck/key)
+   * @param deleteKeyName (format: vol/buck/key/objectId)
    * @param omKeyInfo
    * @throws IOException
    */
