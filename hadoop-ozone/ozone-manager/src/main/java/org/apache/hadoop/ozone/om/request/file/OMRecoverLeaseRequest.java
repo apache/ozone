@@ -90,15 +90,15 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
-        .getRecoverLeaseRequest();
+    OMRequest request = super.preExecute(ozoneManager);
+    RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();
     String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
             keyPath, getBucketLayout());
 
-    return getOmRequest().toBuilder()
+    return request.toBuilder()
         .setRecoverLeaseRequest(
             recoverLeaseRequest.toBuilder()
                 .setKeyName(normalizedKeyPath))
