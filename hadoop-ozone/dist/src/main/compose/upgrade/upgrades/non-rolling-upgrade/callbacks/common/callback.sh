@@ -35,12 +35,26 @@ validate() {
     execute_robot_test "$SCM" -v PREFIX:"$1" ${@:2} upgrade/validate.robot
 }
 
+## @description Validates that if cluster supports snapshot feature.
+## @param Whether the snapshot feature should be supported in cluster.
+## @param All parameters after the first one are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+validate_snapshot_support() {
+  TEST_TAG="snapshot-non-support"
+  if [ "$1" = "true" ];
+  then
+    TEST_TAG="snapshot-support"
+  fi;
+  execute_robot_test --include $TEST_TAG -v ${@:2} upgrade/snapshot.robot
+}
+
 ### CALLBACKS ###
 
 with_old_version() {
   execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
   generate old1
   validate old1
+  validate_snapshot_support false
 }
 
 with_this_version_pre_finalized() {
@@ -52,6 +66,7 @@ with_this_version_pre_finalized() {
 
   generate new1
   validate new1
+  validate_snapshot_support false
 }
 
 with_old_version_downgraded() {
@@ -65,6 +80,7 @@ with_old_version_downgraded() {
   # HDDS-6261: overwrite the same keys again to trigger the precondition check
   # that exists <= 1.1.0 OM
   generate old1 --exclude create-volume-and-bucket
+  validate_snapshot_support false
 }
 
 with_this_version_finalized() {
@@ -75,4 +91,5 @@ with_this_version_finalized() {
 
   generate new2
   validate new2
+  validate_snapshot_support true
 }
