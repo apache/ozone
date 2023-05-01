@@ -85,6 +85,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -465,7 +466,7 @@ public class TestContainerPersistence {
     File container2Dir = metadata2Dir.getParentFile();
 
     Assert.assertTrue(iterator.hasNext());
-    Assert.assertEquals(container2Dir, iterator.next());
+    assertEquals(container2Dir, iterator.next());
 
     container2.delete();
 
@@ -502,7 +503,7 @@ public class TestContainerPersistence {
     // and closed) reports.
     List<StorageContainerDatanodeProtocolProtos.ContainerReplicaProto> reports =
         containerSet.getContainerReport().getReportsList();
-    Assert.assertEquals(10, reports.size());
+    assertEquals(10, reports.size());
     for (StorageContainerDatanodeProtocolProtos.ContainerReplicaProto report :
         reports) {
       long actualContainerID = report.getContainerID();
@@ -634,7 +635,7 @@ public class TestContainerPersistence {
       ChunkBuffer data = chunkManager
           .readChunk(container, blockID, info, getDispatcherContext());
       ChecksumData checksumData = checksum.computeChecksum(data);
-      Assert.assertEquals(info.getChecksumData(), checksumData);
+      assertEquals(info.getChecksumData(), checksumData);
     }
   }
 
@@ -669,10 +670,10 @@ public class TestContainerPersistence {
     chunkManager.writeChunk(container, blockID, info, data,
         getDispatcherContext());
     long bytesUsed = container.getContainerData().getBytesUsed();
-    Assert.assertEquals(datalen, bytesUsed);
+    assertEquals(datalen, bytesUsed);
 
     long bytesWrite = container.getContainerData().getWriteBytes();
-    Assert.assertEquals(datalen * 3, bytesWrite);
+    assertEquals(datalen * 3, bytesWrite);
   }
 
   /**
@@ -722,7 +723,7 @@ public class TestContainerPersistence {
         getBlock(container, blockData.getBlockID());
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
-    Assert.assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+    assertEquals(info.getChecksumData(), readChunk.getChecksumData());
   }
 
   /**
@@ -780,7 +781,44 @@ public class TestContainerPersistence {
         getBlock(container, blockData.getBlockID());
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
-    Assert.assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+    assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+  }
+
+  /**
+   * Make sure old client can put block correctly.
+   * @throws IOException
+   * @throws NoSuchAlgorithmException
+   */
+  @Test
+  public void testPutBlockBackwardCompatible()
+      throws IOException {
+    long testContainerID = getTestContainerID();
+    Container container = addContainer(containerSet, testContainerID);
+
+    BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID);
+    ChunkInfo info = writeChunkHelper(blockID1);
+    BlockData blockData = new BlockData(blockID1);
+    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+    blockData.setBlockCommitSequenceId(3);
+    // emulate old client
+    blockData.setFlag(0);
+    blockManager.putBlock(container, blockData);
+
+    // write a 2nd block
+    info = writeChunkHelper(blockID1);
+    blockData = new BlockData(blockID1);
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+    blockData.setBlockCommitSequenceId(4);
+    // emulate old client
+    blockData.setFlag(0);
+    blockManager.putBlock(container, blockData);
+
+    BlockData readBlockData =
+        blockManager.getBlock(container, blockID1);
+    assertEquals(chunkList.get(0).getLen()*2, readBlockData.getSize());
   }
 
   /**
@@ -811,13 +849,13 @@ public class TestContainerPersistence {
     }
 
     long bytesUsed = container.getContainerData().getBytesUsed();
-    Assert.assertEquals(totalSize, bytesUsed);
+    assertEquals(totalSize, bytesUsed);
     long writeBytes = container.getContainerData().getWriteBytes();
-    Assert.assertEquals(chunkCount * datalen, writeBytes);
+    assertEquals(chunkCount * datalen, writeBytes);
     long readCount = container.getContainerData().getReadCount();
-    Assert.assertEquals(0, readCount);
+    assertEquals(0, readCount);
     long writeCount = container.getContainerData().getWriteCount();
-    Assert.assertEquals(chunkCount, writeCount);
+    assertEquals(chunkCount, writeCount);
 
     BlockData blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkProtoList = new LinkedList<>();
@@ -832,7 +870,7 @@ public class TestContainerPersistence {
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(readBlockData
             .getChunks().size() - 1));
-    Assert.assertEquals(
+    assertEquals(
         lastChunk.getChecksumData(), readChunk.getChecksumData());
   }
 
@@ -857,16 +895,16 @@ public class TestContainerPersistence {
 
     container.update(newMetadata, false);
 
-    Assert.assertEquals(1, containerSet.getContainerMapCopy().size());
+    assertEquals(1, containerSet.getContainerMapCopy().size());
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID));
 
     // Verify in-memory map
     KeyValueContainerData actualNewData = (KeyValueContainerData)
         containerSet.getContainer(testContainerID).getContainerData();
-    Assert.assertEquals("shire_new",
+    assertEquals("shire_new",
         actualNewData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new",
+    assertEquals("bilbo_new",
         actualNewData.getMetadata().get("owner"));
 
     // Verify container data on disk
@@ -875,15 +913,15 @@ public class TestContainerPersistence {
     File newContainerFile = ContainerUtils.getContainerFile(containerBaseDir);
     Assert.assertTrue("Container file should exist.",
         newContainerFile.exists());
-    Assert.assertEquals("Container file should be in same location.",
+    assertEquals("Container file should be in same location.",
         orgContainerFile.getAbsolutePath(),
         newContainerFile.getAbsolutePath());
 
     ContainerData actualContainerData = ContainerDataYaml.readContainerFile(
         newContainerFile);
-    Assert.assertEquals("shire_new",
+    assertEquals("shire_new",
         actualContainerData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new",
+    assertEquals("bilbo_new",
         actualContainerData.getMetadata().get("owner"));
 
 
@@ -893,7 +931,7 @@ public class TestContainerPersistence {
     try {
       container.update(newMetadata, false);
     } catch (StorageContainerException ex) {
-      Assert.assertEquals("Updating a closed container without " +
+      assertEquals("Updating a closed container without " +
           "force option is not allowed. ContainerID: " +
           testContainerID, ex.getMessage());
     }
@@ -906,9 +944,9 @@ public class TestContainerPersistence {
     // Verify in-memory map
     actualNewData = (KeyValueContainerData)
         containerSet.getContainer(testContainerID).getContainerData();
-    Assert.assertEquals("shire_new_1",
+    assertEquals("shire_new_1",
         actualNewData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new_1",
+    assertEquals("bilbo_new_1",
         actualNewData.getMetadata().get("owner"));
 
   }
@@ -939,13 +977,13 @@ public class TestContainerPersistence {
     // List all blocks
     List<BlockData> result = blockManager.listBlock(
         container, 0, 100);
-    Assert.assertEquals(10, result.size());
+    assertEquals(10, result.size());
 
     int index = 0;
     for (int i = index; i < result.size(); i++) {
       BlockData data = result.get(i);
-      Assert.assertEquals(testContainerID, data.getContainerID());
-      Assert.assertEquals(expectedBlocks.get(i).getLocalID(),
+      assertEquals(testContainerID, data.getContainerID());
+      assertEquals(expectedBlocks.get(i).getLocalID(),
           data.getLocalID());
       index++;
     }
@@ -954,9 +992,9 @@ public class TestContainerPersistence {
     long k6 = expectedBlocks.get(6).getLocalID();
     result = blockManager.listBlock(container, k6, 100);
 
-    Assert.assertEquals(4, result.size());
+    assertEquals(4, result.size());
     for (int i = 6; i < 10; i++) {
-      Assert.assertEquals(expectedBlocks.get(i).getLocalID(),
+      assertEquals(expectedBlocks.get(i).getLocalID(),
           result.get(i - 6).getLocalID());
     }
 

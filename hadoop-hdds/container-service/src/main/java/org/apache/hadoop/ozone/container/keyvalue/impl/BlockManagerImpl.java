@@ -214,7 +214,7 @@ public class BlockManagerImpl implements BlockManager {
 
     // if client does not support FLAG_INCREMENTAL_CHUNKS or
     // if the block is new, the BlockData will be stored in its entirety.
-    if ((data.getFlag() & BlockData.FLAG_INCREMENTAL_CHUNKS) != 0 ||
+    if ((data.getFlag() & BlockData.FLAG_INCREMENTAL_CHUNKS) == 0 ||
         existingBlockData == null) {
       blockDataTable.putWithBatch(batch, blockKey, data);
     } else {

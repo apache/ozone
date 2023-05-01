@@ -56,7 +56,7 @@ public class BlockData {
    */
   private long size;
 
-  public static long FLAG_INCREMENTAL_CHUNKS = 0x01;
+  public static final long FLAG_INCREMENTAL_CHUNKS = 0x01;
 
   /**
    * Constructs a BlockData Object.
