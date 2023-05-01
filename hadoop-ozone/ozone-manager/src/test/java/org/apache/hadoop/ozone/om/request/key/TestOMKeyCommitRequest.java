@@ -302,7 +302,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, bucketLayout);
-    String ozoneKey = getOzonePathKey();
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
         .get(bucketKey);
