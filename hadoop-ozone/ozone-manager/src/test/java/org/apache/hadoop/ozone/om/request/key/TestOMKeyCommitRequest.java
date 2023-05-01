@@ -308,14 +308,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         .get(bucketKey);
     long usedBytes = bucketInfo.getUsedBytes();
 
-    performHsyncCommit(ozoneKey,
-        allocatedKeyLocationList.subList(0, 5));
+    performHsyncCommit(allocatedKeyLocationList.subList(0, 5));
     bucketInfo = omMetadataManager.getBucketTable()
         .get(bucketKey);
     long firstCommitUsedBytes = bucketInfo.getUsedBytes();
     Assert.assertEquals(500, firstCommitUsedBytes - usedBytes);
 
-    performHsyncCommit(ozoneKey, allocatedKeyLocationList);
+    performHsyncCommit(allocatedKeyLocationList);
     bucketInfo = omMetadataManager.getBucketTable()
         .get(bucketKey);
     long nextCommitUsedBytes = bucketInfo.getUsedBytes();
@@ -324,7 +323,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
   
   private List<KeyLocation> performHsyncCommit(
-      String ozoneKey, List<KeyLocation> keyLocations) throws Exception {
+      List<KeyLocation> keyLocations) throws Exception {
     // allocated block list
     dataSize = keyLocations.size() * 100;
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
@@ -336,7 +335,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
         .collect(Collectors.toList());
     String openKey = addKeyToOpenKeyTable(allocatedBlockList);
-
+    String ozoneKey = getOzonePathKey();
+    
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
             100L, ozoneManagerDoubleBufferHelper);
