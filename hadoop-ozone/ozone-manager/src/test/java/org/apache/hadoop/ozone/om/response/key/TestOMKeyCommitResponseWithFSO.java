@@ -48,7 +48,8 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
     Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
     if (null != keysToDelete) {
-      String deleteKey = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
+      String deleteKey = omMetadataManager.getOzoneKey(volumeName,
+          bucketName, keyName);
       deleteKeys.getOmKeyInfoList().stream().forEach(e -> deleteKeyMap.put(
           omMetadataManager.getOzoneDeletePathKey(e.getObjectID(), deleteKey),
           new RepeatedOmKeyInfo(e)));
