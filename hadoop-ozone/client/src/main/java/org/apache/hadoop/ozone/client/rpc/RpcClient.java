@@ -430,6 +430,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createVolume(String volumeName, VolumeArgs volArgs)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(volArgs);
     verifyCountsQuota(volArgs.getQuotaInNamespace());
     verifySpaceQuota(volArgs.getQuotaInBytes());
@@ -482,6 +483,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public boolean setVolumeOwner(String volumeName, String owner)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(owner);
     return ozoneManagerClient.setOwner(volumeName, owner);
   }
@@ -489,7 +491,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setVolumeQuota(String volumeName, long quotaInNamespace,
       long quotaInBytes) throws IOException {
-    HddsClientUtils.verifyResourceName(volumeName);
+    verifyVolumeName(volumeName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
     // If the volume is old, we need to remind the user on the client side
@@ -506,6 +508,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneVolume getVolumeDetails(String volumeName)
       throws IOException {
+    verifyVolumeName(volumeName);
     OmVolumeArgs volume = ozoneManagerClient.getVolumeInfo(volumeName);
     return buildOzoneVolume(volume);
   }
@@ -555,6 +558,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void deleteVolume(String volumeName) throws IOException {
+    verifyVolumeName(volumeName);
     ozoneManagerClient.deleteVolume(volumeName);
   }
 
@@ -606,6 +610,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createBucket(String volumeName, String bucketName)
       throws IOException {
+    verifyVolumeName(volumeName);
     // Set acls of current user.
     createBucket(volumeName, bucketName,
         BucketArgs.newBuilder().build());
@@ -702,7 +707,7 @@ public class RpcClient implements ClientProtocol {
 
   private static void verifyVolumeName(String volumeName) throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName);
+      HddsClientUtils.verifyResourceName(volumeName, false);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -866,6 +871,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkNotNull(tenantArgs);
 
     final String volumeName = tenantArgs.getVolumeName();
+    verifyVolumeName(volumeName);
 
     OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
     builder.setTenantId(tenantId);
@@ -1064,6 +1070,7 @@ public class RpcClient implements ClientProtocol {
   public void setBucketVersioning(
       String volumeName, String bucketName, Boolean versioning)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(versioning);
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
@@ -1076,6 +1083,7 @@ public class RpcClient implements ClientProtocol {
   public void setBucketStorageType(
       String volumeName, String bucketName, StorageType storageType)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(storageType);
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
@@ -1087,7 +1095,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException {
-    HddsClientUtils.verifyResourceName(volumeName);
+    verifyVolumeName(volumeName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
@@ -1113,6 +1121,7 @@ public class RpcClient implements ClientProtocol {
   public void setReplicationConfig(
       String volumeName, String bucketName, ReplicationConfig replicationConfig)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(replicationConfig);
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
@@ -1134,6 +1143,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void deleteBucket(
       String volumeName, String bucketName) throws IOException {
+    verifyVolumeName(volumeName);
     ozoneManagerClient.deleteBucket(volumeName, bucketName);
   }
 
@@ -1146,6 +1156,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(
       String volumeName, String bucketName) throws IOException {
+    verifyVolumeName(volumeName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
     return OzoneBucket.newBuilder(conf, this)
@@ -1218,6 +1229,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
+    verifyVolumeName(volumeName);
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
@@ -1274,6 +1286,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata)
       throws IOException {
+    verifyVolumeName(volumeName);
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
@@ -1347,6 +1360,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneInputStream getKey(
       String volumeName, String bucketName, String keyName)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(keyName);
     OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, false);
     return getInputStreamWithRetryFunction(keyInfo);
@@ -1360,7 +1374,8 @@ public class RpcClient implements ClientProtocol {
 
     Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> > result
         = new LinkedHashMap<>();
-
+    
+    verifyVolumeName(volumeName);
     OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, true);
     List<OmKeyLocationInfo> keyLocationInfos
         = keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
@@ -1428,6 +1443,7 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(keyName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1452,6 +1468,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
+    verifyVolumeName(volumeName);
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(toKeyName);
     }
@@ -1468,6 +1485,7 @@ public class RpcClient implements ClientProtocol {
   @Deprecated
   public void renameKeys(String volumeName, String bucketName,
                          Map<String, String> keyMap) throws IOException {
+    verifyVolumeName(volumeName);
     HddsClientUtils.checkNotNull(keyMap);
     OmRenameKeys omRenameKeys =
         new OmRenameKeys(volumeName, bucketName, keyMap, null);
@@ -1630,6 +1648,7 @@ public class RpcClient implements ClientProtocol {
       String keyName,
       ReplicationConfig replicationConfig)
       throws IOException {
+    verifyVolumeName(volumeName);
     HddsClientUtils.checkNotNull(keyName);
     if (omVersion
         .compareTo(OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT) < 0) {
@@ -1660,6 +1679,7 @@ public class RpcClient implements ClientProtocol {
                                               int partNumber,
                                               String uploadID)
       throws IOException {
+    verifyVolumeName(volumeName);
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
@@ -1711,6 +1731,7 @@ public class RpcClient implements ClientProtocol {
       int partNumber,
       String uploadID)
       throws IOException {
+    verifyVolumeName(volumeName);
     if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
@@ -1768,6 +1789,7 @@ public class RpcClient implements ClientProtocol {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(
       String volumeName, String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap) throws IOException {
+    verifyVolumeName(volumeName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -1807,6 +1829,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneMultipartUploadPartListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException {
+    verifyVolumeName(volumeName);
     HddsClientUtils.checkNotNull(uploadID);
     Preconditions.checkArgument(maxParts > 0, "Max Parts Should be greater " +
         "than zero");
@@ -2250,6 +2273,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
       String keyName) throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(keyName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -2290,6 +2314,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public boolean setBucketOwner(String volumeName, String bucketName,
       String owner) throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(owner);
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
