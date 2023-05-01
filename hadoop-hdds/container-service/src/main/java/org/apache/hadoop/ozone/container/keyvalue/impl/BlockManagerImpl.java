@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -50,7 +51,8 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockManagerImpl implements BlockManager {
 
-  static final Logger LOG = LoggerFactory.getLogger(BlockManagerImpl.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(BlockManagerImpl.class);
 
   private ConfigurationSource config;
 
@@ -147,49 +149,15 @@ public class BlockManagerImpl implements BlockManager {
       // for this block in the DB or not.
       long localID = data.getLocalID();
       boolean isBlockInCache = container.isBlockInPendingPutBlockCache(localID);
-      boolean incrBlockCount = false;
+      boolean incrBlockCount;
 
       // update the blockData as well as BlockCommitSequenceId here
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
 
-        // If the block does not exist in the pendingPutBlockCache of the
-        // container, then check the DB to ascertain if it exists or not.
-        // If block exists in cache, blockCount should not be incremented.
-        if (!isBlockInCache) {
-          if (db.getStore().getBlockDataTable().get(
-              containerData.getBlockKey(localID)) == null) {
-            // Block does not exist in DB => blockCount needs to be
-            // incremented when the block is added into DB.
-            incrBlockCount = true;
-          }
-        }
-
-        db.getStore().getBlockDataTable().putWithBatch(
-            batch, containerData.getBlockKey(localID), data);
-        if (bcsId != 0) {
-          db.getStore().getMetadataTable().putWithBatch(
-              batch, containerData.getBcsIdKey(), bcsId);
-        }
-
-        // Set Bytes used, this bytes used will be updated for every write and
-        // only get committed for every put block. In this way, when datanode
-        // is up, for computation of disk space by container only committed
-        // block length is used, And also on restart the blocks committed to DB
-        // is only used to compute the bytes used. This is done to keep the
-        // current behavior and avoid DB write during write chunk operation.
-        db.getStore().getMetadataTable().putWithBatch(
-            batch, containerData.getBytesUsedKey(),
-            containerData.getBytesUsed());
-
-        // Set Block Count for a container.
-        if (incrBlockCount) {
-          db.getStore().getMetadataTable().putWithBatch(
-              batch, containerData.getBlockCountKey(),
-              containerData.getBlockCount() + 1);
-        }
-
-        db.getStore().getBatchHandler().commitBatchOperation(batch);
+        incrBlockCount =
+            updateDBForPutBlock(data, containerData, db, bcsId, localID,
+                isBlockInCache, batch);
       }
 
       if (bcsId != 0) {
@@ -220,6 +188,65 @@ public class BlockManagerImpl implements BlockManager {
       }
       return data.getSize();
     }
+  }
+
+  private static boolean updateDBForPutBlock(BlockData data,
+      KeyValueContainerData containerData, DBHandle db, long bcsId,
+      long localID, boolean isBlockInCache,
+      BatchOperation batch) throws IOException {
+    boolean incrBlockCount = false;
+    Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();
+    String blockKey = containerData.getBlockKey(localID);
+    // If the block does not exist in the pendingPutBlockCache of the
+    // container, then check the DB to ascertain if it exists or not.
+    // If block exists in cache, blockCount should not be incremented.
+    BlockData existingBlockData;
+    if (!isBlockInCache) {
+      existingBlockData = blockDataTable.get(blockKey);
+      if (existingBlockData == null) {
+        // Block does not exist in DB => blockCount needs to be
+        // incremented when the block is added into DB.
+        incrBlockCount = true;
+      }
+    } else {
+      existingBlockData = blockDataTable.get(blockKey);
+    }
+
+    // if the block is new, the BlockData will be stored in its entirety.
+    if (existingBlockData == null) {
+      blockDataTable.putWithBatch(batch, blockKey, data);
+    } else {
+      // otherwise, the chunk is appended to an existing block
+      // create a new list since the existing list may be unmodifiable.
+      List<ContainerProtos.ChunkInfo> updatedChunks =
+          new ArrayList<>(existingBlockData.getChunks());
+      updatedChunks.addAll(data.getChunks());
+      data.setChunks(updatedChunks);
+      blockDataTable.putWithBatch(batch, blockKey, data);
+    }
+
+    if (bcsId != 0) {
+      db.getStore().getMetadataTable().putWithBatch(batch,
+          containerData.getBcsIdKey(), bcsId);
+    }
+
+    // Set Bytes used, this bytes used will be updated for every write and
+    // only get committed for every put block. In this way, when datanode
+    // is up, for computation of disk space by container only committed
+    // block length is used, And also on restart the blocks committed to DB
+    // is only used to compute the bytes used. This is done to keep the
+    // current behavior and avoid DB write during write chunk operation.
+    db.getStore().getMetadataTable().putWithBatch(batch,
+        containerData.getBytesUsedKey(), containerData.getBytesUsed());
+
+    // Set Block Count for a container.
+    if (incrBlockCount) {
+      db.getStore().getMetadataTable().putWithBatch(batch,
+          containerData.getBlockCountKey(), containerData.getBlockCount() + 1);
+    }
+
+    db.getStore().getBatchHandler().commitBatchOperation(batch);
+    return incrBlockCount;
   }
 
   /**

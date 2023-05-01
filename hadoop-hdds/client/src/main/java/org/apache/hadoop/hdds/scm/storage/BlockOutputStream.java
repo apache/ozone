@@ -459,6 +459,11 @@ public class BlockOutputStream extends OutputStream {
         ContainerCommandResponseProto> flushFuture = null;
     try {
       BlockData blockData = containerBlockData.build();
+
+      // optimization for Ratis-based blocks:
+      // clear chunk info so that next PutBlock does not send it over again.
+      containerBlockData.clearChunks();
+
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, token);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
