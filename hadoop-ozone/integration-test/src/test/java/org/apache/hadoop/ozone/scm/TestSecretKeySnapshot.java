@@ -74,7 +74,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration test to verify that symmetric secret keys in correctly
+ * Integration test to verify that symmetric secret keys are correctly
  * synchronized from leader to follower during snapshot installation.
  */
 @Timeout(500)
