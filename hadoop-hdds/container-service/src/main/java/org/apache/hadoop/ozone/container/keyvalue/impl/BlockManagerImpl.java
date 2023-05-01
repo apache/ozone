@@ -212,8 +212,10 @@ public class BlockManagerImpl implements BlockManager {
       existingBlockData = blockDataTable.get(blockKey);
     }
 
+    // if client does not support FLAG_INCREMENTAL_CHUNKS or
     // if the block is new, the BlockData will be stored in its entirety.
-    if (existingBlockData == null) {
+    if ((data.getFlag() & BlockData.FLAG_INCREMENTAL_CHUNKS) != 0 ||
+        existingBlockData == null) {
       blockDataTable.putWithBatch(batch, blockKey, data);
     } else {
       // otherwise, the chunk is appended to an existing block

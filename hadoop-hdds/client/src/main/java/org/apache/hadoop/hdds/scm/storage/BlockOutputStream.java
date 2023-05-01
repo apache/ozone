@@ -54,6 +54,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
+import static org.apache.hadoop.ozone.container.common.helpers.BlockData.FLAG_INCREMENTAL_CHUNKS;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,8 +158,10 @@ public class BlockOutputStream extends OutputStream {
     if (replicationIndex > 0) {
       blkIDBuilder.setReplicaIndex(replicationIndex);
     }
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+    this.containerBlockData = BlockData.newBuilder()
+        .setBlockID(blkIDBuilder.build())
+        .setFlags(FLAG_INCREMENTAL_CHUNKS)
+        .addMetadata(keyValue);
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;

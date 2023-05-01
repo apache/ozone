@@ -33,6 +33,7 @@ import java.util.ArrayList;
  */
 public class BlockData {
   private final BlockID blockID;
+  private long flag;
   private final Map<String, String> metadata;
 
   /**
@@ -55,6 +56,8 @@ public class BlockData {
    */
   private long size;
 
+  public static long FLAG_INCREMENTAL_CHUNKS = 0x01;
+
   /**
    * Constructs a BlockData Object.
    *
@@ -63,6 +66,7 @@ public class BlockData {
   public BlockData(BlockID blockID) {
     this.blockID = blockID;
     this.metadata = new TreeMap<>();
+    this.flag = FLAG_INCREMENTAL_CHUNKS;
     this.size = 0;
   }
 
@@ -85,6 +89,7 @@ public class BlockData {
       IOException {
     BlockData blockData = new BlockData(
         BlockID.getFromProtobuf(data.getBlockID()));
+    blockData.setFlag(data.getFlags());
     for (int x = 0; x < data.getMetadataCount(); x++) {
       blockData.addMetadata(data.getMetadata(x).getKey(),
           data.getMetadata(x).getValue());
@@ -104,6 +109,7 @@ public class BlockData {
     ContainerProtos.BlockData.Builder builder =
         ContainerProtos.BlockData.newBuilder();
     builder.setBlockID(this.blockID.getDatanodeBlockIDProtobuf());
+    builder.setFlags(this.flag);
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
           ContainerProtos.KeyValue.newBuilder();
@@ -113,6 +119,10 @@ public class BlockData {
     builder.addAllChunks(getChunks());
     builder.setSize(size);
     return builder.build();
+  }
+
+  public void setFlag(long flag) {
+    this.flag = flag;
   }
 
   /**
@@ -153,6 +163,10 @@ public class BlockData {
   @SuppressWarnings("unchecked")
   private List<ContainerProtos.ChunkInfo> castChunkList() {
     return (List<ContainerProtos.ChunkInfo>)chunkList;
+  }
+
+  public long getFlag() {
+    return flag;
   }
 
   /**
@@ -281,6 +295,7 @@ public class BlockData {
   public void appendTo(StringBuilder sb) {
     sb.append("[blockId=");
     blockID.appendTo(sb);
+    sb.append(", flag=").append(flag);
     sb.append(", size=").append(size);
     sb.append("]");
   }
