@@ -816,9 +816,11 @@ public class TestContainerPersistence {
     blockData.setFlag(0);
     blockManager.putBlock(container, blockData);
 
+    // chunk info should be overwritten by the 2nd PutBlock
     BlockData readBlockData =
         blockManager.getBlock(container, blockID1);
-    assertEquals(chunkList.get(0).getLen()*2, readBlockData.getSize());
+    assertEquals(chunkList.get(0).getLen() * 2,
+        readBlockData.getSize());
   }
 
   /**
