@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotDeleteResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -71,8 +72,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       throw new OMException(
               "cannot be invoked before finalization.",
               OMException.ResultCodes.
-                NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION)
-              ;
+                NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
 
     final OMRequest omRequest = super.preExecute(ozoneManager);

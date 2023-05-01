@@ -174,7 +174,8 @@ public class TestOmSnapshot {
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(3)
-        .setOmLayoutVersion(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion())
+        .setOmLayoutVersion(OMLayoutFeature.
+          BUCKET_LAYOUT_SUPPORT.layoutVersion())
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -202,8 +203,8 @@ public class TestOmSnapshot {
     finalizeOMUpgrade();
   }
 
-  private static void expectFailurePreFinalization
-      (LambdaTestUtils.VoidCallable eval)
+  private static void expectFailurePreFinalization(LambdaTestUtils.
+      VoidCallable eval)
       throws Exception {
     LambdaTestUtils.intercept(OMException.class,
         "cannot be invoked before finalization.", eval);
@@ -215,7 +216,6 @@ public class TestOmSnapshot {
     expectFailurePreFinalization(() ->
         store.createSnapshot(volumeName, bucketName,
           UUID.randomUUID().toString()));
-
     expectFailurePreFinalization(() ->
         store.listSnapshot(volumeName, bucketName));
     expectFailurePreFinalization(() ->

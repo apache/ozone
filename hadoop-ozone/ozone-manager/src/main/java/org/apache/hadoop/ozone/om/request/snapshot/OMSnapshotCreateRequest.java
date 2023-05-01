@@ -96,8 +96,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       throw new OMException(
               "cannot be invoked before finalization.",
               OMException.ResultCodes.
-                NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION)
-              ;
+                NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
