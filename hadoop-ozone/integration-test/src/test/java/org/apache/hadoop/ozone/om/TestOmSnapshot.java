@@ -163,10 +163,6 @@ public class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME,
-        TimeUnit.SECONDS.toMillis(1),
-        TimeUnit.MILLISECONDS);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
