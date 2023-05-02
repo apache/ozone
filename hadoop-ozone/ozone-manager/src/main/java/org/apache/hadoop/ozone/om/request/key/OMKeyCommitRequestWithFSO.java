@@ -209,8 +209,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       if (pseudoKeyInfo != null) {
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
+        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            trxnLogIndex, delKeyName);
+            pseudoObjId, delKeyName);
         oldKeyVersionsToDeleteMap.put(delKeyName,
             new RepeatedOmKeyInfo(pseudoKeyInfo));
       }

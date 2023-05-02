@@ -251,8 +251,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
           omKeyInfo);
       if (pseudoKeyInfo != null) {
+        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            trxnLogIndex, dbOzoneKey);
+            pseudoObjId, dbOzoneKey);
         oldKeyVersionsToDeleteMap.put(delKeyName,
             new RepeatedOmKeyInfo(pseudoKeyInfo));
       }
