@@ -3678,7 +3678,12 @@
     <value>10</value>
     <tag>OZONE, OM</tag>
     <description>
-      Maximum number of entries allowed in the snapshot cache.
+      Size of the OM Snapshot LRU cache.
+
+      This is a soft limit of open OM Snapshot RocksDB instances that will be
+      held.  The actual number of cached instance could exceed this limit if
+      more than this number of snapshot instances are still in-use by snapDiff
+      or other tasks.
     </description>
   </property>
 
