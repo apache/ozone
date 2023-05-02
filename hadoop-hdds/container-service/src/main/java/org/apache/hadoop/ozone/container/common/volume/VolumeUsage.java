@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -100,5 +103,26 @@ public class VolumeUsage implements SpaceUsageSource {
 
   public void setReserved(long reserved) {
     this.reservedInBytes = reserved;
+  }
+
+  /**
+   * If 'hdds.datanode.volume.min.free.space.percent' is defined,
+   * it will be honored first ie the min space would be calculated as
+   * a percent of volume capacity else it will fall back to
+   * 'hdds.datanode.volume.min.free.space' which has a default value configured.
+   */
+  public static long getMinVolumeFreeSpace(ConfigurationSource conf,
+      long capacity) {
+    if (conf.isConfigured(
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
+      float volumeMinFreeSpacePercent = Float.parseFloat(
+          conf.get(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+      return (long) (capacity * volumeMinFreeSpacePercent);
+    }
+    return (long) conf.getStorageSize(
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+        StorageUnit.BYTES);
+
   }
 }

@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -560,7 +561,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       ContainerData containerData = container.getContainerData();
       double containerUsedPercentage =
           1.0f * containerData.getBytesUsed() / containerData.getMaxSize();
-      return containerUsedPercentage >= containerCloseThreshold;
+      long volumeUsed = containerData.getVolume().getUsedSpace();
+      long volumeCapacity = containerData.getVolume().getCapacity();
+      long volumeFreeSpaceToSpare =
+          VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
+      return (containerUsedPercentage >= containerCloseThreshold) ||
+          (volumeCapacity - volumeUsed <= volumeFreeSpaceToSpare);
     } else {
       return false;
     }
