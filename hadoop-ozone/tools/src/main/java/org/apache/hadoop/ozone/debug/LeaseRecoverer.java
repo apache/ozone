@@ -38,8 +38,8 @@ import picocli.CommandLine.Spec;
 @CommandLine.Command(
     name = "recover",
     customSynopsis = "ozone debug recover --path=<path>",
-    description = "recover the lease of a specified file. Make sure to " +
-        "file system scheme e.g. ofs:// if not the default file system.")
+    description = "recover the lease of a specified file. Make sure to specify "
+        + "file system scheme if ofs:// is not the default.")
 @MetaInfServices(SubcommandWithParent.class)
 public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
 
