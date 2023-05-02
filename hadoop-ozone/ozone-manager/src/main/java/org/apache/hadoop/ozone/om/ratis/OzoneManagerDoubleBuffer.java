@@ -30,6 +30,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -693,9 +694,8 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   static class FlushNotifier {
-    private final ConcurrentHashMap.KeySetView<CountDownLatch,
-        Boolean> flushLatches =
-        new ConcurrentHashMap<>().newKeySet();
+    private final Set<CountDownLatch> flushLatches =
+        ConcurrentHashMap.newKeySet();
 
     void await() throws InterruptedException {
 
