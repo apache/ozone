@@ -59,9 +59,8 @@ public final class S3ErrorTable {
 
   public static final OS3Exception S3_AUTHINFO_CREATION_ERROR =
       new OS3Exception("InvalidRequest", "Error creating s3 auth info. " +
-              "The request may not be signed using AWS V4 signing algorithm," +
-              " or might be invalid",
-          HTTP_BAD_REQUEST);
+          "The request may not be signed using AWS V4 signing algorithm," +
+          " or might be invalid", HTTP_FORBIDDEN);
 
   public static final OS3Exception BUCKET_NOT_EMPTY = new OS3Exception(
       "BucketNotEmpty", "The bucket you tried to delete is not empty.",

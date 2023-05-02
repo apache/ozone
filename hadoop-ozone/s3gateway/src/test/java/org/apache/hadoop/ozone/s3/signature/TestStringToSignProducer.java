@@ -66,13 +66,13 @@ public class TestStringToSignProducer {
     headers.put(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "streaming");
 
     String canonicalRequest = "GET\n"
-            + "/buckets\n"
-            + "\n"
-            + "host:0.0.0.0:9878\nx-amz-content-sha256:Content-SHA\n"
-            + "x-amz-date:" + DATETIME + "\ncontent-type:streaming\n"
-            + "\n"
-            + "host;x-amz-content-sha256;x-amz-date;content-type\n"
-            + "Content-SHA";
+        + "/buckets\n"
+        + "\n"
+        + "host:0.0.0.0:9878\nx-amz-content-sha256:Content-SHA\n"
+        + "x-amz-date:" + DATETIME + "\ncontent-type:streaming\n"
+        + "\n"
+        + "host;x-amz-content-sha256;x-amz-date;content-type\n"
+        + "Content-SHA";
 
     String authHeader =
         "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
@@ -120,12 +120,12 @@ public class TestStringToSignProducer {
   }
 
   private ContainerRequestContext setupContext(
-          URI uri,
-          String method,
-          MultivaluedMap<String, String> headerMap,
-          MultivaluedMap<String, String> queryMap) {
+      URI uri,
+      String method,
+      MultivaluedMap<String, String> headerMap,
+      MultivaluedMap<String, String> queryMap) {
     ContainerRequestContext context =
-            Mockito.mock(ContainerRequestContext.class);
+        Mockito.mock(ContainerRequestContext.class);
     UriInfo uriInfo = Mockito.mock(UriInfo.class);
 
     Mockito.when(uriInfo.getRequestUri()).thenReturn(uri);
@@ -140,15 +140,15 @@ public class TestStringToSignProducer {
 
   private static Stream<Arguments> testValidateRequestHeadersInput() {
     String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
-            + DATE_FORMATTER.format(LocalDate.now())
-            + "/us-east-1/s3/aws4_request, "
-            + "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date,"
-            + " Signature=db81b057718d7c1b3b8"
-            + "dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
+        + DATE_FORMATTER.format(LocalDate.now())
+        + "/us-east-1/s3/aws4_request, "
+        + "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date,"
+        + " Signature=db81b057718d7c1b3b8"
+        + "dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
 
     // Well-formed request headers
     MultivaluedMap<String, String> headersMap1 =
-            new MultivaluedHashMap<>();
+        new MultivaluedHashMap<>();
     headersMap1.putSingle("Authorization", authHeader);
     headersMap1.putSingle("Content-Type", "application/octet-stream");
     headersMap1.putSingle("Host", "0.0.0.0:9878");
@@ -156,53 +156,53 @@ public class TestStringToSignProducer {
     headersMap1.putSingle("X-Amz-Date", DATETIME);
     //Missing X-Amz-Date Header
     MultivaluedMap<String, String> headersMap2 =
-            new MultivaluedHashMap<String, String>(headersMap1);
+        new MultivaluedHashMap<String, String>(headersMap1);
     headersMap2.remove("X-Amz-Date");
     // Invalid X-Amz-Date format
     MultivaluedMap<String, String> headersMap3 =
-            new MultivaluedHashMap<String, String>(headersMap1);
+        new MultivaluedHashMap<String, String>(headersMap1);
     headersMap3.remove("X-Amz-Date");
     headersMap3.putSingle("X-Amz-Date", LocalDateTime.now().toString());
     // Expired X-Amz-Date
     MultivaluedMap<String, String> headersMap4 =
-            new MultivaluedHashMap<String, String>(headersMap1);
+        new MultivaluedHashMap<String, String>(headersMap1);
     headersMap4.remove("X-Amz-Date");
     headersMap4.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
-            format(LocalDateTime.now().minusDays(8)));
+        format(LocalDateTime.now().minusDays(8)));
     MultivaluedMap<String, String> headersMap5 =
-            new MultivaluedHashMap<String, String>(headersMap1);
+        new MultivaluedHashMap<String, String>(headersMap1);
     headersMap5.remove("X-Amz-Date");
     headersMap5.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
-            format(LocalDateTime.now().plusDays(8)));
+        format(LocalDateTime.now().plusDays(8)));
     // Missing X-Amz-Content-Sha256
     MultivaluedMap<String, String> headersMap6 =
-            new MultivaluedHashMap<String, String>(headersMap1);
+        new MultivaluedHashMap<String, String>(headersMap1);
     headersMap6.remove("X-Amz-Content-Sha256");
 
     return Stream.of(
-            arguments(headersMap1, "success"),
-            arguments(headersMap2, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap3, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap4, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap5, S3_AUTHINFO_CREATION_ERROR.getCode()),
-            arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode())
+        arguments(headersMap1, "success"),
+        arguments(headersMap2, S3_AUTHINFO_CREATION_ERROR.getCode()),
+        arguments(headersMap3, S3_AUTHINFO_CREATION_ERROR.getCode()),
+        arguments(headersMap4, S3_AUTHINFO_CREATION_ERROR.getCode()),
+        arguments(headersMap5, S3_AUTHINFO_CREATION_ERROR.getCode()),
+        arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode())
     );
   }
   @ParameterizedTest
   @MethodSource("testValidateRequestHeadersInput")
   public void testValidateRequestHeaders(
-          MultivaluedMap<String, String> headerMap,
-          String expectedResult)
-          throws Exception {
+      MultivaluedMap<String, String> headerMap,
+      String expectedResult)
+      throws Exception {
     String actualResult = "success";
     ContainerRequestContext context = setupContext(
-            new URI("https://0.0.0.0:9878/"),
-            "GET",
-            headerMap,
-            new MultivaluedHashMap<>());
+        new URI("https://0.0.0.0:9878/"),
+        "GET",
+        headerMap,
+        new MultivaluedHashMap<>());
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
-            headerMap.getFirst("Authorization"),
-            headerMap.getFirst("X-Amz-Date")).parseSignature();
+        headerMap.getFirst("Authorization"),
+        headerMap.getFirst("X-Amz-Date")).parseSignature();
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);
     } catch (OS3Exception e) {
@@ -214,37 +214,36 @@ public class TestStringToSignProducer {
 
   private static Stream<Arguments> testValidateCanonicalHeadersInput() {
     return Stream.of(
-            // Well-formed signed headers
-            arguments("content-type;host;x-amz-content-sha256;" +
-                            "x-amz-date;x-amz-security-token",
-                    "success"),
-            // No host signed header
-            arguments("content-type;x-amz-content-sha256;" +
-                            "x-amz-date;x-amz-security-token",
-                    S3_AUTHINFO_CREATION_ERROR.getCode()),
-            // Missing x-amz-* i.e., x-amz-security-token signed header
-            arguments("content-type;host;x-amz-content-sha256;" +
-                            "x-amz-date",
-                    S3_AUTHINFO_CREATION_ERROR.getCode()),
-            // signed header missing in request headers
-            arguments("content-type;dummy;host;x-amz-content-sha256;" +
-                            "x-amz-date;x-amz-security-token",
-                    S3_AUTHINFO_CREATION_ERROR.getCode())
+        // Well-formed signed headers
+        arguments("content-type;host;x-amz-content-sha256;" +
+                "x-amz-date;x-amz-security-token",
+            "success"),
+        // No host signed header
+        arguments("content-type;x-amz-content-sha256;" +
+                "x-amz-date;x-amz-security-token",
+            S3_AUTHINFO_CREATION_ERROR.getCode()),
+        // Missing x-amz-* i.e., x-amz-security-token signed header
+        arguments("content-type;host;x-amz-content-sha256;x-amz-date",
+            S3_AUTHINFO_CREATION_ERROR.getCode()),
+        // signed header missing in request headers
+        arguments("content-type;dummy;host;x-amz-content-sha256;" +
+                "x-amz-date;x-amz-security-token",
+            S3_AUTHINFO_CREATION_ERROR.getCode())
     );
   }
 
   @ParameterizedTest
   @MethodSource("testValidateCanonicalHeadersInput")
   public void testValidateCanonicalHeaders(
-          String signedHeaders,
-          String expectedResult) throws Exception {
+      String signedHeaders,
+      String expectedResult) throws Exception {
     String actualResult = "success";
     String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
-            + DATE_FORMATTER.format(LocalDate.now())
-            + "/us-east-1/s3/aws4_request, "
-            + "SignedHeaders=" + signedHeaders + ", "
-            + "Signature=db81b057718d7c1b3b" +
-            "8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
+        + DATE_FORMATTER.format(LocalDate.now())
+        + "/us-east-1/s3/aws4_request, "
+        + "SignedHeaders=" + signedHeaders + ", "
+        + "Signature=db81b057718d7c1b3b" +
+        "8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
     MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
     headerMap.putSingle("Authorization", authHeader);
     headerMap.putSingle("Content-Length", "123");
@@ -254,13 +253,13 @@ public class TestStringToSignProducer {
     headerMap.putSingle("x-amz-date", DATETIME);
     headerMap.putSingle("x-amz-security-token", "dummy");
     ContainerRequestContext context = setupContext(
-            new URI("https://0.0.0.0:9878/"),
-            "GET",
-            headerMap,
-            new MultivaluedHashMap<>());
+        new URI("https://0.0.0.0:9878/"),
+        "GET",
+        headerMap,
+        new MultivaluedHashMap<>());
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
-            headerMap.getFirst("Authorization"),
-            headerMap.getFirst("x-amz-date")).parseSignature();
+        headerMap.getFirst("Authorization"),
+        headerMap.getFirst("x-amz-date")).parseSignature();
 
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);

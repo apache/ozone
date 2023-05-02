@@ -85,7 +85,7 @@ public class OzoneClientProducer {
         stringToSign =
             StringToSignProducer.createSignatureBase(signatureInfo, context);
       } else {
-        LOG.debug("AWS signature version not supported. version: {}",
+        LOG.debug("Unsupported AWS signature version: {}",
                 signatureInfo.getVersion());
         throw S3_AUTHINFO_CREATION_ERROR;
       }

@@ -53,6 +53,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
 
   private static final Long X_AMZ_EXPIRES_MIN = 1L;
   private static final Long X_AMZ_EXPIRES_MAX = 604800L;
+  private static final String AWS_REQUEST = "aws4_request";
 
   public AuthorizationV4QueryParser(
       Map<String, String> queryParameters
@@ -72,8 +73,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
       validateDateAndExpires();
     } catch (DateTimeParseException ex) {
       throw new MalformedResourceException(
-              "Invalid X-Amz-Date format: "
-                      + queryParameters.get("X-Amz-Date"));
+          "Invalid X-Amz-Date format: " + queryParameters.get("X-Amz-Date"));
     }
 
     final String rawCredential = queryParameters.get("X-Amz-Credential");
@@ -85,7 +85,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     } catch (UnsupportedEncodingException e) {
       throw new MalformedResourceException(
           "X-Amz-Credential is not proper URL encoded rawCredential:"
-                  + rawCredential);
+              + rawCredential);
     }
     validateCredential(credential);
     validateSignedHeaders();
@@ -107,19 +107,19 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   /**
    * Validate if algorithm is in expected format.
    */
-  private void validateAlgorithm()
-          throws MalformedResourceException {
+  private void validateAlgorithm() throws MalformedResourceException {
     String algorithm = queryParameters.get("X-Amz-Algorithm");
     if (algorithm == null) {
-      throw new MalformedResourceException("Missing hash algorithm.");
+      throw new MalformedResourceException("Unspecified signature algorithm.");
     }
     if (isEmpty(algorithm) || !algorithm.equals(AWS4_SIGNING_ALGORITHM)) {
-      throw new MalformedResourceException("Unexpected hash algorithm. Algo:"
-              + algorithm);
+      throw new MalformedResourceException("Unsupported signature algorithm: "
+          + algorithm);
     }
   }
 
-  /** According to AWS documentation.
+  /**
+   * According to AWS documentation:
    * https://docs.aws.amazon.com/AmazonS3/latest/
    * API/sigv4-query-string-auth.html
    * X-Amz-Date: The date and time format must follow the
@@ -130,48 +130,49 @@ public class AuthorizationV4QueryParser implements SignatureParser {
    */
   @VisibleForTesting
   protected void validateDateAndExpires()
-          throws MalformedResourceException, DateTimeParseException {
+      throws MalformedResourceException, DateTimeParseException {
     final String dateString = queryParameters.get("X-Amz-Date");
     final String expiresString = queryParameters.get("X-Amz-Expires");
-    if (dateString == null || expiresString == null ||
-            dateString.length() == 0 || expiresString.length() == 0) {
+    if (dateString == null ||
+        expiresString == null ||
+        dateString.length() == 0 ||
+        expiresString.length() == 0) {
       throw new MalformedResourceException(
-              "dateString or expiresString are missing or empty.");
+          "dateString or expiresString are missing or empty.");
     }
-    final Long expires = Long.valueOf(expiresString);
+    final Long expires = Long.parseLong(expiresString);
     if (expires >= X_AMZ_EXPIRES_MIN && expires <= X_AMZ_EXPIRES_MAX) {
       if (ZonedDateTime.parse(dateString, StringToSignProducer.TIME_FORMATTER)
           .plus(expires, SECONDS).isBefore(ZonedDateTime.now())) {
         throw new MalformedResourceException("Pre-signed S3 url is expired. "
-                + "dateString:" + dateString
-                + " expiresString:" + expiresString);
+            + "dateString:" + dateString
+            + " expiresString:" + expiresString);
       }
     } else {
       throw new MalformedResourceException("Invalid expiry duration. "
-              + "X-Amz-Expires should be between " + X_AMZ_EXPIRES_MIN
-              + "and" + X_AMZ_EXPIRES_MAX + " expiresString:" + expiresString);
+          + "X-Amz-Expires should be between " + X_AMZ_EXPIRES_MIN
+          + "and" + X_AMZ_EXPIRES_MAX + " expiresString:" + expiresString);
     }
   }
 
   private void validateCredential(Credential credential)
-          throws MalformedResourceException {
+      throws MalformedResourceException {
     if (credential.getAccessKeyID().isEmpty()) {
       throw new MalformedResourceException(
-              "AWS access id shouldn't be empty. credential: " + credential);
+          "AWS access id is empty. credential: " + credential);
     }
     if (credential.getAwsRegion().isEmpty()) {
       throw new MalformedResourceException(
-              "AWS region shouldn't be empty. credential: " + credential);
+          "AWS region is empty. credential: " + credential);
     }
     if (credential.getAwsRequest().isEmpty() ||
-            !(credential.getAwsRequest().equals("aws4_request"))) {
+            !(credential.getAwsRequest().equals(AWS_REQUEST))) {
       throw new MalformedResourceException(
-              "AWS request shouldn't be empty or invalid. credential:"
-                      + credential);
+          "AWS request is empty or invalid. credential:" + credential);
     }
     if (credential.getAwsService().isEmpty()) {
       throw new MalformedResourceException(
-              "AWS service shouldn't be empty. credential:" + credential);
+          "AWS service is empty. credential:" + credential);
     }
     // Date should not be empty and should be properly formatted.
     if (!credential.getDate().isEmpty()) {
@@ -179,22 +180,21 @@ public class AuthorizationV4QueryParser implements SignatureParser {
         LocalDate.parse(credential.getDate(), DATE_FORMATTER);
       } catch (DateTimeParseException ex) {
         throw new MalformedResourceException(
-                "AWS date format is invalid. credential:" + credential);
+            "AWS date format is invalid. credential:" + credential);
       }
     } else {
       throw new MalformedResourceException(
-              "AWS date shouldn't be empty. credential:{}" + credential);
+          "AWS date is empty. credential:{}" + credential);
     }
   }
 
   /**
    * Validate Signed headers.
    */
-  private void validateSignedHeaders()
-          throws MalformedResourceException {
+  private void validateSignedHeaders() throws MalformedResourceException {
     String signedHeadersStr = queryParameters.get("X-Amz-SignedHeaders");
     if (signedHeadersStr == null || isEmpty(signedHeadersStr)
-            || signedHeadersStr.split(";").length == 0) {
+        || signedHeadersStr.split(";").length == 0) {
       throw new MalformedResourceException("No signed headers found.");
     }
   }
@@ -202,18 +202,16 @@ public class AuthorizationV4QueryParser implements SignatureParser {
   /**
    * Validate signature.
    */
-  private void validateSignature()
-          throws MalformedResourceException {
+  private void validateSignature() throws MalformedResourceException {
     String signature = queryParameters.get("X-Amz-Signature");
     if (isEmpty(signature)) {
-      throw new MalformedResourceException("Signature can't be empty.");
+      throw new MalformedResourceException("Signature is empty.");
     }
     try {
       Hex.decodeHex(signature);
     } catch (DecoderException e) {
       throw new MalformedResourceException(
-              "Signature:" + signature +
-                      " should be in hexa-decimal encoding.");
+          "Signature:" + signature + " should be in hexa-decimal encoding.");
     }
   }
 }

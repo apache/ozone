@@ -193,14 +193,14 @@ public final class StringToSignProducer {
         }
 
       } else {
-        LOG.error("Header " + header + " not present in " +
-                "request but requested to be signed.");
+        LOG.error("Header " + header + " not present in "
+            + "request but requested to be signed.");
         throw S3_AUTHINFO_CREATION_ERROR;
       }
     }
 
     validateCanonicalHeaders(canonicalHeaders.toString(), headers,
-            unsignedPayload);
+        unsignedPayload);
 
     String payloadHash;
     if (UNSIGNED_PAYLOAD.equals(
@@ -213,8 +213,8 @@ public final class StringToSignProducer {
       // Note: The x-amz-content-sha256 header is required
       // for all AWS Signature Version 4 requests.(using Authorization header)
       if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
-        LOG.error("The request must include x-amz-content-sha256 header "
-                + "for signed paylods");
+        LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
+            + " header for signed payload");
         throw S3_AUTHINFO_CREATION_ERROR;
       }
       payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
@@ -290,7 +290,6 @@ public final class StringToSignProducer {
     StringBuilder result = new StringBuilder();
     for (String p : params) {
       if (!p.equals("X-Amz-Signature")) {
-
         if (result.length() > 0) {
           result.append("&");
         }
@@ -308,8 +307,7 @@ public final class StringToSignProducer {
       String schema,
       String header,
       String headerValue
-  )
-      throws OS3Exception, DateTimeParseException {
+  ) throws OS3Exception, DateTimeParseException {
     switch (header) {
     case HOST:
       // TODO: Placeholder for any host validations.
@@ -320,9 +318,9 @@ public final class StringToSignProducer {
       if (date.isBefore(now.minus(PRESIGN_URL_MAX_EXPIRATION_SECONDS, SECONDS))
           || date.isAfter(now.plus(PRESIGN_URL_MAX_EXPIRATION_SECONDS,
           SECONDS))) {
-        LOG.error("AWS date not in valid range. Request timestamp:{} should " +
-                "not be older than {} seconds.", headerValue,
-            PRESIGN_URL_MAX_EXPIRATION_SECONDS);
+        LOG.error("AWS date not in valid range. Request timestamp:{} should "
+            + "not be older than {} seconds.",
+            headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
         throw S3_AUTHINFO_CREATION_ERROR;
       }
       break;
@@ -334,7 +332,8 @@ public final class StringToSignProducer {
     }
   }
 
-  /** According to AWS Sig V4 documentation
+  /**
+   * According to AWS Sig V4 documentation:
    * https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
    * The CanonicalHeaders list must include the following:
    * HTTP host header..
@@ -345,20 +344,20 @@ public final class StringToSignProducer {
    * @param headers
    */
   private static void validateCanonicalHeaders(
-          String canonicalHeaders,
-          Map<String, String> headers,
-          Boolean unsignedPaylod
+      String canonicalHeaders,
+      Map<String, String> headers,
+      Boolean unsignedPaylod
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
     for (String header : headers.keySet().stream()
-            .filter(s -> s.startsWith("x-amz-"))
-            .collect(Collectors.toSet())) {
+        .filter(s -> s.startsWith("x-amz-"))
+        .collect(Collectors.toSet())) {
       if (!(canonicalHeaders.contains(header + ":"))) {
-        LOG.error("The SignedHeaders list must include all " +
-                "x-amz-* headers in the request");
+        LOG.error("The SignedHeaders list must include all "
+            + "x-amz-* headers in the request");
         throw S3_AUTHINFO_CREATION_ERROR;
       }
     }
