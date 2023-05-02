@@ -384,13 +384,31 @@
         <profile>
             <id>java-11</id>
             <activation>
-                <jdk>11</jdk>
+                <jdk>[11,]</jdk>
                 <property>
                     <name>rocks_tools_native</name>
                 </property>
             </activation>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-jars</id>
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
@@ -404,8 +422,8 @@
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
-                                        <argument>-classpath</argument>
-                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>-cp</argument>
+                                        <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
                                         <argument>-h</argument>
                                         <argument>${project.build.directory}/native/javah</argument>
                                         <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>

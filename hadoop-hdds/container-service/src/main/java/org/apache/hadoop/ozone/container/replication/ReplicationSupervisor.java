@@ -76,18 +76,22 @@ public class ReplicationSupervisor {
 
   private final Map<Class, AtomicInteger> taskCounter =
       new ConcurrentHashMap<>();
+  private int maxQueueSize;
 
   @VisibleForTesting
   ReplicationSupervisor(
-      StateContext context, ExecutorService executor, Clock clock) {
+      StateContext context, ExecutorService executor, Clock clock,
+      int maxQueueSize) {
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.executor = executor;
     this.context = context;
     this.clock = clock;
+    this.maxQueueSize = maxQueueSize;
   }
 
   public ReplicationSupervisor(
-      StateContext context, ReplicationConfig replicationConfig, Clock clock) {
+      StateContext context, ReplicationConfig replicationConfig, Clock clock,
+      int maxQueueSize) {
     this(context,
         new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
@@ -96,13 +100,19 @@ public class ReplicationSupervisor {
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("ContainerReplicationThread-%d")
                 .build()),
-        clock);
+        clock, maxQueueSize);
   }
 
   /**
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
+    if (getTotalInFlightReplications() >= maxQueueSize) {
+      LOG.warn("Ignored {} command for container {} in Replication Supervisor"
+              + "as queue reached max size of {}.",
+          task.getClass(), task.getContainerId(), maxQueueSize);
+      return;
+    }
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes

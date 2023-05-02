@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority
     .CertificateServer;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
@@ -79,6 +80,7 @@ public final class SCMConfigurator {
   private WritableContainerFactory writableContainerFactory;
   private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
       finalizationExecutor;
+  private LeaseManager<Object> leaseManager;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -197,6 +199,14 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify a custom version lease manager.
+   * @param leaseManager - lease Manager.
+   */
+  public void setLeaseManager(LeaseManager<Object> leaseManager) {
+    this.leaseManager = leaseManager;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -299,5 +309,13 @@ public final class SCMConfigurator {
   public UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
       getUpgradeFinalizationExecutor() {
     return finalizationExecutor;
+  }
+
+  /**
+   * Get the lease manager.
+   * @return LeaseManager
+   */
+  public LeaseManager<Object> getLeaseManager() {
+    return leaseManager;
   }
 }

@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +36,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -64,6 +67,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -73,6 +77,7 @@ import javax.annotation.Nonnull;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
@@ -282,7 +287,8 @@ public class TestReplicationSupervisor {
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, newDirectExecutorService(), clock);
+        new ReplicationSupervisor(context, newDirectExecutorService(),
+            clock, 1000);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     // Mock to fetch an exception in the importContainer method.
@@ -397,7 +403,7 @@ public class TestReplicationSupervisor {
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     repConf.setReplicationMaxStreams(1);
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(null, repConf, clock);
+        new ReplicationSupervisor(null, repConf, clock, 1000);
 
     final CountDownLatch indicateRunning = new CountDownLatch(1);
     final CountDownLatch completeRunning = new CountDownLatch(1);
@@ -511,7 +517,7 @@ public class TestReplicationSupervisor {
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
     ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, executor, clock);
+        new ReplicationSupervisor(context, executor, clock, 1000);
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
@@ -635,5 +641,47 @@ public class TestReplicationSupervisor {
     public void execute(@Nonnull Runnable command) {
       // ignore all tasks
     }
+  }
+
+  @Test
+  public void testMaxQueueSize() throws InterruptedException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+
+    Integer[] count = new Integer[1];
+    count[0] = 0;
+    Lock lock = new ReentrantLock();
+
+    ReplicationSupervisor rs = new ReplicationSupervisor(null,
+        replicationConfig, Clock.system(ZoneId.systemDefault()), 2);
+
+    ContainerReplicator replicator = task -> {
+      try {
+        count[0]++;
+        lock.lock();
+      } finally {
+        lock.unlock();
+      }
+    };
+
+    lock.lock();
+    try {
+      //schedule 100 container replication
+      Random random = new Random();
+      for (int i = 0; i < 100; i++) {
+        List<DatanodeDetails> sources = new ArrayList<>();
+        sources.add(datanodes.get(random.nextInt(datanodes.size())));
+        rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
+      }
+      // in progress task will be 2
+      Assertions.assertTrue(count[0] == 2);
+    } finally {
+      lock.unlock();
+    }
+    rs.shutdownAfterFinish();
   }
 }

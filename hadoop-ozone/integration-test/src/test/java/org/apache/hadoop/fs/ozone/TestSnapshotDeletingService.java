@@ -201,7 +201,7 @@ public class TestSnapshotDeletingService {
     Table<String, OmKeyInfo>  deletedDirTable =
         om.getMetadataManager().getDeletedDirTable();
     Table<String, String> renamedKeyTable =
-        om.getMetadataManager().getSnapshotRenamedKeyTable();
+        om.getMetadataManager().getSnapshotRenamedTable();
     DirectoryDeletingService dirDeletingService = (DirectoryDeletingService)
         om.getKeyManager().getDirDeletingService();
     // TODO: [SNAPSHOT] Enable after HDDS-8064.
@@ -316,7 +316,7 @@ public class TestSnapshotDeletingService {
     Table<String, OmKeyInfo> snapDeletedDirTable =
         snap3.getMetadataManager().getDeletedDirTable();
     Table<String, String> snapRenamedTable =
-        snap3.getMetadataManager().getSnapshotRenamedKeyTable();
+        snap3.getMetadataManager().getSnapshotRenamedTable();
     Table<String, RepeatedOmKeyInfo> snapDeletedTable =
         snap3.getMetadataManager().getDeletedTable();
 

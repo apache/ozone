@@ -33,14 +33,14 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
  * Response for OMSnapshotCreateRequest.
  */
 @CleanupTableInfo(cleanupTables = {
-    DELETED_TABLE, SNAPSHOT_RENAMED_KEY_TABLE, SNAPSHOT_INFO_TABLE})
+    DELETED_TABLE, SNAPSHOT_RENAMED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMSnapshotCreateResponse extends OMClientResponse {
 
   private SnapshotInfo snapshotInfo;
@@ -82,9 +82,9 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
         snapshotInfo);
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
-    // Remove all entries from snapshotRenamedKeyTable
+    // Remove all entries from snapshotRenamedTable
     try (TableIterator<String, ? extends Table.KeyValue<String, String>>
-        iterator = omMetadataManager.getSnapshotRenamedKeyTable().iterator()) {
+        iterator = omMetadataManager.getSnapshotRenamedTable().iterator()) {
 
       String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
@@ -96,7 +96,7 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
         if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
           break;
         }
-        omMetadataManager.getSnapshotRenamedKeyTable()
+        omMetadataManager.getSnapshotRenamedTable()
             .deleteWithBatch(batchOperation, renameDbKey);
       }
     }
