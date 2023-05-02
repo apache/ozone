@@ -53,7 +53,7 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
       @Nonnull OmKeyInfo omKeyInfo,
       String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
+      Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
       boolean isHSync) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
             omBucketInfo, deleteKeyMap, isHSync);

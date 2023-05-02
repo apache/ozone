@@ -195,8 +195,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
-      Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap
-          = new HashMap<>();
+      Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
 
@@ -238,6 +237,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             correctedSpace);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
             keyToDelete.getObjectID(), dbOzoneKey);
+        if (null == oldKeyVersionsToDeleteMap) {
+          oldKeyVersionsToDeleteMap = new HashMap<>();
+        }
         oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
@@ -254,6 +256,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
             pseudoObjId, dbOzoneKey);
+        if (null == oldKeyVersionsToDeleteMap) {
+          oldKeyVersionsToDeleteMap = new HashMap<>();
+        }
         oldKeyVersionsToDeleteMap.put(delKeyName,
             new RepeatedOmKeyInfo(pseudoKeyInfo));
       }

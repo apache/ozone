@@ -56,7 +56,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
       @Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
+      Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
       boolean isHSync) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
