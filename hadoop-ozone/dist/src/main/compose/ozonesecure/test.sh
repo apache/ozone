@@ -55,6 +55,21 @@ execute_robot_test scm -v container:1 -v count:2 replication/wait.robot
 docker-compose up -d --scale datanode=3
 execute_robot_test scm -v container:1 -v count:3 replication/wait.robot
 
+# stop om and s3g to free up bound ports
+stop_containers om s3g
+
+# create om and s3g containers with FCQ config
+docker-compose up -d om_fcq
+docker-compose up -d s3g_fcq
+
+execute_robot_test s3g_fcq fcq/s3_om_fcq.robot
+
+# stop om and s3g containers with FCQ config
+stop_containers om_fcq s3g_fcq
+
+# start om and s3g containers with non FCQ config
+start_containers om s3g
+
 stop_docker_env
 
 generate_report

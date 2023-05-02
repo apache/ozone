@@ -14,7 +14,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.4"
+
+x-common-config:
+  &common-config
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  volumes:
+    - ../..:/opt/hadoop
+    - ../_keytabs:/etc/security/keytabs
+    - ./krb5.conf:/etc/krb5.conf
+  env_file:
+    - docker-config
+
+x-common-om-config:
+  &om-common-config
+  <<: *common-config
+  hostname: om
+  ports:
+    - 9874:9874
+    - 9862:9862
+  command: [ "/opt/hadoop/bin/ozone","om" ]
+
+x-common-s3g-config:
+  &s3g-common-config
+  <<: *common-config
+  hostname: s3g
+  ports:
+    - 9878:9878
+  command: [ "/opt/hadoop/bin/ozone","s3g" ]
+
+x-FCQ-config:
+  &FCQ-config
+  CORE-SITE.XML_ipc.9862.callqueue.impl: org.apache.hadoop.ipc.FairCallQueue
+  CORE-SITE.XML_ipc.9862.identity-provider.impl: org.apache.hadoop.ozone.om.helpers.OzoneIdentityProvider
+  OZONE-SITE.XML_ozone.om.transport.class: org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory
+
 services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
@@ -48,78 +82,56 @@ services:
     environment:
       OZONE_OPTS:
   om:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    hostname: om
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-    ports:
-      - 9874:9874
-      - 9862:9862
+    <<: *om-common-config
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
-    env_file:
-      - docker-config
-    command: ["/opt/hadoop/bin/ozone","om"]
   httpfs:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    <<: *common-config
     hostname: httpfs
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 14000:14000
-    env_file:
-      - ./docker-config
     command: [ "/opt/hadoop/bin/ozone","httpfs" ]
     environment:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
   s3g:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    hostname: s3g
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
-    ports:
-      - 9878:9878
-    env_file:
-      - ./docker-config
-    command: ["/opt/hadoop/bin/ozone","s3g"]
+    <<: *s3g-common-config
     environment:
       OZONE_OPTS:
   recon:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    <<: *common-config
     hostname: recon
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9888:9888
-    env_file:
-      - ./docker-config
     environment:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    <<: *common-config
     hostname: scm
-    volumes:
-      - ../..:/opt/hadoop
-      - ../_keytabs:/etc/security/keytabs
-      - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9876:9876
       - 9860:9860
-    env_file:
-      - docker-config
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
+  # Disabled by default
+  om_fcq:
+    <<: *om-common-config
+    profiles:
+      - donotstart
+    environment:
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      <<: *FCQ-config
+  # Disabled by default
+  s3g_fcq:
+    <<: *s3g-common-config
+    profiles:
+      - donotstart
+    environment:
+      OZONE_OPTS:
+      <<: *FCQ-config
