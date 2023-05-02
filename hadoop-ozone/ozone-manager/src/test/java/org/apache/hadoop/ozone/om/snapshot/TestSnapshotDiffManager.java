@@ -8,6 +8,7 @@ import com.google.common.collect.Maps;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.junit.jupiter.api.Assertions;
@@ -54,6 +56,7 @@ import org.rocksdb.RocksIterator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -149,7 +152,8 @@ public class TestSnapshotDiffManager {
     snapshotCache = CacheBuilder.newBuilder()
         .maximumSize(cacheSize)
         .build(loader);
-
+    Mockito.when(ozoneManager.getConfiguration())
+        .thenReturn(new OzoneConfiguration());
     SnapshotDiffManager snapshotDiffManager = Mockito.spy(
         new SnapshotDiffManager(snapdiffDB, differ, ozoneManager, snapshotCache,
             snapdiffJobCFH, snapdiffReportCFH, columnFamilyOptions,
@@ -176,14 +180,15 @@ public class TestSnapshotDiffManager {
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
     Mockito.when(differ.getSSTDiffListWithFullPath(Mockito.any(),
-        Mockito.any())).thenReturn(Lists.newArrayList(randomStrings));
+        Mockito.any(), Mockito.anyString())).thenReturn(Lists.newArrayList(randomStrings));
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
     Mockito.when(jobTableIterator.isValid()).thenReturn(false);
     Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
         snapshotCache.get(snap1), snapshotCache.get(snap2),
         Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
-        Collections.EMPTY_MAP);
+        Collections.EMPTY_MAP,
+        Files.createTempDirectory("snapdiff_dir").toString());
     Assertions.assertEquals(randomStrings, deltaFiles);
   }
 
@@ -226,8 +231,11 @@ public class TestSnapshotDiffManager {
       String snap2 = "snap2";
       if (!useFullDiff) {
         Set<String> randomStrings = Collections.emptySet();
-        Mockito.when(differ.getSSTDiffListWithFullPath(Mockito.any(),
-            Mockito.any())).thenReturn(Lists.newArrayList(randomStrings));
+        Mockito.when(differ.getSSTDiffListWithFullPath(
+            Mockito.any(DifferSnapshotInfo.class),
+            Mockito.any(DifferSnapshotInfo.class),
+            Matchers.anyString()))
+            .thenReturn(Lists.newArrayList(randomStrings));
       }
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
@@ -235,7 +243,8 @@ public class TestSnapshotDiffManager {
       Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
           snapshotCache.get(snap1), snapshotCache.get(snap2),
           Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
-          Collections.EMPTY_MAP);
+          Collections.EMPTY_MAP, Files.createTempDirectory("snapdiff_dir")
+              .toAbsolutePath().toString());
       Assertions.assertEquals(deltaStrings, deltaFiles);
     }
   }
