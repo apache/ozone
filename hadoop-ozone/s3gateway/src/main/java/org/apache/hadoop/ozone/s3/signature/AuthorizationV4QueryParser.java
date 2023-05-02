@@ -118,7 +118,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
     }
   }
 
-  /**
+  /** Validates Date and Expires Query parameters.
    * According to AWS documentation:
    * https://docs.aws.amazon.com/AmazonS3/latest/
    * API/sigv4-query-string-auth.html
