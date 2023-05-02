@@ -38,8 +38,8 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
-    float volumeUsed = vol.getUsedSpace();
-    float volumeCapacity = vol.getCapacity();
+    long volumeUsed = vol.getUsedSpace();
+    long volumeCapacity = vol.getCapacity();
     long free = vol.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
