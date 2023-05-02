@@ -99,14 +99,14 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       checkDestinationDirectory(dir);
     }
 
-    //logic same as the download+import on the destination datanode
-    initializeReplicationSupervisor(conf);
-
     final ContainerOperationClient containerOperationClient =
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
         containerOperationClient.listContainer(0L, 1_000_000);
+
+    //logic same as the download+import on the destination datanode
+    initializeReplicationSupervisor(conf, containerInfos.size() * 2);
 
     replicationTasks = new ArrayList<>();
 
@@ -169,8 +169,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   }
 
   @NotNull
-  private void initializeReplicationSupervisor(ConfigurationSource conf)
-      throws IOException {
+  private void initializeReplicationSupervisor(
+      ConfigurationSource conf, int queueSize) throws IOException {
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
@@ -212,7 +212,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ReplicationServer.ReplicationConfig replicationConfig
         = conf.getObject(ReplicationServer.ReplicationConfig.class);
     supervisor = new ReplicationSupervisor(null, replicationConfig,
-        Clock.system(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()), queueSize);
   }
 
   private void replicateContainer(long counter) throws Exception {

@@ -647,19 +647,21 @@ public class TestReplicationManager {
     enableProcessAll();
     replicationManager.processAll();
 
+    ReplicationQueue queue = replicationManager.getQueue();
+
     // Get the first message off the queue - it should be underRep0.
     ContainerHealthResult.UnderReplicatedHealthResult res
-        = replicationManager.dequeueUnderReplicatedContainer();
+        = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
 
     // Now requeue it
-    replicationManager.requeueUnderReplicatedContainer(res);
+    queue.enqueue(res);
 
     // Now get the next message. It should be underRep1, as it has remaining
     // redundancy 1 + zero retries. UnderRep0 will have remaining redundancy 0
     // and 1 retry. They will have the same weighted redundancy so lesser
     // retries should come first
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep1, res.getContainerInfo());
 
     // Next message is underRep0. It starts with a weighted redundancy of 0 + 1
@@ -668,21 +670,21 @@ public class TestReplicationManager {
     // times. Then the weighted redundancy will be equal and the decommission
     // one will be next due to having less retries.
     for (int i = 0; i < 4; i++) {
-      res = replicationManager.dequeueUnderReplicatedContainer();
+      res = queue.dequeueUnderReplicatedContainer();
       Assert.assertEquals(underRep0, res.getContainerInfo());
-      replicationManager.requeueUnderReplicatedContainer(res);
+      queue.enqueue(res);
     }
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(decomContainer, res.getContainerInfo());
 
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
 
     // Next is the mis-rep container, which has a remaining redundancy of 6.
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(misRep, res.getContainerInfo());
 
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertNull(res);
   }
 

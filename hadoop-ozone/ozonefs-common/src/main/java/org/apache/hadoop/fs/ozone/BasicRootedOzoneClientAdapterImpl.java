@@ -1343,16 +1343,17 @@ public class BasicRootedOzoneClientAdapterImpl
   private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
       String fromSnapshot, String toSnapshot, String volume, String bucket,
       String token) throws IOException, InterruptedException {
-    SnapshotDiffResponse snapshotDiffResponse = null;
-    do {
+    SnapshotDiffResponse snapshotDiffResponse;
+    while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
               token, -1, false);
+      if (snapshotDiffResponse.getJobStatus() == DONE) {
+        break;
+      }
       Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
-    } while (snapshotDiffResponse.getJobStatus() != DONE);
-    SnapshotDiffReportOzone report =
-        snapshotDiffResponse.getSnapshotDiffReport();
-    return report;
+    }
+    return snapshotDiffResponse.getSnapshotDiffReport();
   }
 
   public boolean recoverLease(final Path f) throws IOException {
