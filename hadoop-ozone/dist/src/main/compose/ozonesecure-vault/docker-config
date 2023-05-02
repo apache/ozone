@@ -185,8 +185,9 @@ OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
 OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true
 
 OZONE-SITE.XML_ozone.secret.s3.store.provider=org.apache.hadoop.ozone.s3.remote.vault.VaultS3SecretStorageProvider
-OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.address=localhost:8200
+OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.address=http://vault:8200
 OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.namespace="namespace"
+OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.enginever=2
 OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.secretpath=secret
 OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.auth=TOKEN
 OZONE-SITE.XML_ozone.secret.s3.store.remote.vault.auth.token=00000000-0000-0000-0000-000000000000

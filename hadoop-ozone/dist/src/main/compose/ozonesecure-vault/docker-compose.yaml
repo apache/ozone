@@ -60,6 +60,7 @@ services:
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      OZONE_CLASSPATH: /opt/hadoop/share/ozone/lib/ozone-s3-secret-store-@project.version@.jar:/opt/hadoop/share/ozone/lib/vault-java-driver-*.jar
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -124,19 +125,14 @@ services:
       OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","scm"]
   vault:
-    image: hashicorp/vault
+    image: hashicorp/vault:1.13.2
     hostname: vault
     cap_add:
       - IPC_LOCK
-    env_file:
-      - .env
     ports:
       - ${VAULT_PORT}:8200
-    volumes:
-      - ./data/vault:/vault/file
-      - ./logs/vault:/vault/logs
     command:
       - server
       - -dev
-      - -dev-root-token-id="00000000-0000-0000-0000-000000000000"
-      - -namespace="namespace"
+      - -dev-root-token-id=00000000-0000-0000-0000-000000000000
+      - -namespace=namespace
