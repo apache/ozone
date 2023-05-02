@@ -68,17 +68,20 @@ public class ManagedSstFileReader {
 
     long estimatedSize = 0;
     synchronized (this) {
+      if (estimatedTotalKeys != -1) {
+        return estimatedTotalKeys;
+      }
+
       try (ManagedOptions options = new ManagedOptions()) {
         for (String sstFile : sstFiles) {
           SstFileReader fileReader = new SstFileReader(options);
           fileReader.open(sstFile);
           estimatedSize += fileReader.getTableProperties().getNumEntries();
-          estimatedSize += fileReader.getTableProperties().getNumDeletions();
         }
       }
+      estimatedTotalKeys = estimatedSize;
     }
 
-    estimatedTotalKeys = estimatedSize;
     return estimatedTotalKeys;
   }
 
