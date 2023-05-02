@@ -107,6 +107,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

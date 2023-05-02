@@ -137,22 +137,24 @@ public class FilePerBlockStrategy implements ChunkManager {
         .getContainerData();
 
     File chunkFile = getChunkFile(container, blockID, info);
-    boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
     long offset = info.getOffset();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
-          info, overwrite, stage, chunkFile);
-    }
 
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
+    boolean overwrite;
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
+      overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
+          info, overwrite, stage, chunkFile);
     }
 
     // check whether offset matches block file length if its an overwrite

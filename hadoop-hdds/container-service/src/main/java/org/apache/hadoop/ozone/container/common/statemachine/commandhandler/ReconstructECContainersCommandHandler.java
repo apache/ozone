@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  * Command handler for reconstructing the lost EC containers.
  */
 public class ReconstructECContainersCommandHandler implements CommandHandler {
-
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;

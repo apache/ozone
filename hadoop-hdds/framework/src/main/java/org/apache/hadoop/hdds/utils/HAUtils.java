@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -71,6 +73,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURAT
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 /**
@@ -168,6 +171,7 @@ public final class HAUtils {
 
   /**
    * Replace the current DB with the new DB checkpoint.
+   * (checkpoint in checkpointPath will not be deleted here)
    *
    * @param lastAppliedIndex the last applied index in the current SCM DB.
    * @param checkpointPath   path to the new DB checkpoint
@@ -201,13 +205,16 @@ public final class HAUtils {
       // an inconsistent state and this marker file will fail it from
       // starting up.
       Files.createFile(markerFile);
-      FileUtils.moveDirectory(checkpointPath, oldDB.toPath());
+      // Copy the candidate DB to real DB
+      org.apache.commons.io.FileUtils.copyDirectory(checkpointPath.toFile(),
+          oldDB);
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata "
               + "directory {}. Resetting to original DB.", checkpointPath,
           oldDB.toPath());
       try {
+        FileUtil.fullyDelete(oldDB);
         Files.move(dbBackup.toPath(), oldDB.toPath());
         Files.deleteIfExists(markerFile);
       } catch (IOException ex) {
@@ -225,7 +232,7 @@ public final class HAUtils {
    */
   public static TransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath, DBDefinition definition)
-      throws Exception {
+      throws IOException {
 
     if (dbPath != null) {
       Path dbDir = dbPath.getParent();
@@ -245,12 +252,12 @@ public final class HAUtils {
    * @param tempConfig
    * @param dbDir path to DB
    * @return TransactionInfo
-   * @throws Exception
+   * @throws IOException
    */
   private static TransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir, String dbName,
       DBDefinition definition)
-      throws Exception {
+      throws IOException {
 
     try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
         dbName, definition)) {
@@ -297,7 +304,7 @@ public final class HAUtils {
       long lastAppliedIndex, String leaderId, Path newDBlocation,
       Logger logger) {
     if (transactionInfo.getTransactionIndex() <= lastAppliedIndex) {
-      logger.error("Failed to install checkpoint from SCM leader: {}"
+      logger.error("Failed to install checkpoint from the leader: {}"
               + ". The last applied index: {} is greater than or equal to the "
               + "checkpoint's applied index: {}. Deleting the downloaded "
               + "checkpoint {}", leaderId, lastAppliedIndex,
@@ -319,7 +326,8 @@ public final class HAUtils {
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder =
         DBStoreBuilder.newBuilder(configuration, rocksDBConfiguration)
-            .setName(dbName).setPath(Paths.get(metaDir.getPath()));
+            .setName(dbName)
+            .setPath(Paths.get(metaDir.getPath()));
     // Add column family names and codecs.
     for (DBColumnFamilyDefinition columnFamily : definition
         .getColumnFamilies()) {
@@ -347,6 +355,35 @@ public final class HAUtils {
     }
     return metadataDir;
   }
+
+  /**
+   * Scan the DB dir and return the existing SST files.
+   * SSTs could be used for avoiding repeated download.
+   *
+   * @param db the file representing the DB to be scanned
+   * @return the list of SST file name. If db not exist, will return empty list
+   */
+  public static List<String> getExistingSstFiles(File db) {
+    List<String> sstList = new ArrayList<>();
+    if (!db.exists()) {
+      return sstList;
+    }
+    FilenameFilter filter = new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(ROCKSDB_SST_SUFFIX);
+      }
+    };
+    String[] tempArray = db.list(filter);
+    if (tempArray != null) {
+      sstList = Arrays.asList(tempArray);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
+      }
+    }
+    return sstList;
+  }
+
   /**
    * Build CA list which need to be passed to client.
    *
