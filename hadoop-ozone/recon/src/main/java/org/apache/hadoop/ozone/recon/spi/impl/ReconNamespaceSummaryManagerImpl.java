@@ -95,6 +95,12 @@ public class ReconNamespaceSummaryManagerImpl
         orphanKeysMetaDataSet);
   }
 
+  @Override
+  public OrphanKeysMetaDataSet getOrphanKeysMetaDataSet(long objectId)
+      throws IOException {
+    return orphanKeysMetaDataTable.get(objectId);
+  }
+
   public Table getNSSummaryTable() {
     return nsSummaryTable;
   }

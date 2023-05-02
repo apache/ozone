@@ -50,4 +50,7 @@ public interface ReconNamespaceSummaryManager {
   void batchStoreOrphanKeysMetaData(BatchOperation batch, long objectId,
                                     OrphanKeysMetaDataSet orphanKeysMetaDataSet)
       throws IOException;
+
+  OrphanKeysMetaDataSet getOrphanKeysMetaDataSet(long objectId)
+      throws IOException;
 }

@@ -108,7 +108,7 @@ public class NSSummaryTaskDbEventHandler {
               rdbBatchOperation,
               key, orphanKeysMetaDataSetMap.get(key));
         } catch (IOException e) {
-          LOG.error("Unable to write Namespace Summary data in Recon DB.",
+          LOG.error("Unable to write orphan keys meta data in Recon DB.",
               e);
         }
       });
@@ -262,7 +262,7 @@ public class NSSummaryTaskDbEventHandler {
       writeOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap);
       orphanKeysMetaDataSetMap.clear();
     } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      LOG.error("Unable to write orphan keys meta data in Recon DB.", e);
       return false;
     }
     return true;
@@ -293,12 +293,17 @@ public class NSSummaryTaskDbEventHandler {
     if (null == nsSummary) {
       OrphanKeysMetaDataSet orphanKeysMetaDataSet =
           orphanKeysMetaDataSetMap.get(parentObjectID);
+      if (null == orphanKeysMetaDataSet) {
+        orphanKeysMetaDataSet =
+            reconNamespaceSummaryManager.getOrphanKeysMetaDataSet(
+                parentObjectID);
+      }
       Set<OrphanKeyMetaData> orphanKeyMetaDataSet;
       if (null == orphanKeysMetaDataSet) {
         orphanKeyMetaDataSet = new HashSet<>();
         orphanKeysMetaDataSet = new OrphanKeysMetaDataSet(orphanKeyMetaDataSet);
       }
-      orphanKeyMetaDataSet = orphanKeysMetaDataSet.getList();
+      orphanKeyMetaDataSet = orphanKeysMetaDataSet.getSet();
       OrphanKeyMetaData orphanKeyMetaData = new OrphanKeyMetaData(objectID);
       orphanKeyMetaDataSet.add(orphanKeyMetaData);
       orphanKeysMetaDataSetMap.put(parentObjectID, orphanKeysMetaDataSet);

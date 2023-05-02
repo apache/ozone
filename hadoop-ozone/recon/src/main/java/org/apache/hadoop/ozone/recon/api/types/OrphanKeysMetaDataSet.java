@@ -39,11 +39,11 @@ public class OrphanKeysMetaDataSet {
     this.orphanKeyMetaDataSet = new HashSet<>(orphanKeyMetaDataSet);
   }
 
-  public Set<OrphanKeyMetaData> asList() {
+  public Set<OrphanKeyMetaData> asImmutableSet() {
     return Collections.unmodifiableSet(orphanKeyMetaDataSet);
   }
 
-  public Set<OrphanKeyMetaData> getList() {
+  public Set<OrphanKeyMetaData> getSet() {
     return orphanKeyMetaDataSet;
   }
 
