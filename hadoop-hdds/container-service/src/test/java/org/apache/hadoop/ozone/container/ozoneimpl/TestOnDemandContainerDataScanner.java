@@ -49,7 +49,7 @@ import static org.mockito.Mockito.never;
  * Unit tests for the on-demand container scanner.
  */
 @RunWith(MockitoJUnitRunner.class)
-public class TestOnDemandContainerScanner {
+public class TestOnDemandContainerDataScanner {
 
   private final AtomicLong containerIdSeq = new AtomicLong(100);
 
@@ -75,16 +75,16 @@ public class TestOnDemandContainerScanner {
 
   @After
   public void tearDown() {
-    OnDemandContainerScanner.shutdown();
+    OnDemandContainerDataScanner.shutdown();
   }
 
   @Test
   public void testOnDemandContainerScanner() throws Exception {
     //Without initialization,
     // there shouldn't be interaction with containerController
-    OnDemandContainerScanner.scanContainer(corruptData);
+    OnDemandContainerDataScanner.scanContainer(corruptData);
     Mockito.verifyZeroInteractions(controller);
-    OnDemandContainerScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller);
     testContainerMarkedUnhealthy(healthy, never());
     testContainerMarkedUnhealthy(corruptData, atLeastOnce());
     testContainerMarkedUnhealthy(openContainer, never());
@@ -92,32 +92,32 @@ public class TestOnDemandContainerScanner {
 
   @Test
   public void testContainerScannerMultipleInitsAndShutdowns() throws Exception {
-    OnDemandContainerScanner.init(conf, controller);
-    OnDemandContainerScanner.init(conf, controller);
-    OnDemandContainerScanner.shutdown();
-    OnDemandContainerScanner.shutdown();
+    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.shutdown();
+    OnDemandContainerDataScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
     testContainerMarkedUnhealthy(corruptData, never());
   }
 
   @Test
   public void testSameContainerQueuedMultipleTimes() throws Exception {
-    OnDemandContainerScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller);
     //Given a container that has not finished scanning
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.lenient().when(corruptData.scanData(
-            OnDemandContainerScanner.getThrottler(),
-            OnDemandContainerScanner.getCanceler()))
+            OnDemandContainerDataScanner.getThrottler(),
+            OnDemandContainerDataScanner.getCanceler()))
         .thenAnswer((Answer<Boolean>) invocation -> {
           latch.await();
           return false;
         });
-    Optional<Future<?>> onGoingScan = OnDemandContainerScanner
+    Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
     Assert.assertTrue(onGoingScan.isPresent());
     Assert.assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
-    Optional<Future<?>> secondScan = OnDemandContainerScanner
+    Optional<Future<?>> secondScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
     //Then the second scan is not scheduled and the first scan can still finish
     Assert.assertFalse(secondScan.isPresent());
@@ -131,7 +131,7 @@ public class TestOnDemandContainerScanner {
       Container<?> container, VerificationMode invocationTimes)
       throws InterruptedException, ExecutionException, IOException {
     Optional<Future<?>> result =
-        OnDemandContainerScanner.scanContainer(container);
+        OnDemandContainerDataScanner.scanContainer(container);
     if (result.isPresent()) {
       result.get().get();
     }

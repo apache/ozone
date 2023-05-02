@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerMetadataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.AfterClass;
@@ -168,8 +168,8 @@ public class TestDataScanner {
 
     ContainerScannerConfiguration conf = ozoneConfig.getObject(
         ContainerScannerConfiguration.class);
-    ContainerMetadataScanner sb = new ContainerMetadataScanner(conf,
-        oc.getController());
+    BackgroundContainerMetadataScanner sb =
+        new BackgroundContainerMetadataScanner(conf, oc.getController());
     //Scan the open container and trigger on-demand scan for the closed one
     sb.scanContainer(openContainer);
     tryReadKeyWithMissingChunksDir(bucket, keyNameInClosedContainer);

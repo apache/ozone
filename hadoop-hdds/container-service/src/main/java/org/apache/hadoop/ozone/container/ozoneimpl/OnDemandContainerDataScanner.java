@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
@@ -37,11 +38,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Class for performing on demand scans of containers.
  */
-public final class OnDemandContainerScanner {
+public final class OnDemandContainerDataScanner {
   public static final Logger LOG =
-      LoggerFactory.getLogger(OnDemandContainerScanner.class);
+      LoggerFactory.getLogger(OnDemandContainerDataScanner.class);
 
-  private static volatile OnDemandContainerScanner instance;
+  private static volatile OnDemandContainerDataScanner instance;
 
   private final ExecutorService scanExecutor;
   private final ContainerController containerController;
@@ -50,8 +51,9 @@ public final class OnDemandContainerScanner {
   private final ConcurrentHashMap
       .KeySetView<Long, Boolean> containerRescheduleCheckSet;
   private final OnDemandScannerMetrics metrics;
+  private final long minScanGap;
 
-  private OnDemandContainerScanner(
+  private OnDemandContainerDataScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
     containerController = controller;
     throttler = new DataTransferThrottler(
@@ -60,6 +62,7 @@ public final class OnDemandContainerScanner {
     metrics = OnDemandScannerMetrics.create();
     scanExecutor = Executors.newSingleThreadExecutor();
     containerRescheduleCheckSet = ConcurrentHashMap.newKeySet();
+    minScanGap = conf.getContainerScanMinGap();
   }
 
   public static synchronized void init(
@@ -69,20 +72,27 @@ public final class OnDemandContainerScanner {
           " a second time on a datanode.");
       return;
     }
-    instance = new OnDemandContainerScanner(conf, controller);
+    instance = new OnDemandContainerDataScanner(conf, controller);
+  }
+
+  private static boolean shouldScan(Container<?> container) {
+    return container.shouldScanData() &&
+        !ContainerUtils.recentlyScanned(container, instance.minScanGap);
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {
-    if (instance == null || !container.shouldScanData()) {
+    if (!shouldScan(container)) {
+      LOG.debug("Skipping on demand scan for container {} in state {}",
+          container.getContainerData().getContainerID(),
+          container.getContainerState());
       return Optional.empty();
     }
+
     Future<?> resultFuture = null;
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = instance.scanExecutor.submit(() -> {
-        if (container.shouldScanData()) {
-          performOnDemandScan(container);
-        }
+        performOnDemandScan(container);
         removeContainerFromScheduledContainers(containerId);
       });
     }
@@ -99,6 +109,13 @@ public final class OnDemandContainerScanner {
   }
 
   private static void performOnDemandScan(Container<?> container) {
+    if (shouldScan(container)) {
+      LOG.debug("Skipping on demand scan for container {} in state {}",
+          container.getContainerData().getContainerID(),
+          container.getContainerState());
+      return;
+    }
+
     long containerId = container.getContainerData().getContainerID();
     try {
       ContainerData containerData = container.getContainerData();
@@ -108,8 +125,8 @@ public final class OnDemandContainerScanner {
         logScanCompleted(containerData, now);
         instance.containerController.updateDataScanTimestamp(containerId, now);
       } else {
-        instance.containerController.markContainerUnhealthy(containerId);
         instance.metrics.incNumUnHealthyContainers();
+        instance.containerController.markContainerUnhealthy(containerId);
       }
       instance.metrics.incNumContainersScanned();
     } catch (IOException e) {

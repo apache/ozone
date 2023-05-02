@@ -83,13 +83,13 @@ public class TestContainerScannerMetrics {
 
   @AfterEach
   public void tearDown() {
-    OnDemandContainerScanner.shutdown();
+    OnDemandContainerDataScanner.shutdown();
   }
 
   @Test
   public void testContainerMetaDataScannerMetrics() {
-    ContainerMetadataScanner subject =
-        new ContainerMetadataScanner(conf, controller);
+    BackgroundContainerMetadataScanner subject =
+        new BackgroundContainerMetadataScanner(conf, controller);
     subject.runIteration();
 
     ContainerMetadataScannerMetrics metrics = subject.getMetrics();
@@ -100,8 +100,8 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testContainerMetaDataScannerMetricsUnregisters() {
-    ContainerMetadataScanner subject =
-        new ContainerMetadataScanner(conf, controller);
+    BackgroundContainerMetadataScanner subject =
+        new BackgroundContainerMetadataScanner(conf, controller);
     String name = subject.getMetrics().getName();
 
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
@@ -114,8 +114,8 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testContainerDataScannerMetrics() {
-    ContainerDataScanner subject =
-        new ContainerDataScanner(conf, controller, vol);
+    BackgroundContainerDataScanner subject =
+        new BackgroundContainerDataScanner(conf, controller, vol);
     subject.runIteration();
 
     ContainerDataScannerMetrics metrics = subject.getMetrics();
@@ -127,8 +127,8 @@ public class TestContainerScannerMetrics {
   @Test
   public void testContainerDataScannerMetricsUnregisters() throws IOException {
     HddsVolume volume = new HddsVolume.Builder("/").failedVolume(true).build();
-    ContainerDataScanner subject =
-        new ContainerDataScanner(conf, controller, volume);
+    BackgroundContainerDataScanner subject =
+        new BackgroundContainerDataScanner(conf, controller, volume);
     String name = subject.getMetrics().getName();
 
     assertNotNull(DefaultMetricsSystem.instance().getSource(name));
@@ -141,14 +141,15 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testOnDemandScannerMetrics() throws Exception {
-    OnDemandContainerScanner.init(conf, controller);
+    OnDemandContainerDataScanner.init(conf, controller);
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
-    resultFutureList.add(OnDemandContainerScanner.scanContainer(corruptData));
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
+        corruptData));
     resultFutureList.add(
-        OnDemandContainerScanner.scanContainer(corruptMetadata));
-    resultFutureList.add(OnDemandContainerScanner.scanContainer(healthy));
+        OnDemandContainerDataScanner.scanContainer(corruptMetadata));
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
     waitOnScannerToFinish(resultFutureList);
-    OnDemandScannerMetrics metrics = OnDemandContainerScanner.getMetrics();
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
     // the number of scanned containers
     assertEquals(1, metrics.getNumUnHealthyContainers());
@@ -167,11 +168,11 @@ public class TestContainerScannerMetrics {
 
   @Test
   public void testOnDemandScannerMetricsUnregisters() {
-    OnDemandContainerScanner.init(conf, controller);
-    String metricsName = OnDemandContainerScanner.getMetrics().getName();
+    OnDemandContainerDataScanner.init(conf, controller);
+    String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
     assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
-    OnDemandContainerScanner.shutdown();
-    OnDemandContainerScanner.scanContainer(healthy);
+    OnDemandContainerDataScanner.shutdown();
+    OnDemandContainerDataScanner.scanContainer(healthy);
     assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 

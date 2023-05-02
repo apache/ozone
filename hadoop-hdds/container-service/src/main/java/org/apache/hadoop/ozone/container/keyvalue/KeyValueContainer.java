@@ -880,10 +880,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return checker.fullCheck(throttler, canceler);
   }
 
-  private enum ContainerCheckLevel {
-    NO_CHECK, FAST_CHECK, FULL_CHECK
-  }
-
   /**
    * Creates a temporary file.
    * @param file

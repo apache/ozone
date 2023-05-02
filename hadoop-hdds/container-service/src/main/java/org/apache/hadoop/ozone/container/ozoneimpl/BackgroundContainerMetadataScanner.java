@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,18 +31,21 @@ import java.util.Iterator;
  * containers.
  * Only one thread will be responsible for scanning all volumes.
  */
-public class ContainerMetadataScanner extends AbstractContainerScanner {
+public class BackgroundContainerMetadataScanner extends
+    AbstractBackgroundContainerScanner {
   public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerMetadataScanner.class);
+      LoggerFactory.getLogger(BackgroundContainerMetadataScanner.class);
 
   private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
+  private final long minScanGap;
 
-  public ContainerMetadataScanner(ContainerScannerConfiguration conf,
-                                  ContainerController controller) {
+  public BackgroundContainerMetadataScanner(ContainerScannerConfiguration conf,
+                                            ContainerController controller) {
     super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
     this.metrics = ContainerMetadataScannerMetrics.create();
+    this.minScanGap = conf.getContainerScanMinGap();
   }
 
   @Override
@@ -52,6 +56,12 @@ public class ContainerMetadataScanner extends AbstractContainerScanner {
   @VisibleForTesting
   @Override
   public void scanContainer(Container<?> container) throws IOException {
+    if (ContainerUtils.recentlyScanned(container, minScanGap)) {
+      LOG.debug("Skipping metadata scan of container {} which was " +
+          "recently scanned", container.getContainerData().getContainerID());
+      return;
+    }
+
     if (!container.scanMetaData()) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(

@@ -33,6 +33,9 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +52,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,6 +234,18 @@ public final class ContainerUtils {
       throw new StorageContainerException("Unable to create Message Digest, " +
           "usually this is a java configuration issue.", NO_SUCH_ALGORITHM);
     }
+  }
+
+  public static boolean recentlyScanned(Container<?> container,
+      long minScanGap) {
+    Optional<Instant> lastScanTime =
+        container.getContainerData().lastDataScanTime();
+    boolean timestampPermitsScanning = lastScanTime.isPresent();
+    if (timestampPermitsScanning) {
+      timestampPermitsScanning = Duration.between(Instant.now(),
+              lastScanTime.get()).compareTo(Duration.ofMillis(minScanGap)) > 0;
+    }
+    return timestampPermitsScanning;
   }
 
   /**

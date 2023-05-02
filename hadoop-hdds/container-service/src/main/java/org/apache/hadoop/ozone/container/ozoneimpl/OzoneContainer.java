@@ -106,8 +106,8 @@ public class OzoneContainer {
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
-  private ContainerMetadataScanner metadataScanner;
-  private List<ContainerDataScanner> dataScanners;
+  private BackgroundContainerMetadataScanner metadataScanner;
+  private List<BackgroundContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
@@ -328,8 +328,8 @@ public class OzoneContainer {
     }
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
-      ContainerDataScanner s = new ContainerDataScanner(c, controller,
-          (HddsVolume) v);
+      BackgroundContainerDataScanner s =
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
     }
@@ -337,7 +337,8 @@ public class OzoneContainer {
 
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
-      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+      this.metadataScanner =
+          new BackgroundContainerMetadataScanner(c, controller);
     }
     this.metadataScanner.start();
   }
@@ -348,7 +349,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerScanner.init(c, controller);
+    OnDemandContainerDataScanner.init(c, controller);
   }
 
   /**
@@ -364,10 +365,10 @@ public class OzoneContainer {
     if (dataScanners == null) {
       return;
     }
-    for (ContainerDataScanner s : dataScanners) {
+    for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerScanner.shutdown();
+    OnDemandContainerDataScanner.shutdown();
   }
 
   /**
