@@ -208,7 +208,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
         throw new RuntimeIOException(e);
       }
     }
-    return getTransformedValue(currentKey);
+    return currentKey != null ? getTransformedValue(currentKey) : null;
   }
 
   @Override

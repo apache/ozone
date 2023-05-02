@@ -34,6 +34,7 @@ import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -179,7 +180,6 @@ public class ManagedSstFileReader {
         NativeLibraryNotLoadedException {
       this.fileNameIterator = files.iterator();
       init();
-      moveToNextFile();
     }
 
     protected abstract void init();
@@ -192,7 +192,8 @@ public class ManagedSstFileReader {
     public boolean hasNext() {
       try {
         do {
-          if (currentFileIterator.hasNext()) {
+          if (!Objects.isNull(currentFileIterator) &&
+              currentFileIterator.hasNext()) {
             return true;
           }
         } while (moveToNextFile());
