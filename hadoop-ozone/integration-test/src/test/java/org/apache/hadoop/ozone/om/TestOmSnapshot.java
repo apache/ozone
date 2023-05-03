@@ -208,12 +208,11 @@ public class TestOmSnapshot {
   }
 
   private static void expectFailurePreFinalization(LambdaTestUtils.
-      VoidCallable eval)
-      throws Exception {
-        OMException ex  = Assert.assertThrows(OMException.class,
-          () -> eval.call());
-        Assert.assertTrue(ex.getMessage().contains(
-          "cannot be invoked before finalization."));
+      VoidCallable eval) throws Exception {
+    OMException ex  = Assert.assertThrows(OMException.class,
+            () -> eval.call());
+    Assert.assertTrue(ex.getMessage().contains(
+            "cannot be invoked before finalization."));
   }
 
   private static void preFinalizationChecks()
