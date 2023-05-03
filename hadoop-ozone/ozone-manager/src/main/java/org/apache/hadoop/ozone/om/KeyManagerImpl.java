@@ -255,7 +255,9 @@ public class KeyManagerImpl implements KeyManager {
       openKeyCleanupService.start();
     }
 
-    if (snapshotSstFilteringService == null) {
+    if (snapshotSstFilteringService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
+
       long serviceInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,

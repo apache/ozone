@@ -2214,7 +2214,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       stopTrashEmptier();
       metadataManager.stop();
-      omSnapshotManager.close();
+      // omSnapshotManager is null if ozone.filesystem.snapshot.enabled is false
+      if (omSnapshotManager != null) {
+        omSnapshotManager.close();
+      }
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
       unregisterMXBean();
