@@ -17,12 +17,14 @@
  */
 
 package org.apache.hadoop.ozone.recon.tasks;
+
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +33,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 /**
@@ -74,16 +76,17 @@ public class NSSummaryTask implements ReconOmTask {
                        ReconOMMetadataManager
                        reconOMMetadataManager,
                        OzoneConfiguration
-                       ozoneConfiguration) {
+                       ozoneConfiguration, ReconDBProvider reconDBProvider)
+      throws IOException {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
     this.ozoneConfiguration = ozoneConfiguration;
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, reconDBProvider);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, reconDBProvider);
   }
 
   @Override
@@ -110,6 +113,7 @@ public class NSSummaryTask implements ReconOmTask {
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
+      reconNamespaceSummaryManager.clearOrphanKeysMetaDataTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);

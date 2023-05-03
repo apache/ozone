@@ -35,10 +35,11 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -50,9 +51,9 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 
 /**
  * Test for NSSummaryTask. Create one bucket of each layout
@@ -71,6 +72,8 @@ public final class TestNSSummaryTask {
   private static ReconOMMetadataManager reconOMMetadataManager;
   private static NSSummaryTask nSSummaryTask;
   private static OzoneConfiguration omConfiguration;
+
+  private static ReconDBProvider reconDBProvider;
 
   // Object names
   private static final String VOL = "vol";
@@ -121,7 +124,9 @@ public final class TestNSSummaryTask {
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
             .withContainerDB()
+            .addBinding(ReconDBProvider.class)
             .build();
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
@@ -132,7 +137,7 @@ public final class TestNSSummaryTask {
     populateOMDB();
 
     nSSummaryTask = new NSSummaryTask(reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration, reconDBProvider);
   }
 
   /**

@@ -53,4 +53,11 @@ public interface ReconNamespaceSummaryManager {
 
   OrphanKeysMetaDataSet getOrphanKeysMetaDataSet(long objectId)
       throws IOException;
+
+  void deleteOrphanKeysMetaDataSet(long objectId) throws IOException;
+
+  void clearOrphanKeysMetaDataTable() throws IOException;
+
+  void batchDeleteOrphanKeysMetaData(BatchOperation batch, long objectId)
+      throws IOException;
 }

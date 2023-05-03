@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,18 +33,18 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -55,6 +52,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.junit.Assert;
@@ -64,22 +62,23 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
-
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -115,6 +114,7 @@ public class TestNSSummaryEndpointWithFSO {
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
+  private ReconDBProvider reconDBProvider;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -361,26 +361,27 @@ public class TestNSSummaryEndpointWithFSO {
             temporaryFolder.newFolder());
 
     ReconTestInjector reconTestInjector =
-            new ReconTestInjector.Builder(temporaryFolder)
-                    .withReconOm(reconOMMetadataManager)
-                    .withOmServiceProvider(ozoneManagerServiceProvider)
-                    .withReconSqlDb()
-                    .withContainerDB()
-                    .addBinding(OzoneStorageContainerManager.class,
-                            getMockReconSCM())
-                    .addBinding(StorageContainerServiceProvider.class,
-                            mock(StorageContainerServiceProviderImpl.class))
-                    .addBinding(NSSummaryEndpoint.class)
-                    .build();
+        new ReconTestInjector.Builder(temporaryFolder)
+            .withReconOm(reconOMMetadataManager)
+            .withOmServiceProvider(ozoneManagerServiceProvider)
+            .withReconSqlDb()
+            .withContainerDB()
+            .addBinding(OzoneStorageContainerManager.class,
+                getMockReconSCM())
+            .addBinding(StorageContainerServiceProvider.class,
+                mock(StorageContainerServiceProviderImpl.class))
+            .addBinding(NSSummaryEndpoint.class)
+            .addBinding(ReconDBProvider.class)
+            .build();
     ReconNamespaceSummaryManager reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
-
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, ozoneConfiguration, reconDBProvider);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

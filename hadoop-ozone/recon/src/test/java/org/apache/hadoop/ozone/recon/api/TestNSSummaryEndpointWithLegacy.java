@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.junit.Assert;
@@ -116,6 +117,7 @@ public class TestNSSummaryEndpointWithLegacy {
   private NSSummaryEndpoint nsSummaryEndpoint;
   private OzoneConfiguration conf;
   private CommonUtils commonUtils;
+  private ReconDBProvider reconDBProvider;
 
   private static final String TEST_PATH_UTILITY =
       "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -372,16 +374,17 @@ public class TestNSSummaryEndpointWithLegacy {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(NSSummaryEndpoint.class)
+            .addBinding(ReconDBProvider.class)
             .build();
     ReconNamespaceSummaryManager reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
-
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
-    NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy = 
-        new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
-                                    reconOMMetadataManager, conf);
+    NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
+        new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
+            reconOMMetadataManager, conf, reconDBProvider);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     commonUtils = new CommonUtils();
   }

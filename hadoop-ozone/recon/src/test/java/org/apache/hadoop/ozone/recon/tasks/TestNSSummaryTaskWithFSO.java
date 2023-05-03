@@ -32,10 +32,11 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -116,6 +117,8 @@ public final class TestNSSummaryTaskWithFSO {
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
 
+  private static ReconDBProvider reconDBProvider;
+
   private TestNSSummaryTaskWithFSO() {
   }
 
@@ -137,10 +140,11 @@ public final class TestNSSummaryTaskWithFSO {
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
             .withContainerDB()
+            .addBinding(ReconDBProvider.class)
             .build();
     reconNamespaceSummaryManager =
             reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
-
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     NSSummary nonExistentSummary =
             reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
     Assert.assertNull(nonExistentSummary);
@@ -149,7 +153,7 @@ public final class TestNSSummaryTaskWithFSO {
 
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration);
+        ozoneConfiguration, reconDBProvider);
   }
 
   /**

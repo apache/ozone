@@ -28,9 +28,16 @@ import java.util.Objects;
  */
 public class OrphanKeyMetaData {
   private Long objectId;
+  private Long status;
+  private String volumeName;
+  private String bucketName;
 
-  public OrphanKeyMetaData(Long objectId) {
+  public OrphanKeyMetaData(Long objectId, Long status, String volumeName,
+                           String bucketName) {
     this.objectId = objectId;
+    this.status = status;
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
   }
 
   public Long getObjectId() {
@@ -41,13 +48,39 @@ public class OrphanKeyMetaData {
     this.objectId = objectId;
   }
 
+  public Long getStatus() {
+    return status;
+  }
+
+  public void setStatus(Long status) {
+    this.status = status;
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public void setVolumeName(String volumeName) {
+    this.volumeName = volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
+  public void setBucketName(String bucketName) {
+    this.bucketName = bucketName;
+  }
+
   public static OrphanKeyMetaData fromProto(
       OrphanKeyMetaDataProto proto) {
-    return new OrphanKeyMetaData(proto.getObjectId());
+    return new OrphanKeyMetaData(proto.getObjectId(), proto.getStatus(),
+        proto.getVolumeName(), proto.getBucketName());
   }
 
   public OrphanKeyMetaDataProto toProto() {
-    return OrphanKeyMetaDataProto.newBuilder().setObjectId(objectId).build();
+    return OrphanKeyMetaDataProto.newBuilder().setObjectId(objectId)
+        .setStatus(status).build();
   }
 
   @Override

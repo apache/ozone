@@ -35,10 +35,11 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -51,10 +52,10 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 
 /**
  * Test for NSSummaryTaskWithLegacy.
@@ -120,6 +121,7 @@ public final class TestNSSummaryTaskWithLegacy {
   private static Set<Long> bucketOneAns = new HashSet<>();
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
+  private static ReconDBProvider reconDBProvider;
 
   private TestNSSummaryTaskWithLegacy() {
   }
@@ -138,6 +140,7 @@ public final class TestNSSummaryTaskWithLegacy {
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
             .withContainerDB()
+            .addBinding(ReconDBProvider.class)
             .build();
     reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
@@ -147,10 +150,11 @@ public final class TestNSSummaryTaskWithLegacy {
     Assert.assertNull(nonExistentSummary);
 
     populateOMDB();
-
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, omConfiguration);
+        reconOMMetadataManager, omConfiguration,
+        reconDBProvider);
   }
 
   /**

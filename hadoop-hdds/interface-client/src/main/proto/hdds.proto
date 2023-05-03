@@ -485,4 +485,7 @@ message OrphanKeysMetaDataSetProto {
 
 message OrphanKeyMetaDataProto {
     required int64 objectId = 1;
+    required int64 status = 2;
+    required string volumeName = 3;
+    required string bucketName = 4;
 }

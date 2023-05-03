@@ -101,6 +101,22 @@ public class ReconNamespaceSummaryManagerImpl
     return orphanKeysMetaDataTable.get(objectId);
   }
 
+  @Override
+  public void deleteOrphanKeysMetaDataSet(long objectId) throws IOException {
+    orphanKeysMetaDataTable.delete(objectId);
+  }
+
+  @Override
+  public void clearOrphanKeysMetaDataTable() throws IOException {
+    truncateTable(orphanKeysMetaDataTable);
+  }
+
+  @Override
+  public void batchDeleteOrphanKeysMetaData(BatchOperation batch, long objectId)
+      throws IOException {
+    orphanKeysMetaDataTable.deleteWithBatch(batch, objectId);
+  }
+
   public Table getNSSummaryTable() {
     return nsSummaryTable;
   }
