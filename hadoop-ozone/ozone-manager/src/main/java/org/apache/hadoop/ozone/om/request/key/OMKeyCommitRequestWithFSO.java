@@ -180,7 +180,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // if keyToDelete isn't null, usedNamespace shouldn't check and
       // increase.
-      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+      if (keyToDelete != null && isHSync) {
+        correctedSpace -= keyToDelete.getReplicatedSize();
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
+      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbFileKey,

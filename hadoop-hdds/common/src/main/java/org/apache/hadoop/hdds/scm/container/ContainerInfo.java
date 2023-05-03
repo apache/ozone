@@ -52,7 +52,13 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   @JsonIgnore
   private PipelineID pipelineID;
   private ReplicationConfig replicationConfig;
-  private long usedBytes;
+  /*
+  usedBytes is a volatile field. Writes and Reads of volatile long are atomic
+  and each read of a volatile will see the last write to that volatile by any
+  thread. Note that operations such as `usedBytes++` are not atomic, even if
+  usedBytes is volatile.
+  */
+  private volatile long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
   // The wall-clock ms since the epoch at which the current state enters.

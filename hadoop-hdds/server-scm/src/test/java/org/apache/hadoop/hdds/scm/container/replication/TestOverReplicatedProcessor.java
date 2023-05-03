@@ -58,6 +58,14 @@ public class TestOverReplicatedProcessor {
     overReplicatedProcessor = new OverReplicatedProcessor(
         replicationManager, rmConf.getOverReplicatedInterval());
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
+
+    // Even through the limit has been exceeded, it should not stop over-rep
+    // processing, as the over-rep handler ignores the limit as it only does
+    // deletes.
+    Mockito.when(replicationManager.getReplicationInFlightLimit())
+        .thenReturn(1L);
+    Mockito.when(replicationManager.getInflightReplicationCount())
+        .thenReturn(2L);
   }
 
   @Test

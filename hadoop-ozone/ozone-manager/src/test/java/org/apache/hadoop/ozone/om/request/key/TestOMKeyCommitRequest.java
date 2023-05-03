@@ -217,7 +217,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     List<KeyLocation> committedKeyLocationList = getKeyLocation(3);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
-        committedKeyLocationList));
+        committedKeyLocationList, false));
 
     OMKeyCommitRequest omKeyCommitRequest =
         getOmKeyCommitRequest(modifiedOmRequest);
@@ -293,6 +293,65 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getLatestVersionLocations().getLocationList());
     Assert.assertEquals(3, intersection.size());
 
+  }
+
+  @Test
+  public void testCommitWithHsyncIncrementalUsages() throws Exception {
+    BucketLayout bucketLayout = getBucketLayout();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
+        .get(bucketKey);
+    long usedBytes = bucketInfo.getUsedBytes();
+
+    performHsyncCommit(allocatedKeyLocationList.subList(0, 5));
+    bucketInfo = omMetadataManager.getBucketTable()
+        .get(bucketKey);
+    long firstCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(500, firstCommitUsedBytes - usedBytes);
+
+    performHsyncCommit(allocatedKeyLocationList);
+    bucketInfo = omMetadataManager.getBucketTable()
+        .get(bucketKey);
+    long nextCommitUsedBytes = bucketInfo.getUsedBytes();
+
+    Assert.assertEquals(1000, nextCommitUsedBytes - usedBytes);
+  }
+  
+  private List<KeyLocation> performHsyncCommit(
+      List<KeyLocation> keyLocations) throws Exception {
+    // allocated block list
+    dataSize = keyLocations.size() * 100;
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
+        keyLocations, true));
+    OMKeyCommitRequest omKeyCommitRequest =
+        getOmKeyCommitRequest(modifiedOmRequest);
+
+    List<OmKeyLocationInfo> allocatedBlockList = keyLocations
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    String openKey = addKeyToOpenKeyTable(allocatedBlockList);
+    String ozoneKey = getOzonePathKey();
+    
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
+            100L, ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // key must be prsent in both open key table and key table for hsync
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(
+            omKeyCommitRequest.getBucketLayout()).get(openKey);
+    Assert.assertNotNull(omKeyInfo);
+    omKeyInfo =
+        omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
+            .get(ozoneKey);
+    Assert.assertNotNull(omKeyInfo);
+    return keyLocations;
   }
 
   @Test
@@ -572,13 +631,18 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createCommitKeyRequest() {
-    return createCommitKeyRequest(getKeyLocation(5));
+    return createCommitKeyRequest(false);
+  }
+
+  private OMRequest createCommitKeyRequest(boolean isHsync) {
+    return createCommitKeyRequest(getKeyLocation(5), isHsync);
   }
 
   /**
    * Create OMRequest which encapsulates CommitKeyRequest.
    */
-  private OMRequest createCommitKeyRequest(List<KeyLocation> keyLocations) {
+  private OMRequest createCommitKeyRequest(
+      List<KeyLocation> keyLocations, boolean isHsync) {
     KeyArgs keyArgs =
         KeyArgs.newBuilder().setDataSize(dataSize).setVolumeName(volumeName)
             .setKeyName(keyName).setBucketName(bucketName)
@@ -587,7 +651,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     CommitKeyRequest commitKeyRequest =
         CommitKeyRequest.newBuilder().setKeyArgs(keyArgs)
-            .setClientID(clientID).build();
+            .setClientID(clientID).setHsync(isHsync).build();
 
     return OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
