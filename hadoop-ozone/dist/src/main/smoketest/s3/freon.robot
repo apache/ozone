@@ -24,6 +24,7 @@ Suite Setup         Setup v4 headers
 
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
+${BUCKET}               generated
 
 *** Keywords ***
 #   Export access key and secret to the environment
@@ -41,4 +42,4 @@ Freon S3BG
 *** Test Cases ***
 Run Freon S3BG
     [Setup]    Setup aws credentials
-    Freon S3BG
+    Freon S3BG   s3bg-${BUCKET}
