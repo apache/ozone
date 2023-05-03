@@ -47,6 +47,21 @@ Head object where path is a directory
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
 
+Head object directory objects
+    ${fso-bucket} =     Create fos bucket
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${fso-bucket} --key ${PREFIX}/mydir/ --body /tmp/testfile   0
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${fso-bucket} --key ${PREFIX}/mydir   255
+                        Should contain          ${result}    404
+                        Should contain          ${result}    Not Found
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${fso-bucket} --key ${PREFIX}/mydir/   0
+
+    ${obs-bucket} =     Create obs bucket
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${obs-bucket} --key ${PREFIX}/mydir/ --body /tmp/testfile   0
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${obs-bucket} --key ${PREFIX}/mydir   255
+                        Should contain          ${result}    404
+                        Should contain          ${result}    Not Found
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${obs-bucket} --key ${PREFIX}/mydir/   0
+
 Head non existing key
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
                         Should contain          ${result}    404

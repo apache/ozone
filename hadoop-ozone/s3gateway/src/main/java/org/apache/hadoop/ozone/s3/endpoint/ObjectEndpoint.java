@@ -318,6 +318,8 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneKeyDetails keyDetails = getClientProtocol()
           .getS3KeyDetails(bucketName, keyPath);
 
+      validateCorrectKeyName(keyPath, keyDetails);
+
       long length = keyDetails.getDataSize();
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
@@ -462,6 +464,7 @@ public class ObjectEndpoint extends EndpointBase {
     OzoneKey key;
     try {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
+      validateCorrectKeyName(keyPath, key);
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       AUDIT.logReadFailure(
@@ -493,6 +496,23 @@ public class ObjectEndpoint extends EndpointBase {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters()));
     return response.build();
+  }
+
+  private void validateCorrectKeyName(String keyPath, OzoneKey key)
+      throws OMException {
+    // Since HDDS-7419, OM automatically looks up for a folder if the original
+    // key is not found. E.g. if the key "mykey" is not found, OM will tries
+    // looking for "mykey/" and return a directory keyInfo.
+
+    // This behavior is not compatible with S3A clients who usually use fake
+    // object key like "mydir/" to mark folders and expect a NOT_FOUND when
+    // looking up for "mydir", see HDDS-8496.
+
+    // This validation identify if OM automatically return a directory object,
+    // and return NOT_FOUND to S3A clients.
+    if (keyPath.length() == key.getName().length() - 1 && !key.isFile()) {
+      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    }
   }
 
   /**

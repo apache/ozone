@@ -61,6 +61,8 @@ public class OzoneKey {
   private ReplicationConfig replicationConfig;
 
   private Map<String, String> metadata = new HashMap<>();
+
+  private boolean isFile;
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -97,10 +99,11 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata) {
+                  Map<String, String> metadata, boolean isFile) {
     this(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig);
     this.metadata.putAll(metadata);
+    this.isFile = isFile;
   }
 
   /**
@@ -183,6 +186,10 @@ public class OzoneKey {
     return replicationConfig.getRequiredNodes();
   }
 
+  public boolean isFile() {
+    return isFile;
+  }
+
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }
@@ -191,7 +198,7 @@ public class OzoneKey {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata());
+        keyInfo.getMetadata(), keyInfo.isFile());
   }
 
 }
