@@ -197,7 +197,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return false;
     }
     // flush and commit left out entries at end
-    if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap, 1L)) {
+    if (!writeFlushAndCommitOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap,
+        1L)) {
       return false;
     }
 
@@ -250,7 +251,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       if (removeDeletedDirEntries(omMetadataManager, orphanMetaDataKeyList)) {
         return false;
       }
-
+      if (!deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
+        return false;
+      }
       // Verify if child keys for left out parents are really orphans or
       // their parents are bucket objects.
       List<Long> bucketObjectIds = new ArrayList<>();
@@ -258,6 +261,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         return false;
       }
 
+      if (!deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
+        return false;
+      }
       LOG.info("Completed verification of orphan key candidates.");
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
@@ -293,7 +299,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           return true;
         }
       }
-      return deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList);
+      return false;
     }
   }
 

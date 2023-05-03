@@ -414,7 +414,7 @@ public class NSSummaryTaskDbEventHandler {
           }
         }
       }
-      return deleteFlushAndCommitOrphanKeysMetaDataToDB(bucketObjectIds);
+      return false;
     }
   }
 
