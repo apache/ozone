@@ -226,8 +226,6 @@ $ ozone fs -put ./NOTICE.txt ofs://om/tmp/key1
 
 ## Delete with trash enabled
 
-
-
 In order to enable trash in Ozone, Please add these configs to core-site.xml
 
 {{< highlight xml >}}
