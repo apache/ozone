@@ -91,6 +91,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
@@ -193,6 +194,7 @@ public class ReplicationManager implements SCMService {
   private final int datanodeReplicationLimit;
   private final int reconstructionCommandWeight;
   private final int datanodeDeleteLimit;
+  private final double inflightReplicationFactor;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -245,6 +247,7 @@ public class ReplicationManager implements SCMService {
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
     this.reconstructionCommandWeight = rmConf.getReconstructionCommandWeight();
     this.datanodeDeleteLimit = rmConf.getDatanodeDeleteLimit();
+    this.inflightReplicationFactor = rmConf.getInflightReplicationLimitFactor();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
@@ -397,6 +400,35 @@ public class ReplicationManager implements SCMService {
 
   public void sendCloseContainerEvent(ContainerID containerID) {
     eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+  }
+
+  /**
+   * Returns the maximum number of inflight replications allowed across the
+   * cluster at any given time. If zero is returned, there is no limit.
+   * @return zero if not limit defined, otherwise the maximum number of
+   *         inflight replications allowed across the cluster at any given time.
+   */
+  public long getReplicationInFlightLimit() {
+    if (inflightReplicationFactor <= 0) {
+      return 0;
+    }
+    // Any healthy node in the cluster can participate in replication by being
+    // as source. Eg, even decommissioned hosts can be a source if they are
+    // still online. If the host is offline, then it will be quickly stale or
+    // dead. Therefore we simply count the number of healthy nodes and include
+    // those which are not in service.
+    int healthyNodes = nodeManager.getNodeCount(null, HEALTHY);
+    return (long) Math.ceil(
+        healthyNodes * datanodeReplicationLimit * inflightReplicationFactor);
+  }
+
+  /**
+   * Returns the number of inflight replications currently in progress across
+   * the cluster.
+   */
+  public long getInflightReplicationCount() {
+    return containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
   }
 
   /**
@@ -1227,6 +1259,31 @@ public class ReplicationManager implements SCMService {
       return datanodeDeleteLimit;
     }
 
+    @Config(key = "inflight.limit.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.75",
+        tags = { SCM },
+        description = "The overall replication task limit on a cluster is the" +
+            " number healthy nodes, times the datanode.replication.limit." +
+            " This factor, which should be between zero and 1, scales that" +
+            " limit down to reduce the overall number of replicas pending" +
+            " creation on the cluster. A setting of zero disables global" +
+            " limit checking. A setting of 1 effectively disables it, by" +
+            " making the limit equal to the above equation. However if there" +
+            " are many decommissioning nodes on the cluster, the decommission" +
+            " nodes will have a higher than normal limit, so the setting of 1" +
+            " may still provide some limit in extreme circumstances."
+    )
+    private double inflightReplicationLimitFactor = 0.75;
+
+    public double getInflightReplicationLimitFactor() {
+      return inflightReplicationLimitFactor;
+    }
+
+    public void setInflightReplicationLimitFactor(double factor) {
+      this.inflightReplicationLimitFactor = factor;
+    }
+
     public void setDatanodeReplicationLimit(int limit) {
       this.datanodeReplicationLimit = limit;
     }
@@ -1285,6 +1342,16 @@ public class ReplicationManager implements SCMService {
       if (reconstructionCommandWeight <= 0) {
         throw new IllegalArgumentException("reconstructionCommandWeight is"
             + " set to " + reconstructionCommandWeight + " and must be > 0");
+      }
+      if (inflightReplicationLimitFactor < 0) {
+        throw new IllegalArgumentException(
+            "inflight.limit.factor is set to " + inflightReplicationLimitFactor
+                + " and must be >= 0");
+      }
+      if (inflightReplicationLimitFactor > 1) {
+        throw new IllegalArgumentException(
+            "inflight.limit.factor is set to " + inflightReplicationLimitFactor
+                + " and must be <= 1");
       }
     }
   }

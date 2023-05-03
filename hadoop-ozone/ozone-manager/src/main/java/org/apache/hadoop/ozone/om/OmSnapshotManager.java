@@ -148,6 +148,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
 
+  private final long diffCleanupServiceInterval;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
@@ -234,7 +235,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         ozoneManager, snapshotCache, snapDiffJobCf, snapDiffReportCf,
         columnFamilyOptions, codecRegistry);
 
-    long diffCleanupServiceInterval = ozoneManager.getConfiguration()
+    diffCleanupServiceInterval = ozoneManager.getConfiguration()
         .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
@@ -747,5 +748,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (options != null) {
       options.close();
     }
+  }
+
+  public long getDiffCleanupServiceInterval() {
+    return diffCleanupServiceInterval;
   }
 }
