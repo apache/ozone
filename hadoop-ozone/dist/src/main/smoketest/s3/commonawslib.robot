@@ -118,12 +118,6 @@ Create legacy bucket
     ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
     [Return]             ${legacy_bucket}
 
-Create fso bucket
-    ${postfix} =         Generate Ozone String
-    ${bucket} =   Set Variable               fso-bucket-${postfix}
-    ${result} =          Execute and checkrc        ozone sh bucket create -l FILE_SYSTEM_OPTIMIZED s3v/${bucket}   0
-    [Return]             ${bucket}
-
 Create obs bucket
     ${postfix} =         Generate Ozone String
     ${bucket} =   Set Variable               obs-bucket-${postfix}
