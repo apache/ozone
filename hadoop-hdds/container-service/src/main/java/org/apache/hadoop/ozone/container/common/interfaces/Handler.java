@@ -21,22 +21,23 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.function.Consumer;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.ratis.statemachine.StateMachine;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -48,15 +49,15 @@ public abstract class Handler {
   protected final ConfigurationSource conf;
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
-  protected String scmID;
+  protected String clusterId;
   protected final ContainerMetrics metrics;
   protected String datanodeId;
-  private Consumer<ContainerReplicaProto> icrSender;
+  private IncrementalReportSender<Container> icrSender;
 
   protected Handler(ConfigurationSource config, String datanodeId,
       ContainerSet contSet, VolumeSet volumeSet,
       ContainerMetrics containerMetrics,
-      Consumer<ContainerReplicaProto> icrSender) {
+      IncrementalReportSender<Container> icrSender) {
     this.conf = config;
     this.containerSet = contSet;
     this.volumeSet = volumeSet;
@@ -69,7 +70,7 @@ public abstract class Handler {
       final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
-      Consumer<ContainerReplicaProto> icrSender) {
+      IncrementalReportSender<Container> icrSender) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
@@ -80,6 +81,10 @@ public abstract class Handler {
           containerType + "doesn't exist.");
     }
   }
+
+  public abstract StateMachine.DataChannel getStreamDataChannel(
+          Container container, ContainerCommandRequestProto msg)
+          throws StorageContainerException;
 
   /**
    * Returns the Id of this datanode.
@@ -98,8 +103,13 @@ public abstract class Handler {
    */
   protected void sendICR(final Container container)
       throws StorageContainerException {
-    ContainerReplicaProto containerReport = container.getContainerReport();
-    icrSender.accept(containerReport);
+    if (container
+        .getContainerState() == ContainerProtos.ContainerDataProto
+        .State.RECOVERING) {
+      // Ignoring the recovering containers reports for now.
+      return;
+    }
+    icrSender.send(container);
   }
 
   public abstract ContainerCommandResponseProto handle(
@@ -138,7 +148,7 @@ public abstract class Handler {
       throws IOException;
 
   /**
-   * Marks the container Unhealthy. Moves the container to UHEALTHY state.
+   * Marks the container Unhealthy. Moves the container to UNHEALTHY state.
    *
    * @param container container to update
    * @throws IOException in case of exception
@@ -186,8 +196,19 @@ public abstract class Handler {
   public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
-  public void setScmID(String scmId) {
-    this.scmID = scmId;
+  /**
+   * Deletes the possible onDisk but unreferenced blocks/chunks with localID
+   * in the container.
+   *
+   * @param container container whose block/chunk is to be deleted
+   * @param localID   localId of the block/chunk
+   * @throws IOException
+   */
+  public abstract void deleteUnreferenced(Container container, long localID)
+      throws IOException;
+
+  public void setClusterID(String clusterID) {
+    this.clusterId = clusterID;
   }
 
 }

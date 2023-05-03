@@ -16,10 +16,12 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.base.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
  */
 public class OmKeyLocationInfoGroup {
   private final long version;
+  // TODO: HDDS-5472 Store one version of locationInfo for each
+  //   OmKeyLocationInfoGroup
   private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
   private  boolean isMultipartKey;
 
@@ -89,15 +93,26 @@ public class OmKeyLocationInfoGroup {
     return version;
   }
 
+  /**
+   * Use this expensive method only when absolutely needed!
+   * It creates a new list so it is not an O(1) operation.
+   * Use getLocationLists() instead.
+   * @return a list of OmKeyLocationInfo
+   */
   public List<OmKeyLocationInfo> getLocationList() {
     return locationVersionMap.values().stream().flatMap(List::stream)
         .collect(Collectors.toList());
+  }
+
+  public Collection<List<OmKeyLocationInfo>> getLocationLists() {
+    return locationVersionMap.values();
   }
 
   public long getLocationListCount() {
     return locationVersionMap.values().stream().mapToLong(List::size).sum();
   }
 
+  @Deprecated
   public List<OmKeyLocationInfo> getLocationList(Long versionToFetch) {
     return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
@@ -137,8 +152,7 @@ public class OmKeyLocationInfoGroup {
    */
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
-    Map<Long, List<OmKeyLocationInfo>> newMap =
-        new HashMap<>(locationVersionMap);
+    Map<Long, List<OmKeyLocationInfo>> newMap = new HashMap<>();
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }
@@ -151,7 +165,7 @@ public class OmKeyLocationInfoGroup {
     }
   }
 
-  void removeBlocks(long versionToRemove){
+  void removeBlocks(long versionToRemove) {
     locationVersionMap.remove(versionToRemove);
   }
 
@@ -167,10 +181,28 @@ public class OmKeyLocationInfoGroup {
     sb.append("version:").append(version).append(" ");
     sb.append("isMultipartKey:").append(isMultipartKey);
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for(OmKeyLocationInfo kli: kliList) {
+      for (OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
     }
     return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    OmKeyLocationInfoGroup that = (OmKeyLocationInfoGroup) o;
+    return version == that.version && isMultipartKey == that.isMultipartKey
+        && Objects.equal(locationVersionMap, that.locationVersionMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(version, locationVersionMap, isMultipartKey);
   }
 }

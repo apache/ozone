@@ -47,6 +47,11 @@ public class ConfigurationExample extends ConfigurationExampleParent {
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
   private long waitTime = 1;
 
+  @Config(key = "threshold", type = ConfigType.DOUBLE, defaultValue = "10",
+      description = "Threshold (To test DOUBLE config type)",
+      tags = ConfigTag.MANAGEMENT)
+  private double threshold = 10;
+
   public void setClientAddress(String clientAddress) {
     this.clientAddress = clientAddress;
   }
@@ -67,6 +72,10 @@ public class ConfigurationExample extends ConfigurationExampleParent {
     this.waitTime = waitTime;
   }
 
+  public void setThreshold(double threshold) {
+    this.threshold = threshold;
+  }
+
   public String getClientAddress() {
     return clientAddress;
   }
@@ -85,5 +94,9 @@ public class ConfigurationExample extends ConfigurationExampleParent {
 
   public long getWaitTime() {
     return waitTime;
+  }
+
+  public double getThreshold() {
+    return threshold;
   }
 }

@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -33,6 +32,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -94,9 +94,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
+            volume, bucket, null);
       }
       lockAcquired =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
@@ -131,7 +131,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(dbBucketKey),
-            new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, omBucketInfo));
       }
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
@@ -204,8 +204,11 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * @param exception
    * @return OMClientResponse
    */
-  abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception);
+  OMClientResponse onFailure(OMResponse.Builder omResponse,
+      IOException exception) {
+    return new OMBucketAclResponse(
+        createErrorOMResponse(omResponse, exception));
+  }
 
   /**
    * Completion hook for final processing before return without lock.

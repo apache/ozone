@@ -19,34 +19,35 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests SCM Safe mode with pipeline rules.
  */
 
-@Ignore
+@Disabled
 public class TestSCMSafeModeWithPipelineRules {
 
   private MiniOzoneCluster cluster;
@@ -54,12 +55,9 @@ public class TestSCMSafeModeWithPipelineRules {
   private PipelineManager pipelineManager;
   private MiniOzoneCluster.Builder clusterBuilder;
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  public void setup(int numDatanodes) throws Exception {
+  public void setup(int numDatanodes, Path metadataDir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().toString());
+        metadataDir.toAbsolutePath().toString());
     conf.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         true);
@@ -80,15 +78,15 @@ public class TestSCMSafeModeWithPipelineRules {
 
 
   @Test
-  public void testScmSafeMode() throws Exception {
+  public void testScmSafeMode(@TempDir Path tempDir) throws Exception {
 
     int datanodeCount = 6;
-    setup(datanodeCount);
+    setup(datanodeCount, tempDir);
 
-    waitForRatis3NodePipelines(datanodeCount/3);
+    waitForRatis3NodePipelines(datanodeCount / 3);
     waitForRatis1NodePipelines(datanodeCount);
 
-    int totalPipelineCount = datanodeCount + (datanodeCount/3);
+    int totalPipelineCount = datanodeCount + (datanodeCount / 3);
 
     //Cluster is started successfully
     cluster.stop();
@@ -98,8 +96,8 @@ public class TestSCMSafeModeWithPipelineRules {
 
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelineList =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE));
 
 
     pipelineList.get(0).getNodes().forEach(datanodeDetails -> {
@@ -115,7 +113,7 @@ public class TestSCMSafeModeWithPipelineRules {
         cluster.getStorageContainerManager().getScmSafeModeManager();
 
 
-    // Ceil(0.1 * 2) is 1, as one pipeline is healthy healthy pipeline rule is
+    // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
     GenericTestUtils.waitFor(() ->
@@ -128,7 +126,7 @@ public class TestSCMSafeModeWithPipelineRules {
         !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
             .validate(), 1000, 60000);
 
-    Assert.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
+    Assertions.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
     DatanodeDetails restartedDatanode = pipelineList.get(1).getFirstNode();
     // Now restart one datanode from the 2nd pipeline
@@ -148,7 +146,7 @@ public class TestSCMSafeModeWithPipelineRules {
 
     // As after safemode wait time is not completed, we should have total
     // pipeline's as original count 6(1 node pipelines) + 2 (3 node pipeline)
-    Assert.assertEquals(totalPipelineCount,
+    Assertions.assertEquals(totalPipelineCount,
         pipelineManager.getPipelines().size());
 
     ReplicationManager replicationManager =
@@ -177,11 +175,11 @@ public class TestSCMSafeModeWithPipelineRules {
     });
 
     waitForRatis1NodePipelines(datanodeCount);
-    waitForRatis3NodePipelines(datanodeCount/3);
+    waitForRatis3NodePipelines(datanodeCount / 3);
 
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -192,16 +190,17 @@ public class TestSCMSafeModeWithPipelineRules {
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 
   private void waitForRatis1NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, Pipeline.PipelineState.OPEN)
+        .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
+            Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 }

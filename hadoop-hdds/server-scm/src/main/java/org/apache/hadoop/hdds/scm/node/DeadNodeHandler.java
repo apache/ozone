@@ -19,7 +19,9 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,14 +29,18 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
@@ -83,7 +89,23 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
         removeContainerReplicas(datanodeDetails);
       }
+      
+      // remove commands in command queue for the DN
+      final List<SCMCommand> cmdList = nodeManager.getCommandQueue(
+          datanodeDetails.getUuid());
+      LOG.info("Clearing command queue of size {} for DN {}",
+          cmdList.size(), datanodeDetails);
 
+      //move dead datanode out of ClusterNetworkTopology
+      NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+      if (nt.contains(datanodeDetails)) {
+        nt.remove(datanodeDetails);
+        //make sure after DN is removed from topology,
+        //DatanodeDetails instance returned from nodeStateManager has no parent.
+        Preconditions.checkState(
+            nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+                .getParent() == null);
+      }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an
       // unregistered datanode!
@@ -101,12 +123,12 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         .ifPresent(pipelines ->
             pipelines.forEach(id -> {
               try {
-                pipelineManager.finalizeAndDestroyPipeline(
+                pipelineManager.closePipeline(
                     pipelineManager.getPipeline(id), false);
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?
-              } catch (IOException ex) {
+              } catch (IOException | TimeoutException ex) {
                 LOG.warn("Exception while finalizing pipeline {}",
                     id, ex);
               }
@@ -171,5 +193,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         });
   }
 
+  protected NodeManager getNodeManager() {
+    return nodeManager;
+  }
 
 }

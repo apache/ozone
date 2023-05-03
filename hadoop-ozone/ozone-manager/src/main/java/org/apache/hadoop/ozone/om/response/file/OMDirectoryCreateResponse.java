@@ -19,11 +19,13 @@
 package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -40,7 +42,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
  * Response for create directory request.
  */
 @CleanupTableInfo(cleanupTables = {KEY_TABLE})
-public class OMDirectoryCreateResponse extends OMClientResponse {
+public class OMDirectoryCreateResponse extends OmKeyResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
@@ -48,14 +50,17 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
   private Result result;
+  private OmBucketInfo bucketInfo;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo dirKeyInfo,
-      @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull Result result) {
-    super(omResponse);
+      @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull Result result,
+      @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
+    super(omResponse, bucketLayout);
     this.dirKeyInfo = dirKeyInfo;
     this.parentKeyInfos = parentKeyInfos;
     this.result = result;
+    this.bucketInfo = bucketInfo;
   }
 
   /**
@@ -79,14 +84,18 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
                 parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
         LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
             parentKeyInfo);
-        omMetadataManager.getKeyTable()
+        omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
 
       String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
           dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-          dirKeyInfo);
+      omMetadataManager.getKeyTable(getBucketLayout())
+          .putWithBatch(batchOperation, dirKey, dirKeyInfo);
+      String bucketKey = omMetadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, bucketInfo);
     } else if (Result.DIRECTORY_ALREADY_EXISTS == result) {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

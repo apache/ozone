@@ -28,14 +28,14 @@ import org.apache.hadoop.http.HttpConfig;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * This class contains constants for configuration keys used in Ozone.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
-  public static final String OZONE_TAGS_SYSTEM_KEY =
-      "ozone.tags.system";
   public static final String DFS_CONTAINER_IPC_PORT =
       "dfs.container.ipc";
   public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
@@ -53,6 +53,12 @@ public final class OzoneConfigKeys {
   public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
       "dfs.container.ipc.random.port";
   public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
+      false;
+
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
+      "dfs.container.ratis.datastream.random.port";
+  public static final boolean
+      DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
@@ -78,6 +84,35 @@ public final class OzoneConfigKeys {
   public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
+   * Ratis Port where containers listen to datastream requests.
+   */
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
+      = "dfs.container.ratis.datastream.enabled";
+  public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
+      = false;
+  public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
+      = "dfs.container.ratis.datastream.port";
+  public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
+      = 9855;
+
+  /**
+   * Flag to enable ratis streaming on filesystem writes.
+   */
+  public static final String OZONE_FS_DATASTREAM_ENABLED
+      = "ozone.fs.datastream.enabled";
+  public static final boolean OZONE_FS_DATASTREAM_ENABLED_DEFAULT
+      = false;
+
+  /**
+   * Flag to enable hsync/hflush.
+   */
+  public static final String OZONE_FS_HSYNC_ENABLED
+      = "ozone.fs.hsync.enabled";
+  public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
+      = false;
+
+
+  /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
@@ -97,6 +132,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF =
       "OFF";
 
+  public static final String OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE =
+      "ozone.metastore.rocksdb.cf.write.buffer.size";
+  public static final String
+      OZONE_METADATA_STORE_ROCKSDB_CF_WRITE_BUFFER_SIZE_DEFAULT = "128MB";
+
   public static final String OZONE_UNSAFEBYTEOPERATIONS_ENABLED =
       "ozone.UnsafeByteOperations.enabled";
   public static final boolean OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT
@@ -113,6 +153,18 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
+      "ozone.client.max.ec.stripe.write.retries";
+  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
+      "10";
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
+      "ozone.client.ec.grpc.retries.enabled";
+  public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
+      = true;
+  public static final String OZONE_CLIENT_EC_GRPC_RETRIES_MAX =
+      "ozone.client.ec.grpc.retries.max";
+  public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the
@@ -122,6 +174,20 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS =
       "ozone.administrators";
+
+  public static final String OZONE_ADMINISTRATORS_GROUPS =
+      "ozone.administrators.groups";
+
+  public static final String OZONE_S3_ADMINISTRATORS =
+      "ozone.s3.administrators";
+  public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
+      "ozone.s3.administrators.groups";
+
+  public static final String OZONE_READONLY_ADMINISTRATORS =
+      "ozone.readonly.administrators";
+  public static final String OZONE_READONLY_ADMINISTRATORS_GROUPS =
+      "ozone.readonly.administrators.groups";
+
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
@@ -148,8 +214,8 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final int OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.getValue();
+  public static final String OZONE_REPLICATION_DEFAULT =
+      ReplicationFactor.THREE.toString();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =
@@ -170,27 +236,55 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
-  /**
-   * The interval of open key clean service.
-   */
-  public static final String OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_SECONDS =
-      "ozone.open.key.cleanup.service.interval.seconds";
-  public static final int
-      OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_SECONDS_DEFAULT
-      = 24 * 3600; // a total of 24 hour
-
-  /**
-   * An open key gets cleaned up when it is being in open state for too long.
-   */
-  public static final String OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS =
-      "ozone.open.key.expire.threshold";
-  public static final int OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT =
-      24 * 3600;
-
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT =
       "ozone.block.deleting.service.timeout";
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
       = "300s"; // 300s for default
+
+  public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT =
+      "ozone.sst.filtering.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
+      // 300s for default
+
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
+      "ozone.snapshot.deleting.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT = "30s";
+
+  public static final String OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT =
+      "ozone.snapshot.deleting.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT = "300s";
+
+  public static final String OZONE_BLOCK_DELETING_SERVICE_WORKERS =
+      "ozone.block.deleting.service.workers";
+  public static final int OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT
+      = 10;
+
+  /**
+   * Configuration properties for Ozone Recovering Container Scrubbing Service.
+   */
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT =
+      "ozone.recovering.container.scrubbing.service.timeout";
+
+  // 300s for default
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT = "300s";
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS =
+      "ozone.recovering.container.scrubbing.service.workers";
+  public static final int
+      OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS_DEFAULT = 10;
+
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT =
+      "ozone.recovering.container.timeout";
+  public static final String
+      OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
+
 
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
@@ -319,7 +413,12 @@ public final class OzoneConfigKeys {
   public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
       "hdds.datanode.metadata.rocksdb.cache.size";
   public static final String
-      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "1GB";
+
+  // Specifying the dedicated volumes for per-disk db instances.
+  // For container schema v3 only.
+  public static final String HDDS_DATANODE_CONTAINER_DB_DIR =
+      "hdds.datanode.container.db.dir";
 
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
@@ -328,6 +427,8 @@ public final class OzoneConfigKeys {
   public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
       "ozone.security.http.kerberos.enabled";
   public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;
+  public static final String OZONE_HTTP_FILTER_INITIALIZERS_KEY =
+      "ozone.http.filter.initializers";
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
@@ -364,7 +465,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
-      15;
+      500;
   public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
@@ -398,7 +499,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";
-  public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = false;
+  public static final boolean OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT = true;
 
   public static final String OZONE_MANAGER_FAIR_LOCK = "ozone.om.lock.fair";
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;
@@ -439,6 +540,97 @@ public final class OzoneConfigKeys {
       "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
+
+  public static final int OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT = -1;
+  public static final String OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY =
+      "ozone.client.key.provider.cache.expiry";
+  public static final long OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT =
+      TimeUnit.DAYS.toMillis(10); // 10 days
+
+  public static final String OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION =
+      "ozone.client.key.latest.version.location";
+  public static final boolean OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION_DEFAULT =
+      true;
+
+  public static final String OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED =
+          "ozone.network.flexible.fqdn.resolution.enabled";
+  public static final boolean OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT =
+          false;
+
+  public static final String OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED =
+          "ozone.network.jvm.address.cache.enabled";
+  public static final boolean OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT =
+          true;
+
+  public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
+      "ozone.client.required.om.version.min";
+
+  public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_DEFAULT =
+      OzoneManagerVersion.S3G_PERSISTENT_CONNECTIONS.name();
+
+  public static final String
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_MS =
+      "ozone.client.bucket.replication.config.refresh.time.ms";
+  public static final long
+      OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
+      300 * 1000;
+
+  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+      "ozone.client.fs.default.bucket.layout";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
+      "FILE_SYSTEM_OPTIMIZED";
+
+  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY =
+      "LEGACY";
+
+  public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
+      "ozone.audit.log.debug.cmd.list.omaudit";
+
+  // Items listing page size for fs client sub-commands output
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE = "ozone.fs.listing.page.size";
+
+  public static final int
+      OZONE_FS_LISTING_PAGE_SIZE_DEFAULT = 1024;
+
+  public static final int
+      OZONE_FS_MAX_LISTING_PAGE_SIZE = 5000;
+
+  public static final String
+      OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
+
+
+  public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
+  public static final String FS_TRASH_CLASSNAME_DEFAULT =
+      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+
+  public static final String
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
+      "ozone.om.snapshot.compaction.dag.max.time.allowed";
+
+  public static final long
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT =
+      TimeUnit.DAYS.toMillis(30);
+
+  public static final String
+      OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL =
+      "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval";
+
+  public static final long
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
+      TimeUnit.HOURS.toMillis(1);
+
+  public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
+      "ozone.om.delta.update.data.size.max.limit";
+  public static final String
+      OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT = "1024MB";
+
+  public static final TimeDuration
+      OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT =
+      TimeDuration.valueOf(150, TimeUnit.SECONDS);
+  public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
+      "ozone.scm.close.container.wait.duration";
 
   /**
    * There is no need to instantiate this class.

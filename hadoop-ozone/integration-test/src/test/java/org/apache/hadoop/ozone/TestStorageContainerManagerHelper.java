@@ -25,16 +25,17 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -74,47 +75,50 @@ public class TestStorageContainerManagerHelper {
       throws Exception {
     Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    // Write 20 keys in bucketName.
-    Set<String> keyNames = Sets.newHashSet();
-    for (int i = 0; i < numOfKeys; i++) {
-      String keyName = RandomStringUtils.randomAlphabetic(5) + i;
-      keyNames.add(keyName);
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      // Write 20 keys in bucketName.
+      Set<String> keyNames = Sets.newHashSet();
+      for (int i = 0; i < numOfKeys; i++) {
+        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        keyNames.add(keyName);
 
-      TestDataUtil
-          .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+        TestDataUtil
+            .createKey(bucket, keyName, RandomStringUtils.randomAlphabetic(5));
+      }
+
+      for (String key : keyNames) {
+        OmKeyArgs arg = new OmKeyArgs.Builder()
+            .setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getName())
+            .setKeyName(key)
+            .build();
+        OmKeyInfo location = cluster.getOzoneManager()
+            .lookupKey(arg);
+        keyLocationMap.put(key, location);
+      }
     }
 
-    for (String key : keyNames) {
-      OmKeyArgs arg = new OmKeyArgs.Builder()
-          .setVolumeName(bucket.getVolumeName())
-          .setBucketName(bucket.getName())
-          .setKeyName(key)
-          .setRefreshPipeline(true)
-          .build();
-      OmKeyInfo location = cluster.getOzoneManager()
-          .lookupKey(arg);
-      keyLocationMap.put(key, location);
-    }
     return keyLocationMap;
   }
 
   public List<String> getPendingDeletionBlocks(Long containerID)
       throws IOException {
     List<String> pendingDeletionBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containerID);
-    KeyPrefixFilter filter =
-        new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
+    KeyValueContainerData cData = getContainerMetadata(containerID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+      KeyPrefixFilter filter = cData.getDeletingBlockKeyFilter();
 
-    List<? extends Table.KeyValue<String, BlockData>> kvs =
-        meta.getStore().getBlockDataTable()
-        .getRangeKVs(null, Integer.MAX_VALUE, filter);
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.containerPrefix(), filter);
 
-    for (Table.KeyValue<String, BlockData> entry : kvs) {
-      pendingDeletionBlocks
-              .add(entry.getKey().replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        pendingDeletionBlocks
+            .add(entry.getKey().replace(cData.getDeletingBlockKeyPrefix(), ""));
+      }
     }
-    meta.close();
     return pendingDeletionBlocks;
   }
 
@@ -129,44 +133,48 @@ public class TestStorageContainerManagerHelper {
 
   public List<Long> getAllBlocks(Long containeID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containeID);
+    KeyValueContainerData cData = getContainerMetadata(containeID);
+    try (DBHandle db = BlockUtils.getDB(cData, conf)) {
 
-    List<? extends Table.KeyValue<String, BlockData>> kvs =
-          meta.getStore().getBlockDataTable()
-          .getRangeKVs(null, Integer.MAX_VALUE,
-          MetadataKeyFilters.getUnprefixedKeyFilter());
+      List<? extends Table.KeyValue<String, BlockData>> kvs =
+          db.getStore().getBlockDataTable()
+              .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                  cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
-    for (Table.KeyValue<String, BlockData> entry : kvs) {
-      allBlocks.add(Long.valueOf(entry.getKey()));
+      for (Table.KeyValue<String, BlockData> entry : kvs) {
+        allBlocks.add(Long.valueOf(DatanodeSchemaThreeDBDefinition
+            .getKeyWithoutPrefix(entry.getKey())));
+      }
     }
-    meta.close();
     return allBlocks;
   }
 
   public boolean verifyBlocksWithTxnTable(Map<Long, List<Long>> containerBlocks)
       throws IOException {
     for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
-      ReferenceCountedDB meta = getContainerMetadata(entry.getKey());
-      DatanodeStore ds = meta.getStore();
-      DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
-          (DatanodeStoreSchemaTwoImpl) ds;
-      List<? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
-          txnsInTxnTable = dnStoreTwoImpl.getDeleteTransactionTable()
-          .getRangeKVs(null, Integer.MAX_VALUE, null);
-      List<Long> conID = new ArrayList<>();
-      for (Table.KeyValue<Long, DeletedBlocksTransaction> txn :
-          txnsInTxnTable) {
-        conID.addAll(txn.getValue().getLocalIDList());
+      KeyValueContainerData cData = getContainerMetadata(entry.getKey());
+      try (DBHandle db = BlockUtils.getDB(cData, conf)) {
+        DatanodeStore ds = db.getStore();
+        DatanodeStoreSchemaThreeImpl dnStoreImpl =
+            (DatanodeStoreSchemaThreeImpl) ds;
+        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+            txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
+            .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
+                cData.containerPrefix());
+        List<Long> conID = new ArrayList<>();
+        for (Table.KeyValue<String, DeletedBlocksTransaction> txn :
+            txnsInTxnTable) {
+          conID.addAll(txn.getValue().getLocalIDList());
+        }
+        if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+          return false;
+        }
       }
-      if (!conID.equals(containerBlocks.get(entry.getKey()))) {
-        return false;
-      }
-      meta.close();
     }
     return true;
   }
 
-  private ReferenceCountedDB getContainerMetadata(Long containerID)
+  private KeyValueContainerData getContainerMetadata(Long containerID)
       throws IOException {
     ContainerWithPipeline containerWithPipeline = cluster
         .getStorageContainerManager().getClientProtocolServer()
@@ -179,7 +187,7 @@ public class TestStorageContainerManagerHelper {
     KeyValueContainerData containerData =
         (KeyValueContainerData) containerServer.getContainerSet()
         .getContainer(containerID).getContainerData();
-    return BlockUtils.getDB(containerData, conf);
+    return containerData;
   }
 
   private OzoneContainer getContainerServerByDatanodeUuid(String dnUUID)

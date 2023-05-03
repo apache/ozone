@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -46,26 +47,23 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createDeleteKeyRequest());
-
-    OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(modifiedOmRequest);
-
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+    String ozoneKey = addKeyToTable();
 
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
     Assert.assertNotNull(omKeyInfo);
+
+    OMRequest modifiedOmRequest =
+            doPreExecute(createDeleteKeyRequest());
+
+    OMKeyDeleteRequest omKeyDeleteRequest =
+            getOmKeyDeleteRequest(modifiedOmRequest);
 
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
@@ -75,7 +73,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         omClientResponse.getOMResponse().getStatus());
     // Now after calling validateAndUpdateCache, it should be deleted.
 
-    omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
   }
@@ -86,13 +84,13 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         doPreExecute(createDeleteKeyRequest());
 
     OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(modifiedOmRequest);
+            getOmKeyDeleteRequest(modifiedOmRequest);
 
     // Add only volume and bucket entry to DB.
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
 
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
@@ -108,11 +106,12 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         doPreExecute(createDeleteKeyRequest());
 
     OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(modifiedOmRequest);
+            getOmKeyDeleteRequest(modifiedOmRequest);
 
-    OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+    OMClientResponse omClientResponse = omKeyDeleteRequest
+        .validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper,
+            omKeyDeleteRequest.getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -124,13 +123,14 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         doPreExecute(createDeleteKeyRequest());
 
     OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(modifiedOmRequest);
+            getOmKeyDeleteRequest(modifiedOmRequest);
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
-    OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+    OMClientResponse omClientResponse = omKeyDeleteRequest
+        .validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper,
+            omKeyDeleteRequest.getBucketLayout());
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
@@ -145,7 +145,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
 
     OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(originalOmRequest);
+            getOmKeyDeleteRequest(originalOmRequest);
 
     OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
 
@@ -169,5 +169,19 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     return OMRequest.newBuilder().setDeleteKeyRequest(deleteKeyRequest)
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
         .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  protected String addKeyToTable() throws Exception {
+    OMRequestTestUtils.addKeyToTable(false, volumeName,
+            bucketName, keyName, clientID, replicationType, replicationFactor,
+            omMetadataManager);
+
+    return omMetadataManager.getOzoneKey(volumeName, bucketName,
+            keyName);
+  }
+
+  protected OMKeyDeleteRequest getOmKeyDeleteRequest(
+      OMRequest modifiedOmRequest) {
+    return new OMKeyDeleteRequest(modifiedOmRequest, BucketLayout.DEFAULT);
   }
 }

@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -39,7 +38,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 
 import com.google.common.base.Strings;
 import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
+import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,9 +78,9 @@ public class InitDatanodeState implements DatanodeState,
   public DatanodeStateMachine.DatanodeStates call() throws Exception {
     Collection<InetSocketAddress> addresses = null;
     try {
-      addresses = getSCMAddresses(conf);
+      addresses = getSCMAddressForDatanodes(conf);
     } catch (IllegalArgumentException e) {
-      if(!Strings.isNullOrEmpty(e.getMessage())) {
+      if (!Strings.isNullOrEmpty(e.getMessage())) {
         LOG.error("Failed to get SCM addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
@@ -123,18 +122,12 @@ public class InitDatanodeState implements DatanodeState,
    */
   private void persistContainerDatanodeDetails() {
     String dataNodeIDPath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    if (Strings.isNullOrEmpty(dataNodeIDPath)) {
-      LOG.error("A valid path is needed for config setting {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
-      this.context.setState(DatanodeStateMachine.DatanodeStates.SHUTDOWN);
-      return;
-    }
     File idPath = new File(dataNodeIDPath);
     DatanodeDetails datanodeDetails = this.context.getParent()
         .getDatanodeDetails();
-    if (datanodeDetails != null && !idPath.exists()) {
+    if (datanodeDetails != null) {
       try {
-        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
       } catch (IOException ex) {
         // As writing DatanodeDetails in to datanodeid file failed, which is
         // a critical thing, so shutting down the state machine.

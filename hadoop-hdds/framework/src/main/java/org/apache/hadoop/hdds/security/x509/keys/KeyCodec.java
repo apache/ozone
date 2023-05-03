@@ -69,8 +69,11 @@ public class KeyCodec {
       LoggerFactory.getLogger(KeyCodec.class);
   private final Path location;
   private final SecurityConfig securityConfig;
-  private Set<PosixFilePermission> permissionSet =
+  private Set<PosixFilePermission> dirPermissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
+          .collect(Collectors.toSet());
+  private Set<PosixFilePermission> filePermissionSet =
+      Stream.of(OWNER_READ, OWNER_WRITE)
           .collect(Collectors.toSet());
   private Supplier<Boolean> isPosixFileSystem;
 
@@ -87,6 +90,18 @@ public class KeyCodec {
   }
 
   /**
+   * Creates a KeyCodec with component name.
+   *
+   * @param config - Security Config.
+   * @param keyDir - path to save the key materials.
+   */
+  public KeyCodec(SecurityConfig config, Path keyDir) {
+    this.securityConfig = config;
+    isPosixFileSystem = KeyCodec::isPosix;
+    this.location = keyDir;
+  }
+
+  /**
    * Checks if File System supports posix style security permissions.
    *
    * @return True if it supports posix.
@@ -97,13 +112,21 @@ public class KeyCodec {
   }
 
   /**
-   * Returns the Permission set.
+   * Returns the keys directory permission set.
    *
    * @return Set
    */
   @VisibleForTesting
-  public Set<PosixFilePermission> getPermissionSet() {
-    return permissionSet;
+  public Set<PosixFilePermission> getDirPermissionSet() {
+    return dirPermissionSet;
+  }
+
+  /**
+   * Returns the file permission set.
+   * @return
+   */
+  public Set<PosixFilePermission> getFilePermissionSet() {
+    return filePermissionSet;
   }
 
   /**
@@ -157,7 +180,7 @@ public class KeyCodec {
       privateKeyWriter.writeObject(
           new PemObject(PRIVATE_KEY, key.getEncoded()));
     }
-    Files.setPosixFilePermissions(privateKeyFile.toPath(), permissionSet);
+    Files.setPosixFilePermissions(privateKeyFile.toPath(), filePermissionSet);
   }
 
   /**
@@ -179,7 +202,7 @@ public class KeyCodec {
       keyWriter.writeObject(
           new PemObject(PUBLIC_KEY, key.getEncoded()));
     }
-    Files.setPosixFilePermissions(publicKeyFile.toPath(), permissionSet);
+    Files.setPosixFilePermissions(publicKeyFile.toPath(), filePermissionSet);
   }
 
   /**
@@ -312,9 +335,9 @@ public class KeyCodec {
     checkPreconditions(basePath);
 
     File privateKeyFile =
-        Paths.get(location.toString(), privateKeyFileName).toFile();
+        Paths.get(basePath.toString(), privateKeyFileName).toFile();
     File publicKeyFile =
-        Paths.get(location.toString(), publicKeyFileName).toFile();
+        Paths.get(basePath.toString(), publicKeyFileName).toFile();
     checkKeyFile(privateKeyFile, force, publicKeyFile);
 
     try (PemWriter privateKeyWriter = new PemWriter(new
@@ -328,8 +351,8 @@ public class KeyCodec {
       publicKeyWriter.writeObject(
           new PemObject(PUBLIC_KEY, keyPair.getPublic().getEncoded()));
     }
-    Files.setPosixFilePermissions(privateKeyFile.toPath(), permissionSet);
-    Files.setPosixFilePermissions(publicKeyFile.toPath(), permissionSet);
+    Files.setPosixFilePermissions(privateKeyFile.toPath(), filePermissionSet);
+    Files.setPosixFilePermissions(publicKeyFile.toPath(), filePermissionSet);
   }
 
   /**
@@ -382,7 +405,7 @@ public class KeyCodec {
     if (Files.exists(basePath)) {
       // Not the end of the world if we reset the permissions on an existing
       // directory.
-      Files.setPosixFilePermissions(basePath, permissionSet);
+      Files.setPosixFilePermissions(basePath, dirPermissionSet);
     } else {
       boolean success = basePath.toFile().mkdirs();
       if (!success) {
@@ -391,7 +414,7 @@ public class KeyCodec {
         throw new IOException("Unable to create the directory for the "
             + "location. Location:" + basePath);
       }
-      Files.setPosixFilePermissions(basePath, permissionSet);
+      Files.setPosixFilePermissions(basePath, dirPermissionSet);
     }
   }
 

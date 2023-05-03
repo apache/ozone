@@ -24,6 +24,7 @@ Suite Setup         Create volumes
 
 *** Variables ***
 ${prefix}    generated
+${SCM}       scm
 
 *** Keywords ***
 Create volumes
@@ -41,11 +42,12 @@ Setup ACL tests
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
     Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/readable-link
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/link-to-unreadable-bucket
+
+    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
+    Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
+    Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/readable-link
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/link-to-unreadable-bucket
 
 Can follow link with read access
     Execute             kdestroy
@@ -68,6 +70,17 @@ ACL verified on source bucket
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
+Create link loop
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
+                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
+                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+
+Delete link loop
+                        Execute                     ozone sh bucket delete ${target}/loop1
+                        Execute                     ozone sh bucket delete ${target}/loop2
+                        Execute                     ozone sh bucket delete ${target}/loop3
+
 *** Test Cases ***
 Link to non-existent bucket
                         Execute                     ozone sh bucket link ${source}/no-such-bucket ${target}/dangling-link
@@ -85,15 +98,15 @@ Key read passthrough
                         Key Should Match Local File     ${source}/bucket1/key2    /opt/hadoop/NOTICE.txt
 
 Key list passthrough
-    ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.name'
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.[].name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Be Equal             ${target_list}    ${source_list}
                         Should Contain              ${source_list}    key1
                         Should Contain              ${source_list}    key2
 
 Key delete passthrough
                         Execute                     ozone sh key delete ${target}/link1/key2
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Not Contain          ${source_list}    key2
 
 Bucket list contains links
@@ -102,8 +115,14 @@ Bucket list contains links
                         Should Contain              ${result}         dangling-link
 
 Bucket info shows source
-    ${result} =         Execute                     ozone sh bucket info ${target}/link1 | jq -r '.sourceVolume, .sourceBucket' | xargs
-                        Should Be Equal             ${result}    ${source} bucket1
+    ${result} =         Execute                     ozone sh bucket info ${target}/link1
+                        Should Contain              ${result}            ${source}
+                        Should Contain              ${result}            bucket1
+                        Should Contain              ${result}            ${target}
+                        Should Contain              ${result}            link1
+                        Should Contain              ${result}            modificationTime
+                        Should Contain              ${result}            creationTime
+                        Should Not contain          ${result}            metadata
 
 Source and target have separate ACLs
     Execute       ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
@@ -133,11 +152,10 @@ ACL verified on source bucket
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source bucket
 
 Loop in link chain is detected
-                        Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
-                        Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
-                        Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
+    [setup]             Create link loop
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/loop2
                         Should Contain              ${result}    DETECTED_LOOP
+    [teardown]          Delete link loop
 
 Multiple links to same bucket are allowed
     Execute                         ozone sh bucket link ${source}/bucket1 ${target}/link3
@@ -148,5 +166,12 @@ Source bucket not affected by deleting link
                         Execute                     ozone sh bucket delete ${target}/link1
     ${bucket_list} =    Execute                     ozone sh bucket list ${target}
                         Should Not Contain          ${bucket_list}    link1
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.name'
+    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Contain              ${source_list}    key1
+
+Setting bucket property on link not allowed
+                        Execute                     ozone sh bucket link ${source}/bucket1 ${target}/link4
+    ${result} =         Execute And Ignore Error    ozone sh bucket setquota ${target}/link4 --quota 1GB
+                        Should Contain              ${result}    NOT_SUPPORTED_OPERATION
+    ${result} =         Execute                     ozone sh bucket info ${target}/link4
+                        Should Contain              ${result}            sourceBucket

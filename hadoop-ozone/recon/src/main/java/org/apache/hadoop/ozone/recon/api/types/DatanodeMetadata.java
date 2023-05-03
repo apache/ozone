@@ -56,6 +56,9 @@ public final class DatanodeMetadata {
   @XmlElement(name = "containers")
   private int containers;
 
+  @XmlElement(name = "openContainers")
+  private int openContainers;
+
   @XmlElement(name = "leaderCount")
   private int leaderCount;
 
@@ -71,6 +74,12 @@ public final class DatanodeMetadata {
   @XmlElement(name = "buildDate")
   private String buildDate;
 
+  @XmlElement(name = "layoutVersion")
+  private int layoutVersion;
+
+  @XmlElement(name = "networkLocation")
+  private String networkLocation;
+
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
@@ -80,11 +89,14 @@ public final class DatanodeMetadata {
     this.datanodeStorageReport = builder.datanodeStorageReport;
     this.pipelines = builder.pipelines;
     this.containers = builder.containers;
+    this.openContainers = builder.openContainers;
     this.leaderCount = builder.leaderCount;
     this.version = builder.version;
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
     this.buildDate = builder.buildDate;
+    this.layoutVersion = builder.layoutVersion;
+    this.networkLocation = builder.networkLocation;
   }
 
   public String getHostname() {
@@ -115,6 +127,10 @@ public final class DatanodeMetadata {
     return containers;
   }
 
+  public int getOpenContainers() {
+    return openContainers;
+  }
+
   public int getLeaderCount() {
     return leaderCount;
   }
@@ -139,6 +155,14 @@ public final class DatanodeMetadata {
     return buildDate;
   }
 
+  public int getLayoutVersion() {
+    return layoutVersion;
+  }
+
+  public String getNetworkLocation() {
+    return networkLocation;
+  }
+
   /**
    * Returns new builder class that builds a DatanodeMetadata.
    *
@@ -161,14 +185,18 @@ public final class DatanodeMetadata {
     private DatanodeStorageReport datanodeStorageReport;
     private List<DatanodePipeline> pipelines;
     private int containers;
+    private int openContainers;
     private int leaderCount;
     private String version;
     private long setupTime;
     private String revision;
     private String buildDate;
+    private int layoutVersion;
+    private String networkLocation;
 
     public Builder() {
       this.containers = 0;
+      this.openContainers = 0;
       this.leaderCount = 0;
     }
 
@@ -208,6 +236,11 @@ public final class DatanodeMetadata {
       return this;
     }
 
+    public Builder withOpenContainers(int openContainers) {
+      this.openContainers = openContainers;
+      return this;
+    }
+
     public Builder withLeaderCount(int leaderCount) {
       this.leaderCount = leaderCount;
       return this;
@@ -238,6 +271,15 @@ public final class DatanodeMetadata {
       return this;
     }
 
+    public Builder withLayoutVersion(int layoutVersion) {
+      this.layoutVersion = layoutVersion;
+      return this;
+    }
+
+    public Builder withNetworkLocation(String networkLocation) {
+      this.networkLocation = networkLocation;
+      return this;
+    }
     /**
      * Constructs DatanodeMetadata.
      *

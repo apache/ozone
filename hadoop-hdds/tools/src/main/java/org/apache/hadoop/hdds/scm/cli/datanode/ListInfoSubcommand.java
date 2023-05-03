@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -51,24 +52,55 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "")
   private String uuid;
 
+  @CommandLine.Option(names = {"--operational-state"},
+      description = "Show info by datanode NodeOperationalState(" +
+          "IN_SERVICE, " +
+          "DECOMMISSIONING, DECOMMISSIONED, " +
+          "ENTERING_MAINTENANCE, IN_MAINTENANCE).",
+      defaultValue = "")
+  private String nodeOperationalState;
+
+  @CommandLine.Option(names = {"--node-state"},
+      description = "Show info by datanode NodeState(" +
+      " HEALTHY, STALE, DEAD)",
+      defaultValue = "")
+  private String nodeState;
+
+  @CommandLine.Option(names = { "--json" },
+       description = "Show info in json format",
+       defaultValue = "false")
+  private boolean json;
+
   private List<Pipeline> pipelines;
 
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
-      getAllNodes(scmClient).forEach(this::printDatanodeInfo);
+    Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
+    if (!Strings.isNullOrEmpty(ipaddress)) {
+      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
+          .compareToIgnoreCase(ipaddress) == 0);
+    }
+    if (!Strings.isNullOrEmpty(uuid)) {
+      allNodes = allNodes.filter(p ->
+          p.getDatanodeDetails().getUuidString().equals(uuid));
+    }
+    if (!Strings.isNullOrEmpty(nodeOperationalState)) {
+      allNodes = allNodes.filter(p -> p.getOpState().toString()
+          .compareToIgnoreCase(nodeOperationalState) == 0);
+    }
+    if (!Strings.isNullOrEmpty(nodeState)) {
+      allNodes = allNodes.filter(p -> p.getHealthState().toString()
+          .compareToIgnoreCase(nodeState) == 0);
+    }
+
+    if (json) {
+      List<DatanodeWithAttributes> datanodeList = allNodes.collect(
+              Collectors.toList());
+      System.out.print(
+              JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
-      Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
-      if (!Strings.isNullOrEmpty(ipaddress)) {
-        allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
-            .compareToIgnoreCase(ipaddress) == 0);
-      }
-      if (!Strings.isNullOrEmpty(uuid)) {
-        allNodes = allNodes.filter(p ->
-            p.getDatanodeDetails().getUuidString().equals(uuid));
-      }
       allNodes.forEach(this::printDatanodeInfo);
     }
   }
@@ -100,9 +132,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
             p -> pipelineListInfo.append(p.getId().getId().toString())
-                .append("/").append(p.getFactor().toString()).append("/")
-                .append(p.getType().toString()).append("/")
-                .append(p.getPipelineState().toString()).append("/")
+                .append("/").append(p.getReplicationConfig().toString())
+                .append("/").append(p.getType().toString())
+                .append("/").append(p.getPipelineState().toString()).append("/")
                 .append(datanode.getUuid().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
                 .append(System.getProperty("line.separator")));

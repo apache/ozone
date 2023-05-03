@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -51,7 +52,7 @@ public final class OzoneClientFactory {
   /**
    * Private constructor, class is not meant to be initialized.
    */
-  private OzoneClientFactory(){}
+  private OzoneClientFactory() { }
 
 
   /**
@@ -88,6 +89,7 @@ public final class OzoneClientFactory {
     Preconditions.checkNotNull(omHost);
     Preconditions.checkNotNull(omRpcPort);
     Preconditions.checkNotNull(config);
+    OmUtils.resolveOmHost(omHost, omRpcPort);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
     return getRpcClient(getClientProtocol(config), config);
   }
@@ -247,7 +249,9 @@ public final class OzoneClientFactory {
     } catch (Exception e) {
       final String message = "Couldn't create RpcClient protocol";
       LOG.error(message + " exception: ", e);
-      if (e.getCause() instanceof IOException) {
+      if (e instanceof RemoteException) {
+        throw ((RemoteException) e).unwrapRemoteException();
+      } else if (e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
       } else {
         throw new IOException(message, e);

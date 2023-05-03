@@ -17,13 +17,17 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.fs.shell.FsCommand;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
+
+import java.util.concurrent.Callable;
 
 /** Provide command line access to a Ozone FileSystem. */
 @InterfaceAudience.Private
@@ -57,6 +61,8 @@ public class OzoneFsShell extends FsShell {
     // commands, and then this method can be abstract
     if (this.getClass().equals(OzoneFsShell.class)) {
       factory.registerCommands(FsCommand.class);
+      // ozone delete rm command registration supersedes fs delete
+      factory.registerCommands(OzoneFsDelete.class);
     }
   }
 
@@ -73,20 +79,32 @@ public class OzoneFsShell extends FsShell {
    */
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    TracingUtil.initTracing("FsShell", conf);
     conf.setQuietMode(false);
     shell.setConf(conf);
-    int res;
-    try {
-      res = ToolRunner.run(shell, argv);
-    } finally {
-      shell.close();
-    }
+    int res = TracingUtil.executeInNewSpan("main",
+        (Callable<Integer>) () -> shell.execute(argv));
     System.exit(res);
+  }
+
+  private int execute(String[] argv) throws Exception {
+    try {
+      return ToolRunner.run(this, argv);
+    } finally {
+      close();
+    }
   }
 
   // TODO: this should be abstract in a base class
   protected static OzoneFsShell newShellInstance() {
     return new OzoneFsShell();
+  }
+
+  // for testing purposes, ensure that ozone specific
+  // added fs commands are visible
+  @VisibleForTesting
+  public CommandFactory getCommandFactory() {
+    return commandFactory;
   }
 }

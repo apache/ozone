@@ -17,17 +17,24 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.failure.Failures;
+import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -49,6 +56,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
 
+  enum AllowedBucketLayouts { FILE_SYSTEM_OPTIMIZED, OBJECT_STORE }
+
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
           " removed in later versions.")
@@ -58,6 +67,13 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
       description = "num of ozoneManagers. Full name --numOzoneManager will" +
           " be removed in later versions.")
   private static int numOzoneManagers = 1;
+
+  @Option(names = {"-s", "--num-storage-container-manager",
+      "--numStorageContainerManagers"},
+      description = "num of storageContainerManagers." +
+          "Full name --numStorageContainerManagers will" +
+          " be removed in later versions.")
+  private static int numStorageContainerManagerss = 1;
 
   @Option(names = {"-t", "--num-threads", "--numThreads"},
       description = "num of IO threads. Full name --numThreads will be" +
@@ -84,12 +100,24 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
           "--failureInterval will be removed in later versions.")
   private static int failureInterval = 300; // 5 minute period between failures.
 
+  @CommandLine.Mixin
+  private static FreonReplicationOptions freonReplication =
+          new FreonReplicationOptions();
+
+  @Option(names = {"-l", "--layout"},
+      description = "Allowed Bucket Layouts: ${COMPLETION-CANDIDATES}")
+  private static AllowedBucketLayouts allowedBucketLayout =
+      AllowedBucketLayouts.FILE_SYSTEM_OPTIMIZED;
+
   private static MiniOzoneChaosCluster cluster;
+  private static OzoneClient client;
   private static MiniOzoneLoadGenerator loadGenerator;
 
   private static String omServiceId = null;
+  private static String scmServiceId = null;
 
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
+  private static final String SCM_SERVICE_ID = "scmChaosTest";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -102,16 +130,28 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .setNumDatanodes(numDatanodes)
         .setNumOzoneManagers(numOzoneManagers)
         .setOMServiceID(omServiceId)
+        .setNumStorageContainerManagers(numStorageContainerManagerss)
+        .setSCMServiceID(scmServiceId)
         .setNumDataVolumes(numDataVolumes);
     failureClasses.forEach(chaosBuilder::addFailures);
 
     cluster = chaosBuilder.build();
     cluster.waitForClusterToBeReady();
 
+    client = cluster.newClient();
+    ObjectStore store = client.getObjectStore();
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    ObjectStore store = cluster.getRpcClient().getObjectStore();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
+
+    BucketLayout bucketLayout =
+        BucketLayout.valueOf(allowedBucketLayout.toString());
+    final BucketArgs.Builder builder = BucketArgs.newBuilder();
+
+    freonReplication.fromParams(configuration).ifPresent(config ->
+            builder.setDefaultReplicationConfig(
+                    new DefaultReplicationConfig(config)));
+    builder.setBucketLayout(bucketLayout);
 
     MiniOzoneLoadGenerator.Builder loadBuilder =
         new MiniOzoneLoadGenerator.Builder()
@@ -119,7 +159,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .setConf(configuration)
         .setNumBuffers(numBuffers)
         .setNumThreads(numThreads)
-        .setOMServiceId(omServiceId);
+        .setOMServiceId(omServiceId)
+        .setBucketArgs(builder.build());
     loadClasses.forEach(loadBuilder::addLoadGenerator);
     loadGenerator = loadBuilder.build();
   }
@@ -136,12 +177,17 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     numDatanodes = nDns;
   }
 
-  static void setNumOzoneManagers(int nOms, boolean enableHA) {
+  static void setNumManagers(int nOms, int numScms, boolean enableHA) {
 
     if (nOms > 1 || enableHA) {
       omServiceId = OM_SERVICE_ID;
     }
     numOzoneManagers = nOms;
+
+    if (numScms > 1 || enableHA) {
+      scmServiceId = SCM_SERVICE_ID;
+    }
+    numStorageContainerManagerss = numScms;
   }
 
   /**
@@ -152,6 +198,8 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();
     }
+
+    IOUtils.closeQuietly(client);
 
     if (cluster != null) {
       cluster.shutdown();

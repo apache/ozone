@@ -36,28 +36,19 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test Container calls.
  */
+@Timeout(300)
 public class TestContainerSmallFile {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
@@ -65,7 +56,7 @@ public class TestContainerSmallFile {
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -78,7 +69,7 @@ public class TestContainerSmallFile {
     xceiverClientManager = new XceiverClientManager(ozoneConfig);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws InterruptedException {
     if (cluster != null) {
       cluster.shutdown();
@@ -105,7 +96,7 @@ public class TestContainerSmallFile {
         ContainerProtocolCalls.readSmallFile(client, blockID, null);
     String readData = response.getData().getDataBuffers().getBuffersList()
         .get(0).toStringUtf8();
-    Assert.assertEquals("data123", readData);
+    Assertions.assertEquals("data123", readData);
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -120,14 +111,12 @@ public class TestContainerSmallFile {
     ContainerProtocolCalls.createContainer(client,
         container.getContainerInfo().getContainerID(), null);
 
-    thrown.expect(StorageContainerException.class);
-    thrown.expectMessage("Unable to find the block");
-
     BlockID blockID = ContainerTestHelper.getTestBlockID(
         container.getContainerInfo().getContainerID());
     // Try to read a Key Container Name
-    ContainerProtos.GetSmallFileResponseProto response =
-        ContainerProtocolCalls.readSmallFile(client, blockID, null);
+    Assertions.assertThrowsExactly(StorageContainerException.class,
+        () -> ContainerProtocolCalls.readSmallFile(client, blockID, null),
+        "Unable to find the block");
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -147,14 +136,11 @@ public class TestContainerSmallFile {
     ContainerProtocolCalls.writeSmallFile(client, blockID,
         "data123".getBytes(UTF_8), null);
 
-    thrown.expect(StorageContainerException.class);
-    thrown.expectMessage("ContainerID 8888 does not exist");
-
-    // Try to read a invalid key
-    ContainerProtos.GetSmallFileResponseProto response =
-        ContainerProtocolCalls.readSmallFile(client,
-            ContainerTestHelper.getTestBlockID(
-                nonExistContainerID), null);
+    Assertions.assertThrowsExactly(StorageContainerException.class,
+        () -> ContainerProtocolCalls.readSmallFile(client,
+            ContainerTestHelper.getTestBlockID(nonExistContainerID),
+            null),
+        "ContainerID 8888 does not exist");
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -176,16 +162,14 @@ public class TestContainerSmallFile {
             .writeSmallFile(client, blockID1, "data123".getBytes(UTF_8), null);
     long bcsId = responseProto.getCommittedBlockLength().getBlockID()
         .getBlockCommitSequenceId();
-    try {
-      blockID1.setBlockCommitSequenceId(bcsId + 1);
-      //read a file with higher bcsId than the container bcsId
-      ContainerProtocolCalls
-          .readSmallFile(client, blockID1, null);
-      Assert.fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      Assert
-          .assertTrue(sce.getResult() == ContainerProtos.Result.UNKNOWN_BCSID);
-    }
+
+    blockID1.setBlockCommitSequenceId(bcsId + 1);
+    //read a file with higher bcsId than the container bcsId
+    StorageContainerException sce =
+        Assertions.assertThrows(StorageContainerException.class, () ->
+            ContainerProtocolCalls.readSmallFile(client, blockID1, null));
+    Assertions.assertSame(ContainerProtos.Result.UNKNOWN_BCSID,
+        sce.getResult());
 
     // write a new block again to bump up the container bcsId
     BlockID blockID2 = ContainerTestHelper
@@ -193,21 +177,19 @@ public class TestContainerSmallFile {
     ContainerProtocolCalls
         .writeSmallFile(client, blockID2, "data123".getBytes(UTF_8), null);
 
-    try {
-      blockID1.setBlockCommitSequenceId(bcsId + 1);
-      //read a file with higher bcsId than the committed bcsId for the block
-      ContainerProtocolCalls.readSmallFile(client, blockID1, null);
-      Assert.fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      Assert
-          .assertTrue(sce.getResult() == ContainerProtos.Result.BCSID_MISMATCH);
-    }
+    blockID1.setBlockCommitSequenceId(bcsId + 1);
+    //read a file with higher bcsId than the committed bcsId for the block
+    sce = Assertions.assertThrows(StorageContainerException.class, () ->
+        ContainerProtocolCalls.readSmallFile(client, blockID1, null));
+    Assertions.assertSame(ContainerProtos.Result.BCSID_MISMATCH,
+        sce.getResult());
+
     blockID1.setBlockCommitSequenceId(bcsId);
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client, blockID1, null);
     String readData = response.getData().getDataBuffers().getBuffersList()
         .get(0).toStringUtf8();
-    Assert.assertEquals("data123", readData);
+    Assertions.assertEquals("data123", readData);
     xceiverClientManager.releaseClient(client, false);
   }
 }
