@@ -225,9 +225,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         long usedBytesDiff = 0;
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
-          oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
-              keyToDelete, omMetadataManager,
-              trxnLogIndex, ozoneManager.isRatisEnabled());
+          oldKeyVersionsToDelete = getOldVersionsToCleanUp(
+              keyToDelete, trxnLogIndex, ozoneManager.isRatisEnabled());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
           checkBucketQuotaInNamespace(omBucketInfo, 1L);

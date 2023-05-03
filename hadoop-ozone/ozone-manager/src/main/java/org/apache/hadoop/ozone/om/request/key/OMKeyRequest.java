@@ -805,8 +805,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
-      OMMetadataManager omMetadataManager, long trxnLogIndex,
+      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
     return OmUtils.prepareKeyForDelete(keyToDelete, null,
           trxnLogIndex, isRatisEnabled);
