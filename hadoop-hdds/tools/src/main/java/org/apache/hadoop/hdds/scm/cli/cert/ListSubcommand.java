@@ -46,6 +46,8 @@ public class ListSubcommand extends ScmCertSubcommand {
   private static final Logger LOG =
       LoggerFactory.getLogger(ListSubcommand.class);
 
+  private static final int MAX_FETCHED_CERTIFICATES = 999;
+
   @Option(names = {"-s", "--start"},
       description = "Certificate serial id to start the iteration",
       defaultValue = "0", showDefaultValue = Visibility.ALWAYS)
@@ -91,6 +93,10 @@ public class ListSubcommand extends ScmCertSubcommand {
         startSerialId, count, isRevoked);
     LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
         type.toUpperCase(), count, certPemList.size());
+    if (count == certPemList.size()) {
+      LOG.info("The certificate list could be longer than the batch size. " +
+          "Please use the \"-c\" option to see more certificates.");
+    }
     LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
         "Expiry", "Subject", "Issuer"));
     for (String certPemStr : certPemList) {
