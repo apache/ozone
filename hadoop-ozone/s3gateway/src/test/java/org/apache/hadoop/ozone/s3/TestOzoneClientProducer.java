@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
@@ -164,16 +165,17 @@ public class TestOzoneClientProducer {
         fail("Empty AuthHeader must fail");
       }
     } catch (WebApplicationException ex) {
-      Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
       if (authHeader == null || authHeader.isEmpty() ||
               authHeader.startsWith("AWS ")) {
         // Empty auth header and unsupported AWS signature
         // should fail with Invalid Request.
+        Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
         Assert.assertEquals(S3_AUTHINFO_CREATION_ERROR.getErrorMessage(),
             ex.getMessage());
       } else {
         // Other requests have stale timestamp and
         // should fail with Malformed Authorization Header.
+        Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
         Assert.assertEquals(MALFORMED_HEADER.getErrorMessage(),
             ex.getMessage());
 
