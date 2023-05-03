@@ -501,15 +501,16 @@ public class ObjectEndpoint extends EndpointBase {
   private void validateCorrectKeyName(String keyPath, OzoneKey key)
       throws OMException {
     // Since HDDS-7419, OM automatically looks up for a folder if the original
-    // key is not found. E.g. if the key "mykey" is not found, OM will tries
-    // looking for "mykey/" and return a directory keyInfo.
+    // key is not found. E.g. if the key "mykey" is not found, OM will try
+    // looking for "mykey/" and return a directory keyInfo if the folder
+    // exists.
 
     // This behavior is not compatible with S3A clients who usually use fake
     // object key like "mydir/" to mark folders and expect a NOT_FOUND when
     // looking up for "mydir", see HDDS-8496.
 
-    // This validation identify if OM automatically return a directory object,
-    // and return NOT_FOUND to S3A clients.
+    // This validation identifies if OM automatically return a directory object,
+    // and returns NOT_FOUND to S3A clients.
     if (keyPath.length() == key.getName().length() - 1 && !key.isFile()) {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
