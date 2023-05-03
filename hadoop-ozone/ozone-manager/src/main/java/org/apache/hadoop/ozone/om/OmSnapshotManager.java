@@ -401,8 +401,10 @@ public final class OmSnapshotManager implements AutoCloseable {
           .writeLock().unlock();
     }
 
-    LOG.info("Created checkpoint : {} for snapshot {}",
-        dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    if (dbCheckpoint != null) {
+      LOG.info("Created checkpoint : {} for snapshot {}",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    }
 
     final RocksDBCheckpointDiffer dbCpDiffer =
         store.getRocksDBCheckpointDiffer();
@@ -823,6 +825,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
+    if (snapshotDiffManager != null) {
+      snapshotDiffManager.close();
+    }
+    if (snapshotCache != null) {
+      snapshotCache.invalidateAll();
+    }
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
     }
