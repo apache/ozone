@@ -1,0 +1,101 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.snapshot;
+
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.upgrade.MockOmRequest;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureAspect;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+import java.io.IOException;
+
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/**
+ * Class to test annotation based interceptor that checks whether
+ * Ozone snapshot feature is enabled.
+ */
+public class TestSnapshotFeatureEnabledAspect {
+
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+//  private OzoneConfiguration configuration = new OzoneConfiguration();
+
+  @Before
+  public void setUp() throws IOException {
+//    configuration.set("ozone.metadata.dirs",
+//        temporaryFolder.newFolder().getAbsolutePath());
+  }
+
+  /**
+   * Check Aspect implementation with SnapshotFeatureEnabledUtil.
+   */
+  @Test
+  public void testSnapshotFeatureEnabledAnnotation() throws Exception {
+    SnapshotFeatureEnabledUtil testObj = new SnapshotFeatureEnabledUtil();
+    SnapshotFeatureEnabledAspect aspect = new SnapshotFeatureEnabledAspect();
+
+    JoinPoint joinPoint = mock(JoinPoint.class);
+    when(joinPoint.getTarget()).thenReturn(testObj);
+
+    MethodSignature methodSignature = mock(MethodSignature.class);
+    when(methodSignature.getMethod()).thenReturn(
+        SnapshotFeatureEnabledUtil.class.getMethod("snapshotMethod"));
+    when(methodSignature.toShortString()).thenReturn("snapshotMethod");
+    when(joinPoint.getSignature()).thenReturn(methodSignature);
+
+    LambdaTestUtils.intercept(OMException.class,
+        "Operation snapshotMethod cannot be invoked because " +
+            "Ozone snapshot feature is disabled",
+        () -> aspect.checkLayoutFeature(joinPoint));
+  }
+
+  /**
+   * Check Aspect implementation with mocked OzoneManager.
+   */
+//  @Test
+//  public void testPreExecuteFeatureCheck() throws Exception {
+//
+//    OzoneManager om = mock(OzoneManager.class);
+//    when(om.isFilesystemSnapshotEnabled()).thenReturn(false);
+//
+//    MockOmRequest mockOmRequest = new MockOmRequest();
+//    SnapshotFeatureEnabledAspect aspect = new SnapshotFeatureEnabledAspect();
+//
+//    JoinPoint joinPoint = mock(JoinPoint.class);
+//    when(joinPoint.getArgs()).thenReturn(new Object[]{om});
+//    when(joinPoint.getTarget()).thenReturn(mockOmRequest);
+//
+//    LambdaTestUtils.intercept(OMException.class,
+//        "cannot be invoked",
+//        () -> aspect.beforeRequestApplyTxn(joinPoint));
+//  }
+}

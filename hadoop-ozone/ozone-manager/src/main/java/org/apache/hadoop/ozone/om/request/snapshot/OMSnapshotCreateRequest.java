@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotFeatureEnabled;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
@@ -87,11 +88,10 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   }
 
   @Override
+  @SnapshotFeatureEnabled(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     // Reject if snapshot feature is disabled
-    checkFsSnapshotEnabled(ozoneManager);
-    // TODO: Use an annotation similar to @DisallowedUntilLayoutVersion instead?
-    //  See HDDS-7772.
+//    checkFsSnapshotEnabled(ozoneManager);
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
