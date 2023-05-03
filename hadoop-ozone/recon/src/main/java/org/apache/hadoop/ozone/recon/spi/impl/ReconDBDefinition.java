@@ -120,6 +120,6 @@ public class ReconDBDefinition implements DBDefinition {
   public DBColumnFamilyDefinition[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {
         CONTAINER_KEY, KEY_CONTAINER, CONTAINER_KEY_COUNT, REPLICA_HISTORY,
-        NAMESPACE_SUMMARY, REPLICA_HISTORY_V2};
+        NAMESPACE_SUMMARY, REPLICA_HISTORY_V2, ORPHAN_KEYS_METADATA};
   }
 }
