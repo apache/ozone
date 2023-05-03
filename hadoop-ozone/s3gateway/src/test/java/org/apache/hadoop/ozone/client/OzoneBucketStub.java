@@ -151,7 +151,6 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), replicationConfig, metadata, null,
-                true,
                 () -> readKey(key)
             ));
             super.close();
@@ -184,7 +183,6 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                true,
                 () -> readKey(key)
             ));
             super.close();
