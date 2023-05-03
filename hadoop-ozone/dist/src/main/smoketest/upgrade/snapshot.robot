@@ -18,7 +18,6 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
-Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -39,7 +38,9 @@ Create snapshot
 
 Create snapshot in non-supported ozone version
     [Tags]     snapshot-non-support
-    ${output} =         Execute and checkrc    ozone sh bucket create /vol/bucket2     255
+    ${output} =         Execute and checkrc    ozone sh volume create vol     0
+    ${output} =         Execute and checkrc    ozone sh bucket create /vol/bucket2     0
+    ${output} =         Execute and checkrc    ozone sh snapshot create /vol/bucket2 snapshot1     255
 
 List snapshot
     [Tags]     snapshot-support
@@ -54,6 +55,8 @@ List snapshot in non-supported ozone version
 
 Snapshot Diff
     [Tags]     snapshot-support
+    ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
+                        Should contain    ${output}       Snapshot diff job is IN_PROGRESS
     ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
                         Should contain    ${output}       +    key1
 

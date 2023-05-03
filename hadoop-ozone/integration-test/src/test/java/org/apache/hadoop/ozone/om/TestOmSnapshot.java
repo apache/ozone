@@ -66,6 +66,7 @@ import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
@@ -86,6 +87,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.awaitility.Awaitility.with;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
@@ -117,6 +119,8 @@ public class TestOmSnapshot {
   private static RDBStore rdbStore;
 
   private static OzoneBucket ozoneBucket;
+  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(500);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(10);
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -206,8 +210,10 @@ public class TestOmSnapshot {
   private static void expectFailurePreFinalization(LambdaTestUtils.
       VoidCallable eval)
       throws Exception {
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization.", eval);
+        OMException ex  = Assert.assertThrows(OMException.class,
+          () -> eval.call());
+        Assert.assertTrue(ex.getMessage().contains(
+          "cannot be invoked before finalization."));
   }
 
   private static void preFinalizationChecks()
@@ -247,18 +253,20 @@ public class TestOmSnapshot {
     Assert.assertTrue(isStarting(finalizationResponse.status()));
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        final UpgradeFinalizer.StatusAndMessages progress =
-            omclient.queryUpgradeFinalizationProgress(
-                upgradeClientID, false, false);
-        return isDone(progress.status());
-      } catch (IOException e) {
-        Assert.fail("Unexpected exception while waiting for "
-            + "the OM upgrade to finalize: " + e.getMessage());
-      }
-      return false;
-    }, 500, 10000);
+    try {
+      with().atMost(POLL_MAX_DURATION)
+          .pollInterval(POLL_INTERVAL_DURATION)
+          .await()
+          .until(() -> {
+            final UpgradeFinalizer.StatusAndMessages progress =
+                omclient.queryUpgradeFinalizationProgress(
+                    upgradeClientID, false, false);
+            return isDone(progress.status());
+          });
+    } catch (Exception e) {
+      Assert.fail("Unexpected exception while waiting for "
+          + "the OM upgrade to finalize: " + e.getMessage());
+    }
   }
 
   @AfterClass
