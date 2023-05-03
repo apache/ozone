@@ -590,10 +590,12 @@ public class ReplicationManager implements SCMService {
     for (DatanodeDetails dn : datanodes) {
       try {
         int totalCount = getQueuedReplicationCount(dn);
-        if (totalCount >= getReplicationLimit(dn)) {
-          LOG.debug("Datanode {} has reached the maximum number of queued " +
-              "commands, replication + reconstruction * {}: {})",
-              dn, reconstructionCommandWeight, totalCount);
+        int replicationLimit = getReplicationLimit(dn);
+        if (totalCount >= replicationLimit) {
+          LOG.debug("Datanode {} has reached the maximum of {} queued " +
+              "commands for state {}, replication + reconstruction * {}: {}",
+              dn, replicationLimit, dn.getPersistedOpState(),
+              reconstructionCommandWeight, totalCount);
           addExcludedNode(dn);
           continue;
         }
