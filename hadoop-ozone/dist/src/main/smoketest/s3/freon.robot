@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ./commonawslib.robot
 Suite Setup         Setup v4 headers
+Default Tags        no-bucket-type
 
 
 *** Variables ***
