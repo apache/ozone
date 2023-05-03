@@ -184,6 +184,10 @@ public final class ContainerTestUtils {
       boolean scanDataSuccess, AtomicLong containerIdSeq) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
+//    when(data.getState()).thenReturn(
+//        ContainerProtos.ContainerDataProto.State.CLOSED);
+//    when(c.getContainerState()).thenReturn(
+//        ContainerProtos.ContainerDataProto.State.CLOSED);
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))

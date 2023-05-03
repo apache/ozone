@@ -71,7 +71,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 /**
  * This class tests the data scanner functionality.
  */
-public class TestDataScanner {
+public class TestContainerDataScanners {
 
   /**
    * Set a timeout for each test.

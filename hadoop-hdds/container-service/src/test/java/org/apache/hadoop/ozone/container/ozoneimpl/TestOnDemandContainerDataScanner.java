@@ -34,6 +34,8 @@ import org.mockito.stubbing.Answer;
 import org.mockito.verification.VerificationMode;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -41,6 +43,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -125,6 +130,73 @@ public class TestOnDemandContainerDataScanner {
     onGoingScan.get().get();
     Mockito.verify(controller, atLeastOnce()).
         markContainerUnhealthy(corruptData.getContainerData().getContainerID());
+  }
+
+  @Test
+  public void testScanTimestampUpdated() throws Exception {
+    OnDemandContainerDataScanner.init(conf, controller);
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    Assert.assertTrue(scanFuture.isPresent());
+    scanFuture.get().get();
+    Mockito.verify(controller, atLeastOnce())
+        .updateDataScanTimestamp(
+            eq(healthy.getContainerData().getContainerID()), any());
+  }
+
+  @Test
+  public void testUnscannedContainerIsScanned() throws Exception {
+    OnDemandContainerDataScanner.init(conf, controller);
+
+    // If there is no last scanned time, the container should be scanned.
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, containerIdSeq);
+    Mockito.when(healthy.getContainerData().lastDataScanTime()).thenReturn(Optional.empty());
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    Assert.assertTrue(scanFuture.isPresent());
+    scanFuture.get().get();
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+  }
+
+  @Test
+  public void testRecentlyScannedContainerIsSkipped() throws Exception {
+    OnDemandContainerDataScanner.init(conf, controller);
+
+    // If the last scan time is within the configured gap, the container
+    // should be skipped.
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, containerIdSeq);
+    Instant recentLastScanTime = Instant.now()
+        .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
+        .plus(1, ChronoUnit.MINUTES);
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
+        .thenReturn(Optional.of(recentLastScanTime));
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    // Scan should not have been scheduled.
+    Assert.assertFalse(scanFuture.isPresent());
+    Mockito.verify(healthy, never()).scanData(any(), any());
+  }
+
+  @Test
+  public void testPreviouslyScannedContainerIsScanned() throws Exception {
+    OnDemandContainerDataScanner.init(conf, controller);
+
+    // If the last scan time is before than the configured gap, the container
+    // should be scanned.
+    ContainerTestUtils.setupMockContainer(healthy,
+        true, true, containerIdSeq);
+    Instant oldLastScanTime = Instant.now()
+        .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
+        .minus(10, ChronoUnit.MINUTES);
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
+        .thenReturn(Optional.of(oldLastScanTime));
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    Assert.assertTrue(scanFuture.isPresent());
+    scanFuture.get().get();
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   private void testContainerMarkedUnhealthy(

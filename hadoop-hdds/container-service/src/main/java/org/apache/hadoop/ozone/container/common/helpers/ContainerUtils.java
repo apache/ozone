@@ -240,12 +240,14 @@ public final class ContainerUtils {
       long minScanGap) {
     Optional<Instant> lastScanTime =
         container.getContainerData().lastDataScanTime();
-    boolean timestampPermitsScanning = lastScanTime.isPresent();
-    if (timestampPermitsScanning) {
-      timestampPermitsScanning = Duration.between(Instant.now(),
-              lastScanTime.get()).compareTo(Duration.ofMillis(minScanGap)) > 0;
-    }
-    return timestampPermitsScanning;
+    // Container is considered recently scanned if it was scanned within the
+    // configured time frame. If the optional is empty, the container was
+    // never scanned.
+
+    return lastScanTime.map(scanInstant ->
+        Duration.between(Instant.now(), scanInstant).abs()
+            .compareTo(Duration.ofMillis(minScanGap)) < 0)
+        .orElse(false);
   }
 
   /**

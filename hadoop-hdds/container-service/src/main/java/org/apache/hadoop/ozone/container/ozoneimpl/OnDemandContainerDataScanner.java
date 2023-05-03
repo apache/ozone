@@ -76,15 +76,33 @@ public final class OnDemandContainerDataScanner {
   }
 
   private static boolean shouldScan(Container<?> container) {
-    return container.shouldScanData() &&
-        !ContainerUtils.recentlyScanned(container, instance.minScanGap);
+    boolean shouldScan = true;
+    long containerID = container.getContainerData().getContainerID();
+    if (instance == null) {
+      LOG.debug("Skipping on demand scan for container {} since scanner was " +
+              "not initialized.", containerID);
+      shouldScan = false;
+    } else if (!container.shouldScanData()) {
+      LOG.debug("Skipping on demand scan for container {} in state {}.",
+          containerID, container.getContainerState());
+      shouldScan = false;
+    } else if (ContainerUtils.recentlyScanned(container, instance.minScanGap)) {
+      Optional<Instant> lastScanTime =
+          container.getContainerData().lastDataScanTime();
+      String lastScanTimeStr = "never";
+      if (lastScanTime.isPresent()) {
+        lastScanTimeStr = "at " + lastScanTime.get();
+      }
+      LOG.debug("Skipping on demand scan for container {} which was last " +
+              "scanned {}. Current time is {}.",
+          containerID, lastScanTimeStr, Instant.now());
+      shouldScan = false;
+    }
+    return shouldScan;
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {
     if (!shouldScan(container)) {
-      LOG.debug("Skipping on demand scan for container {} in state {}",
-          container.getContainerData().getContainerID(),
-          container.getContainerState());
       return Optional.empty();
     }
 
@@ -109,10 +127,7 @@ public final class OnDemandContainerDataScanner {
   }
 
   private static void performOnDemandScan(Container<?> container) {
-    if (shouldScan(container)) {
-      LOG.debug("Skipping on demand scan for container {} in state {}",
-          container.getContainerData().getContainerID(),
-          container.getContainerState());
+    if (!shouldScan(container)) {
       return;
     }
 
@@ -120,15 +135,15 @@ public final class OnDemandContainerDataScanner {
     try {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
-      if (container.scanData(instance.throttler, instance.canceler)) {
-        Instant now = Instant.now();
-        logScanCompleted(containerData, now);
-        instance.containerController.updateDataScanTimestamp(containerId, now);
-      } else {
+      if (!container.scanData(instance.throttler, instance.canceler)) {
         instance.metrics.incNumUnHealthyContainers();
         instance.containerController.markContainerUnhealthy(containerId);
       }
+
       instance.metrics.incNumContainersScanned();
+      Instant now = Instant.now();
+      logScanCompleted(containerData, now);
+      instance.containerController.updateDataScanTimestamp(containerId, now);
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);
