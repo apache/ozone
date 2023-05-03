@@ -88,6 +88,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    // Reject if snapshot feature is disabled
+    checkFsSnapshotEnabled(ozoneManager);
+    // TODO: Use an annotation similar to @DisallowedUntilLayoutVersion instead?
+    //  See HDDS-7772.
+
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
