@@ -41,7 +41,7 @@ This is very different from HDFS which provides a single rooted file system.
 
 Ozone's namespace is a collection of volumes or is a forest instead of a
 single rooted tree as in HDFS. This property makes it easy to deploy multiple
-OMs for scaling.
+OMs for scaling(pending future development).
 
 ## Ozone Manager Metadata
 
@@ -60,7 +60,7 @@ understood if we trace what happens during a key write and key read.
 
 ### Key Write
 
-![Write Path](OzoneManager-WritePath.png)
+![Ozone Manager Write Path](OzoneManager-WritePath.png)
 
 * To write a key to Ozone, a client tells Ozone manager that it would like to
 write a key into a bucket that lives inside a specific volume. Once Ozone
@@ -84,7 +84,7 @@ information on Ozone manager.
 
 ### Key Reads
 
-![Read Path](OzoneManager-ReadPath.png)
+![Ozone Manager Read Path](OzoneManager-ReadPath.png)
 
 * Key reads are simpler, the client requests the block list from the Ozone
 Manager

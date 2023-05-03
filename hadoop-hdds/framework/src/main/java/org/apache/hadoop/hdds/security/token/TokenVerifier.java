@@ -18,22 +18,70 @@
 
 package org.apache.hadoop.hdds.security.token;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.security.token.Token;
+
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Ozone GRPC token header verifier.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
 public interface TokenVerifier {
+
   /**
-   * Given a user, tokenStr, cmd and container/block id, verify the token.
+   * Verify if {@code token} is valid to allow execution of {@code cmd} for
+   * {@code user}.
+   *
    * @param user user of the request
-   * @param tokenStr token str of the request
-   * @param cmd container command type
-   * @param id blockID/containerID
-   * @return UGI
+   * @param token the token to verify
+   * @param cmd container command
    * @throws SCMSecurityException if token verification fails.
    */
-  void verify(String user, String tokenStr,
-      ContainerProtos.Type cmd, String id) throws SCMSecurityException;
+  void verify(String user, Token<?> token,
+      ContainerCommandRequestProtoOrBuilder cmd)
+      throws SCMSecurityException;
+
+  /** Same as {@link #verify(String, Token,
+   * ContainerCommandRequestProtoOrBuilder)}, but with encoded token. */
+  default void verify(ContainerCommandRequestProtoOrBuilder cmd, String user,
+      String encodedToken) throws SCMSecurityException {
+
+    if (Strings.isNullOrEmpty(encodedToken)) {
+      throw new BlockTokenException("Failed to find any token (empty or " +
+          "null.)");
+    }
+
+    final Token<?> token = new Token<>();
+    try {
+      token.decodeFromUrlString(encodedToken);
+    } catch (IOException ex) {
+      throw new BlockTokenException("Failed to decode token : " + encodedToken);
+    }
+
+    verify(user, token, cmd);
+  }
+
+  /** Create appropriate token verifier based on the configuration. */
+  static TokenVerifier create(SecurityConfig conf,
+      CertificateClient certClient) {
+
+    if (!conf.isBlockTokenEnabled() && !conf.isContainerTokenEnabled()) {
+      return new NoopTokenVerifier();
+    }
+
+    List<TokenVerifier> list = new LinkedList<>();
+    list.add(new BlockTokenVerifier(conf, certClient));
+    list.add(new ContainerTokenVerifier(conf, certClient));
+    return new CompositeTokenVerifier(list);
+  }
 }

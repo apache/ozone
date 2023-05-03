@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.recon.persistence;
 
 import java.io.Serializable;
 
+/**
+ * Some historical info about a container on a datanode.
+ */
 public class ContainerHistory implements Serializable {
 
   private long containerId;
@@ -27,14 +30,21 @@ public class ContainerHistory implements Serializable {
   private String datanodeHost;
   private long firstSeenTime;
   private long lastSeenTime;
+  private long bcsId;
 
   public ContainerHistory(long containerId, String datanodeUuid,
-      String datanodeHost, long firstSeenTime, long lastSeenTime) {
+                          String datanodeHost, long firstSeenTime,
+                          long lastSeenTime, long lastBcsId) {
     this.containerId = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
+    this.bcsId = lastBcsId;
+  }
+
+  public long getLastBcsId() {
+    return bcsId;
   }
 
   public long getContainerId() {

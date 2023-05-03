@@ -24,7 +24,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneOb
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.StoreType.*;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.StoreType.valueOf;
 
 /**
  * Class representing an unique ozone object.
@@ -72,6 +73,8 @@ public abstract class OzoneObj implements IOzoneObj {
   public abstract String getBucketName();
 
   public abstract String getKeyName();
+
+  public abstract OzonePrefixPath getOzonePrefixPathViewer();
 
   /**
    * Get PrefixName.

@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -38,27 +40,23 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.junit.AfterClass;
+
+import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests TestBlockOutputStreamFlushDelay class.
  */
+@Timeout(300)
 public class TestBlockOutputStreamFlushDelay {
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -78,14 +76,13 @@ public class TestBlockOutputStreamFlushDelay {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
 
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
@@ -117,8 +114,9 @@ public class TestBlockOutputStreamFlushDelay {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -152,7 +150,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data less than a chunk size, the data will just sit
     // in the buffer, with only one buffer being allocated in the buffer pool
@@ -261,7 +259,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data equal flush Size = 2 chunks, at this time
     // buffer pool will have 2 buffers allocated worth of chunk size
@@ -325,6 +323,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -356,7 +355,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data equal flush Size > 1 chunk, at this time
     // buffer pool will have 2 buffers allocated worth of chunk size
@@ -420,6 +419,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -451,7 +451,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
@@ -496,6 +496,7 @@ public class TestBlockOutputStreamFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
         XceiverClientManager.getXceiverClientMetrics();
@@ -532,7 +533,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
 
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
@@ -637,7 +638,7 @@ public class TestBlockOutputStreamFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here

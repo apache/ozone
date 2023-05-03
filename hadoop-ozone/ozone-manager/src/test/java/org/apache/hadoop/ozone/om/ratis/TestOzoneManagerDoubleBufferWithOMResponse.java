@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -32,12 +33,13 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -57,11 +59,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,9 +109,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder().
-        setOmMetadataManager(omMetadataManager).
-        setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(omMetadataManager)
+        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .setmaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .setIndexToTerm((i) -> term)
         .build();
@@ -193,16 +197,17 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     checkDeletedBuckets(deleteBucketQueue);
 
     // Check lastAppliedIndex is updated correctly or not.
-    Assert.assertEquals(bucketCount + deleteCount + 1, lastAppliedIndex);
+    GenericTestUtils.waitFor(() ->
+        bucketCount + deleteCount + 1 == lastAppliedIndex,
+        100, 30000);
 
-
-    OMTransactionInfo omTransactionInfo =
+    TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertNotNull(omTransactionInfo);
+    assertNotNull(transactionInfo);
 
     Assert.assertEquals(lastAppliedIndex,
-        omTransactionInfo.getTransactionIndex());
-    Assert.assertEquals(term, omTransactionInfo.getTerm());
+        transactionInfo.getTransactionIndex());
+    Assert.assertEquals(term, transactionInfo.getTerm());
   }
 
   /**
@@ -282,7 +287,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doMixTransactions(String volumeName, int bucketCount,
       Queue<OMBucketDeleteResponse> deleteBucketQueue,
       Queue<OMBucketCreateResponse> bucketQueue) {
-    for (int i=0; i < bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       String bucketName = UUID.randomUUID().toString();
       long transactionID = trxId.incrementAndGet();
       OMBucketCreateResponse omBucketCreateResponse = createBucket(volumeName,
@@ -302,7 +307,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMClientResponse deleteBucket(String volumeName, String bucketName,
       long transactionID) {
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createDeleteBucketRequest(volumeName, bucketName);
+        OMRequestTestUtils.createDeleteBucketRequest(volumeName, bucketName);
 
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
@@ -432,7 +437,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private void doTransactions(int bucketCount) {
     String volumeName = UUID.randomUUID().toString();
     createVolume(volumeName, trxId.incrementAndGet());
-    for (int i=0; i< bucketCount; i++) {
+    for (int i = 0; i < bucketCount; i++) {
       createBucket(volumeName, UUID.randomUUID().toString(),
           trxId.incrementAndGet());
     }
@@ -448,7 +453,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     String admin = OzoneConsts.OZONE;
     String owner = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createVolumeRequest(volumeName, admin, owner);
+        OMRequestTestUtils.createVolumeRequest(volumeName, admin, owner);
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
@@ -464,9 +469,11 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMBucketCreateResponse createBucket(String volumeName,
       String bucketName, long transactionID)  {
 
+    BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        TestOMRequestUtils.createBucketRequest(bucketName, volumeName, false,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+        OMRequestTestUtils.newCreateBucketRequest(bucketInfo).build();
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

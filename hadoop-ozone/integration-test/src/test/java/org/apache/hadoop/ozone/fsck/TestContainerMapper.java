@@ -21,24 +21,40 @@ package org.apache.hadoop.ozone.fsck;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.FileUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Test cases for ContainerMapper.
@@ -72,6 +88,8 @@ public class TestContainerMapper {
     dbPath = GenericTestUtils.getRandomizedTempPath();
     conf.set(OZONE_OM_DB_DIRS, dbPath);
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE, "100MB");
+    conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
+        0, StorageUnit.MB);
     // By default, 2 pipelines are created. Setting the value to 6, will ensure
     // each pipleine can have 3 containers open.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 6);
@@ -87,7 +105,11 @@ public class TestContainerMapper {
     ozoneManager = cluster.getOzoneManager();
     store.createVolume(volName);
     OzoneVolume volume = store.getVolume(volName);
-    volume.createBucket(bucketName);
+    // TODO: HDDS-5463
+    //  Recon's container ID to key mapping does not yet support FSO buckets.
+    volume.createBucket(bucketName, BucketArgs.newBuilder()
+            .setBucketLayout(BucketLayout.OBJECT_STORE)
+            .build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     byte[] data = generateData(10 * 1024 * 1024, (byte)98);
 
@@ -122,6 +144,7 @@ public class TestContainerMapper {
 
   @AfterClass
   public static void shutdown() throws IOException {
+    IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
     FileUtils.deleteFully(new File(dbPath));
   }

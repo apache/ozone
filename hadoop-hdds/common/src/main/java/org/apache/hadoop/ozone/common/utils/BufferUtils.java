@@ -24,6 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+/**
+ * Utilities for buffers.
+ */
 public final class BufferUtils {
 
   /** Utility classes should not be constructed. **/
@@ -71,8 +74,36 @@ public final class BufferUtils {
     return buffers;
   }
 
+  /**
+   * Return a read only copy of ByteBuffer array.
+   */
+  public static ByteBuffer[] getReadOnlyByteBuffers(
+      ByteBuffer[] byteBuffers) {
+    if (byteBuffers == null) {
+      return null;
+    }
+    ByteBuffer[] readOnlyBuffers = new ByteBuffer[byteBuffers.length];
+    for (int i = 0; i < byteBuffers.length; i++) {
+      readOnlyBuffers[i] = byteBuffers[i] == null ?
+          null : byteBuffers[i].asReadOnlyBuffer();
+    }
+    return readOnlyBuffers;
+  }
+
+  /**
+   * Return a read only ByteBuffer array for the input ByteStrings list.
+   */
+  public static ByteBuffer[] getReadOnlyByteBuffersArray(
+      List<ByteString> byteStrings) {
+    return getReadOnlyByteBuffers(byteStrings).toArray(new ByteBuffer[0]);
+  }
+
   public static ByteString concatByteStrings(List<ByteString> byteStrings) {
-    return byteStrings.stream().reduce(ByteString::concat).orElse(null);
+    ByteString result = ByteString.EMPTY;
+    for (ByteString byteString : byteStrings) {
+      result = result.concat(byteString);
+    }
+    return result;
   }
 
   /**
@@ -95,5 +126,11 @@ public final class BufferUtils {
    */
   public static int getNumberOfBins(long numElements, long maxElementsPerBin) {
     return (int) Math.ceil((double) numElements / (double) maxElementsPerBin);
+  }
+
+  public static void clearBuffers(ByteBuffer[] byteBuffers) {
+    for (ByteBuffer buffer : byteBuffers) {
+      buffer.clear();
+    }
   }
 }

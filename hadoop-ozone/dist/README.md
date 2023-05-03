@@ -30,7 +30,7 @@ docker-compose up -d
 ```
 
 More information can be found in the Getting Started Guide:
-* [Getting Started: Run Ozone with Docker Compose](https://hadoop.apache.org/ozone/docs/current/start/runningviadocker.html)
+* [Getting Started: Run Ozone with Docker Compose](https://ozone.apache.org/docs/current/start/runningviadocker.html)
 
 ## Testing on Kubernetes
 
@@ -38,8 +38,8 @@ More information can be found in the Getting Started Guide:
 ### Installation
 
 Please refer to the Getting Started guide for a couple of options for testing Ozone on Kubernetes:
-* [Getting Started: Minikube and Ozone](https://hadoop.apache.org/ozone/docs/current/start/minikube.html)
-* [Getting Started: Ozone on Kubernetes](https://hadoop.apache.org/ozone/docs/current/start/kubernetes.html)
+* [Getting Started: Minikube and Ozone](https://ozone.apache.org/docs/current/start/minikube.html)
+* [Getting Started: Ozone on Kubernetes](https://ozone.apache.org/docs/current/start/kubernetes.html)
 
 ### Monitoring
 

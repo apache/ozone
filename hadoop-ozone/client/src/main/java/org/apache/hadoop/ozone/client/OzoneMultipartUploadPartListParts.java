@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
@@ -29,9 +30,7 @@ import java.util.List;
  */
 public class OzoneMultipartUploadPartListParts {
 
-  private ReplicationType replicationType;
-
-  private ReplicationFactor replicationFactor;
+  private ReplicationConfig replicationConfig;
 
   //When a list is truncated, this element specifies the last part in the list,
   // as well as the value to use for the part-number-marker request parameter
@@ -44,13 +43,20 @@ public class OzoneMultipartUploadPartListParts {
   private boolean truncated;
   private List<PartInfo> partInfoList = new ArrayList<>();
 
+  @Deprecated
   public OzoneMultipartUploadPartListParts(ReplicationType type,
       ReplicationFactor factor,
       int nextMarker, boolean truncate) {
-    this.replicationType = type;
     this.nextPartNumberMarker = nextMarker;
     this.truncated = truncate;
-    this.replicationFactor = factor;
+    this.replicationConfig = ReplicationConfig.fromTypeAndFactor(type, factor);
+  }
+
+  public OzoneMultipartUploadPartListParts(ReplicationConfig replicationConfig,
+                                           int nextMarker, boolean truncate) {
+    this.nextPartNumberMarker = nextMarker;
+    this.truncated = truncate;
+    this.replicationConfig = replicationConfig;
   }
 
   public void addAllParts(List<PartInfo> partInfos) {
@@ -59,10 +65,6 @@ public class OzoneMultipartUploadPartListParts {
 
   public void addPart(PartInfo partInfo) {
     this.partInfoList.add(partInfo);
-  }
-
-  public ReplicationType getReplicationType() {
-    return replicationType;
   }
 
   public int getNextPartNumberMarker() {
@@ -77,8 +79,20 @@ public class OzoneMultipartUploadPartListParts {
     return partInfoList;
   }
 
+  @Deprecated
+  public ReplicationType getReplicationType() {
+    return ReplicationType
+            .fromProto(replicationConfig.getReplicationType());
+  }
+
+  @Deprecated
   public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+    return ReplicationFactor
+            .fromProto(ReplicationConfig.getLegacyFactor(replicationConfig));
+  }
+
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   /**

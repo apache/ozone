@@ -26,8 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
-
-import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Codec to serialize / deserialize Pipeline.
@@ -36,7 +35,8 @@ public class PipelineCodec implements Codec<Pipeline> {
 
   @Override
   public byte[] toPersistedFormat(Pipeline object) throws IOException {
-    return object.getProtobufMessage(CURRENT_VERSION).toByteArray();
+    return object
+        .getProtobufMessage(ClientVersion.CURRENT_VERSION).toByteArray();
   }
 
   @Override

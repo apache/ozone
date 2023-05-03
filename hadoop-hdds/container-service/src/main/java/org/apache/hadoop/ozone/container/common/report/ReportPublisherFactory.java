@@ -21,12 +21,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 
 /**
  * Factory class to construct {@link ReportPublisher} for a report.
@@ -34,7 +35,7 @@ import com.google.protobuf.GeneratedMessage;
 public class ReportPublisherFactory {
 
   private final ConfigurationSource conf;
-  private final Map<Class<? extends GeneratedMessage>,
+  private final Map<Class<? extends Message>,
       Class<? extends ReportPublisher>> report2publisher;
 
   /**
@@ -53,6 +54,7 @@ public class ReportPublisherFactory {
         CommandStatusReportPublisher.class);
     report2publisher.put(PipelineReportsProto.class,
             PipelineReportPublisher.class);
+    report2publisher.put(CRLStatusReport.class, CRLStatusReportPublisher.class);
   }
 
   /**
@@ -63,7 +65,7 @@ public class ReportPublisherFactory {
    * @return report publisher
    */
   public ReportPublisher getPublisherFor(
-      Class<? extends GeneratedMessage> report) {
+      Class<? extends Message> report) {
     Class<? extends ReportPublisher> publisherClass =
         report2publisher.get(report);
     if (publisherClass == null) {

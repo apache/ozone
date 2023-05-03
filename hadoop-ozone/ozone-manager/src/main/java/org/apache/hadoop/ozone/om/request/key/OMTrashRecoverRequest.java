@@ -124,7 +124,7 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
     } catch (IOException ex) {
       LOG.error("Fail for recovering trash.", ex);
       omClientResponse = new OMTrashRecoverResponse(null,
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, ex), getBucketLayout());
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(

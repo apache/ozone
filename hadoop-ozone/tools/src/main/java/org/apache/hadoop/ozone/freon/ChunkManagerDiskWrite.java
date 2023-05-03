@@ -29,12 +29,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -59,6 +60,7 @@ import static org.apache.commons.lang3.RandomStringUtils.randomAscii;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
     Callable<Void> {
 
@@ -79,7 +81,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       description = "Strategy to layout files in the container",
       defaultValue = "FILE_PER_CHUNK"
   )
-  private ChunkLayOutVersion chunkLayout;
+  private ContainerLayoutVersion containerLayout;
 
   private ChunkManager chunkManager;
 
@@ -102,7 +104,8 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
       VolumeSet volumeSet =
-          new MutableVolumeSet("dnid", "clusterid", ozoneConfiguration);
+          new MutableVolumeSet("dnid", "clusterid", ozoneConfiguration, null,
+              StorageVolume.VolumeType.DATA_VOLUME, null);
 
       Random random = new Random();
 
@@ -118,7 +121,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
 
         KeyValueContainerData keyValueContainerData =
             new KeyValueContainerData(containerId,
-                chunkLayout,
+                containerLayout,
                 1_000_000L,
                 getPrefix(),
                 "nodeid");
@@ -135,13 +138,13 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       data = randomAscii(chunkSize).getBytes(UTF_8);
 
       chunkManager = ChunkManagerFactory.createChunkManager(ozoneConfiguration,
-          null);
+          null, null);
 
       timer = getMetrics().timer("chunk-write");
 
       LOG.info("Running chunk write test: threads={} chunkSize={} " +
               "chunksPerBlock={} layout={}",
-          threadCount, chunkSize, chunksPerBlock, chunkLayout);
+          threadCount, chunkSize, chunksPerBlock, containerLayout);
 
       runTests(this::writeChunk);
 

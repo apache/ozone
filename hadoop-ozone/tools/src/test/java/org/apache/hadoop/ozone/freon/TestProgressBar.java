@@ -26,7 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import java.util.stream.LongStream;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyChar;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for the Progressbar class for Freon.
@@ -51,7 +55,7 @@ public class TestProgressBar {
     long maxValue = 10L;
 
     ProgressBar progressbar =
-        new ProgressBar(stream, maxValue, currentValue, true);
+        new ProgressBar(stream, maxValue, currentValue, true, () -> "");
 
     Runnable task = () -> LongStream.range(0, maxValue)
         .forEach(counter -> numberOfKeysAdded.getAndIncrement());

@@ -23,11 +23,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -65,8 +73,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMAllocateBlockRequest.class);
 
-  public OMAllocateBlockRequest(OMRequest omRequest) {
-    super(omRequest);
+  public OMAllocateBlockRequest(OMRequest omRequest,
+      BucketLayout bucketLayout) {
+    super(omRequest, bucketLayout);
   }
 
   @Override
@@ -78,6 +87,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     Preconditions.checkNotNull(allocateBlockRequest);
 
     KeyArgs keyArgs = allocateBlockRequest.getKeyArgs();
+    String keyPath = keyArgs.getKeyName();
+    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        keyPath, getBucketLayout());
 
     ExcludeList excludeList = new ExcludeList();
     if (allocateBlockRequest.hasExcludeList()) {
@@ -94,22 +106,22 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  one uses direct omclient we might be in trouble.
 
 
+    ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
+        keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-            ozoneManager.getBlockTokenSecretManager(), keyArgs.getType(),
-            keyArgs.getFactor(), excludeList, ozoneManager.getScmBlockSize(),
-            ozoneManager.getScmBlockSize(),
+            ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
+            ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
+            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId(),
+            ozoneManager.getMetrics());
 
     // Set modification time and normalize key if required.
-    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now())
-        .setKeyName(validateAndNormalizeKey(
-            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+    KeyArgs.Builder newKeyArgs =
+        keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()
@@ -184,9 +196,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
-      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
-          keyName, clientID);
-      openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
+      openKeyName = omMetadataManager
+          .getOpenKey(volumeName, bucketName, keyName, clientID);
+      openKeyInfo =
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
             KEY_NOT_FOUND);
@@ -199,10 +212,17 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
-      long preAllocatedSpace = newLocationList.size()
-          * ozoneManager.getScmBlockSize()
-          * openKeyInfo.getFactor().getNumber();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
+      long preAllocatedKeySize = newLocationList.size()
+          * ozoneManager.getScmBlockSize();
+      long hadAllocatedKeySize =
+          openKeyInfo.getLatestVersionLocations().getLocationList().size()
+              * ozoneManager.getScmBlockSize();
+      ReplicationConfig repConfig = openKeyInfo.getReplicationConfig();
+      long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
+          preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
+          hadAllocatedKeySize, repConfig);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -213,15 +233,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
-          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
+          CacheValue.get(trxnLogIndex, openKeyInfo));
 
-      omBucketInfo.incrUsedBytes(preAllocatedSpace);
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omBucketInfo.copyObject());
+          openKeyInfo, clientID, getBucketLayout());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
@@ -229,7 +248,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
-          omResponse, exception));
+          omResponse, exception), getBucketLayout());
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
@@ -245,5 +264,54 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AllocateBlock
+  )
+  public static OMRequest disallowAllocateBlockWithECReplicationConfig(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)) {
+      if (req.getAllocateBlockRequest().getKeyArgs().hasEcReplicationConfig()) {
+        throw new OMException("Cluster does not have the Erasure Coded"
+            + " Storage support feature finalized yet, but the request contains"
+            + " an Erasure Coded replication type. Rejecting the request,"
+            + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates block allocation requests.
+   * We do not want to allow older clients to create block allocation requests
+   * for keys that are present in buckets which use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AllocateBlock
+  )
+  public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getAllocateBlockRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
+      }
+    }
+    return req;
   }
 }

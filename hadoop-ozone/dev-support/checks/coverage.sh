@@ -26,13 +26,15 @@ REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
+JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout)
+
 #Install jacoco cli
 mvn --non-recursive --no-transfer-progress \
   org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy \
-  -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
+  -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
 jacoco() {
-  java -jar target/dependency/org.jacoco.cli-0.8.5-nodeps.jar "$@"
+  java -jar target/dependency/org.jacoco.cli-${JACOCO_VERSION}-nodeps.jar "$@"
 }
 
 #Merge all the jacoco.exec files
@@ -42,8 +44,7 @@ rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes
 
 #Unzip all the classes from the last build
-find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | \
-    grep -E 'hadoop-ozone-|hadoop-hdds-' | \
+find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'ozone-*.jar' | \
     grep -v -E 'shaded|hadoop2|hadoop3|tests' | \
     xargs -n1 unzip -o -q -d target/coverage-classes
 
@@ -52,7 +53,6 @@ find target/coverage-classes -name proto -type d | xargs rm -rf
 find target/coverage-classes -name generated -type d | xargs rm -rf
 find target/coverage-classes -name v1 -type d | xargs rm -rf
 find target/coverage-classes -name freon -type d | xargs rm -rf
-find target/coverage-classes -name genesis -type d | xargs rm -rf
 
 #generate the reports
 jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"

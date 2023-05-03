@@ -21,7 +21,7 @@
  * Please see http://wiki.apache.org/hadoop/Compatibility
  * for what changes are allowed for an *unstable* .proto interface.
  */
-
+syntax = "proto2";
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
 option java_outer_classname = "HddsProtos";
 option java_generic_services = true;
@@ -62,6 +62,11 @@ message ExtendedDatanodeDetailsProto {
     optional string buildDate = 5;
 }
 
+message MoveDataNodePairProto {
+    required DatanodeDetailsProto src = 1;
+    required DatanodeDetailsProto tgt = 2;
+}
+
 /**
  Proto message encapsulating information required to uniquely identify a
  OzoneManager.
@@ -71,6 +76,19 @@ message OzoneManagerDetailsProto {
     required string ipAddress = 2;     // IP address of OM.
     required string hostName = 3;      // Hostname of OM.
     repeated Port ports = 4;
+}
+
+message ScmNodeDetailsProto {
+    required string scmNodeId = 1;     // SCM Node Id.
+    required string clusterId = 2;     // Cluster Id of SCM cluster.
+    required string hostName = 3;      // Hostname of SCM.
+}
+
+message NodeDetailsProto {
+    required string uuid = 1;
+    required string clusterId = 2;
+    required string hostName = 3;
+    required NodeType nodeType = 4;
 }
 
 message Port {
@@ -83,6 +101,10 @@ message PipelineID {
   optional string id = 1;
   // TODO(runzhiwang): when id is gone, specify 1 as the index of uuid128 and mark as required
   optional UUID uuid128 = 100;
+}
+
+message ContainerID {
+    required uint64 id = 1;
 }
 
 enum PipelineState {
@@ -103,6 +125,8 @@ message Pipeline {
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
     optional UUID suggestedLeaderID = 9;
+    repeated uint32 memberReplicaIndexes = 10;
+    optional ECReplicationConfig ecReplicationConfig = 11;
     // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
     optional UUID leaderID128 = 100;
 }
@@ -131,14 +155,15 @@ enum NodeState {
     HEALTHY = 1;
     STALE = 2;
     DEAD = 3;
+    HEALTHY_READONLY = 6;
 }
 
 enum NodeOperationalState {
     IN_SERVICE = 1;
-    DECOMMISSIONING = 2;
-    DECOMMISSIONED = 3;
-    ENTERING_MAINTENANCE = 4;
-    IN_MAINTENANCE = 5;
+    ENTERING_MAINTENANCE = 2;
+    IN_MAINTENANCE = 3;
+    DECOMMISSIONING = 4;
+    DECOMMISSIONED = 5;
 }
 
 enum QueryScope {
@@ -156,10 +181,12 @@ message NodePool {
     repeated Node nodes = 1;
 }
 
-message DatanodeUsageInfo {
+message DatanodeUsageInfoProto {
     optional int64 capacity = 1;
     optional int64 used = 2;
     optional int64 remaining = 3;
+    optional DatanodeDetailsProto node = 4;
+    optional int64 containerCount = 5;
 }
 
 /**
@@ -184,6 +211,7 @@ enum LifeCycleState {
     CLOSED = 4;
     DELETING = 5;
     DELETED = 6; // object is deleted.
+    RECOVERING = 7;
 }
 
 enum LifeCycleEvent {
@@ -196,6 +224,7 @@ enum LifeCycleEvent {
 }
 
 message ContainerInfoProto {
+    // Replace int64 with ContainerID message
     required int64 containerID = 1;
     required LifeCycleState state = 2;
     optional PipelineID pipelineID = 3;
@@ -205,8 +234,9 @@ message ContainerInfoProto {
     required string owner = 7;
     optional int64 deleteTransactionId = 8;
     optional int64 sequenceId = 9;
-    required ReplicationFactor replicationFactor  = 10;
+    optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    optional ECReplicationConfig ecReplicationConfig = 12;
 }
 
 message ContainerWithPipeline {
@@ -221,18 +251,56 @@ message GetScmInfoRequestProto {
 message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
+    repeated string peerRoles = 3;
 }
 
+message AddScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message AddScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
+
+message RemoveScmRequestProto {
+    required string clusterId = 1;
+    required string scmId = 2;
+    required string ratisAddr = 3;
+}
+
+message RemoveScmResponseProto {
+    required bool success = 1;
+    optional string scmId = 2;
+}
 
 enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
     CHAINED = 3;
+    EC = 4;
+    NONE = -1; // Invalid Type
 }
 
 enum ReplicationFactor {
     ONE = 1;
     THREE = 3;
+    ZERO = 0; // Invalid Factor
+}
+
+message ECReplicationConfig {
+    required int32 data = 1;
+    required int32 parity = 2;
+    required string codec = 3;
+    required int32 ecChunkSize = 4;
+}
+
+message DefaultReplicationConfig {
+    required ReplicationType type = 1;
+    optional ReplicationFactor factor = 2;
+    optional ECReplicationConfig ecReplicationConfig = 3;
 }
 
 enum ScmOps {
@@ -251,6 +319,7 @@ enum ScmOps {
 
 message ExcludeListProto {
     repeated string datanodes = 1;
+    // Replace int64 with ContainerID message
     repeated int64 containerIds = 2;
     repeated PipelineID pipelineIds = 3;
 }
@@ -259,10 +328,27 @@ message ExcludeListProto {
  * Block ID that uniquely identify a block by SCM.
  */
 message ContainerBlockID {
+    // Replace int64 with ContainerID message
     required int64 containerID = 1;
     required int64 localID = 2;
 }
 
+message SecretKeyProto {
+    required uint32 keyId = 1;
+    required uint64 expiryDate = 2;
+    required bytes privateKeyBytes = 3;
+    required bytes publicKeyBytes = 4;
+}
+
+/**
+ * Security token identifier
+ */
+message TokenProto {
+  required bytes identifier = 1;
+  required bytes password = 2;
+  required string kind = 3;
+  required string service = 4;
+}
 
 /**
  * Information for the Hdds block token.
@@ -292,10 +378,103 @@ message BlockID {
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
 
+message UpgradeFinalizationStatus {
+    enum Status {
+        ALREADY_FINALIZED = 1;
+        STARTING_FINALIZATION = 2;
+        FINALIZATION_IN_PROGRESS = 3;
+        FINALIZATION_DONE = 4;
+        FINALIZATION_REQUIRED = 5;
+    }
+    required Status status = 1;
+    repeated string messages = 2;
+}
+
 /**
  * Information for Certificate Revocation List.
  */
 message CRLInfoProto {
     required string x509CRL = 1;
     required uint64 creationTimestamp = 2;
+    required int64 crlSequenceID = 3;
+}
+
+/**
+ * Information for X509 Certificate.
+ */
+message CertInfoProto {
+    required string x509Certificate = 1;
+    required uint64 timestamp = 2;
+}
+
+message ContainerReplicaHistoryListProto {
+    repeated ContainerReplicaHistoryProto replicaHistory = 1;
+}
+
+message ContainerReplicaHistoryProto {
+    required string uuid = 1;
+    required int64 firstSeenTime = 2;
+    required int64 lastSeenTime = 3;
+    required int64 bcsId = 4;
+}
+
+message SCMContainerReplicaProto {
+    required int64 containerID = 1;
+    required string state = 2;
+    required DatanodeDetailsProto datanodeDetails = 3;
+    required string placeOfBirth = 4;
+    required int64 sequenceID = 5;
+    required int64 keyCount = 6;
+    required int64 bytesUsed = 7;
+    optional int64 replicaIndex = 8;
+}
+
+message KeyContainerIDList {
+    required string key = 1;
+    repeated ContainerID container = 2;
+}
+
+message KeyIntValue {
+    required string key = 1;
+    optional int64 value = 2;
+}
+
+message ReplicationManagerReportProto {
+    required int64 timestamp = 1;
+    repeated KeyIntValue stat = 2;
+    repeated KeyContainerIDList statSample = 3;
+}
+
+message ContainerBalancerConfigurationProto {
+    optional string utilizationThreshold = 5;
+    optional int32 datanodesInvolvedMaxPercentagePerIteration = 6;
+    optional int64 sizeMovedMaxPerIteration = 7;
+    optional int64 sizeEnteringTargetMax = 8;
+    optional int64 sizeLeavingSourceMax = 9;
+    optional int32 iterations = 10;
+    optional string excludeContainers = 11;
+    optional int64 moveTimeout = 12;
+    optional int64 balancingIterationInterval = 13;
+    optional string includeDatanodes = 14;
+    optional string excludeDatanodes = 15;
+    optional bool moveNetworkTopologyEnable = 16;
+    optional bool triggerDuBeforeMoveEnable = 17;
+
+    required bool shouldRun = 18;
+    optional int32 nextIterationIndex = 19;
+    optional int64 moveReplicationTimeout = 20;
+}
+
+message TransferLeadershipRequestProto {
+    required string newLeaderId = 1;
+}
+
+message TransferLeadershipResponseProto {
+}
+
+message DeletedBlocksTransactionInfo {
+    optional int64 txID = 1;
+    optional int64 containerID = 2;
+    repeated int64 localID = 3;
+    optional int32 count = 4;
 }

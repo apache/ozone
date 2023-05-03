@@ -23,6 +23,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
 import java.time.Duration;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATASTREAM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
@@ -123,6 +124,40 @@ public class DatanodeRatisServerConfig {
     this.leaderNumPendingRequests = leaderNumPendingRequests;
   }
 
+  @Config(key = "datastream.request.threads",
+      defaultValue = "20",
+      type = ConfigType.INT,
+      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
+      description = "Maximum number of threads in the thread pool for " +
+          "datastream request."
+  )
+  private int streamRequestThreads;
+
+  public int getStreamRequestThreads() {
+    return streamRequestThreads;
+  }
+
+  public void setStreamRequestThreads(int streamRequestThreads) {
+    this.streamRequestThreads = streamRequestThreads;
+  }
+
+  @Config(key = "datastream.client.pool.size",
+      defaultValue = "10",
+      type = ConfigType.INT,
+      tags = {OZONE, DATANODE, RATIS, DATASTREAM},
+      description = "Maximum number of client proxy in NettyServerStreamRpc " +
+          "for datastream write."
+  )
+  private int clientPoolSize;
+
+  public int getClientPoolSize() {
+    return clientPoolSize;
+  }
+
+  public void setClientPoolSize(int clientPoolSize) {
+    this.clientPoolSize = clientPoolSize;
+  }
+
   @Config(key = "delete.ratis.log.directory",
           defaultValue = "true",
           type = ConfigType.BOOLEAN,
@@ -138,5 +173,21 @@ public class DatanodeRatisServerConfig {
 
   public void setLeaderNumPendingRequests(boolean delete) {
     this.shouldDeleteRatisLogDirectory = delete;
+  }
+
+  @Config(key = "leaderelection.pre-vote",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, DATANODE, RATIS},
+      description = "Flag to enable/disable ratis election pre-vote."
+  )
+  private boolean preVoteEnabled = true;
+
+  public boolean isPreVoteEnabled() {
+    return preVoteEnabled;
+  }
+
+  public void setPreVote(boolean preVote) {
+    this.preVoteEnabled = preVote;
   }
 }

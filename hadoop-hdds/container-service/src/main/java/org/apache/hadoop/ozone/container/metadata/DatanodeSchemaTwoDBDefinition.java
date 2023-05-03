@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -70,8 +71,9 @@ public class DatanodeSchemaTwoDBDefinition extends
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
-  public DatanodeSchemaTwoDBDefinition(String dbPath) {
-    super(dbPath);
+  public DatanodeSchemaTwoDBDefinition(String dbPath,
+      ConfigurationSource config) {
+    super(dbPath, config);
   }
 
   @Override

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 
 /**
  * Mixin class to handle ObjectID and UpdateID.
@@ -54,7 +54,7 @@ public class WithObjectID extends WithMetadata {
   }
 
   /**
-   * Set the Object ID. If this value is already set then this function throws.
+   * Set the Object ID.
    * There is a reason why we cannot use the final here. The object
    * ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
    * deserialized from the protobuf in many places in code. We need to set
@@ -63,7 +63,7 @@ public class WithObjectID extends WithMetadata {
    * @param obId - long
    */
   public void setObjectID(long obId) {
-    if(this.objectID != 0) {
+    if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
       throw new UnsupportedOperationException("Attempt to modify object ID " +
           "which is not zero. Current Object ID is " + this.objectID);
     }
@@ -103,8 +103,8 @@ public class WithObjectID extends WithMetadata {
     // Main reason, in non-HA transaction Index after restart starts from 0.
     // And also because of this same reason we don't do replay checks in non-HA.
 
-    if (isRatisEnabled) {
-      Preconditions.checkArgument(updateId >= this.updateID, String.format(
+    if (isRatisEnabled && updateId < this.updateID) {
+      throw new IllegalArgumentException(String.format(
           "Trying to set updateID to %d which is not greater than the " +
               "current value of %d for %s", updateId, this.updateID,
           getObjectInfo()));

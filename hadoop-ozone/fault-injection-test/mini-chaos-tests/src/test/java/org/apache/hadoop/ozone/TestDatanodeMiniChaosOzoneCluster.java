@@ -30,7 +30,7 @@ import java.util.concurrent.Callable;
  * Test Datanode with Chaos.
  */
 @CommandLine.Command(
-    name = "datanode",
+    name = "dn",
     description = "run chaos cluster across Ozone Datanodes",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

@@ -22,6 +22,11 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 /**
  * S3 Gateway specific configuration keys.
  */
@@ -35,6 +40,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   public S3GatewayHttpServer(MutableConfigurationSource conf,
       String name) throws IOException {
     super(conf, name);
+    addServlet("icon", "/favicon.ico", IconServlet.class);
   }
 
   @Override
@@ -97,4 +103,17 @@ public class S3GatewayHttpServer extends BaseHttpServer {
     return S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
   }
 
+  /**
+   * Servlet for favicon.ico.
+   */
+  public static class IconServlet extends HttpServlet {
+    private static final long serialVersionUID = -1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+      response.setContentType("image/png");
+      response.sendRedirect("/static/images/ozone.ico");
+    }
+  }
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,9 +28,10 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -39,22 +41,30 @@ import org.junit.Test;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
+/**
+ * Tests OFS behavior when filesystem paths are enabled and parent directory is
+ * missing for some reason.
+ */
 public class TestOzoneFileSystemMissingParent {
 
   private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster;
   private static Path bucketPath;
   private static FileSystem fs;
+  private static OzoneClient client;
 
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     String volumeName = bucket.getVolumeName();
     Path volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
@@ -77,6 +87,7 @@ public class TestOzoneFileSystemMissingParent {
 
   @AfterClass
   public static void tearDown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       cluster = null;
@@ -123,5 +134,8 @@ public class TestOzoneFileSystemMissingParent {
     LambdaTestUtils.intercept(OMException.class,
         "Cannot create file : parent/file " + "as parent "
             + "directory doesn't exist", () -> stream.close());
+
+    // cleanup
+    fs.delete(renamedPath, true);
   }
 }

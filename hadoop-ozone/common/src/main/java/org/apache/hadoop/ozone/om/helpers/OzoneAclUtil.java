@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -43,7 +44,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NON
  */
 public final class OzoneAclUtil {
 
-  private OzoneAclUtil(){
+  private OzoneAclUtil() {
   }
 
   /**
@@ -60,7 +61,7 @@ public final class OzoneAclUtil {
 
     // User ACL.
     listOfAcls.add(new OzoneAcl(USER, userName, userRights, ACCESS));
-    if(userGroups != null) {
+    if (userGroups != null) {
       // Group ACLs of the User.
       Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
           new OzoneAcl(GROUP, group, groupRights, ACCESS)));
@@ -69,41 +70,36 @@ public final class OzoneAclUtil {
   }
 
   /**
-   * Check if acl right requested for given RequestContext exist
-   * in provided acl list.
-   * Acl validation rules:
-   * 1. If user/group has ALL bit set than all user should have all rights.
-   * 2. If user/group has NONE bit set than user/group will not have any right.
-   * 3. For all other individual rights individual bits should be set.
+   * Helper function to get acl list for one user/group.
    *
-   * @param acls
-   * @param context
-   * @return return true if acl list contains right requsted in context.
+   * @param identityName
+   * @param type
+   * @param aclList
+   * @return list of OzoneAcls
    * */
-  public static boolean checkAclRight(List<OzoneAcl> acls,
-      RequestContext context) throws OMException {
-    String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
-    ACLType aclToCheck = context.getAclRights();
-    for (OzoneAcl a : acls) {
-      if(checkAccessInAcl(a, userGroups, userName, aclToCheck)) {
-        return true;
-      }
+  public static List<OzoneAcl> filterAclList(String identityName,
+      IAccessAuthorizer.ACLIdentityType type, List<OzoneAcl> aclList) {
+
+    if (aclList == null || aclList.isEmpty()) {
+      return new ArrayList<>();
     }
-    return false;
+
+    List retList = aclList.stream().filter(acl -> acl.getType() == type
+        && acl.getName().equals(identityName)).collect(Collectors.toList());
+    return retList;
   }
 
-  private static boolean checkAccessInAcl(OzoneAcl a, String[] groups,
-      String username, ACLType aclToCheck) {
+  private static boolean checkAccessInAcl(OzoneAcl a, UserGroupInformation ugi,
+      ACLType aclToCheck) {
     BitSet rights = a.getAclBitSet();
     switch (a.getType()) {
     case USER:
-      if (a.getName().equals(username)) {
+      if (a.getName().equals(ugi.getShortUserName())) {
         return checkIfAclBitIsSet(aclToCheck, rights);
       }
       break;
     case GROUP:
-      for (String grp : groups) {
+      for (String grp : ugi.getGroupNames()) {
         if (a.getName().equals(grp)) {
           return checkIfAclBitIsSet(aclToCheck, rights);
         }
@@ -130,11 +126,10 @@ public final class OzoneAclUtil {
    * */
   public static boolean checkAclRights(List<OzoneAcl> acls,
       RequestContext context) throws OMException {
-    String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
+    UserGroupInformation clientUgi = context.getClientUgi();
     ACLType aclToCheck = context.getAclRights();
     for (OzoneAcl acl : acls) {
-      if (checkAccessInAcl(acl, userGroups, userName, aclToCheck)) {
+      if (checkAccessInAcl(acl, clientUgi, aclToCheck)) {
         return true;
       }
     }
@@ -175,7 +170,7 @@ public final class OzoneAclUtil {
       inheritedAcls = parentAcls.stream()
           .filter(a -> a.getAclScope() == DEFAULT)
           .map(acl -> new OzoneAcl(acl.getType(), acl.getName(),
-              acl.getAclBitSet(), OzoneAcl.AclScope.ACCESS))
+              acl.getAclBitSet(), ACCESS))
           .collect(Collectors.toList());
     }
     if (inheritedAcls != null && !inheritedAcls.isEmpty()) {

@@ -31,5 +31,6 @@ public enum ConfigType {
   LONG,
   TIME,
   SIZE,
-  CLASS
+  CLASS,
+  DOUBLE
 }

@@ -18,20 +18,22 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * A dummy BlockInputStream with pipeline refresh function to mock read
@@ -41,6 +43,7 @@ final class DummyBlockInputStreamWithRetry
     extends DummyBlockInputStream {
 
   private int getChunkInfoCount = 0;
+  private IOException ioException;
 
   @SuppressWarnings("parameternumber")
   DummyBlockInputStreamWithRetry(
@@ -52,25 +55,32 @@ final class DummyBlockInputStreamWithRetry
       XceiverClientFactory xceiverClientManager,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunkMap,
-      AtomicBoolean isRerfreshed) {
+      AtomicBoolean isRerfreshed, IOException ioException) {
     super(blockId, blockLen, pipeline, token, verifyChecksum,
         xceiverClientManager, blockID -> {
           isRerfreshed.set(true);
-          return Pipeline.newBuilder()
-              .setState(Pipeline.PipelineState.OPEN)
-              .setId(PipelineID.randomId())
-              .setType(HddsProtos.ReplicationType.STAND_ALONE)
-              .setFactor(HddsProtos.ReplicationFactor.ONE)
-              .setNodes(Collections.emptyList())
-              .build();
+          try {
+            BlockLocationInfo blockLocationInfo = mock(BlockLocationInfo.class);
+            Pipeline mockPipeline = MockPipeline.createPipeline(1);
+            when(blockLocationInfo.getPipeline()).thenReturn(mockPipeline);
+            return blockLocationInfo;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+
         }, chunkList, chunkMap);
+    this.ioException  = ioException;
   }
 
   @Override
   protected List<ChunkInfo> getChunkInfos() throws IOException {
     if (getChunkInfoCount == 0) {
       getChunkInfoCount++;
-      throw new ContainerNotFoundException("Exception encountered");
+      if (ioException != null) {
+        throw  ioException;
+      }
+      throw new StorageContainerException("Exception encountered",
+          CONTAINER_NOT_FOUND);
     } else {
       return super.getChunkInfos();
     }

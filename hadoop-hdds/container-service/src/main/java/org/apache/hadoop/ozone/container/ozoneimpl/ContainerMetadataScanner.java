@@ -24,128 +24,44 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class is responsible to perform metadata verification of the
  * containers.
+ * Only one thread will be responsible for scanning all volumes.
  */
-public class ContainerMetadataScanner extends Thread {
+public class ContainerMetadataScanner extends AbstractContainerScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerMetadataScanner.class);
 
+  private final ContainerMetadataScannerMetrics metrics;
   private final ContainerController controller;
-  private final long metadataScanInterval;
-  private final ContainerMetadataScrubberMetrics metrics;
-  /**
-   * True if the thread is stopping.<p/>
-   * Protected by this object's lock.
-   */
-  private boolean stopping = false;
 
-  public ContainerMetadataScanner(ContainerScrubberConfiguration conf,
+  public ContainerMetadataScanner(ContainerScannerConfiguration conf,
                                   ContainerController controller) {
+    super("ContainerMetadataScanner", conf.getMetadataScanInterval());
     this.controller = controller;
-    this.metadataScanInterval = conf.getMetadataScanInterval();
-    this.metrics = ContainerMetadataScrubberMetrics.create();
-    setName("ContainerMetadataScanner");
-    setDaemon(true);
+    this.metrics = ContainerMetadataScannerMetrics.create();
   }
 
   @Override
-  public void run() {
-    /*
-     * the outer daemon loop exits on shutdown()
-     */
-    LOG.info("Background ContainerMetadataScanner starting up");
-    try {
-      while (!stopping) {
-        runIteration();
-        if (!stopping) {
-          metrics.resetNumUnhealthyContainers();
-          metrics.resetNumContainersScanned();
-        }
-      }
-    } catch (Exception e) {
-      LOG.error("{} exiting because of exception ", this, e);
-    } finally {
-      if (metrics != null) {
-        metrics.unregister();
-      }
-    }
+  public Iterator<Container<?>> getContainerIterator() {
+    return controller.getContainers();
   }
 
   @VisibleForTesting
-  void runIteration() {
-    long start = System.nanoTime();
-    Iterator<Container<?>> containerIt = controller.getContainers();
-    while (!stopping && containerIt.hasNext()) {
-      Container container = containerIt.next();
-      try {
-        scrub(container);
-      } catch (IOException e) {
-        LOG.info("Unexpected error while scrubbing container {}",
-            container.getContainerData().getContainerID());
-      } finally {
-        metrics.incNumContainersScanned();
-      }
-    }
-    long interval = System.nanoTime()-start;
-    if (!stopping) {
-      metrics.incNumScanIterations();
-      LOG.info("Completed an iteration of container metadata scrubber in" +
-              " {} minutes." +
-              " Number of  iterations (since the data-node restart) : {}" +
-              ", Number of containers scanned in this iteration : {}" +
-              ", Number of unhealthy containers found in this iteration : {}",
-          TimeUnit.NANOSECONDS.toMinutes(interval),
-          metrics.getNumScanIterations(),
-          metrics.getNumContainersScanned(),
-          metrics.getNumUnHealthyContainers());
-      long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(interval);
-      long remainingSleep = metadataScanInterval - elapsedMillis;
-      if (remainingSleep > 0) {
-        try {
-          Thread.sleep(remainingSleep);
-        } catch (InterruptedException e) {
-          LOG.info("Background ContainerMetadataScanner interrupted." +
-              " Going to exit");
-          // Restore the interruption flag and the internal `stopping`
-          // variable to prevent the next iteration thus stopping the thread
-          interrupt();
-          this.stopping = true;
-        }
-      }
-    }
-  }
-
-  @VisibleForTesting
-  public void scrub(Container container) throws IOException {
+  @Override
+  public void scanContainer(Container<?> container) throws IOException {
     if (!container.scanMetaData()) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(
           container.getContainerData().getContainerID());
     }
+    metrics.incNumContainersScanned();
   }
 
-  @VisibleForTesting
-  public ContainerMetadataScrubberMetrics getMetrics() {
-    return metrics;
-  }
-
-  /**
-   * Shutdown the ContainerMetadataScanner thread.
-   */
-  // Ignore the sonar false positive on the InterruptedException issue
-  // as this a normal flow of a shutdown.
-  @SuppressWarnings("squid:S2142")
-  public synchronized void shutdown() {
-    this.stopping = true;
-    this.interrupt();
-    try {
-      this.join();
-    } catch (InterruptedException ex) {
-      LOG.debug("Interrupted exception while stopping metadata scanner.", ex);
-    }
+  @Override
+  public ContainerMetadataScannerMetrics getMetrics() {
+    return this.metrics;
   }
 }

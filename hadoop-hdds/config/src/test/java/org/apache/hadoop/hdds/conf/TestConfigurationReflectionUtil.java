@@ -64,6 +64,10 @@ public class TestConfigurationReflectionUtil {
             null, false,
             "", false,
             "", false},
+        {ConfigurationExample.class, "threshold",
+            ConfigType.DOUBLE, true,
+            "ozone.scm.client.threshold", true,
+            "10", true},
     });
   }
 

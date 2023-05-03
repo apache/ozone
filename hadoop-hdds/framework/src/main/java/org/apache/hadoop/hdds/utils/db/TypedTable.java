@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -25,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -98,7 +99,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
-      try(TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
               iterator()) {
 
         while (tableIterator.hasNext()) {
@@ -108,7 +109,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           // NEVER. Setting epoch value -1, so that when it is marked for
           // delete, this will be considered for cleanup.
           cache.loadInitial(new CacheKey<>(kv.getKey()),
-              new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
+              CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
     } else {
@@ -270,13 +271,26 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
     rawTable.deleteWithBatch(batch, codecRegistry.asRawData(key));
-
   }
 
   @Override
-  public TableIterator<KEY, TypedKeyValue> iterator() {
+  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+    rawTable.deleteRange(codecRegistry.asRawData(beginKey),
+        codecRegistry.asRawData(endKey));
+  }
+
+  @Override
+  public TableIterator<KEY, TypedKeyValue> iterator() throws IOException {
     TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
         rawTable.iterator();
+    return new TypedTableIterator(iterator, keyType, valueType);
+  }
+
+  @Override
+  public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
+      throws IOException {
+    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
+        rawTable.iterator(codecRegistry.asRawData(prefix));
     return new TypedTableIterator(iterator, keyType, valueType);
   }
 
@@ -314,20 +328,29 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public TableCacheMetrics createCacheMetrics() throws IOException {
+    return TableCacheMetrics.create(cache, getName());
+  }
+
+  @Override
   public List<TypedKeyValue> getRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
     byte[] startKeyBytes = null;
+    byte[] prefixBytes = null;
     if (startKey != null) {
       startKeyBytes = codecRegistry.asRawData(startKey);
     }
+    if (prefix != null) {
+      prefixBytes = codecRegistry.asRawData(prefix);
+    }
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
-            rawTable.getRangeKVs(startKeyBytes, count, filters);
+        rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
 
     List<TypedKeyValue> rangeKVs = new ArrayList<>();
     rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
@@ -337,24 +360,47 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<TypedKeyValue> getSequentialRangeKVs(
-          KEY startKey, int count,
+          KEY startKey, int count, KEY prefix,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
     byte[] startKeyBytes = null;
+    byte[] prefixBytes = null;
     if (startKey != null) {
       startKeyBytes = codecRegistry.asRawData(startKey);
     }
+    if (prefix != null) {
+      prefixBytes = codecRegistry.asRawData(prefix);
+    }
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
-            rawTable.getSequentialRangeKVs(startKeyBytes, count, filters);
+        rawTable.getSequentialRangeKVs(startKeyBytes, count,
+            prefixBytes, filters);
 
     List<TypedKeyValue> rangeKVs = new ArrayList<>();
     rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
 
     return rangeKVs;
+  }
+
+  @Override
+  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
+      throws IOException {
+    rawTable.deleteBatchWithPrefix(batch, codecRegistry.asRawData(prefix));
+  }
+
+  @Override
+  public void dumpToFileWithPrefix(File externalFile, KEY prefix)
+      throws IOException {
+    rawTable.dumpToFileWithPrefix(externalFile,
+        codecRegistry.asRawData(prefix));
+  }
+
+  @Override
+  public void loadFromFile(File externalFile) throws IOException {
+    rawTable.loadFromFile(externalFile);
   }
 
   @Override
@@ -447,24 +493,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         return null;
       }
       return new TypedKeyValue(result);
-    }
-
-    @Override
-    public KEY key() throws IOException {
-      byte[] result = rawIterator.key();
-      if (result == null) {
-        return null;
-      }
-      return codecRegistry.asObject(result, keyClass);
-    }
-
-    @Override
-    public TypedKeyValue value() {
-      KeyValue keyValue = rawIterator.value();
-      if(keyValue != null) {
-        return new TypedKeyValue(keyValue, keyClass, valueClass);
-      }
-      return null;
     }
 
     @Override

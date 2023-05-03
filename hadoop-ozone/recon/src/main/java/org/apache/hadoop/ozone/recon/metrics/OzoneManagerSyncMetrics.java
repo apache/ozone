@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -74,6 +75,9 @@ public final class OzoneManagerSyncMetrics {
 
   @Metric(about = "Average number of updates got per OM delta request")
   private MutableGaugeFloat averageNumUpdatesInDeltaRequest;
+
+  @Metric(about = "The lag of sequence number between Recon and OM")
+  private MutableGaugeLong sequenceNumberLag;
 
   public void incrNumSnapshotRequests() {
     this.numSnapshotRequests.incr();
@@ -129,5 +133,13 @@ public final class OzoneManagerSyncMetrics {
 
   public MutableCounterLong getNumNonZeroDeltaRequests() {
     return numNonZeroDeltaRequests;
+  }
+
+  public void setSequenceNumberLag(long lag) {
+    sequenceNumberLag.set(lag);
+  }
+
+  public MutableGaugeLong getSequenceNumberLag() {
+    return sequenceNumberLag;
   }
 }

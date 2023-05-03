@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -26,14 +27,20 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
@@ -133,14 +140,114 @@ public class OMDBDefinition implements DBDefinition {
                     S3SecretValue.class,
                     new S3SecretValueCodec());
 
-  public static final DBColumnFamilyDefinition<String, OMTransactionInfo>
+  public static final DBColumnFamilyDefinition<String, TransactionInfo>
             TRANSACTION_INFO_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
                     String.class,
                     new StringCodec(),
-                    OMTransactionInfo.class,
-                    new OMTransactionInfoCodec());
+                    TransactionInfo.class,
+                    new TransactionInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDirectoryInfo>
+            DIRECTORY_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.DIRECTORY_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OmDirectoryInfo.class,
+                    new OmDirectoryInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo>
+            FILE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.FILE_TABLE,
+                    String.class,
+                    new StringCodec(),
+                    OmKeyInfo.class,
+                    new OmKeyInfoCodec(true));
+
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo>
+            OPEN_FILE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                  OmMetadataManagerImpl.OPEN_FILE_TABLE,
+                  String.class,
+                  new StringCodec(),
+                  OmKeyInfo.class,
+                  new OmKeyInfoCodec(true));
+
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo>
+      DELETED_DIR_TABLE =
+      new DBColumnFamilyDefinition<>(OmMetadataManagerImpl.DELETED_DIR_TABLE,
+          String.class, new StringCodec(), OmKeyInfo.class,
+          new OmKeyInfoCodec(true));
+
+  public static final DBColumnFamilyDefinition<String, String>
+      META_TABLE = new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.META_TABLE,
+          String.class,
+          new StringCodec(),
+          String.class,
+          new StringCodec());
+
+  // Tables for multi-tenancy
+
+  public static final DBColumnFamilyDefinition<String, OmDBAccessIdInfo>
+            TENANT_ACCESS_ID_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE,
+                    String.class,  // accessId
+                    new StringCodec(),
+                    OmDBAccessIdInfo.class,  // tenantId, secret, principal
+                    new OmDBAccessIdInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo>
+            PRINCIPAL_TO_ACCESS_IDS_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE,
+                    String.class,  // User principal
+                    new StringCodec(),
+                    OmDBUserPrincipalInfo.class,  // List of accessIds
+                    new OmDBUserPrincipalInfoCodec());
+
+  public static final DBColumnFamilyDefinition<String, OmDBTenantState>
+            TENANT_STATE_TABLE =
+            new DBColumnFamilyDefinition<>(
+                    OmMetadataManagerImpl.TENANT_STATE_TABLE,
+                    String.class,  // tenantId (tenant name)
+                    new StringCodec(),
+                    OmDBTenantState.class,
+                    new OmDBTenantStateCodec());
+
+  // End tables for S3 multi-tenancy
+
+  public static final DBColumnFamilyDefinition<String, SnapshotInfo>
+      SNAPSHOT_INFO_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
+          String.class,  // snapshot path
+          new StringCodec(),
+          SnapshotInfo.class,
+          new OmDBSnapshotInfoCodec());
+
+  /**
+   * SnapshotRenamedTable that complements the keyTable (or fileTable)
+   * and dirTable entries of the immediately previous snapshot in the
+   * same snapshot scope (bucket or volume).
+   * <p>
+   * Key/Dir renames between the two subsequent snapshots are captured, this
+   * information is used in {@link SnapshotDeletingService} to check if the
+   * renamedKey or renamedDir is present in the previous snapshot's keyTable
+   * (or fileTable).
+   */
+  public static final DBColumnFamilyDefinition<String, String>
+      SNAPSHOT_RENAMED_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE,
+          String.class,  // /volumeName/bucketName/objectID
+          new StringCodec(),
+          String.class, // path to key in prev snapshot's key(file)/dir Table.
+          new StringCodec());
 
   @Override
   public String getName() {
@@ -157,7 +264,11 @@ public class OMDBDefinition implements DBDefinition {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
         VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
+        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
+        FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
+        TENANT_ACCESS_ID_TABLE,
+        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
+        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_TABLE};
   }
 }
 

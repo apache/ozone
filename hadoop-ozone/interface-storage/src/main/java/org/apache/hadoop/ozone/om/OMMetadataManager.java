@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -17,25 +17,33 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -47,7 +55,7 @@ import com.google.common.annotations.VisibleForTesting;
 /**
  * OM metadata manager interface.
  */
-public interface OMMetadataManager {
+public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * Start metadata manager.
    *
@@ -74,7 +82,7 @@ public interface OMMetadataManager {
    *
    * @return OzoneManagerLock
    */
-  OzoneManagerLock getLock();
+  IOzoneManagerLock getLock();
 
   /**
    * Returns the epoch associated with current OM process.
@@ -214,6 +222,15 @@ public interface OMMetadataManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return list of snapshot
+   */
+  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
    * Recover trash allows the user to recover the keys
    * that were marked as deleted, but not actually deleted by Ozone Manager.
    * @param volumeName - The volume name.
@@ -241,26 +258,24 @@ public interface OMMetadataManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
-   * with #deleting# prefix in OM DB.
-   *
-   * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} represent keys and blocks.
-   * @throws IOException
-   */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
-
-  /**
-   * Returns the names of up to {@code count} open keys that are older than
-   * the configured expiration age.
+   * Returns the names of up to {@code count} open keys whose age is
+   * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of open keys to return.
-   * @return a list of {@link String} representing names of open expired keys.
+   * @param expireThreshold The threshold of open key expire age.
+   * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(int count) throws IOException;
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
+      BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -288,7 +303,15 @@ public interface OMMetadataManager {
    *
    * @return KeyTable.
    */
-  Table<String, OmKeyInfo> getKeyTable();
+
+  Table<String, OmKeyInfo> getKeyTable(BucketLayout bucketLayout);
+
+  /**
+   * Returns the FileTable.
+   *
+   * @return FileTable.
+   */
+  Table<String, OmKeyInfo> getFileTable();
 
   /**
    * Get Deleted Table.
@@ -302,7 +325,7 @@ public interface OMMetadataManager {
    *
    * @return Table.
    */
-  Table<String, OmKeyInfo> getOpenKeyTable();
+  Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout buckLayout);
 
   /**
    * Gets the DelegationTokenTable.
@@ -337,13 +360,23 @@ public interface OMMetadataManager {
    */
   Table<String, OmMultipartKeyInfo> getMultipartInfoTable();
 
-  /**
-   * Gets the S3 Secrets table.
-   * @return Table
-   */
-  Table<String, S3SecretValue> getS3SecretTable();
+  Table<String, TransactionInfo> getTransactionInfoTable();
 
-  Table<String, OMTransactionInfo> getTransactionInfoTable();
+  Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
+
+  Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable();
+
+  Table<String, OmDBTenantState> getTenantStateTable();
+
+  Table<String, SnapshotInfo> getSnapshotInfoTable();
+
+  Table<String, String> getSnapshotRenamedTable();
+
+  /**
+   * Gets the OM Meta table.
+   * @return meta table reference.
+   */
+  Table<String, String> getMetaTable();
 
   /**
    * Returns number of rows in a table.  This should not be used for very
@@ -374,6 +407,12 @@ public interface OMMetadataManager {
       String bucketName, String prefix) throws IOException;
 
   /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
@@ -396,5 +435,116 @@ public interface OMMetadataManager {
       getBucketIterator();
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator();
+      getKeyIterator() throws IOException;
+
+  /**
+   * Given parent object id and path component name, return the corresponding
+   * DB 'prefixKey' key.
+   *
+   * @param volumeId - ID of the volume
+   * @param bucketId - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param pathComponentName   - path component name
+   * @return DB directory key as String.
+   */
+  String getOzonePathKey(long volumeId, long bucketId,
+                         long parentObjectId, String pathComponentName);
+
+  default String getOzonePathKey(long volumeId, long bucketId,
+      OmDirectoryInfo dir) {
+    return getOzonePathKey(volumeId, bucketId,
+        dir.getParentObjectID(), dir.getName());
+  }
+
+  /**
+   * Given ozone path key, component id, return the corresponding 
+   * DB path key for delete table.
+   *
+   * @param objectId - object Id
+   * @param pathKey   - path key of component
+   * @return DB Delete directory key as String.
+   */
+  String getOzoneDeletePathKey(long objectId, String pathKey);
+
+  /**
+   * Given ozone delete path key return the corresponding
+   * DB path key for directory table.
+   *
+   * @param ozoneDeletePath - ozone delete path
+   * @return DB directory key as String.
+   */
+  String getOzoneDeletePathDirKey(String ozoneDeletePath);
+
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param id             - client id for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long volumeId, long bucketId,
+                         long parentObjectId, String fileName, long id);
+
+
+  /**
+   * Given a volume, bucket and a objectID, return the DB key name in
+   * snapshotRenamedTable.
+   *
+   * @param volume   - volume name
+   * @param bucket   - bucket name
+   * @param objectID - objectID of the key
+   * @return DB rename key as String.
+   */
+  String getRenameKey(String volume, String bucket, long objectID);
+
+  /**
+   * Returns the DB key name of a multipart upload key in OM metadata store.
+   *
+   * @param volumeId       - ID of the volume
+   * @param bucketId       - ID of the bucket
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param uploadId       - the upload id for this key
+   * @return bytes of DB key.
+   */
+  String getMultipartKey(long volumeId, long bucketId,
+                         long parentObjectId, String fileName,
+                         String uploadId);
+
+  /**
+   * Get Deleted Directory Table.
+   *
+   * @return Deleted Directory Table.
+   */
+  Table<String, OmKeyInfo> getDeletedDirTable();
+
+  /**
+   * Get the ID of given volume.
+   *
+   * @param volume volume name
+   * @return ID of the volume
+   * @throws IOException
+   */
+  long getVolumeId(String volume) throws IOException;
+
+  /**
+   * Get the ID of given bucket.
+   *
+   * @param volume volume name
+   * @param bucket bucket name
+   * @return ID of the bucket
+   * @throws IOException
+   */
+  long getBucketId(String volume, String bucket) throws IOException;
+
+  /**
+   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * @param deletedKey - key to be purged from the deletedTable
+   * @return {@link BlockGroup}
+   */
+  List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
 }

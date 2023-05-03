@@ -28,15 +28,19 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -44,7 +48,10 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
 /**
  * Configuration for ozone.
@@ -52,6 +59,12 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
+
+  public static final SortedSet<String> TAGS = unmodifiableSortedSet(
+      Arrays.stream(ConfigTag.values())
+          .map(Enum::name)
+          .collect(toCollection(TreeSet::new)));
+
   static {
     addDeprecatedKeys();
 
@@ -108,6 +121,7 @@ public class OzoneConfiguration extends Configuration
     setClassLoader(conf.getClassLoader());
     if (!(conf instanceof OzoneConfiguration)) {
       loadDefaults();
+      addResource(conf);
     }
   }
 
@@ -125,6 +139,7 @@ public class OzoneConfiguration extends Configuration
     } catch (IOException e) {
       e.printStackTrace();
     }
+    addResource("ozone-default.xml");
     // Adding core-site here because properties from core-site are
     // distributed to executors by spark driver. Ozone properties which are
     // added to core-site, will be overridden by properties from adding Resource
@@ -241,7 +256,6 @@ public class OzoneConfiguration extends Configuration
     // adds the default resources
     Configuration.addDefaultResource("hdfs-default.xml");
     Configuration.addDefaultResource("hdfs-site.xml");
-    Configuration.addDefaultResource("ozone-default.xml");
   }
 
   /**
@@ -272,6 +286,11 @@ public class OzoneConfiguration extends Configuration
     return props;
   }
 
+  public Map<String, String> getOzoneProperties() {
+    String ozoneRegex = ".*(ozone|hdds|ratis|container|scm|recon)\\..*";
+    return getValByRegex(ozoneRegex);
+  }
+
   @Override
   public Collection<String> getConfigKeys() {
     return getProps().keySet()
@@ -281,27 +300,39 @@ public class OzoneConfiguration extends Configuration
   }
 
   @Override
-  public Map<String, String> getPropsWithPrefix(String confPrefix) {
+  public Map<String, String> getPropsMatchPrefixAndTrimPrefix(
+      String keyPrefix) {
     Properties props = getProps();
     Map<String, String> configMap = new HashMap<>();
     for (String name : props.stringPropertyNames()) {
-      if (name.startsWith(confPrefix)) {
+      if (name.startsWith(keyPrefix)) {
         String value = get(name);
-        String keyName = name.substring(confPrefix.length());
+        String keyName = name.substring(keyPrefix.length());
         configMap.put(keyName, value);
       }
     }
     return configMap;
   }
 
-  private static void addDeprecatedKeys(){
+  @Override
+  public boolean isPropertyTag(String tagStr) {
+    return TAGS.contains(tagStr) || super.isPropertyTag(tagStr);
+  }
+
+  private static void addDeprecatedKeys() {
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
             ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT),
         new DeprecationDelta(HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpcslowness.timeout",
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
-           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout")
+           + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
+        new DeprecationDelta("dfs.datanode.keytab.file",
+            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+        new DeprecationDelta("ozone.scm.chunk.layout",
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
+        new DeprecationDelta("hdds.datanode.replication.work.dir",
+            OZONE_CONTAINER_COPY_WORKDIR)
     });
   }
 }

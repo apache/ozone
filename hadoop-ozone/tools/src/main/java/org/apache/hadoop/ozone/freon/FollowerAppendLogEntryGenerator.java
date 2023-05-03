@@ -88,6 +88,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
+@SuppressWarnings("java:S2245") // no need for secure random
 public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     implements Callable<Void>, StreamObserver<AppendEntriesReplyProto> {
 
@@ -220,10 +221,11 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         long callId = callIdRandom.nextLong();
         inFlightMessages.put(callId);
         sender.onNext(createAppendLogEntry(sequence, callId));
-      } catch (Exception e) {
+      } catch (InterruptedException e) {
         LOG.error(
             "Error while sending new append entry request (HB) to the "
                 + "follower", e);
+        Thread.currentThread().interrupt();
       }
     });
   }
@@ -241,6 +243,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         rateLimiter.acquire();
       } catch (InterruptedException e) {
         LOG.error("Rate limiter acquire has been interrupted", e);
+        Thread.currentThread().interrupt();
       }
     }
     long previousLog = nextIndex - 1;
@@ -334,7 +337,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
             .build());
     RaftClient client = RaftClient.newBuilder()
         .setClientId(clientId)
-        .setProperties(new RaftProperties(true))
+        .setProperties(new RaftProperties())
         .setRaftGroup(group)
         .build();
 

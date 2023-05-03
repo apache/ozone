@@ -21,10 +21,11 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
@@ -38,15 +39,15 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  * Response for S3 Initiate Multipart Upload request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, MULTIPARTINFO_TABLE})
-public class S3InitiateMultipartUploadResponse extends OMClientResponse {
+public class S3InitiateMultipartUploadResponse extends OmKeyResponse {
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private OmKeyInfo omKeyInfo;
 
   public S3InitiateMultipartUploadResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmKeyInfo omKeyInfo) {
-    super(omResponse);
+      @Nonnull OmKeyInfo omKeyInfo, @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.omKeyInfo = omKeyInfo;
   }
@@ -55,8 +56,9 @@ public class S3InitiateMultipartUploadResponse extends OMClientResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public S3InitiateMultipartUploadResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public S3InitiateMultipartUploadResponse(@Nonnull OMResponse omResponse,
+                                           @Nonnull BucketLayout bucketLayout) {
+    super(omResponse, bucketLayout);
     checkStatusNotOK();
   }
 
@@ -69,8 +71,8 @@ public class S3InitiateMultipartUploadResponse extends OMClientResponse {
             omKeyInfo.getBucketName(), omKeyInfo.getKeyName(),
             omMultipartKeyInfo.getUploadID());
 
-    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-        multipartKey, omKeyInfo);
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .putWithBatch(batchOperation, multipartKey, omKeyInfo);
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         multipartKey, omMultipartKeyInfo);
   }

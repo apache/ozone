@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -31,8 +33,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class used to test ReconInternalSchemaDefinition.
@@ -64,8 +65,8 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
           resultSet.getInt("DATA_TYPE")));
     }
 
-    Assert.assertEquals(3, actualPairs.size());
-    Assert.assertEquals(expectedPairs, actualPairs);
+    assertEquals(3, actualPairs.size());
+    assertEquals(expectedPairs, actualPairs);
   }
 
   @Test
@@ -77,7 +78,7 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
         RECON_TASK_STATUS_TABLE_NAME, null);
 
     while (resultSet.next()) {
-      Assert.assertEquals(RECON_TASK_STATUS_TABLE_NAME,
+      assertEquals(RECON_TASK_STATUS_TABLE_NAME,
           resultSet.getString("TABLE_NAME"));
     }
 
@@ -101,9 +102,9 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
     // Read
     ReconTaskStatus dbRecord = dao.findById("HelloWorldTask");
 
-    Assert.assertEquals("HelloWorldTask", dbRecord.getTaskName());
-    Assert.assertEquals(Long.valueOf(now), dbRecord.getLastUpdatedTimestamp());
-    Assert.assertEquals(Long.valueOf(100), dbRecord.getLastUpdatedSeqNumber());
+    assertEquals("HelloWorldTask", dbRecord.getTaskName());
+    assertEquals(Long.valueOf(now), dbRecord.getLastUpdatedTimestamp());
+    assertEquals(Long.valueOf(100), dbRecord.getLastUpdatedSeqNumber());
 
     // Update
     dbRecord.setLastUpdatedSeqNumber(150L);
@@ -111,7 +112,7 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
 
     // Read updated
     dbRecord = dao.findById("HelloWorldTask");
-    Assert.assertEquals(Long.valueOf(150), dbRecord.getLastUpdatedSeqNumber());
+    assertEquals(Long.valueOf(150), dbRecord.getLastUpdatedSeqNumber());
 
     // Delete
     dao.deleteById("GoodbyeWorldTask");
@@ -119,7 +120,7 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
     // Verify
     dbRecord = dao.findById("GoodbyeWorldTask");
 
-    Assert.assertNull(dbRecord);
+    assertNull(dbRecord);
   }
 
 }

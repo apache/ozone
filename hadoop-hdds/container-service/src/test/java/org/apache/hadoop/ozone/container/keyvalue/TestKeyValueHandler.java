@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
@@ -37,26 +38,33 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -76,22 +84,25 @@ public class TestKeyValueHandler {
   @Rule
   public TestRule timeout = Timeout.seconds(300);
 
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
+
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
 
-  private final ChunkLayOutVersion layout;
+  private final ContainerLayoutVersion layout;
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
 
-  public TestKeyValueHandler(ChunkLayOutVersion layout) {
+  public TestKeyValueHandler(ContainerLayoutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Iterable<Object[]> parameters() {
-    return ChunkLayoutTestInfo.chunkLayoutParameters();
+    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   @Before
@@ -117,6 +128,7 @@ public class TestKeyValueHandler {
   /**
    * Test that Handler handles different command types correctly.
    */
+  @Test
   public void testHandlerCommandHandling() throws Exception {
     Mockito.reset(handler);
     // Test Create Container Request handling
@@ -134,7 +146,7 @@ public class TestKeyValueHandler {
     DispatcherContext context = new DispatcherContext.Builder().build();
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, context);
-    Mockito.verify(handler, times(1)).handleCreateContainer(
+    Mockito.verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -193,20 +205,14 @@ public class TestKeyValueHandler {
     Mockito.verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
-    // Test Delete Block Request handling
-    ContainerCommandRequestProto deleteBlockRequest =
-        getDummyCommandRequestProto(ContainerProtos.Type.DeleteBlock);
-    KeyValueHandler
-        .dispatchRequest(handler, deleteBlockRequest, container, context);
-    Mockito.verify(handler, times(1)).handleDeleteBlock(
-        any(ContainerCommandRequestProto.class), any());
+    // Block Deletion is handled by BlockDeletingService and need not be
+    // tested here.
 
-    // Test List Block Request handling
     ContainerCommandRequestProto listBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, context);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
@@ -217,13 +223,8 @@ public class TestKeyValueHandler {
     Mockito.verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
-    // Test Delete Chunk Request handling
-    ContainerCommandRequestProto deleteChunkRequest =
-        getDummyCommandRequestProto(ContainerProtos.Type.DeleteChunk);
-    KeyValueHandler
-        .dispatchRequest(handler, deleteChunkRequest, container, context);
-    Mockito.verify(handler, times(1)).handleDeleteChunk(
-        any(ContainerCommandRequestProto.class), any());
+    // Chunk Deletion is handled by BlockDeletingService and need not be
+    // tested here.
 
     // Test Write Chunk Request handling
     ContainerCommandRequestProto writeChunkRequest =
@@ -238,7 +239,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
         .dispatchRequest(handler, listChunkRequest, container, context);
-    Mockito.verify(handler, times(3)).handleUnsupportedOp(
+    Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling
@@ -259,14 +260,16 @@ public class TestKeyValueHandler {
   }
 
   @Test
-  public void testVolumeSetInKeyValueHandler() throws Exception{
+  public void testVolumeSetInKeyValueHandler() throws Exception {
     File path = GenericTestUtils.getRandomizedTestDir();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
+    conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
     MutableVolumeSet
-        volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
+        volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
-      ContainerSet cset = new ContainerSet();
+      ContainerSet cset = new ContainerSet(1000);
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
@@ -292,7 +295,7 @@ public class TestKeyValueHandler {
       try {
         new KeyValueHandler(conf,
             context.getParent().getDatanodeDetails().getUuidString(),
-            cset, volumeSet, metrics, c->{});
+            cset, volumeSet, metrics, c -> { });
       } catch (RuntimeException ex) {
         GenericTestUtils.assertExceptionContains("class org.apache.hadoop" +
             ".ozone.container.common.impl.HddsDispatcher not org.apache" +
@@ -355,29 +358,39 @@ public class TestKeyValueHandler {
             "-" + UUID.randomUUID().toString());
     try {
       final long containerID = 1L;
+      final String clusterId = UUID.randomUUID().toString();
+      final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
-      final ContainerSet containerSet = new ContainerSet();
+      final ContainerSet containerSet = new ContainerSet(1000);
       final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
 
-      Mockito.when(volumeSet.getVolumesList())
-          .thenReturn(Collections.singletonList(
-              new HddsVolume.Builder(testDir).conf(conf).build()));
+      HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
+          .clusterID(clusterId).datanodeUuid(datanodeId)
+          .build();
+      hddsVolume.format(clusterId);
+      hddsVolume.createWorkingDir(clusterId, null);
 
-      final int[] interval = new int[1];
-      interval[0] = 2;
-      final ContainerMetrics metrics = new ContainerMetrics(interval);
+      Mockito.when(volumeSet.getVolumesList())
+          .thenReturn(Collections.singletonList(hddsVolume));
+
+      List<HddsVolume> hddsVolumeList = StorageVolumeUtil
+          .getHddsVolumesList(volumeSet.getVolumesList());
+
+      assertTrue(hddsVolumeList.size() == 1);
+
+      final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
       final AtomicInteger icrReceived = new AtomicInteger(0);
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
-          UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
+          datanodeId, containerSet, volumeSet, metrics,
           c -> icrReceived.incrementAndGet());
-      kvHandler.setScmID(UUID.randomUUID().toString());
+      kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
           ContainerCommandRequestProto.newBuilder()
               .setCmdType(ContainerProtos.Type.CreateContainer)
-              .setDatanodeUuid(UUID.randomUUID().toString())
+              .setDatanodeUuid(datanodeId)
               .setCreateContainer(
                   ContainerProtos.CreateContainerRequestProto.newBuilder()
                       .setContainerType(ContainerType.KeyValueContainer)
@@ -393,6 +406,9 @@ public class TestKeyValueHandler {
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
+
+      assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
+          .getDeleteLeftovers(hddsVolume).hasNext());
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

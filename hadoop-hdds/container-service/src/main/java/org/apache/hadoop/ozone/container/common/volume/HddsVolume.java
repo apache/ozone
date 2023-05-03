@@ -18,32 +18,35 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
-import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.util.Time;
 
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.RawDB;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
+import static org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil.initPerDiskDBStore;
 
 /**
  * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
@@ -52,104 +55,59 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/metadata}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterUuid>>/current/<<containerDir>>/<<containerID
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one
- * scmUuid directory for each SCM it is a part of (currently only one SCM is
+ * clusterUuid directory for each SCM it is a part of (currently only one SCM is
  * supported).
- *
+ * <p>
  * During DN startup, if the VERSION file exists, we verify that the
  * clusterID in the version file matches the clusterID from SCM.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 @SuppressWarnings("finalclass")
-public class HddsVolume
-    implements Checkable<Boolean, VolumeCheckResult> {
+public class HddsVolume extends StorageVolume {
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsVolume.class);
 
   public static final String HDDS_VOLUME_DIR = "hdds";
+  private static final Path TMP_DIR = Paths.get("tmp");
+  private static final Path TMP_DELETE_SERVICE_DIR =
+      Paths.get("container_delete_service");
 
-  private final File hddsRootDir;
-  private final VolumeInfo volumeInfo;
-  private VolumeState state;
   private final VolumeIOStats volumeIOStats;
+  private final VolumeInfoMetrics volumeInfoMetrics;
 
-  // VERSION file properties
-  private String storageID;       // id of the file system
-  private String clusterID;       // id of the cluster
-  private String datanodeUuid;    // id of the DataNode
-  private long cTime;             // creation time of the file system state
-  private int layoutVersion;      // layout version of the storage data
   private final AtomicLong committedBytes; // till Open containers become full
 
-  /**
-   * Run a check on the current volume to determine if it is healthy.
-   * @param unused context for the check, ignored.
-   * @return result of checking the volume.
-   * @throws Exception if an exception was encountered while running
-   *            the volume check.
-   */
-  @Override
-  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
-    if (!hddsRootDir.exists()) {
-      return VolumeCheckResult.FAILED;
-    }
-    DiskChecker.checkDir(hddsRootDir);
-    return VolumeCheckResult.HEALTHY;
-  }
+  // Mentions the type of volume
+  private final VolumeType type = VolumeType.DATA_VOLUME;
+  // The dedicated DbVolume that the db instance of this HddsVolume resides.
+  // This is optional, if null then the db instance resides on this HddsVolume.
+  private DbVolume dbVolume;
+  // The subdirectory with storageID as its name, used to build the
+  // container db path. This is initialized only once together with dbVolume,
+  // and stored as a member to prevent spawning lots of File objects.
+  private File dbParentDir;
+  private Path tmpDirPath;
+  private Path deleteServiceDirPath;
+  private AtomicBoolean dbLoaded = new AtomicBoolean(false);
 
   /**
    * Builder for HddsVolume.
    */
-  public static class Builder {
-    private final String volumeRootStr;
-    private ConfigurationSource conf;
-    private StorageType storageType;
+  public static class Builder extends StorageVolume.Builder<Builder> {
 
-    private String datanodeUuid;
-    private String clusterID;
-    private boolean failedVolume = false;
-    private SpaceUsageCheckFactory usageCheckFactory;
-
-    public Builder(String rootDirStr) {
-      this.volumeRootStr = rootDirStr;
+    public Builder(String volumeRootStr) {
+      super(volumeRootStr, HDDS_VOLUME_DIR);
     }
 
-    public Builder conf(ConfigurationSource config) {
-      this.conf = config;
-      return this;
-    }
-
-    public Builder storageType(StorageType st) {
-      this.storageType = st;
-      return this;
-    }
-
-    public Builder datanodeUuid(String datanodeUUID) {
-      this.datanodeUuid = datanodeUUID;
-      return this;
-    }
-
-    public Builder clusterID(String cid) {
-      this.clusterID = cid;
-      return this;
-    }
-
-    // This is added just to create failed volume objects, which will be used
-    // to create failed HddsVolume objects in the case of any exceptions caused
-    // during creating HddsVolume object.
-    public Builder failedVolume(boolean failed) {
-      this.failedVolume = failed;
-      return this;
-    }
-
-    public Builder usageCheckFactory(SpaceUsageCheckFactory factory) {
-      usageCheckFactory = factory;
+    @Override
+    public Builder getThis() {
       return this;
     }
 
@@ -159,285 +117,105 @@ public class HddsVolume
   }
 
   private HddsVolume(Builder b) throws IOException {
-    if (!b.failedVolume) {
-      StorageLocation location = StorageLocation.parse(b.volumeRootStr);
-      hddsRootDir = new File(location.getUri().getPath(), HDDS_VOLUME_DIR);
-      this.state = VolumeState.NOT_INITIALIZED;
-      this.clusterID = b.clusterID;
-      this.datanodeUuid = b.datanodeUuid;
-      this.volumeIOStats = new VolumeIOStats(b.volumeRootStr);
+    super(b);
 
-      volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
-          .storageType(b.storageType)
-          .usageCheckFactory(b.usageCheckFactory)
-          .build();
+    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
+      this.setState(VolumeState.NOT_INITIALIZED);
+      this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr(),
+          this.getStorageDir().toString());
+      this.volumeInfoMetrics =
+          new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       this.committedBytes = new AtomicLong(0);
 
-      LOG.info("Creating Volume: {} of storage type : {} and capacity : {}",
-          hddsRootDir, b.storageType, volumeInfo.getCapacity());
+      LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
+          getStorageDir(), b.getStorageType(),
+              getVolumeInfo().get().getCapacity());
 
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
-      // HddsVolumeObject.
-      hddsRootDir = new File(b.volumeRootStr);
+      // HddsVolume Object.
+      this.setState(VolumeState.FAILED);
       volumeIOStats = null;
-      volumeInfo = null;
-      storageID = UUID.randomUUID().toString();
-      state = VolumeState.FAILED;
+      volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
       committedBytes = null;
     }
+
   }
 
-  public VolumeInfo getVolumeInfo() {
-    return volumeInfo;
-  }
+  @Override
+  public void createWorkingDir(String workingDirName,
+      MutableVolumeSet dbVolumeSet) throws IOException {
+    super.createWorkingDir(workingDirName, dbVolumeSet);
 
-  /**
-   * Initializes the volume.
-   * Creates the Version file if not present,
-   * otherwise returns with IOException.
-   * @throws IOException
-   */
-  private void initialize() throws IOException {
-    VolumeState intialVolumeState = analyzeVolumeState();
-    switch (intialVolumeState) {
-    case NON_EXISTENT:
-      // Root directory does not exist. Create it.
-      if (!hddsRootDir.mkdirs()) {
-        throw new IOException("Cannot create directory " + hddsRootDir);
-      }
-      setState(VolumeState.NOT_FORMATTED);
-      createVersionFile();
-      break;
-    case NOT_FORMATTED:
-      // Version File does not exist. Create it.
-      createVersionFile();
-      break;
-    case NOT_INITIALIZED:
-      // Version File exists. Verify its correctness and update property fields.
-      readVersionFile();
-      setState(VolumeState.NORMAL);
-      break;
-    case INCONSISTENT:
-      // Volume Root is in an inconsistent state. Skip loading this volume.
-      throw new IOException("Volume is in an " + VolumeState.INCONSISTENT +
-          " state. Skipped loading volume: " + hddsRootDir.getPath());
-    default:
-      throw new IOException("Unrecognized initial state : " +
-          intialVolumeState + "of volume : " + hddsRootDir);
+    createTmpDir();
+
+    // Create DB store for a newly formatted volume
+    if (VersionedDatanodeFeatures.isFinalized(
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+      createDbStore(dbVolumeSet);
     }
-  }
-
-  private VolumeState analyzeVolumeState() {
-    if (!hddsRootDir.exists()) {
-      // Volume Root does not exist.
-      return VolumeState.NON_EXISTENT;
-    }
-    if (!hddsRootDir.isDirectory()) {
-      // Volume Root exists but is not a directory.
-      LOG.warn("Volume {} exists but is not a directory,"
-          + " current volume state: {}.",
-          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
-      return VolumeState.INCONSISTENT;
-    }
-    File[] files = hddsRootDir.listFiles();
-    if (files == null || files.length == 0) {
-      // Volume Root exists and is empty.
-      return VolumeState.NOT_FORMATTED;
-    }
-    if (!getVersionFile().exists()) {
-      // Volume Root is non empty but VERSION file does not exist.
-      LOG.warn("VERSION file does not exist in volume {},"
-          + " current volume state: {}.",
-          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
-      return VolumeState.INCONSISTENT;
-    }
-    // Volume Root and VERSION file exist.
-    return VolumeState.NOT_INITIALIZED;
-  }
-
-  public void format(String cid) throws IOException {
-    Preconditions.checkNotNull(cid, "clusterID cannot be null while " +
-        "formatting Volume");
-    this.clusterID = cid;
-    initialize();
-  }
-
-  /**
-   * Create Version File and write property fields into it.
-   * @throws IOException
-   */
-  private void createVersionFile() throws IOException {
-    this.storageID = HddsVolumeUtil.generateUuid();
-    this.cTime = Time.now();
-    this.layoutVersion = DataNodeLayoutVersion.getLatestVersion().getVersion();
-
-    if (this.clusterID == null || datanodeUuid == null) {
-      // HddsDatanodeService does not have the cluster information yet. Wait
-      // for registration with SCM.
-      LOG.debug("ClusterID not available. Cannot format the volume {}",
-          this.hddsRootDir.getPath());
-      setState(VolumeState.NOT_FORMATTED);
-    } else {
-      // Write the version file to disk.
-      writeVersionFile();
-      setState(VolumeState.NORMAL);
-    }
-  }
-
-  private void writeVersionFile() throws IOException {
-    Preconditions.checkNotNull(this.storageID,
-        "StorageID cannot be null in Version File");
-    Preconditions.checkNotNull(this.clusterID,
-        "ClusterID cannot be null in Version File");
-    Preconditions.checkNotNull(this.datanodeUuid,
-        "DatanodeUUID cannot be null in Version File");
-    Preconditions.checkArgument(this.cTime > 0,
-        "Creation Time should be positive");
-    Preconditions.checkArgument(this.layoutVersion ==
-            DataNodeLayoutVersion.getLatestVersion().getVersion(),
-        "Version File should have the latest LayOutVersion");
-
-    File versionFile = getVersionFile();
-    LOG.debug("Writing Version file to disk, {}", versionFile);
-
-    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(this.storageID,
-        this.clusterID, this.datanodeUuid, this.cTime, this.layoutVersion);
-    dnVersionFile.createVersionFile(versionFile);
-  }
-
-  /**
-   * Read Version File and update property fields.
-   * Get common storage fields.
-   * Should be overloaded if additional fields need to be read.
-   *
-   * @throws IOException on error
-   */
-  private void readVersionFile() throws IOException {
-    File versionFile = getVersionFile();
-    Properties props = DatanodeVersionFile.readFrom(versionFile);
-    if (props.isEmpty()) {
-      throw new InconsistentStorageStateException(
-          "Version file " + versionFile + " is missing");
-    }
-
-    LOG.debug("Reading Version file from disk, {}", versionFile);
-    this.storageID = HddsVolumeUtil.getStorageID(props, versionFile);
-    this.clusterID = HddsVolumeUtil.getClusterID(props, versionFile,
-        this.clusterID);
-    this.datanodeUuid = HddsVolumeUtil.getDatanodeUUID(props, versionFile,
-        this.datanodeUuid);
-    this.cTime = HddsVolumeUtil.getCreationTime(props, versionFile);
-    this.layoutVersion = HddsVolumeUtil.getLayOutVersion(props, versionFile);
-  }
-
-  private File getVersionFile() {
-    return HddsVolumeUtil.getVersionFile(hddsRootDir);
   }
 
   public File getHddsRootDir() {
-    return hddsRootDir;
+    return super.getStorageDir();
   }
 
-  public StorageType getStorageType() {
-    if(volumeInfo != null) {
-      return volumeInfo.getStorageType();
-    }
-    return StorageType.DEFAULT;
-  }
-
-  public String getStorageID() {
-    return storageID;
-  }
-
-  public String getClusterID() {
-    return clusterID;
-  }
-
-  public String getDatanodeUuid() {
-    return datanodeUuid;
-  }
-
-  public long getCTime() {
-    return cTime;
-  }
-
-  public int getLayoutVersion() {
-    return layoutVersion;
-  }
-
-  public VolumeState getStorageState() {
-    return state;
-  }
-
-  public long getCapacity() {
-    return volumeInfo != null ? volumeInfo.getCapacity() : 0;
-  }
-
-  public long getAvailable() {
-    return volumeInfo != null ? volumeInfo.getAvailable() : 0;
-  }
-
-  public long getUsedSpace() {
-    return volumeInfo != null ? volumeInfo.getScmUsed() : 0;
-  }
-
-  public void setState(VolumeState state) {
-    this.state = state;
-  }
-
-  public boolean isFailed() {
-    return (state == VolumeState.FAILED);
+  public VolumeType getType() {
+    return type;
   }
 
   public VolumeIOStats getVolumeIOStats() {
     return volumeIOStats;
   }
 
+  public VolumeInfoMetrics getVolumeInfoStats() {
+    return volumeInfoMetrics;
+  }
+
+  @Override
   public void failVolume() {
-    setState(VolumeState.FAILED);
-    if (volumeInfo != null) {
-      volumeInfo.shutdownUsageThread();
-    }
+    super.failVolume();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
+    closeDbStore();
   }
 
+  @Override
   public void shutdown() {
-    this.state = VolumeState.NON_EXISTENT;
-    if (volumeInfo != null) {
-      volumeInfo.shutdownUsageThread();
-    }
+    super.shutdown();
     if (volumeIOStats != null) {
       volumeIOStats.unregister();
     }
+    if (volumeInfoMetrics != null) {
+      volumeInfoMetrics.unregister();
+    }
+    closeDbStore();
   }
 
-  /**
-   * VolumeState represents the different states a HddsVolume can be in.
-   * NORMAL          =&gt; Volume can be used for storage
-   * FAILED          =&gt; Volume has failed due and can no longer be used for
-   *                    storing containers.
-   * NON_EXISTENT    =&gt; Volume Root dir does not exist
-   * INCONSISTENT    =&gt; Volume Root dir is not empty but VERSION file is
-   *                    missing or Volume Root dir is not a directory
-   * NOT_FORMATTED   =&gt; Volume Root exists but not formatted(no VERSION file)
-   * NOT_INITIALIZED =&gt; VERSION file exists but has not been verified for
-   *                    correctness.
-   */
-  public enum VolumeState {
-    NORMAL,
-    FAILED,
-    NON_EXISTENT,
-    INCONSISTENT,
-    NOT_FORMATTED,
-    NOT_INITIALIZED
+  @Override
+  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    VolumeCheckResult result = super.check(unused);
+    if (!isDbLoaded()) {
+      return result;
+    }
+    DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
+    if (result != VolumeCheckResult.HEALTHY ||
+        !df.getContainerSchemaV3Enabled() || !df.autoCompactionSmallSstFile()) {
+      return result;
+    }
+    // Calculate number of files per level and size per level
+    RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
+        new File(dbParentDir, CONTAINER_DB_NAME).getAbsolutePath(), getConf());
+    rawDB.getStore().compactionIfNeeded();
+
+    return VolumeCheckResult.HEALTHY;
   }
 
   /**
    * add "delta" bytes to committed space in the volume.
+   *
    * @param delta bytes to add to committed space counter
    * @return bytes of committed space
    */
@@ -447,29 +225,216 @@ public class HddsVolume
 
   /**
    * return the committed space in the volume.
+   *
    * @return bytes of committed space
    */
   public long getCommittedBytes() {
     return committedBytes.get();
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hash(hddsRootDir);
+  public void setDbVolume(DbVolume dbVolume) {
+    this.dbVolume = dbVolume;
   }
 
-  @Override
-  public boolean equals(Object other) {
-    return this == other
-        || other instanceof HddsVolume && ((HddsVolume) other).hddsRootDir
-        .equals(this.hddsRootDir);
+  public DbVolume getDbVolume() {
+    return this.dbVolume;
+  }
+
+  public File getDbParentDir() {
+    return this.dbParentDir;
+  }
+
+  public Path getTmpDirPath() {
+    return this.tmpDirPath;
+  }
+
+  public Path getDeleteServiceDirPath() {
+    return this.deleteServiceDirPath;
+  }
+
+  public boolean isDbLoaded() {
+    return dbLoaded.get();
+  }
+
+  public void loadDbStore(boolean readOnly) throws IOException {
+    // DN startup for the first time, not registered yet,
+    // so the DbVolume is not formatted.
+    if (!getStorageState().equals(VolumeState.NORMAL)) {
+      return;
+    }
+
+    // DB is already loaded
+    if (dbLoaded.get()) {
+      LOG.warn("Schema V3 db is already loaded from {} for volume {}",
+          getDbParentDir(), getStorageID());
+      return;
+    }
+
+    File clusterIdDir = new File(dbVolume == null ?
+        getStorageDir() : dbVolume.getStorageDir(),
+        getClusterID());
+    if (!clusterIdDir.exists()) {
+      throw new IOException("Working dir " + clusterIdDir.getAbsolutePath() +
+          " not created for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    File storageIdDir = new File(clusterIdDir, getStorageID());
+    if (!storageIdDir.exists()) {
+      throw new IOException("Db parent dir " + storageIdDir.getAbsolutePath() +
+          " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    File containerDBFile = new File(storageIdDir, CONTAINER_DB_NAME);
+    if (!containerDBFile.exists()) {
+      throw new IOException("Db dir " + storageIdDir.getAbsolutePath() +
+          " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
+    }
+
+    String containerDBPath = containerDBFile.getAbsolutePath();
+    try {
+      initPerDiskDBStore(containerDBPath, getConf(), readOnly);
+    } catch (IOException e) {
+      throw new IOException("Can't init db instance under path "
+          + containerDBPath + " for volume " + getStorageID(), e);
+    }
+
+    dbParentDir = storageIdDir;
+    dbLoaded.set(true);
+    LOG.info("SchemaV3 db is loaded at {} for volume {}", containerDBPath,
+        getStorageID());
   }
 
   /**
-   * Override toSting() to show the path of HddsVolume.
+   * Pick a DbVolume for HddsVolume and init db instance.
+   * Use the HddsVolume directly if no DbVolume found.
+   * @param dbVolumeSet
    */
-  @Override
-  public String toString() {
-    return getHddsRootDir().toString();
+  public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
+    DbVolume chosenDbVolume = null;
+    File clusterIdDir;
+    String workingDir = getWorkingDir() == null ? getClusterID() :
+        getWorkingDir();
+
+    if (dbVolumeSet == null || dbVolumeSet.getVolumesList().isEmpty()) {
+      // No extra db volumes specified, just create db under the HddsVolume.
+      clusterIdDir = new File(getStorageDir(), workingDir);
+    } else {
+      // Randomly choose a DbVolume for simplicity.
+      List<DbVolume> dbVolumeList = StorageVolumeUtil.getDbVolumesList(
+          dbVolumeSet.getVolumesList());
+      chosenDbVolume = dbVolumeList.get(
+          ThreadLocalRandom.current().nextInt(dbVolumeList.size()));
+      clusterIdDir = new File(chosenDbVolume.getStorageDir(), workingDir);
+    }
+
+    if (!clusterIdDir.exists()) {
+      throw new IOException("The working dir "
+          + clusterIdDir.getAbsolutePath() + " is missing for volume "
+          + getStorageID());
+    }
+
+    // Init subdir with the storageID of HddsVolume.
+    File storageIdDir = new File(clusterIdDir, getStorageID());
+    if (!storageIdDir.mkdirs() && !storageIdDir.exists()) {
+      throw new IOException("Can't make subdir under "
+          + clusterIdDir.getAbsolutePath() + " for volume "
+          + getStorageID());
+    }
+
+    // Create the db instance for HddsVolume under the subdir above.
+    String containerDBPath = new File(storageIdDir, CONTAINER_DB_NAME)
+        .getAbsolutePath();
+    try {
+      HddsVolumeUtil.initPerDiskDBStore(containerDBPath, getConf(), false);
+      dbLoaded.set(true);
+      LOG.info("SchemaV3 db is created and loaded at {} for volume {}",
+          containerDBPath, getStorageID());
+    } catch (IOException e) {
+      String errMsg = "Can't create db instance under path "
+          + containerDBPath + " for volume " + getStorageID();
+      LOG.error(errMsg, e);
+      throw new IOException(errMsg);
+    }
+
+    // Set the dbVolume and dbParentDir of the HddsVolume for db path lookup.
+    dbVolume = chosenDbVolume;
+    dbParentDir = storageIdDir;
+    if (chosenDbVolume != null) {
+      chosenDbVolume.addHddsDbStorePath(getStorageID(), containerDBPath);
+    }
+
+    // If SchemaV3 is disabled, close the DB instance
+    if (!SchemaV3.isFinalizedAndEnabled(getConf())) {
+      closeDbStore();
+    }
+  }
+
+  private String getIdDir() throws IOException {
+    try {
+      return VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+          this, getClusterID() == null ? "" : getClusterID());
+    } catch (IOException ex) {
+      String errMsg = "Cannot resolve volume container path " +
+          "ID dir for volume {} " + getStorageID() +
+          " when creating volume tmp dir";
+      LOG.error(errMsg, ex);
+      throw new IOException(errMsg, ex);
+    }
+  }
+
+  private Path createTmpPath() throws IOException {
+
+    // HddsVolume root directory path
+    String hddsRoot = getHddsRootDir().toString();
+
+    // HddsVolume path
+    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
+
+    Path volPath = Paths.get(vol);
+    Path idPath = Paths.get(getIdDir());
+
+    return volPath.resolve(idPath).resolve(TMP_DIR);
+  }
+
+  private void createTmpDir() throws IOException {
+    tmpDirPath = createTmpPath();
+
+    if (Files.notExists(tmpDirPath)) {
+      try {
+        Files.createDirectories(tmpDirPath);
+      } catch (IOException ex) {
+        LOG.error("Error creating {}", tmpDirPath.toString(), ex);
+      }
+    }
+  }
+
+  public void createDeleteServiceDir() throws IOException {
+    if (tmpDirPath == null) {
+      createTmpDir();
+    }
+
+    deleteServiceDirPath =
+        tmpDirPath.resolve(TMP_DELETE_SERVICE_DIR);
+
+    if (Files.notExists(deleteServiceDirPath)) {
+      try {
+        Files.createDirectories(deleteServiceDirPath);
+      } catch (IOException ex) {
+        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
+      }
+    }
+  }
+
+  private void closeDbStore() {
+    if (!dbLoaded.get()) {
+      return;
+    }
+
+    String containerDBPath = new File(dbParentDir, CONTAINER_DB_NAME)
+        .getAbsolutePath();
+    DatanodeStoreCache.getInstance().removeDB(containerDBPath);
+    dbLoaded.set(false);
+    LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
+        getStorageID());
   }
 }

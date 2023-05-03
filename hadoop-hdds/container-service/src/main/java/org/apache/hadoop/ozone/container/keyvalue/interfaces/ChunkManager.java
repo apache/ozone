@@ -19,13 +19,17 @@ package org.apache.hadoop.ozone.container.keyvalue.interfaces;
  */
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.ratis.statemachine.StateMachine;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -100,5 +104,45 @@ public interface ChunkManager {
   default void finishWriteChunks(KeyValueContainer kvContainer,
       BlockData blockData) throws IOException {
     // no-op
+  }
+
+  default String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
+    return null;
+  }
+
+  default StateMachine.DataChannel getStreamDataChannel(
+          Container container, BlockID blockID, ContainerMetrics metrics)
+          throws StorageContainerException {
+    return null;
+  }
+
+  static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
+      long defaultReadBufferCapacity) {
+    long bufferCapacity = 0;
+    if (chunkInfo.isReadDataIntoSingleBuffer()) {
+      // Older client - read all chunk data into one single buffer.
+      bufferCapacity = chunkInfo.getLen();
+    } else {
+      // Set buffer capacity to checksum boundary size so that each buffer
+      // corresponds to one checksum. If checksum is NONE, then set buffer
+      // capacity to default (OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY = 64KB).
+      ChecksumData checksumData = chunkInfo.getChecksumData();
+
+      if (checksumData != null) {
+        if (checksumData.getChecksumType() ==
+            ContainerProtos.ChecksumType.NONE) {
+          bufferCapacity = defaultReadBufferCapacity;
+        } else {
+          bufferCapacity = checksumData.getBytesPerChecksum();
+        }
+      }
+    }
+    // If the buffer capacity is 0, set all the data into one ByteBuffer
+    if (bufferCapacity == 0) {
+      bufferCapacity = chunkInfo.getLen();
+    }
+
+    return bufferCapacity;
   }
 }
