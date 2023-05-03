@@ -70,6 +70,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
@@ -1170,6 +1171,12 @@ public class TestReplicationManager {
     replicationManager.datanodeCommandCountUpdated(dn3);
     Assert.assertEquals(replicationManager.getExcludedNodes().size(), 1);
 
+    // Starting maintenance on dn3 increases its limits, so it should no longer
+    // be excluded
+    dn3.setPersistedOpState(ENTERING_MAINTENANCE);
+    replicationManager.datanodeCommandCountUpdated(dn3);
+    Assert.assertEquals(0, replicationManager.getExcludedNodes().size());
+
     // now sent a reconstruction command. It should be sent to dn2, which is
     // at the lowest count, but this command should push it to the limit and
     // cause it to be excluded.
@@ -1177,22 +1184,19 @@ public class TestReplicationManager {
         container, dn1, dn2);
     replicationManager.sendThrottledReconstructionCommand(container, command);
     excluded = replicationManager.getExcludedNodes();
-    Assert.assertEquals(excluded.size(), 2);
-    // dn 3 was already in the excluded list
-    Assert.assertTrue(excluded.contains(dn3));
+    Assert.assertEquals(excluded.size(), 1);
     // dn 2 reached the limit from the reconstruction command
     Assert.assertTrue(excluded.contains(dn2));
 
     // Update received for DN2, it should be cleared from the excluded list.
     replicationManager.datanodeCommandCountUpdated(dn2);
     excluded = replicationManager.getExcludedNodes();
-    Assert.assertEquals(excluded.size(), 1);
-    Assert.assertFalse(excluded.contains(dn2));
+    Assert.assertEquals(excluded.size(), 0);
 
     // Finally, update received for DN1 - it is not excluded and should not
     // be added or cause any problems by not being there
     replicationManager.datanodeCommandCountUpdated(dn1);
-    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertEquals(excluded.size(), 0);
     Assert.assertFalse(excluded.contains(dn1));
   }
 
