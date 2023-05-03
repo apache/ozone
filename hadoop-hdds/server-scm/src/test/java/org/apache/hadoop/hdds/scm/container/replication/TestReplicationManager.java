@@ -1161,7 +1161,7 @@ public class TestReplicationManager {
         MockDatanodeDetails.randomDatanodeDetails(), 1);
 
     Set<DatanodeDetails> excluded = replicationManager.getExcludedNodes();
-    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertEquals(1, excluded.size());
     // dn 3 was at the limit already, so should be added when filtering the
     // nodes
     Assert.assertTrue(excluded.contains(dn3));
@@ -1184,20 +1184,19 @@ public class TestReplicationManager {
         container, dn1, dn2);
     replicationManager.sendThrottledReconstructionCommand(container, command);
     excluded = replicationManager.getExcludedNodes();
-    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertEquals(1, excluded.size());
     // dn 2 reached the limit from the reconstruction command
     Assert.assertTrue(excluded.contains(dn2));
 
     // Update received for DN2, it should be cleared from the excluded list.
     replicationManager.datanodeCommandCountUpdated(dn2);
     excluded = replicationManager.getExcludedNodes();
-    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(0, excluded.size());
 
     // Finally, update received for DN1 - it is not excluded and should not
     // be added or cause any problems by not being there
     replicationManager.datanodeCommandCountUpdated(dn1);
-    Assert.assertEquals(excluded.size(), 0);
-    Assert.assertFalse(excluded.contains(dn1));
+    Assert.assertEquals(0, excluded.size());
   }
 
   @Test
