@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -1323,5 +1325,22 @@ public class SCMClientProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      String scmId) {
+    Builder decommissionScmResponseBuilder =
+        DecommissionScmResponseProto.newBuilder();
+
+    try {
+      decommissionScmResponseBuilder
+          .setSuccess(scm.removePeerFromHARing(scmId));
+    } catch (IOException ex) {
+      decommissionScmResponseBuilder
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage());
+    }
+    return decommissionScmResponseBuilder.build();
   }
 }

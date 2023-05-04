@@ -96,6 +96,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
@@ -1210,6 +1211,11 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
     String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
+
+    // Block SnapDiff if either one of the snapshots is not active
+    checkSnapshotActive(ozoneManager, fsKey);
+    checkSnapshotActive(ozoneManager, tsKey);
+
     try {
       submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
           snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);

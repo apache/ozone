@@ -146,7 +146,20 @@ public class TestReplicationManager {
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
 
-    replicationManager = new ReplicationManager(
+    replicationManager = createReplicationManager();
+    containerReplicaMap = new HashMap<>();
+    containerInfoSet = new HashSet<>();
+    repConfig = new ECReplicationConfig(3, 2);
+    repReport = new ReplicationManagerReport();
+    repQueue = new ReplicationQueue();
+
+    // Ensure that RM will run when asked.
+    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
+    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+  }
+
+  private ReplicationManager createReplicationManager() throws IOException {
+    return new ReplicationManager(
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -162,15 +175,6 @@ public class TestReplicationManager {
         // do not start any threads for processing
       }
     };
-    containerReplicaMap = new HashMap<>();
-    containerInfoSet = new HashSet<>();
-    repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
-    repQueue = new ReplicationQueue();
-
-    // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
   }
 
   private void enableProcessAll() {
@@ -1190,6 +1194,36 @@ public class TestReplicationManager {
     replicationManager.datanodeCommandCountUpdated(dn1);
     Assert.assertEquals(excluded.size(), 1);
     Assert.assertFalse(excluded.contains(dn1));
+  }
+
+  @Test
+  public void testInflightReplicationLimit() throws IOException {
+    int healthyNodes = 10;
+    ReplicationManager.ReplicationManagerConfiguration config =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    Mockito.when(nodeManager.getNodeCount(
+        Mockito.isNull(), eq(HddsProtos.NodeState.HEALTHY)))
+        .thenReturn(healthyNodes);
+
+    config.setInflightReplicationLimitFactor(0.0);
+    configuration.setFromObject(config);
+    ReplicationManager rm = createReplicationManager();
+    Assertions.assertEquals(0, rm.getReplicationInFlightLimit());
+
+    config.setInflightReplicationLimitFactor(1);
+    configuration.setFromObject(config);
+    rm = createReplicationManager();
+    Assertions.assertEquals(
+        healthyNodes * config.getDatanodeReplicationLimit(),
+        rm.getReplicationInFlightLimit());
+
+    config.setInflightReplicationLimitFactor(0.75);
+    configuration.setFromObject(config);
+    rm = createReplicationManager();
+    Assertions.assertEquals(
+        (int) Math.ceil(healthyNodes
+            * config.getDatanodeReplicationLimit() * 0.75),
+        rm.getReplicationInFlightLimit());
   }
 
   @SafeVarargs
