@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.Matchers;
+import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -102,7 +104,7 @@ public class TestSCMDbCheckpointServlet {
   }
 
   @Test
-  public void testDoGet()
+  public void testDoPost()
       throws ServletException, IOException, CompressorException,
       InterruptedException {
 
@@ -129,6 +131,9 @@ public class TestSCMDbCheckpointServlet {
       when(scmDbCheckpointServletMock.getServletContext())
           .thenReturn(servletContextMock);
 
+      when(requestMock.getMethod()).thenReturn("POST");
+      when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
+          "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
       when(servletContextMock.getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE))
           .thenReturn(cluster.getStorageContainerManager());
       when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
@@ -137,7 +142,7 @@ public class TestSCMDbCheckpointServlet {
       doNothing().when(responseMock).setHeader(Matchers.anyString(),
           Matchers.anyString());
 
-      tempFile = File.createTempFile("testDoGet_" + System
+      tempFile = File.createTempFile("testDoPost_" + System
           .currentTimeMillis(), ".tar");
 
       FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -158,14 +163,14 @@ public class TestSCMDbCheckpointServlet {
             }
           });
 
-      doCallRealMethod().when(scmDbCheckpointServletMock).doGet(requestMock,
+      doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
           responseMock);
 
       scmDbCheckpointServletMock.init();
       long initialCheckpointCount =
           scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-      scmDbCheckpointServletMock.doGet(requestMock, responseMock);
+      scmDbCheckpointServletMock.doPost(requestMock, responseMock);
 
       Assertions.assertTrue(tempFile.length() > 0);
       Assertions.assertTrue(
@@ -180,5 +185,42 @@ public class TestSCMDbCheckpointServlet {
       FileUtils.deleteQuietly(tempFile);
     }
 
+  }
+
+  @Test
+  public void testDoPostWithInvalidContentType()
+      throws ServletException, IOException, InterruptedException {
+
+    SCMDBCheckpointServlet scmDbCheckpointServletMock =
+        mock(SCMDBCheckpointServlet.class);
+
+    doCallRealMethod().when(scmDbCheckpointServletMock).init();
+    doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
+        scm.getScmMetadataStore().getStore(),
+        scmMetrics.getDBCheckpointMetrics(),
+        false,
+        Collections.emptyList(),
+        Collections.emptyList(),
+        false);
+    doCallRealMethod().when(scmDbCheckpointServletMock)
+        .writeDbDataToStream(any(), any(), any(), any(), any());
+
+    HttpServletRequest requestMock = mock(HttpServletRequest.class);
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
+
+    ServletContext servletContextMock = mock(ServletContext.class);
+    when(scmDbCheckpointServletMock.getServletContext())
+        .thenReturn(servletContextMock);
+
+    when(requestMock.getContentType()).thenReturn("application/json");
+
+    doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
+        responseMock);
+
+    scmDbCheckpointServletMock.init();
+
+    scmDbCheckpointServletMock.doPost(requestMock, responseMock);
+
+    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 }

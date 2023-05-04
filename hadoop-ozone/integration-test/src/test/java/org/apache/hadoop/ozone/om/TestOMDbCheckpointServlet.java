@@ -64,6 +64,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
@@ -84,6 +85,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Matchers;
+import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
@@ -130,7 +132,7 @@ public class TestOMDbCheckpointServlet {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
 
-    tempFile = File.createTempFile("testDoGet_" + System
+    tempFile = File.createTempFile("testDoPost_" + System
         .currentTimeMillis(), ".tar");
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -189,8 +191,11 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(cluster.getOzoneManager());
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
         .thenReturn("true");
+    when(requestMock.getMethod()).thenReturn("POST");
+    when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
+        "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
 
-    doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
+    doCallRealMethod().when(omDbCheckpointServletMock).doPost(requestMock,
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
@@ -198,7 +203,7 @@ public class TestOMDbCheckpointServlet {
   }
 
   @Test
-  public void testDoGet() throws Exception {
+  public void testDoPost() throws Exception {
     conf.setBoolean(OZONE_ACL_ENABLED, false);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
 
@@ -224,7 +229,7 @@ public class TestOMDbCheckpointServlet {
     long initialCheckpointCount =
         omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
 
     Assert.assertTrue(tempFile.length() > 0);
     Assert.assertTrue(
@@ -235,6 +240,36 @@ public class TestOMDbCheckpointServlet {
             getLastCheckpointStreamingTimeTaken() > 0);
     Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
         getNumCheckpoints() > initialCheckpointCount);
+  }
+
+  @Test
+  public void testDoPostWithInvalidContentType() throws Exception {
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+
+    setupCluster();
+
+    final OzoneManager om = cluster.getOzoneManager();
+
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        om.getOmAdminUsernames(),
+        om.getOmAdminGroups(),
+        om.isSpnegoEnabled());
+
+    when(requestMock.getContentType()).thenReturn("application/json");
+    doNothing().when(responseMock).setContentType("application/x-tar");
+    doNothing().when(responseMock).setHeader(Matchers.anyString(),
+        Matchers.anyString());
+
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+
+    omDbCheckpointServletMock.init();
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
+
+    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 
   @Test
@@ -260,7 +295,7 @@ public class TestOMDbCheckpointServlet {
         om.isSpnegoEnabled());
 
     omDbCheckpointServletMock.init();
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
 
     // Response status should be set to 403 Forbidden since there was no user
     // principal set in the request
@@ -273,7 +308,7 @@ public class TestOMDbCheckpointServlet {
     when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
     when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
 
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
 
     // Verify that the Response status is set to 403 again for DN user.
     verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -284,7 +319,7 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
 
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
 
     // Recon user should be able to access the servlet and download the
     // snapshot

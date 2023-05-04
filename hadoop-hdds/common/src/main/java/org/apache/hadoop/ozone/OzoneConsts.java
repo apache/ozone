@@ -149,6 +149,8 @@ public final class OzoneConsts {
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
 
+  public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
+
   /**
    * Supports Bucket Versioning.
    */

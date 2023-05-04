@@ -33,6 +33,7 @@ share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/commons-fileupload.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
 share/ozone/lib/derby.jar

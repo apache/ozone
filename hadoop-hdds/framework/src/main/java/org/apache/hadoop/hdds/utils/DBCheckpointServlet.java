@@ -251,6 +251,19 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
+   * Process a GET request for the DB checkpoint snapshot.
+   *
+   * @param request  The servlet request we are processing
+   * @param response The servlet response we are creating
+   */
+  @Override
+  public void doGet(HttpServletRequest request, HttpServletResponse response) {
+    LOG.info("Received GET request to obtain DB checkpoint snapshot");
+
+    generateSnapshotCheckpoint(request, response, false);
+  }
+
+  /**
    * Process a POST request for the DB checkpoint snapshot.
    *
    * @param request  The servlet request we are processing
@@ -266,19 +279,6 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     generateSnapshotCheckpoint(request, response, true);
-  }
-
-  /**
-   * Process a GET request for the DB checkpoint snapshot.
-   *
-   * @param request  The servlet request we are processing
-   * @param response The servlet response we are creating
-   */
-  @Override
-  public void doGet(HttpServletRequest request, HttpServletResponse response) {
-    LOG.info("Received GET request to obtain DB checkpoint snapshot");
-
-    generateSnapshotCheckpoint(request, response, false);
   }
 
   /**
