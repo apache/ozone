@@ -88,9 +88,9 @@ public class EmptyContainerHandler extends AbstractCheck {
   private boolean isContainerEmptyAndClosed(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
-        container.getNumberOfKeys() == 0 && replicas.stream()
-        .allMatch(r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
-            r.getKeyCount() == 0);
+        replicas.stream().allMatch(
+            r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
+                r.isEmpty());
   }
 
   /**
@@ -103,12 +103,11 @@ public class EmptyContainerHandler extends AbstractCheck {
       final Set<ContainerReplica> replicas) {
     Preconditions.assertTrue(containerInfo.getState() ==
         HddsProtos.LifeCycleState.CLOSED);
-    Preconditions.assertTrue(containerInfo.getNumberOfKeys() == 0);
 
     for (ContainerReplica rp : replicas) {
       Preconditions.assertTrue(
           rp.getState() == ContainerReplicaProto.State.CLOSED);
-      Preconditions.assertTrue(rp.getKeyCount() == 0);
+      Preconditions.assertTrue(rp.isEmpty());
 
       try {
         replicationManager.sendDeleteCommand(containerInfo,

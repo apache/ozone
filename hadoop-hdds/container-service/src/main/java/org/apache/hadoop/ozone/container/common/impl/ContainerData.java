@@ -101,6 +101,8 @@ public abstract class ContainerData {
 
   private String checksum;
 
+  private boolean isEmpty;
+
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
    * eg. in prior versions). */
@@ -154,6 +156,7 @@ public abstract class ContainerData {
     this.maxSize = size;
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
+    this.isEmpty = false;
     setChecksumTo0ByteArray();
   }
 
@@ -535,6 +538,18 @@ public abstract class ContainerData {
    */
   public long getBlockCount() {
     return this.blockCount.get();
+  }
+
+  public boolean isEmpty() {
+    return isEmpty;
+  }
+
+  /**
+   * Indicates that this container has no more data, and is eligible for
+   * deletion. Once this flag is set on a container, it cannot leave this state.
+   */
+  public void markAsEmpty() {
+    this.isEmpty = true;
   }
 
   /**

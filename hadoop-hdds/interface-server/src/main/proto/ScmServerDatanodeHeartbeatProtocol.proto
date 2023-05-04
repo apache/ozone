@@ -233,6 +233,7 @@ message ContainerReplicaProto {
   optional uint64 blockCommitSequenceId = 12;
   optional string originNodeId = 13;
   optional int32 replicaIndex = 14;
+  optional bool isEmpty = 15 [default = false];
 }
 
 message CommandStatusReportsProto {

@@ -342,6 +342,11 @@ public final class KeyValueContainerUtil {
     if (!chunksDir.exists()) {
       Files.createDirectories(chunksDir.toPath());
     }
+
+    if (isEmpty(store, kvContainerData)) {
+      kvContainerData.markAsEmpty();
+    }
+
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
@@ -390,6 +395,24 @@ public final class KeyValueContainerUtil {
     }
     kvData.setBytesUsed(usedBytes);
     kvData.setBlockCount(blockCount);
+  }
+
+  /**
+   * A container is empty if:
+   * - The container is closed
+   * - There are no blocks in its block table.
+   *
+   * Empty containers are eligible for deletion.
+   */
+  public static boolean isEmpty(DatanodeStore store,
+      KeyValueContainerData container) throws IOException {
+    if (container.isOpen()) {
+      return false;
+    }
+    try (BlockIterator<BlockData> blockIterator =
+             store.getBlockIterator(container.getContainerID())) {
+      return !blockIterator.hasNext();
+    }
   }
 
   public static long getBlockLength(BlockData block) throws IOException {

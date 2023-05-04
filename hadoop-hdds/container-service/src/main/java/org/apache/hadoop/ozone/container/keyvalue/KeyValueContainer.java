@@ -803,7 +803,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setReplicaIndex(containerData.getReplicaIndex())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
-        .setOriginNodeId(containerData.getOriginNodeId());
+        .setOriginNodeId(containerData.getOriginNodeId())
+        .setIsEmpty(containerData.isEmpty());
     return ciBuilder.build();
   }
 

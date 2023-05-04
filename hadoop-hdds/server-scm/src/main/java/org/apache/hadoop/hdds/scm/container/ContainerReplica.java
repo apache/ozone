@@ -42,8 +42,9 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private Long sequenceId;
   private final long keyCount;
   private final long bytesUsed;
+  private final boolean isEmpty;
 
-
+  @SuppressWarnings("parameternumber")
   private ContainerReplica(
       final ContainerID containerID,
       final ContainerReplicaProto.State state,
@@ -51,7 +52,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       final DatanodeDetails datanode,
       final UUID originNodeId,
       long keyNum,
-      long dataSize) {
+      long dataSize,
+      boolean isEmpty) {
     this.containerID = containerID;
     this.state = state;
     this.datanodeDetails = datanode;
@@ -59,6 +61,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.keyCount = keyNum;
     this.bytesUsed = dataSize;
     this.replicaIndex = replicaIndex;
+    this.isEmpty = isEmpty;
   }
 
   private void setSequenceId(Long seqId) {
@@ -119,6 +122,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return bytesUsed;
   }
 
+  public boolean isEmpty() {
+    return isEmpty;
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
@@ -172,7 +179,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setKeyCount(keyCount)
         .setOriginNodeId(placeOfBirth)
         .setReplicaIndex(replicaIndex)
-        .setSequenceId(sequenceId);
+        .setSequenceId(sequenceId)
+        .setEmpty(isEmpty);
   }
 
   @Override
@@ -187,6 +195,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         ", bytesUsed=" + bytesUsed + ((replicaIndex > 0) ?
         ",replicaIndex=" + replicaIndex :
         "") +
+        ", isEmpty=" + isEmpty +
         '}';
   }
 
@@ -203,6 +212,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long bytesUsed;
     private long keyCount;
     private int replicaIndex;
+    private boolean isEmpty;
 
     /**
      * Set Container Id.
@@ -272,6 +282,11 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setEmpty(boolean empty) {
+      isEmpty = empty;
+      return this;
+    }
+
     /**
      * Constructs new ContainerReplicaBuilder.
      *
@@ -287,7 +302,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       ContainerReplica replica = new ContainerReplica(
           containerID, state, replicaIndex, datanode,
           Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
-          keyCount, bytesUsed);
+          keyCount, bytesUsed, isEmpty);
       Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
       return replica;
     }
