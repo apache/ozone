@@ -41,6 +41,14 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
 fi
 
+if [[ "${CANCEL_NATIVE_VERSION_CHECK}" != "true" ]]; then
+  NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
+  . "$DIR/native_check.sh"
+  init_native_maven_opts
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} ${NATIVE_MAVEN_OPTIONS}"
+fi
+
+
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
   mvn ${MAVEN_OPTIONS} -DskipTests clean install
 fi

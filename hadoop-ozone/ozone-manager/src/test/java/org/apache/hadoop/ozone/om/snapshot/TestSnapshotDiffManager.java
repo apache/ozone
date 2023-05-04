@@ -89,8 +89,6 @@ public class TestSnapshotDiffManager {
 
   private LoadingCache<String, OmSnapshot> snapshotCache;
 
-  private Map<String, OmSnapshot> snapshotMap;
-
   @Mock
   private ColumnFamilyHandle snapdiffJobCFH;
 
@@ -180,7 +178,8 @@ public class TestSnapshotDiffManager {
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
     Mockito.when(differ.getSSTDiffListWithFullPath(Mockito.any(),
-        Mockito.any(), Mockito.anyString())).thenReturn(Lists.newArrayList(randomStrings));
+        Mockito.any(), Mockito.anyString()))
+        .thenReturn(Lists.newArrayList(randomStrings));
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
     Mockito.when(jobTableIterator.isValid()).thenReturn(false);
@@ -323,10 +322,11 @@ public class TestSnapshotDiffManager {
           getMockedTable(fromSnapshotTableMap, snapshotTableName);
       SnapshotDiffManager snapshotDiffManager =
           getMockedSnapshotDiffManager(10);
-      Mockito.doAnswer((Answer<Boolean>) invocationOnMock ->
-              Integer.parseInt(invocationOnMock.getArgument(0, String.class)
-                  .substring(3)) % 2 == 0).when(snapshotDiffManager)
-          .isKeyInBucket(Matchers.anyString(), Matchers.any(), Matchers.any());
+      Mockito.when(snapshotDiffManager
+          .isKeyInBucket(Matchers.anyString(), Matchers.any(), Matchers.any()))
+          .thenAnswer((Answer<Boolean>) invocationOnMock ->
+          Integer.parseInt(invocationOnMock.getArgument(0, String.class)
+              .substring(3)) % 2 == 0);
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
           new SnapshotTestUtils.HashPersistentMap<>();
       PersistentMap<byte[], byte[]> newObjectIdKeyMap =
@@ -451,7 +451,7 @@ public class TestSnapshotDiffManager {
       });
       SnapshotDiffManager snapshotDiffManager =
           getMockedSnapshotDiffManager(10);
-      long val = snapshotDiffManager.generateDiffReport("jobId",
+      snapshotDiffManager.generateDiffReport("jobId",
           objectIdsToCheck, oldObjectIdKeyMap, newObjectIdKeyMap);
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse("jobId", "vol",
