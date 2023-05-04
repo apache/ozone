@@ -497,7 +497,14 @@ Returns a summary of the current state of the Ozone cluster.
 
 **Parameters**
 
-No parameters.
+* prevKey (optional)
+
+  Only returns the volume after the given prevKey.
+  Example: prevKey=vol1
+
+* limit (optional)
+
+  Only returns the limited number of results. The default limit is 1000.
 
 **Returns**
 
@@ -542,6 +549,15 @@ Returns all the volumes in the cluster.
 * volume (optional)
 
   The volume in string without any protocol prefix.
+
+* prevKey (optional)
+
+  Only returns the bucket after the given prevKey. prevKey is ignored if volume is not specified.
+  Example: prevKey=bucket1
+
+* limit (optional)
+
+  Only returns the limited number of results. The default limit is 1000.
   
 
 **Returns**

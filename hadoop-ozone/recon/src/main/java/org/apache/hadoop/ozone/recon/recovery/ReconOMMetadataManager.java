@@ -58,6 +58,38 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
   List<OmVolumeArgs> listVolumes() throws IOException;
 
   /**
+   * Return a list of volumes owned by a given user; if user is null, returns
+   * all volumes.
+   *
+   * This method can be optimized by using username as a filter.
+   *
+   * @param startKey the start volume name determines where to start listing
+   * from, this key is excluded from the result.
+   * @param maxKeys the maximum number of volumes to return.
+   * @return
+   * @throws IOException
+   */
+  List<OmVolumeArgs> listAllVolumes(String startKey,
+      int maxKeys) throws IOException;
+
+  /**
+   * Returns a list of buckets represented by {@link OmBucketInfo} in the given
+   * volume.
+   *
+   * @param volumeName the name of the volume. If volumeName is empty, list
+   * all buckets in the cluster.
+   * @param startBucket the start bucket name. Only the buckets whose name is
+   * after this value will be included in the result. This key is excluded from
+   * the result.
+   * @param maxNumOfBuckets the maximum number of buckets to return. It ensures
+   * the size of the result will not exceed this limit.
+   * @return a list of buckets.
+   * @throws IOException
+   */
+  List<OmBucketInfo> listAllBuckets(String volumeName,
+      String startBucket, int maxNumOfBuckets) throws IOException;
+
+  /**
    * Check if volume exists in the OM table.
    * @param volName volume name without any protocol prefix.
    * @return true if volume exists, otherwise false.

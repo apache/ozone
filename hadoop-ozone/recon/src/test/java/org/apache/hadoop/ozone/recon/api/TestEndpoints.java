@@ -436,6 +436,30 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     reconOMMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
 
+    OmBucketInfo bucketInfo2 = OmBucketInfo.newBuilder()
+        .setVolumeName("sampleVol2")
+        .setBucketName("bucketTwo")
+        .addAcl(new OzoneAcl(
+            IAccessAuthorizer.ACLIdentityType.GROUP,
+            "TestGroup2",
+            IAccessAuthorizer.ACLType.READ,
+            OzoneAcl.AclScope.ACCESS
+        ))
+        .setQuotaInBytes(OzoneConsts.GB)
+        .setUsedBytes(100 * OzoneConsts.MB)
+        .setQuotaInNamespace(5)
+        .setStorageType(StorageType.SSD)
+        .setUsedNamespace(3)
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setOwner("TestUser2")
+        .setIsVersionEnabled(false)
+        .build();
+
+    String bucketKey2 = reconOMMetadataManager.getBucketKey(
+        bucketInfo2.getVolumeName(), bucketInfo2.getBucketName());
+
+    reconOMMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
+
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
     // key = key_two
@@ -842,7 +866,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testGetVolumes() throws Exception {
-    Response response = omEndpoint.getVolumes();
+    Response response = omEndpoint.getVolumes(10, "");
     Assertions.assertEquals(200, response.getStatus());
     VolumesResponse volumesResponse =
         (VolumesResponse) response.getEntity();
@@ -856,6 +880,30 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         Assertions.fail(e.getMessage());
       }
     });
+  }
+
+  @Test
+  public void testGetVolumesWithPrevKeyAndLimit() throws IOException {
+    // Test limit
+    Response responseWithLimit = omEndpoint.getVolumes(1, null);
+    Assertions.assertEquals(200, responseWithLimit.getStatus());
+    VolumesResponse volumesResponseWithLimit =
+        (VolumesResponse) responseWithLimit.getEntity();
+    Assertions.assertEquals(1, volumesResponseWithLimit.getTotalCount());
+    Assertions.assertEquals(1, volumesResponseWithLimit.getVolumes().size());
+
+    // Test prevKey
+    Response responseWithPrevKey = omEndpoint.getVolumes(1, "sampleVol");
+    Assertions.assertEquals(200, responseWithPrevKey.getStatus());
+    VolumesResponse volumesResponseWithPrevKey =
+        (VolumesResponse) responseWithPrevKey.getEntity();
+
+    Assertions.assertEquals(1, volumesResponseWithPrevKey.getTotalCount());
+    Assertions.assertEquals(1, volumesResponseWithPrevKey.getVolumes().size());
+    Assertions.assertEquals("sampleVol2",
+        volumesResponseWithPrevKey.getVolumes().stream()
+            .findFirst().get().getVolume());
+
   }
 
   private void testBucketResponse(BucketMetadata bucketMetadata)
@@ -884,6 +932,27 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(1, acl.getAclList().size());
       assertEquals("WRITE", acl.getAclList().get(0));
       break;
+    case "bucketTwo":
+      assertEquals("sampleVol2", bucketMetadata.getVolumeName());
+      assertEquals("SSD", bucketMetadata.getStorageType());
+      assertNull(bucketMetadata.getSourceVolume());
+      assertNull(bucketMetadata.getSourceBucket());
+      assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());
+      assertEquals(100 * OzoneConsts.MB, bucketMetadata.getUsedBytes());
+      assertEquals(5, bucketMetadata.getQuotaInNamespace());
+      assertEquals(3, bucketMetadata.getUsedNamespace());
+      assertFalse(bucketMetadata.isVersionEnabled());
+      assertEquals("OBJECT_STORE", bucketMetadata.getBucketLayout());
+      assertEquals("TestUser2", bucketMetadata.getOwner());
+
+      assertEquals(1, bucketMetadata.getAcls().size());
+      AclMetadata acl2 = bucketMetadata.getAcls().get(0);
+      assertEquals("TestGroup2", acl2.getName());
+      assertEquals("GROUP", acl2.getType());
+      assertEquals("ACCESS", acl2.getScope());
+      assertEquals(1, acl2.getAclList().size());
+      assertEquals("READ", acl2.getAclList().get(0));
+      break;
     default:
       Assertions.fail(String.format("Bucket %s not registered",
           bucketName));
@@ -894,12 +963,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   @Test
   public void testGetBuckets() throws Exception {
     // Normal bucket under a volume
-    Response response = omEndpoint.getBuckets("sampleVol2");
+    Response response = omEndpoint.getBuckets("sampleVol2", 10, null);
     Assertions.assertEquals(200, response.getStatus());
     BucketsResponse bucketUnderVolumeResponse =
         (BucketsResponse) response.getEntity();
-    Assertions.assertEquals(1, bucketUnderVolumeResponse.getTotalCount());
-    Assertions.assertEquals(1,
+    Assertions.assertEquals(2, bucketUnderVolumeResponse.getTotalCount());
+    Assertions.assertEquals(2,
         bucketUnderVolumeResponse.getBuckets().size());
 
     bucketUnderVolumeResponse.getBuckets().forEach(bucketMetadata -> {
@@ -911,7 +980,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     });
 
     // Listing all buckets
-    Response response3 = omEndpoint.getBuckets(null);
+    Response response3 = omEndpoint.getBuckets(null, 10, null);
     Assertions.assertEquals(200, response3.getStatus());
     BucketsResponse allBucketsResponse =
         (BucketsResponse) response3.getEntity();
@@ -919,8 +988,77 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Include bucketOne under sampleVol in
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in initializeNewOmMetadataManager.
-    Assertions.assertEquals(2, allBucketsResponse.getTotalCount());
-    Assertions.assertEquals(2, allBucketsResponse.getBuckets().size());
+    Assertions.assertEquals(3, allBucketsResponse.getTotalCount());
+    Assertions.assertEquals(3, allBucketsResponse.getBuckets().size());
+  }
+
+  @Test
+  public void testGetBucketsWithPrevKeyAndLimit() throws IOException {
+    // Case 1: Volume is not specified (prevKey is ignored)
+    // Test limit
+    Response responseLimitWithoutVolume = omEndpoint.getBuckets(null, 1, null);
+    Assertions.assertEquals(200, responseLimitWithoutVolume.getStatus());
+
+    BucketsResponse bucketsResponseLimitWithoutVolume =
+        (BucketsResponse) responseLimitWithoutVolume.getEntity();
+    Assertions.assertEquals(1,
+        bucketsResponseLimitWithoutVolume.getTotalCount());
+    Assertions.assertEquals(1,
+        bucketsResponseLimitWithoutVolume.getBuckets().size());
+
+    // Test prevKey (it should be ignored)
+    Response responsePrevKeyWithoutVolume = omEndpoint.getBuckets(
+        null, 1, "bucketOne");
+
+    Assertions.assertEquals(200,
+        responsePrevKeyWithoutVolume.getStatus());
+
+    BucketsResponse bucketResponsePrevKeyWithoutVolume =
+        (BucketsResponse) responsePrevKeyWithoutVolume.getEntity();
+    Assertions.assertEquals(1,
+        bucketResponsePrevKeyWithoutVolume.getTotalCount());
+    Assertions.assertEquals(1,
+        bucketResponsePrevKeyWithoutVolume.getBuckets().size());
+    Assertions.assertEquals("sampleVol",
+        bucketResponsePrevKeyWithoutVolume.getBuckets()
+            .stream().findFirst().get().getVolumeName());
+    Assertions.assertEquals("bucketOne",
+        bucketResponsePrevKeyWithoutVolume.getBuckets()
+            .stream().findFirst().get().getBucketName());
+
+    // Case 2: Volume is specified (prevKey is not ignored)
+    // Test limit
+    Response responseLimitWithVolume = omEndpoint.getBuckets(
+        "sampleVol2", 1, null);
+
+    Assertions.assertEquals(200, responseLimitWithVolume.getStatus());
+
+    BucketsResponse bucketResponseLimitWithVolume =
+        (BucketsResponse) responseLimitWithVolume.getEntity();
+    Assertions.assertEquals(1,
+        bucketResponseLimitWithVolume.getTotalCount());
+    Assertions.assertEquals(1,
+        bucketResponseLimitWithVolume.getBuckets().size());
+
+    // Test prevKey (it should not be ignored)
+    Response responsePrevKeyWithVolume = omEndpoint.getBuckets(
+        "sampleVol2", 1, "bucketOne");
+
+    Assertions.assertEquals(200, responsePrevKeyWithVolume.getStatus());
+
+    BucketsResponse bucketPrevKeyResponseWithVolume =
+        (BucketsResponse) responsePrevKeyWithVolume.getEntity();
+    Assertions.assertEquals(1,
+        bucketPrevKeyResponseWithVolume.getTotalCount());
+    Assertions.assertEquals(1,
+        bucketPrevKeyResponseWithVolume.getBuckets().size());
+    Assertions.assertEquals("sampleVol2",
+        bucketResponsePrevKeyWithoutVolume.getBuckets()
+            .stream().findFirst().get().getVolumeName());
+    Assertions.assertEquals("bucketTwo",
+        bucketPrevKeyResponseWithVolume.getBuckets()
+            .stream().findFirst().get().getBucketName());
+
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -31,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -42,6 +44,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 
 /**
  * Endpoint to fetch details about volume.
@@ -64,8 +71,14 @@ public class OMEndpoint {
 
   @GET
   @Path("/volumes")
-  public Response getVolumes() throws IOException {
-    List<OmVolumeArgs> volumes = omMetadataManager.listVolumes();
+  public Response getVolumes(
+      @DefaultValue(DEFAULT_FETCH_COUNT)
+      @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(StringUtils.EMPTY)
+      @QueryParam(RECON_QUERY_PREVKEY) String prevKey
+  ) throws IOException {
+    List<OmVolumeArgs> volumes = omMetadataManager.listAllVolumes(
+        prevKey, limit);
     List<VolumeMetadata> volumeMetadata = volumes.stream()
         .map(this::toVolumeMetadata).collect(Collectors.toList());
     VolumesResponse volumesResponse =
@@ -75,10 +88,15 @@ public class OMEndpoint {
 
   @GET
   @Path("/buckets")
-  public Response getBuckets(@QueryParam("volume") String volume)
-      throws IOException {
-    List<OmBucketInfo> buckets = omMetadataManager
-        .listBucketsUnderVolume(volume);
+  public Response getBuckets(
+      @QueryParam(RECON_QUERY_VOLUME) String volume,
+      @DefaultValue(DEFAULT_FETCH_COUNT)
+      @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(StringUtils.EMPTY)
+      @QueryParam(RECON_QUERY_PREVKEY) String prevKey
+  ) throws IOException {
+    List<OmBucketInfo> buckets = omMetadataManager.listAllBuckets(
+        volume, prevKey, limit);
     List<BucketMetadata> bucketMetadata = buckets
         .stream().map(this::toBucketMetadata).collect(Collectors.toList());
     BucketsResponse bucketsResponse =
