@@ -252,17 +252,21 @@ public final class OmSnapshotManager implements AutoCloseable {
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
-        diffCleanupServiceInterval,
-        diffCleanupServiceTimeout,
-        ozoneManager,
-        snapshotDiffDb,
-        snapDiffJobCf,
-        snapDiffPurgedJobCf,
-        snapDiffReportCf,
-        codecRegistry
-    );
-    this.snapshotDiffCleanupService.start();
+    if (ozoneManager.isFilesystemSnapshotEnabled()) {
+      this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
+          diffCleanupServiceInterval,
+          diffCleanupServiceTimeout,
+          ozoneManager,
+          snapshotDiffDb,
+          snapDiffJobCf,
+          snapDiffPurgedJobCf,
+          snapDiffReportCf,
+          codecRegistry
+      );
+      this.snapshotDiffCleanupService.start();
+    } else {
+      this.snapshotDiffCleanupService = null;
+    }
   }
 
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
