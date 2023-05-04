@@ -35,12 +35,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -52,13 +50,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
+@Timeout(120)
 public class TestRecursiveAclWithFSO {
-
-  @Rule public Timeout timeout = Timeout.seconds(120);
 
   private MiniOzoneCluster cluster;
 
@@ -69,7 +69,7 @@ public class TestRecursiveAclWithFSO {
   private final UserGroupInformation user2 = UserGroupInformation
       .createUserForTesting("user2", new String[] {"test2"});
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     // loginUser is the user running this test.
     // Implication: loginUser is automatically added to the OM admin list.
@@ -176,21 +176,21 @@ public class TestRecursiveAclWithFSO {
     // perform  delete
     try {
       ozoneBucket.deleteDirectory("a/b2", true);
-      Assert.fail("Should throw permission denied !");
+      fail("Should throw permission denied !");
     } catch (OMException ome) {
       // expect permission error
-      Assert.assertEquals("Permission check failed",
-          OMException.ResultCodes.PERMISSION_DENIED, ome.getResult());
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          ome.getResult(), "Permission check failed");
     }
 
     // perform rename
     try {
       ozoneBucket.renameKey("a/b2", "a/b2_renamed");
-      Assert.fail("Should throw permission denied !");
+      fail("Should throw permission denied !");
     } catch (OMException ome) {
       // expect permission error
-      Assert.assertEquals("Permission check failed",
-          OMException.ResultCodes.PERMISSION_DENIED, ome.getResult());
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          ome.getResult(), "Permission check failed");
     }
 
     // Test case 2
@@ -204,21 +204,21 @@ public class TestRecursiveAclWithFSO {
     // perform  delete
     try {
       ozoneBucket.deleteDirectory("a/b1", true);
-      Assert.fail("Should throw permission denied !");
+      fail("Should throw permission denied !");
     } catch (OMException ome) {
       // expect permission error
-      Assert.assertEquals("Permission check failed",
-          OMException.ResultCodes.PERMISSION_DENIED, ome.getResult());
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          ome.getResult(), "Permission check failed");
     }
 
     // perform rename
     try {
       ozoneBucket.renameKey("a/b1", "a/b1_renamed");
-      Assert.fail("Should throw permission denied !");
+      fail("Should throw permission denied !");
     } catch (OMException ome) {
       // expect permission error
-      Assert.assertEquals("Permission check failed",
-          OMException.ResultCodes.PERMISSION_DENIED, ome.getResult());
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          ome.getResult(), "Permission check failed");
     }
 
     // Test case 3
@@ -264,7 +264,7 @@ public class TestRecursiveAclWithFSO {
 
   }
 
-  @After
+  @AfterEach
   public void stopCluster() {
     if (cluster != null) {
       cluster.shutdown();
@@ -287,7 +287,7 @@ public class TestRecursiveAclWithFSO {
       String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-    Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   /**
@@ -298,7 +298,7 @@ public class TestRecursiveAclWithFSO {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setBucketName(bucket).setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OZONE).build();
-    Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   /**
@@ -309,7 +309,7 @@ public class TestRecursiveAclWithFSO {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setBucketName(bucket).setKeyName(key)
         .setResType(OzoneObj.ResourceType.KEY).setStoreType(OZONE).build();
-    Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
