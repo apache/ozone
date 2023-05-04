@@ -295,7 +295,7 @@ public interface ClientProtocol {
    * @param bucketPrefix Bucket prefix to match
    * @param prevBucket Starting point of the list, this bucket is excluded
    * @param maxListResult Max number of buckets to return.
-   * @param isSnapshot Set the flag to list the buckets which have snapshot.
+   * @param isSnapshot flag to list the buckets which have snapshot.
    * @return {@code List<OzoneBucket>}
    * @throws IOException
    */
