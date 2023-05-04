@@ -81,150 +81,153 @@ public class TestRecursiveAclWithFSO {
 
   @Test
   public void testKeyDeleteAndRenameWithoutPermission() throws Exception {
+    /* r = READ, w = WRITE, c = CREATE, d = DELETE
+       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
+    String aclWorldAll = "world::a";
 
     List<String> keys = new ArrayList<>();
     // Create volumes with user1
 
-    OzoneClient client = cluster.newClient();
-    ObjectStore objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
 
-    /* r = READ, w = WRITE, c = CREATE, d = DELETE
-       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
-    String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclWorldAll);
+      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclWorldAll);
+    }
 
     // Login as user1, create directories and keys
     UserGroupInformation.setLoginUser(user1);
-    client = cluster.newClient();
-    objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
 
-    OzoneVolume volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = objectStore.getVolume("volume1");
 
-    BucketArgs omBucketArgs =
-        BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
+      BucketArgs omBucketArgs =
+          BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
 
-    // create bucket with user1
-    volume.createBucket("bucket1", omBucketArgs);
-    setBucketAcl(objectStore, volume.getName(), "bucket1", aclWorldAll);
-    OzoneBucket ozoneBucket = volume.getBucket("bucket1");
+      // create bucket with user1
+      volume.createBucket("bucket1", omBucketArgs);
+      setBucketAcl(objectStore, volume.getName(), "bucket1", aclWorldAll);
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
 
-    /**
-     *                       buck-1
-     *                        |
-     *                        a
-     *                        |
-     *          ------------------------------------
-     *         |           |              |        |
-     *         b1          b2             b3      file1
-     *       -----       ------           -----
-     *       |    |      |    |          |    |
-     *      c1   c2     d1   d2          e1   e2
-     *       |    |      |    |           |    |
-     *       f1   f2     f3  --------     f5   f6
-     *                      |        |
-     *                    d21        file2
-     *                     |
-     *                     f4
-     *
-     *     Test Case 1 :
-     *     Remove delete acl from file File2
-     *     Try deleting b2
-     *
-     *     Test case 2:
-     *     Remove delete acl fro dir c2
-     *     Try deleting b1
-     *
-     *     Test case 3
-     *     try deleting b3
-     */
+      /**
+       *                       buck-1
+       *                        |
+       *                        a
+       *                        |
+       *          ------------------------------------
+       *         |           |              |        |
+       *         b1          b2             b3      file1
+       *       -----       ------           -----
+       *       |    |      |    |          |    |
+       *      c1   c2     d1   d2          e1   e2
+       *       |    |      |    |           |    |
+       *       f1   f2     f3  --------     f5   f6
+       *                      |        |
+       *                    d21        file2
+       *                     |
+       *                     f4
+       *
+       *     Test Case 1 :
+       *     Remove delete acl from file File2
+       *     Try deleting b2
+       *
+       *     Test case 2:
+       *     Remove delete acl fro dir c2
+       *     Try deleting b1
+       *
+       *     Test case 3
+       *     try deleting b3
+       */
 
-    String keyf1 = "a/b1/c1/f1";
-    String keyf2 = "a/b1/c2/f2";
-    String keyf3 = "a/b2/d1/f3";
-    String keyf4 = "a/b2/d2/d21/f4";
-    String keyf5 = "/a/b3/e1/f5";
-    String keyf6 = "/a/b3/e2/f6";
+      String keyf1 = "a/b1/c1/f1";
+      String keyf2 = "a/b1/c2/f2";
+      String keyf3 = "a/b2/d1/f3";
+      String keyf4 = "a/b2/d2/d21/f4";
+      String keyf5 = "/a/b3/e1/f5";
+      String keyf6 = "/a/b3/e2/f6";
 
-    String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
-    String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
 
-    keys.add(keyf1);
-    keys.add(keyf2);
-    keys.add(keyf3);
-    keys.add(keyf4);
-    keys.add(keyf5);
-    keys.add(keyf6);
-    keys.add(file1);
-    keys.add(file2);
+      keys.add(keyf1);
+      keys.add(keyf2);
+      keys.add(keyf3);
+      keys.add(keyf4);
+      keys.add(keyf5);
+      keys.add(keyf6);
+      keys.add(file1);
+      keys.add(file2);
 
-    createKeys(objectStore, ozoneBucket, keys);
+      createKeys(objectStore, ozoneBucket, keys);
 
-    // Test case 1
-    // Remove acls from file2
-    // Delete/Rename on directory a/b2 should throw permission denied
-    // (since file2 is a child)
-    removeAclsFromKey(objectStore, ozoneBucket, file2);
+      // Test case 1
+      // Remove acls from file2
+      // Delete/Rename on directory a/b2 should throw permission denied
+      // (since file2 is a child)
+      removeAclsFromKey(objectStore, ozoneBucket, file2);
+    }
     OzoneObj ozoneObj;
     List<OzoneAcl> aclList1;
 
     UserGroupInformation.setLoginUser(user2);
-    client = cluster.newClient();
-    objectStore = client.getObjectStore();
-    volume = objectStore.getVolume("volume1");
-    ozoneBucket = volume.getBucket("bucket1");
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
+      OzoneVolume volume = objectStore.getVolume("volume1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
 
-    // perform  delete
-    try {
-      ozoneBucket.deleteDirectory("a/b2", true);
-      fail("Should throw permission denied !");
-    } catch (OMException ome) {
-      // expect permission error
-      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-          ome.getResult(), "Permission check failed");
+      // perform  delete
+      try {
+        ozoneBucket.deleteDirectory("a/b2", true);
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
+
+      // perform rename
+      try {
+        ozoneBucket.renameKey("a/b2", "a/b2_renamed");
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
+
+      // Test case 2
+      // Remove acl from directory c2, delete/rename a/b1 should throw
+      // permission denied since c2 is a subdirectory
+
+      UserGroupInformation.setLoginUser(user1);
+      removeAclsFromKey(objectStore, ozoneBucket, "a/b1/c2");
+
+      UserGroupInformation.setLoginUser(user2);
+      // perform  delete
+      try {
+        ozoneBucket.deleteDirectory("a/b1", true);
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
+
+      // perform rename
+      try {
+        ozoneBucket.renameKey("a/b1", "a/b1_renamed");
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
+
+      // Test case 3
+      // delete b3 and this shouldn't throw exception because acls have not
+      // been removed from subpaths.
+      ozoneBucket.deleteDirectory("a/b3", true);
     }
-
-    // perform rename
-    try {
-      ozoneBucket.renameKey("a/b2", "a/b2_renamed");
-      fail("Should throw permission denied !");
-    } catch (OMException ome) {
-      // expect permission error
-      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-          ome.getResult(), "Permission check failed");
-    }
-
-    // Test case 2
-    // Remove acl from directory c2, delete/rename a/b1 should throw
-    // permission denied since c2 is a subdirectory
-
-    UserGroupInformation.setLoginUser(user1);
-    removeAclsFromKey(objectStore, ozoneBucket, "a/b1/c2");
-
-    UserGroupInformation.setLoginUser(user2);
-    // perform  delete
-    try {
-      ozoneBucket.deleteDirectory("a/b1", true);
-      fail("Should throw permission denied !");
-    } catch (OMException ome) {
-      // expect permission error
-      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-          ome.getResult(), "Permission check failed");
-    }
-
-    // perform rename
-    try {
-      ozoneBucket.renameKey("a/b1", "a/b1_renamed");
-      fail("Should throw permission denied !");
-    } catch (OMException ome) {
-      // expect permission error
-      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-          ome.getResult(), "Permission check failed");
-    }
-
-    // Test case 3
-    // delete b3 and this shouldn't throw exception because acls have not
-    // been removed from subpaths.
-    ozoneBucket.deleteDirectory("a/b3", true);
   }
 
   private void removeAclsFromKey(ObjectStore objectStore,
