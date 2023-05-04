@@ -48,12 +48,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -79,8 +81,11 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = Mockito.mock(ReplicationManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     Mockito.when(replicationManager.getConfig())
-        .thenReturn(new ReplicationManagerConfiguration());
+        .thenReturn(ozoneConfiguration.getObject(
+            ReplicationManagerConfiguration.class));
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -96,7 +101,7 @@ public class TestRatisUnderReplicationHandler {
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent);
+        replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
         commandsSent);
   }
@@ -253,12 +258,52 @@ public class TestRatisUnderReplicationHandler {
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         testProcessing(replicas, Collections.emptyList(),
-            getUnderReplicatedHealthResult(), 2, 1);
-    Assert.assertEquals(1, commands.size());
-    Pair<DatanodeDetails, SCMCommand<?>> command = commands.stream()
-        .findFirst().get();
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
 
-    Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
+  /**
+   * Tests that a CLOSED RATIS container with 2 CLOSED replicas and 1
+   * UNHEALTHY replica is correctly seen as under replicated. And, under
+   * replication is fixed by sending a command to replicate either of the
+   * CLOSED replicas.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    commands.forEach(
+        command -> Assert.assertNotEquals(unhealthyReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
+  @Test
+  public void testOnlyHighestBcsidShouldBeASource() throws IOException {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1));
+    ContainerReplica valid = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED, 2);
+    replicas.add(valid);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+
+    // Ensure that the replica with SEQ=2 is the only source sent
+    Mockito.verify(replicationManager).sendThrottledReplicationCommand(
+        Mockito.any(ContainerInfo.class),
+        Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
+        Mockito.any(DatanodeDetails.class), anyInt());
   }
 
   /**

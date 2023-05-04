@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -170,9 +172,11 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
-    assertTrue(dirTable.iterator().hasNext());
-    assertEquals(root.getName(),
-        dirTable.iterator().next().getValue().getName());
+    try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
+        iterator = dirTable.iterator()) {
+      assertTrue(iterator.hasNext());
+      assertEquals(root.getName(), iterator.next().getValue().getName());
+    }
 
     assertTrue(dirDeletingService.getRunCount().get() > 1);
   }
@@ -377,6 +381,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
+  @Flaky("HDDS-8453")
   public void testDirDeletedTableCleanUpForSnapshot() throws Exception {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -478,23 +483,27 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   private void cleanupTables() throws IOException {
-    cluster.getOzoneManager().getMetadataManager()
-        .getDeletedDirTable().iterator().removeFromDB();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = cluster.getOzoneManager().getMetadataManager()
-        .getFileTable().iterator()) {
-      while (iterator.hasNext()) {
-        iterator.next();
-        iterator.removeFromDB();
-      }
+    OMMetadataManager metadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+
+    try (TableIterator<?, ?> it = metadataManager.getDeletedDirTable()
+        .iterator()) {
+      removeAllFromDB(it);
     }
-    try (TableIterator<String, ? extends Table.KeyValue<String,
-        OmDirectoryInfo>> deletedItr = cluster.getOzoneManager()
-        .getMetadataManager().getDirectoryTable().iterator()) {
-      while (deletedItr.hasNext()) {
-        deletedItr.next();
-        deletedItr.removeFromDB();
-      }
+    try (TableIterator<?, ?> it = metadataManager.getFileTable().iterator()) {
+      removeAllFromDB(it);
+    }
+    try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
+        .iterator()) {
+      removeAllFromDB(it);
+    }
+  }
+
+  private static void removeAllFromDB(TableIterator<?, ?> iterator)
+      throws IOException {
+    while (iterator.hasNext()) {
+      iterator.next();
+      iterator.removeFromDB();
     }
   }
 

@@ -223,7 +223,7 @@ public class TestLegacyReplicationManager {
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
     containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
-    createReplicationManager(new ReplicationManagerConfiguration());
+    createReplicationManager(newRMConfig());
   }
 
   void createReplicationManager(int replicationLimit, int deletionLimit)
@@ -240,7 +240,7 @@ public class TestLegacyReplicationManager {
   void createReplicationManager(
       LegacyReplicationManagerConfiguration conf)
       throws Exception {
-    createReplicationManager(null, conf);
+    createReplicationManager(newRMConfig(), conf);
   }
 
   private void createReplicationManager(ReplicationManagerConfiguration rmConf)
@@ -1680,8 +1680,7 @@ public class TestLegacyReplicationManager {
     public void testNotUnderReplicatedDueToMaintenanceMinRepOne()
         throws Exception {
       replicationManager.stop();
-      ReplicationManagerConfiguration newConf =
-          new ReplicationManagerConfiguration();
+      ReplicationManagerConfiguration newConf = newRMConfig();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1701,8 +1700,7 @@ public class TestLegacyReplicationManager {
     public void testUnderReplicatedDueToMaintenanceMinRepOne()
         throws Exception {
       replicationManager.stop();
-      ReplicationManagerConfiguration newConf =
-          new ReplicationManagerConfiguration();
+      ReplicationManagerConfiguration newConf = newRMConfig();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1827,6 +1825,13 @@ public class TestLegacyReplicationManager {
       assertReplicaScheduled(0);
       assertUnderReplicatedCount(1);
     }
+  }
+
+  private static ReplicationManagerConfiguration newRMConfig() {
+    ReplicationManagerConfiguration conf =
+        new ReplicationManagerConfiguration();
+    conf.setEnableLegacy(true);
+    return conf;
   }
 
   /**

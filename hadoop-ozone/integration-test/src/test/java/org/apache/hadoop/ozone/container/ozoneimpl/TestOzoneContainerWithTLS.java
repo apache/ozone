@@ -181,19 +181,20 @@ public class TestOzoneContainerWithTLS {
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
-          Collections.singletonList(caClient.getCACertificate()));
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
+          Collections.singletonList(caClient.getCACertificate()))) {
 
-      if (containerTokenEnabled) {
-        secretManager.start(caClient);
-        client.connect();
-        createSecureContainer(client, containerId,
-            secretManager.generateToken(
-                UserGroupInformation.getCurrentUser().getUserName(),
-                ContainerID.valueOf(containerId)));
-      } else {
-        client.connect();
-        createContainer(client, containerId);
+        if (containerTokenEnabled) {
+          secretManager.start(caClient);
+          client.connect();
+          createSecureContainer(client, containerId,
+              secretManager.generateToken(
+                  UserGroupInformation.getCurrentUser().getUserName(),
+                  ContainerID.valueOf(containerId)));
+        } else {
+          client.connect();
+          createContainer(client, containerId);
+        }
       }
     } finally {
       if (container != null) {

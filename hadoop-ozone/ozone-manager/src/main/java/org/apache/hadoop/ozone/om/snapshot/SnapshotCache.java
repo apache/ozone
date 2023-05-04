@@ -26,7 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -43,6 +45,7 @@ public class SnapshotCache {
   // Snapshot cache internal hash map.
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
+  // TODO: Wrap SoftReference<> around the value?
   private final ConcurrentHashMap<String, OmSnapshot> dbMap;
   // Linked hash set that holds OmSnapshot instances whose reference count
   // has reached zero.
@@ -63,6 +66,27 @@ public class SnapshotCache {
     this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
     this.cacheSize = cacheSize;
+  }
+
+  /**
+   * @return number of DB instances currently held in cache.
+   */
+  public int size() {
+    return dbMap.size();
+  }
+
+  /**
+   * Immediately invalidate all entries and close their DB instances in cache.
+   */
+  public void invalidateAll() throws IOException {
+    Iterator<Map.Entry<String, OmSnapshot>> it = dbMap.entrySet().iterator();
+
+    while (it.hasNext()) {
+      Map.Entry<String, OmSnapshot> entry = it.next();
+      // TODO: If wrapped with SoftReference<>, entry.getValue() could be null?
+      entry.getValue().close();
+      it.remove();
+    }
   }
 
   /**
@@ -120,9 +144,9 @@ public class SnapshotCache {
 
     // If the snapshot is already loaded in cache, the check inside the loader
     // above is ignored. But we would still want to reject all get()s except
-    // when called from SDT if the snapshot is not active any more.
+    // when called from SDT (and some) if the snapshot is not active any more.
     if (!omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE) &&
-        !OmSnapshotManager.isCalledFromSnapshotDeletingService()) {
+        !SnapshotUtils.isCalledFromSnapshotDeletingService()) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
           FILE_NOT_FOUND);

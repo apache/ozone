@@ -26,6 +26,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 
@@ -34,10 +35,12 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
@@ -252,11 +255,14 @@ public class TestOMSnapshotCreateRequest {
   @Test
   public void testEmptySnapshotRenamedKeyTable() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
+    Table<String, String> snapshotRenamedTable =
+        omMetadataManager.getSnapshotRenamedTable();
 
-    renameKey("key1", "key2");
+    renameKey("key1", "key2", 0);
+    renameDir("dir1", "dir2", 5);
     // Rename table should be empty as there is no rename happening in
     // the snapshot scope.
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    Assert.assertTrue(snapshotRenamedTable.isEmpty());
 
     // Create snapshot
     createSnapshot(snapshotName1);
@@ -266,15 +272,16 @@ public class TestOMSnapshotCreateRequest {
         omMetadataManager.getSnapshotInfoTable().get(snapKey);
     Assert.assertNotNull(snapshotInfo);
 
-    renameKey("key3", "key4");
-    // Rename table should have one entry as rename is within snapshot scope.
-    Assert.assertFalse(omMetadataManager.getSnapshotRenamedKeyTable()
-        .isEmpty());
+    renameKey("key3", "key4", 10);
+    renameDir("dir3", "dir4", 15);
 
-    // Create snapshot to clear snapshotRenamedKeyTable
+    // Rename table should have two entries as rename is within snapshot scope.
+    Assert.assertEquals(2, omMetadataManager
+        .countRowsInTable(snapshotRenamedTable));
+
+    // Create snapshot to clear snapshotRenamedTable
     createSnapshot(snapshotName2);
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
-
+    Assert.assertTrue(snapshotRenamedTable.isEmpty());
   }
 
   @Test
@@ -311,9 +318,10 @@ public class TestOMSnapshotCreateRequest {
         omResponse.getStatus());
   }
 
-  private void renameKey(String fromKey, String toKey) throws IOException {
-    OmKeyInfo toKeyInfo = addKey(fromKey);
-    OmKeyInfo fromKeyInfo = addKey(toKey);
+  private void renameKey(String fromKey, String toKey, long offset)
+      throws IOException {
+    OmKeyInfo toKeyInfo = addKey(toKey, offset + 1L);
+    OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 2L);
 
     OMResponse omResponse = OMResponse
         .newBuilder()
@@ -326,9 +334,40 @@ public class TestOMSnapshotCreateRequest {
         new OMKeyRenameResponse(omResponse, fromKeyInfo.getKeyName(),
             toKeyInfo.getKeyName(), toKeyInfo);
 
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
     omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
+  }
+
+  private void renameDir(String fromKey, String toKey, long offset)
+      throws Exception {
+    String fromKeyParentName = UUID.randomUUID().toString();
+    OmKeyInfo fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, fromKeyParentName, HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE, 100L);
+
+    OmKeyInfo toKeyInfo = addKey(toKey, offset + 4L);
+    OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 5L);
+    OMResponse omResponse = OMResponse
+        .newBuilder()
+        .setRenameKeyResponse(
+            OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
+        .setStatus(OzoneManagerProtocolProtos.Status.OK)
+        .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+        .build();
+
+    OMKeyRenameResponseWithFSO omKeyRenameResponse =
+        new OMKeyRenameResponseWithFSO(omResponse, getDBKeyName(fromKeyInfo),
+            getDBKeyName(toKeyInfo), fromKeyParent, null, toKeyInfo,
+            null, true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+  }
+
+  protected String getDBKeyName(OmKeyInfo keyInfo) throws IOException {
+    return omMetadataManager.getOzonePathKey(
+        omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName),
+        keyInfo.getParentObjectID(), keyInfo.getKeyName());
   }
 
   private void createSnapshot(String snapName) throws Exception {
@@ -362,9 +401,10 @@ public class TestOMSnapshotCreateRequest {
     return new OMSnapshotCreateRequest(modifiedRequest);
   }
 
-  private OmKeyInfo addKey(String keyName) {
+  private OmKeyInfo addKey(String keyName, long objectId) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE, 0L);
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+        objectId);
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

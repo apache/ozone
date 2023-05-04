@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -29,7 +30,7 @@ import java.util.Set;
  * A PlacementPolicy support choosing datanodes to build
  * pipelines or containers with specified constraints.
  */
-public interface PlacementPolicy<Replica> {
+public interface PlacementPolicy {
 
   default List<DatanodeDetails> chooseDatanodes(
           List<DatanodeDetails> excludedNodes,
@@ -75,8 +76,8 @@ public interface PlacementPolicy<Replica> {
    * @param replicas: Map of replicas with value signifying if
    *                  replica can be copied
    */
-  Set<Replica> replicasToCopyToFixMisreplication(
-          Map<Replica, Boolean> replicas);
+  Set<ContainerReplica> replicasToCopyToFixMisreplication(
+          Map<ContainerReplica, Boolean> replicas);
 
   /**
    * Given a set of replicas of a container which are overreplicated,
@@ -85,6 +86,6 @@ public interface PlacementPolicy<Replica> {
    * @param expectedCountPerUniqueReplica: Replication factor of each
    *                                     unique replica
    */
-  Set<Replica> replicasToRemoveToFixOverreplication(
-          Set<Replica> replicas, int expectedCountPerUniqueReplica);
+  Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+          Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica);
 }

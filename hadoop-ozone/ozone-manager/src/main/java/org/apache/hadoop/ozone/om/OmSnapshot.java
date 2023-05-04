@@ -263,6 +263,19 @@ public class OmSnapshot implements IOmMetadataReader, Closeable, RefCount {
     omMetadataManager.getStore().close();
   }
 
+  @Override
+  protected void finalize() throws Throwable {
+    // Verify that the DB handle has been closed, log warning otherwise
+    // https://softwareengineering.stackexchange.com/a/288724
+    if (!omMetadataManager.getStore().isClosed()) {
+      LOG.warn("{} is not closed properly. snapshotName: {}",
+          // Print hash code for debugging
+          omMetadataManager.getStore().toString(),
+          snapshotName);
+    }
+    super.finalize();
+  }
+
   @VisibleForTesting
   public OMMetadataManager getMetadataManager() {
     return omMetadataManager;
