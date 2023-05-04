@@ -242,7 +242,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.loadJobsOnStartUp();
   }
 
-  private Optional<ManagedSSTDumpTool> initSSTDumpTool(OzoneConfiguration conf) {
+  private Optional<ManagedSSTDumpTool> initSSTDumpTool(
+      final OzoneConfiguration conf) {
     if (!NativeLibraryLoader.getInstance()
         .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       return Optional.empty();
