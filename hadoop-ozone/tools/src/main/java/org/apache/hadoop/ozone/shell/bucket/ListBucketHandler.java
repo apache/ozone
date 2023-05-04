@@ -45,8 +45,8 @@ public class ListBucketHandler extends VolumeHandler {
   @CommandLine.Mixin
   private ListOptions listOptions;
 
-  @CommandLine.Option(names = {"--snapshot"},
-      description = "List bucket which have snapshots.")
+  @CommandLine.Option(names = {"--has-snapshot"},
+      description = "Only show buckets that have at least one active snapshot.")
   private boolean bucketWithSnapshot;
 
   @Override
