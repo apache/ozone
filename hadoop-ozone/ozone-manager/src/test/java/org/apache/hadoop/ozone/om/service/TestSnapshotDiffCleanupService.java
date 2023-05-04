@@ -22,7 +22,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -163,15 +162,14 @@ public class TestSnapshotDiffCleanupService {
     purgedJobTableCfh = db.get().createColumnFamily(purgedJobTableCfd);
     reportTableCfh = db.get().createColumnFamily(reportTableCfd);
 
-    codecRegistry = new CodecRegistry();
 
-    // Integers are used for indexing persistent list.
-    codecRegistry.addCodec(Integer.class, new IntegerCodec());
+    final CodecRegistry.Builder b = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
-    codecRegistry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
+    b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
-    codecRegistry.addCodec(SnapshotDiffJob.class,
+    b.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
+    codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 
     diffCleanupService = new SnapshotDiffCleanupService(

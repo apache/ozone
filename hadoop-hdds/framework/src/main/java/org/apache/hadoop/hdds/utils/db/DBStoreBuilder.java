@@ -90,7 +90,7 @@ public final class DBStoreBuilder {
   // any options. On build, this will be replaced with defaultCfOptions.
   private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
-  private CodecRegistry registry;
+  private final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
   private String rocksDbStat;
   // RocksDB column family write buffer size
   private long rocksDbCfWriteBufferSize;
@@ -136,7 +136,6 @@ public final class DBStoreBuilder {
       RocksDBConfiguration rocksDBConfiguration) {
     cfOptions = new HashMap<>();
     this.configuration = configuration;
-    this.registry = new CodecRegistry();
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
@@ -187,7 +186,7 @@ public final class DBStoreBuilder {
    *
    * @return DBStore
    */
-  public DBStore build() throws IOException {
+  public RDBStore build() throws IOException {
     if (StringUtil.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
       throw new IOException("Required parameter is missing. Please make sure "
@@ -210,7 +209,7 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-          registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
+          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionLog, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration);
     } finally {

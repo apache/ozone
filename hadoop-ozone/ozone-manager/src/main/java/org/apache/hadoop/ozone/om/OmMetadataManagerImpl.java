@@ -40,9 +40,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -255,7 +255,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       SNAPSHOT_RENAMED_TABLE
   };
 
-  private DBStore store;
+  private RDBStore store;
 
   private final IOzoneManagerLock lock;
 
@@ -521,13 +521,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     snapshotChainManager = new SnapshotChainManager(this);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
+  public static RDBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
             java.util.Optional.empty(), true);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+  public static RDBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
                                        disableAutoCompaction)
@@ -536,7 +536,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         disableAutoCompaction, true);
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+  public static RDBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
                                    disableAutoCompaction,
@@ -732,7 +732,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @VisibleForTesting
   @Override
-  public DBStore getStore() {
+  public RDBStore getStore() {
     return store;
   }
 
@@ -1808,7 +1808,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    *
    * @param store DB store.
    */
-  protected void setStore(DBStore store) {
+  protected void setStore(RDBStore store) {
     this.store = store;
   }
 
