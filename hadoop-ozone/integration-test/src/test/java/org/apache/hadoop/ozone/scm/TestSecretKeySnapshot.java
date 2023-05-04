@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -69,6 +70,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -210,13 +212,14 @@ public final class TestSecretKeySnapshot {
     StorageContainerManager followerSCM = cluster.getSCM(followerId);
 
     // wait until leader SCM got enough secret keys.
+    SecretKeyManager leaderSecretKeyManager = leaderSCM.getSecretKeyManager();
     GenericTestUtils.waitFor(
-        () -> leaderSCM.getSecretKeyManager().getSortedKeys().size() >= 2,
+        () -> leaderSecretKeyManager.getSortedKeys().size() >= 2,
         ROTATE_CHECK_DURATION_MS, EXPIRY_DURATION_MS);
 
     writeToIncreaseLogIndex(leaderSCM, 200);
-    ManagedSecretKey currentKeyInLeader = leaderSCM.getSecretKeyManager()
-        .getCurrentSecretKey();
+    ManagedSecretKey currentKeyInLeader =
+        leaderSecretKeyManager.getCurrentSecretKey();
 
     // Start the inactive SCM. Install Snapshot will happen as part
     // of setConfiguration() call to ratis leader and the follower will catch
@@ -241,12 +244,25 @@ public final class TestSecretKeySnapshot {
 
     // Verify that the follower has the secret keys created
     // while it was inactive.
-    assertTrue(followerSCM.getSecretKeyManager().isInitialized());
+    SecretKeyManager followerSecretKeyManager =
+        followerSCM.getSecretKeyManager();
+    assertTrue(followerSecretKeyManager.isInitialized());
     List<ManagedSecretKey> followerKeys =
-        followerSCM.getSecretKeyManager().getSortedKeys();
-    LOG.info("Follower secret keys: {}", followerKeys);
+        followerSecretKeyManager.getSortedKeys();
+    LOG.info("Follower secret keys after snapshot: {}", followerKeys);
     assertTrue(followerKeys.size() >= 2);
     assertTrue(followerKeys.contains(currentKeyInLeader));
+    assertEquals(leaderSecretKeyManager.getSortedKeys(), followerKeys);
+
+    // Wait for the next rotation, assert that the updates can be synchronized
+    // normally post snapshot.
+    ManagedSecretKey currentKeyAtSnapshot = leaderSecretKeyManager.getCurrentSecretKey();
+    GenericTestUtils.waitFor(() ->
+            !leaderSecretKeyManager.getCurrentSecretKey()
+                .equals(currentKeyAtSnapshot),
+        ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
+    assertEquals(leaderSecretKeyManager.getSortedKeys(),
+        followerSecretKeyManager.getSortedKeys());
 
   }
 
