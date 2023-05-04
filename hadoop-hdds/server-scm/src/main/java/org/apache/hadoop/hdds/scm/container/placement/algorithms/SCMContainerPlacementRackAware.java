@@ -30,9 +30,12 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -59,6 +62,8 @@ public final class SCMContainerPlacementRackAware
   private final SCMContainerPlacementMetrics metrics;
   // Used to check the placement policy is validated in the parent class
   private static final int REQUIRED_RACKS = 2;
+  private static final String META_DATA_SIZE_REQUIRED = "metadataSizeRequired";
+  private static final String DATA_SIZE_REQUIRED = "dataSizeRequired";
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -99,11 +104,181 @@ public final class SCMContainerPlacementRackAware
    */
   @Override
   protected List<DatanodeDetails> chooseDatanodesInternal(
-          List<DatanodeDetails> usedNodes,
-          List<DatanodeDetails> excludedNodes,
-          List<DatanodeDetails> favoredNodes, int nodesRequired,
-          long metadataSizeRequired, long dataSizeRequired)
-          throws SCMException {
+      List<DatanodeDetails> usedNodes,
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes, int nodesRequired,
+      long metadataSizeRequired, long dataSizeRequired)
+      throws SCMException {
+    Map<String, Long> mapSizeRequired = new HashMap<>();
+    mapSizeRequired.put(META_DATA_SIZE_REQUIRED, metadataSizeRequired);
+    mapSizeRequired.put(DATA_SIZE_REQUIRED, dataSizeRequired);
+
+    if (!usedNodesPassed(usedNodes)) {
+      // If interface is called without used nodes
+      // In this case consider only exclude nodes to determine racks
+      return chooseDatanodesInternalLegacy(excludedNodes,
+          favoredNodes, nodesRequired, mapSizeRequired);
+    }
+    Preconditions.checkArgument(nodesRequired > 0);
+    metrics.incrDatanodeRequestCount(nodesRequired);
+    int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
+    int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
+    int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
+    if (datanodeCount < nodesRequired + excludedNodesCount + usedNodesCount) {
+      throw new SCMException("No enough datanodes to choose. " +
+          "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
+          " ExcludedNode = " + excludedNodesCount +
+          " UsedNode = " + usedNodesCount, null);
+    }
+    List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
+    // sanity check of favoredNodes
+    if (mutableFavoredNodes != null && excludedNodes != null) {
+      mutableFavoredNodes = new ArrayList<>();
+      mutableFavoredNodes.addAll(favoredNodes);
+      mutableFavoredNodes.removeAll(excludedNodes);
+    }
+    int favoredNodeNum = mutableFavoredNodes == null ? 0 :
+        mutableFavoredNodes.size();
+    List<DatanodeDetails> chosenNodes = new ArrayList<>();
+    List<DatanodeDetails> mutableUsedNodes = new ArrayList<>();
+    mutableUsedNodes.addAll(usedNodes);
+    List<DatanodeDetails> mutableExcludedNodes = new ArrayList<>();
+    if (excludedNodes != null) {
+      mutableExcludedNodes.addAll(excludedNodes);
+    }
+    DatanodeDetails favoredNode;
+    int favorIndex = 0;
+    if (mutableUsedNodes.size() == 0) {
+      // choose all nodes for a new pipeline case
+      // choose first datanode from scope ROOT or from favoredNodes if not null
+      favoredNode = favoredNodeNum > favorIndex ?
+          mutableFavoredNodes.get(favorIndex) : null;
+      DatanodeDetails firstNode;
+      if (favoredNode != null) {
+        firstNode = favoredNode;
+        favorIndex++;
+      } else {
+        firstNode = chooseNode(mutableExcludedNodes, null,
+            null, metadataSizeRequired,
+            dataSizeRequired);
+      }
+      chosenNodes.add(firstNode);
+      nodesRequired--;
+      if (nodesRequired == 0) {
+        return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
+      }
+      // choose second datanode on the same rack as first one
+      favoredNode = favoredNodeNum > favorIndex ?
+          mutableFavoredNodes.get(favorIndex) : null;
+      DatanodeDetails secondNode;
+      if (favoredNode != null &&
+          networkTopology.isSameParent(firstNode, favoredNode)) {
+        secondNode = favoredNode;
+        favorIndex++;
+      } else {
+        mutableExcludedNodes.add(firstNode);
+        secondNode = chooseNode(mutableExcludedNodes, Arrays.asList(firstNode),
+            Arrays.asList(firstNode), metadataSizeRequired, dataSizeRequired);
+      }
+      chosenNodes.add(secondNode);
+      nodesRequired--;
+      if (nodesRequired == 0) {
+        return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
+      }
+      mutableUsedNodes.addAll(chosenNodes);
+      // choose remaining datanodes on different rack as first and second
+      mutableExcludedNodes.add(secondNode);
+    } else {
+      // choose node to meet replication requirement
+      // case 1: one used node, choose one on the same rack as the used
+      // node, choose others on different racks.
+      if (mutableUsedNodes.size() == 1) {
+        favoredNode = favoredNodeNum > favorIndex ?
+            mutableFavoredNodes.get(favorIndex) : null;
+        DatanodeDetails firstNode;
+        if (favoredNode != null &&
+            networkTopology.isSameParent(mutableUsedNodes.get(0),
+            favoredNode)) {
+          firstNode = favoredNode;
+          favorIndex++;
+        } else {
+          firstNode = chooseNode(mutableExcludedNodes, mutableUsedNodes,
+              mutableUsedNodes, metadataSizeRequired, dataSizeRequired);
+        }
+        chosenNodes.add(firstNode);
+        nodesRequired--;
+        if (nodesRequired == 0) {
+          return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
+        }
+        // choose remaining nodes on different racks
+        mutableExcludedNodes.add(firstNode);
+        mutableExcludedNodes.addAll(mutableUsedNodes);
+      } else {
+        // case 2: two or more used nodes, if these two nodes are
+        // in the same rack, then choose nodes on different racks, otherwise,
+        // choose one on the same rack as one of used
+        // nodes, remaining chosen
+        // are on different racks.
+        for (int i = 0; i < usedNodesCount; i++) {
+          for (int j = i + 1; j < usedNodesCount; j++) {
+            if (networkTopology.isSameParent(
+                usedNodes.get(i), usedNodes.get(j))) {
+              // choose remaining nodes on different racks
+              mutableExcludedNodes.addAll(mutableUsedNodes);
+              return chooseNodes(mutableExcludedNodes, chosenNodes,
+                  mutableFavoredNodes, mutableUsedNodes, favorIndex,
+                  nodesRequired, mapSizeRequired);
+            }
+          }
+        }
+        // choose one data on the same rack with one used node
+        favoredNode = favoredNodeNum > favorIndex ?
+            mutableFavoredNodes.get(favorIndex) : null;
+        DatanodeDetails secondNode;
+        if (favoredNode != null && networkTopology.isSameParent(
+            chosenNodes.get(0), favoredNode)) {
+          secondNode = favoredNode;
+          favorIndex++;
+        } else {
+          secondNode =
+              chooseNode(mutableExcludedNodes, mutableUsedNodes,
+                  mutableUsedNodes, metadataSizeRequired, dataSizeRequired);
+        }
+        chosenNodes.add(secondNode);
+        mutableExcludedNodes.add(secondNode);
+        mutableExcludedNodes.addAll(mutableUsedNodes);
+        mutableUsedNodes.addAll(chosenNodes);
+        nodesRequired--;
+        if (nodesRequired == 0) {
+          return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
+        }
+      }
+    }
+    // choose remaining nodes on different racks
+    return chooseNodes(mutableExcludedNodes, chosenNodes, mutableFavoredNodes,
+        mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired);
+  }
+
+  /**
+   * Called by SCM to choose datanodes.
+   * There are two scenarios, one is choosing all nodes for a new pipeline.
+   * Another is choosing node to meet replication requirement.
+   *
+   * @param excludedNodes - list of the datanodes to exclude.
+   * @param favoredNodes - list of nodes preferred. This is a hint to the
+   *                     allocator, whether the favored nodes will be used
+   *                     depends on whether the nodes meets the allocator's
+   *                     requirement.
+   * @param nodesRequired - number of datanodes required.
+   * @param mapSizeRequired - size required for the container, Ratis metadata.
+   * @return List of datanodes.
+   * @throws SCMException  SCMException
+   */
+  protected List<DatanodeDetails> chooseDatanodesInternalLegacy(
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> favoredNodes, int nodesRequired,
+      Map<String, Long> mapSizeRequired)
+      throws SCMException {
     Preconditions.checkArgument(nodesRequired > 0);
     metrics.incrDatanodeRequestCount(nodesRequired);
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
@@ -114,7 +289,10 @@ public final class SCMContainerPlacementRackAware
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount, null);
     }
+    long metadataSizeRequired = mapSizeRequired.get(META_DATA_SIZE_REQUIRED);
+    long dataSizeRequired = mapSizeRequired.get(DATA_SIZE_REQUIRED);
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
+    List<DatanodeDetails> mutableUsedNodes = new ArrayList<>();
     // sanity check of favoredNodes
     if (mutableFavoredNodes != null && excludedNodes != null) {
       mutableFavoredNodes = new ArrayList<>();
@@ -136,7 +314,7 @@ public final class SCMContainerPlacementRackAware
         firstNode = favoredNode;
         favorIndex++;
       } else {
-        firstNode = chooseNode(null, null, metadataSizeRequired,
+        firstNode = chooseNode(null, null, null, metadataSizeRequired,
             dataSizeRequired);
       }
       chosenNodes.add(firstNode);
@@ -155,7 +333,7 @@ public final class SCMContainerPlacementRackAware
         favorIndex++;
       } else {
         secondNode = chooseNode(chosenNodes, Arrays.asList(firstNode),
-            metadataSizeRequired, dataSizeRequired);
+            Arrays.asList(firstNode), metadataSizeRequired, dataSizeRequired);
       }
       chosenNodes.add(secondNode);
       nodesRequired--;
@@ -163,9 +341,10 @@ public final class SCMContainerPlacementRackAware
         return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
       }
 
+      mutableUsedNodes.addAll(chosenNodes);
       // choose remaining datanodes on different rack as first and second
       return chooseNodes(null, chosenNodes, mutableFavoredNodes,
-          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
+          mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired);
     } else {
       List<DatanodeDetails> mutableExcludedNodes = new ArrayList<>();
       mutableExcludedNodes.addAll(excludedNodes);
@@ -183,7 +362,7 @@ public final class SCMContainerPlacementRackAware
           favorIndex++;
         } else {
           firstNode = chooseNode(mutableExcludedNodes, excludedNodes,
-              metadataSizeRequired, dataSizeRequired);
+              excludedNodes, metadataSizeRequired, dataSizeRequired);
         }
         chosenNodes.add(firstNode);
         nodesRequired--;
@@ -191,8 +370,10 @@ public final class SCMContainerPlacementRackAware
           return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
         }
         // choose remaining nodes on different racks
-        return chooseNodes(null, chosenNodes, mutableFavoredNodes, favorIndex,
-            nodesRequired, metadataSizeRequired, dataSizeRequired);
+        mutableUsedNodes.addAll(chosenNodes);
+        mutableUsedNodes.addAll(mutableExcludedNodes);
+        return chooseNodes(null, chosenNodes, mutableFavoredNodes,
+            mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired);
       }
       // case 2: two or more excluded nodes, if these two nodes are
       // in the same rack, then choose nodes on different racks, otherwise,
@@ -203,9 +384,11 @@ public final class SCMContainerPlacementRackAware
           if (networkTopology.isSameParent(
               excludedNodes.get(i), excludedNodes.get(j))) {
             // choose remaining nodes on different racks
+            mutableUsedNodes.addAll(chosenNodes);
+            mutableUsedNodes.addAll(mutableExcludedNodes);
             return chooseNodes(mutableExcludedNodes, chosenNodes,
-                mutableFavoredNodes, favorIndex, nodesRequired,
-                metadataSizeRequired, dataSizeRequired);
+                mutableFavoredNodes, mutableUsedNodes, favorIndex,
+                nodesRequired, mapSizeRequired);
           }
         }
       }
@@ -219,7 +402,7 @@ public final class SCMContainerPlacementRackAware
         favorIndex++;
       } else {
         secondNode =
-            chooseNode(chosenNodes, mutableExcludedNodes,
+            chooseNode(chosenNodes, mutableExcludedNodes, mutableExcludedNodes,
                 metadataSizeRequired, dataSizeRequired);
       }
       chosenNodes.add(secondNode);
@@ -229,8 +412,11 @@ public final class SCMContainerPlacementRackAware
         return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
       }
       // choose remaining nodes on different racks
+      mutableUsedNodes.addAll(chosenNodes);
+      mutableUsedNodes.addAll(mutableExcludedNodes);
       return chooseNodes(mutableExcludedNodes, chosenNodes, mutableFavoredNodes,
-          favorIndex, nodesRequired, metadataSizeRequired, dataSizeRequired);
+          mutableUsedNodes,
+          favorIndex, nodesRequired, mapSizeRequired);
     }
   }
 
@@ -248,17 +434,34 @@ public final class SCMContainerPlacementRackAware
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param affinityNodes - the chosen nodes should be on the same rack as
    *                    affinityNodes. Can be null.
+   * @param usedNodes - the chosen nodes should be on the different rack
+   *                    than usedNodes rack when affinityNode is null.
    * @param dataSizeRequired - size required for the container.
    * @param metadataSizeRequired - size required for Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
   private DatanodeDetails chooseNode(List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> affinityNodes, long metadataSizeRequired,
+      List<DatanodeDetails> affinityNodes, List<DatanodeDetails> usedNodes,
+      long metadataSizeRequired,
       long dataSizeRequired) throws SCMException {
     int ancestorGen = RACK_LEVEL;
     int maxRetry = MAX_RETRY;
     List<String> excludedNodesForCapacity = null;
+
+    // When affinity node is null, in this case new node to be selected
+    // should be in different rack than used nodes rack.
+    // Exclude nodes should be just excluded from topology node selection,
+    // which is filled in excludedNodesForCapacity
+    // Used node rack should not be part of rack selection
+    // which is filled in excludedNodes
+    if (affinityNodes == null && excludedNodes != null) {
+      excludedNodesForCapacity = excludedNodes.stream()
+          .map(DatanodeDetails::getNetworkFullPath)
+          .collect(Collectors.toList());
+      excludedNodes = usedNodes;
+    }
+
     boolean isFallbacked = false;
     while (true) {
       metrics.incrDatanodeChooseAttemptCount();
@@ -338,17 +541,18 @@ public final class SCMContainerPlacementRackAware
    * @param favoredNodes - list of favoredNodes. It's a hint. Whether the nodes
    *                     are chosen depends on whether they meet the constrains.
    *                     Can be null.
+   * @param usedNodes - list of the nodes that are already used.
    * @param favorIndex - the node index of favoredNodes which is not chosen yet.
    * @param nodesRequired - number of datanodes required.
-   * @param dataSizeRequired - size required for the container.
-   * @param metadataSizeRequired - size required for Ratis metadata.
+   * @param mapSizeRequired - size required for the container, Ratis metadata.
    * @return List of chosen datanodes.
    * @throws SCMException  SCMException
    */
   private List<DatanodeDetails> chooseNodes(List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> chosenNodes, List<DatanodeDetails> favoredNodes,
-      int favorIndex, int nodesRequired, long metadataSizeRequired,
-      long dataSizeRequired) throws SCMException {
+      List<DatanodeDetails> usedNodes,
+      int favorIndex, int nodesRequired,
+      Map<String, Long> mapSizeRequired) throws SCMException {
     Preconditions.checkArgument(chosenNodes != null);
     List<DatanodeDetails> excludedNodeList = excludedNodes != null ?
         excludedNodes : chosenNodes;
@@ -362,10 +566,12 @@ public final class SCMContainerPlacementRackAware
         chosenNode = favoredNode;
         favorIndex++;
       } else {
-        chosenNode = chooseNode(excludedNodeList, null,
-            metadataSizeRequired, dataSizeRequired);
+        chosenNode = chooseNode(excludedNodeList, null, usedNodes,
+            mapSizeRequired.get(META_DATA_SIZE_REQUIRED),
+            mapSizeRequired.get(DATA_SIZE_REQUIRED));
       }
       excludedNodeList.add(chosenNode);
+      usedNodes.add(chosenNode);
       if (excludedNodeList != chosenNodes) {
         chosenNodes.add(chosenNode);
       }

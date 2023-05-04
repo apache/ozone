@@ -46,4 +46,9 @@
     <value>1s</value>
   </property>
 
+  <property>
+    <name>ozone.om.snapshot.diff.job.default.wait.time</name>
+    <value>1s</value>
+  </property>
+
 </configuration>

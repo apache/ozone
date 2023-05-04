@@ -32,31 +32,51 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
+            var protocol = "";
+            var portNo = "";
 
             $http.get("jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo")
                 .then(function (result) {
+                    const URLScheme = location.protocol.replace(":" , "");
                     ctrl.nodemanagermetrics = result.data.beans[0];
-                    $scope.nodeStatus = ctrl.nodemanagermetrics && ctrl.nodemanagermetrics.NodeStatusInfo &&
-                    ctrl.nodemanagermetrics.NodeStatusInfo.map(({ key, value }) => {
+
+                    $scope.nodeStatus = ctrl.nodemanagermetrics
+                        && ctrl.nodemanagermetrics.NodeStatusInfo
+                        && ctrl.nodemanagermetrics.NodeStatusInfo.map(
+                            ({ key, value }) => {
+                                value.map(({key, value}) => {
+                                    if (key == "HTTP") {
+                                        protocol = key;
+                                        portNo = value;
+                                    }
+                                    if (key == "HTTPS"){
+                                        protocol = key.toLowerCase() === URLScheme ? key : "HTTP";
+                                        portNo = value;
+                                    }
+                                });
                                 return {
                                     hostname: key,
-                                    opstate: value[0],
-                                    comstate: value[1]
-                                }});
+                                    opstate: value && value.find((element) => element.key == "OPSTATE").value,
+                                    comstate: value && value.find((element) => element.key == "COMSTATE").value,
+                                    portno: portNo,
+                                    portval: protocol
+                                }
+                            });
+
                     nodeStatusCopy = [...$scope.nodeStatus];
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
                 });
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
-                 if($scope.RecordsToDisplay == 'All') {
-                     $scope.lastIndex = 1;
-                     $scope.nodeStatus = nodeStatusCopy;
-                 } else {
-                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
-                 }
-                 $scope.currentPage = 1;
+                if($scope.RecordsToDisplay == 'All') {
+                    $scope.lastIndex = 1;
+                    $scope.nodeStatus = nodeStatusCopy;
+                } else {
+                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                }
+                $scope.currentPage = 1;
             }
             /* Page Slicing  logic */
             $scope.handlePagination = (pageIndex, isDisabled) => {
@@ -68,12 +88,11 @@
                     $scope.nodeStatus = nodeStatusCopy.slice(startIndex, endIndex);
                 }
             }
-             /*column sort logic*/
+            /*column sort logic*/
             $scope.columnSort = (colName) => {
                 $scope.columnName = colName;
                 $scope.reverse = !$scope.reverse;
             }
-
             const nodeOpStateSortOrder = {
                 "IN_SERVICE": "a",
                 "DECOMMISSIONING": "b",
@@ -97,8 +116,6 @@
                 return ("" + nodeStateSortOrder[v1.value])
                     .localeCompare("" + nodeStateSortOrder[v2.value])
             }
-
         }
     });
-
 })();

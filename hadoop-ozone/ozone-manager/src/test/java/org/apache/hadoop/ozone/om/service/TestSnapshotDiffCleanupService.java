@@ -18,15 +18,9 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -50,8 +44,21 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
@@ -86,6 +93,8 @@ public class TestSnapshotDiffCleanupService {
   private SnapshotDiffCleanupService diffCleanupService;
   @Mock
   private OzoneManager ozoneManager;
+  @Mock
+  private OzoneConfiguration config;
 
   @BeforeAll
   public static void staticInit() throws RocksDBException {
@@ -131,7 +140,18 @@ public class TestSnapshotDiffCleanupService {
   @BeforeEach
   public void init() throws RocksDBException, IOException {
     MockitoAnnotations.initMocks(this);
-    when(ozoneManager.isLeaderReady()).thenReturn(true);
+    when(config.getLong(
+        OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK,
+        OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT)
+    ).thenReturn(1000L);
+
+    when(config.getTimeDuration(
+        OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME,
+        OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS)
+    ).thenReturn(TimeUnit.DAYS.toMillis(7));
+
+    when(ozoneManager.getConfiguration()).thenReturn(config);
 
     jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
         columnFamilyOptions);

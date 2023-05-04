@@ -146,7 +146,20 @@ public class TestReplicationManager {
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
 
-    replicationManager = new ReplicationManager(
+    replicationManager = createReplicationManager();
+    containerReplicaMap = new HashMap<>();
+    containerInfoSet = new HashSet<>();
+    repConfig = new ECReplicationConfig(3, 2);
+    repReport = new ReplicationManagerReport();
+    repQueue = new ReplicationQueue();
+
+    // Ensure that RM will run when asked.
+    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
+    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+  }
+
+  private ReplicationManager createReplicationManager() throws IOException {
+    return new ReplicationManager(
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -162,15 +175,6 @@ public class TestReplicationManager {
         // do not start any threads for processing
       }
     };
-    containerReplicaMap = new HashMap<>();
-    containerInfoSet = new HashSet<>();
-    repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
-    repQueue = new ReplicationQueue();
-
-    // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
   }
 
   private void enableProcessAll() {
@@ -647,19 +651,21 @@ public class TestReplicationManager {
     enableProcessAll();
     replicationManager.processAll();
 
+    ReplicationQueue queue = replicationManager.getQueue();
+
     // Get the first message off the queue - it should be underRep0.
     ContainerHealthResult.UnderReplicatedHealthResult res
-        = replicationManager.dequeueUnderReplicatedContainer();
+        = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
 
     // Now requeue it
-    replicationManager.requeueUnderReplicatedContainer(res);
+    queue.enqueue(res);
 
     // Now get the next message. It should be underRep1, as it has remaining
     // redundancy 1 + zero retries. UnderRep0 will have remaining redundancy 0
     // and 1 retry. They will have the same weighted redundancy so lesser
     // retries should come first
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep1, res.getContainerInfo());
 
     // Next message is underRep0. It starts with a weighted redundancy of 0 + 1
@@ -668,21 +674,21 @@ public class TestReplicationManager {
     // times. Then the weighted redundancy will be equal and the decommission
     // one will be next due to having less retries.
     for (int i = 0; i < 4; i++) {
-      res = replicationManager.dequeueUnderReplicatedContainer();
+      res = queue.dequeueUnderReplicatedContainer();
       Assert.assertEquals(underRep0, res.getContainerInfo());
-      replicationManager.requeueUnderReplicatedContainer(res);
+      queue.enqueue(res);
     }
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(decomContainer, res.getContainerInfo());
 
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(underRep0, res.getContainerInfo());
 
     // Next is the mis-rep container, which has a remaining redundancy of 6.
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertEquals(misRep, res.getContainerInfo());
 
-    res = replicationManager.dequeueUnderReplicatedContainer();
+    res = queue.dequeueUnderReplicatedContainer();
     Assert.assertNull(res);
   }
 
@@ -1188,6 +1194,36 @@ public class TestReplicationManager {
     replicationManager.datanodeCommandCountUpdated(dn1);
     Assert.assertEquals(excluded.size(), 1);
     Assert.assertFalse(excluded.contains(dn1));
+  }
+
+  @Test
+  public void testInflightReplicationLimit() throws IOException {
+    int healthyNodes = 10;
+    ReplicationManager.ReplicationManagerConfiguration config =
+        new ReplicationManager.ReplicationManagerConfiguration();
+    Mockito.when(nodeManager.getNodeCount(
+        Mockito.isNull(), eq(HddsProtos.NodeState.HEALTHY)))
+        .thenReturn(healthyNodes);
+
+    config.setInflightReplicationLimitFactor(0.0);
+    configuration.setFromObject(config);
+    ReplicationManager rm = createReplicationManager();
+    Assertions.assertEquals(0, rm.getReplicationInFlightLimit());
+
+    config.setInflightReplicationLimitFactor(1);
+    configuration.setFromObject(config);
+    rm = createReplicationManager();
+    Assertions.assertEquals(
+        healthyNodes * config.getDatanodeReplicationLimit(),
+        rm.getReplicationInFlightLimit());
+
+    config.setInflightReplicationLimitFactor(0.75);
+    configuration.setFromObject(config);
+    rm = createReplicationManager();
+    Assertions.assertEquals(
+        (int) Math.ceil(healthyNodes
+            * config.getDatanodeReplicationLimit() * 0.75),
+        rm.getReplicationInFlightLimit());
   }
 
   @SafeVarargs

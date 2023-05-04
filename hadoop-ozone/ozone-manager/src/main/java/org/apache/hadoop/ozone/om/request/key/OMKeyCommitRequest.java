@@ -227,7 +227,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace needn't check and
       // increase.
-      if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+      if (keyToDelete != null && isHSync) {
+        correctedSpace -= keyToDelete.getReplicatedSize();
+        checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+            correctedSpace);
+      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         oldKeyVersionsToDelete = getOldVersionsToCleanUp(dbOzoneKey,
