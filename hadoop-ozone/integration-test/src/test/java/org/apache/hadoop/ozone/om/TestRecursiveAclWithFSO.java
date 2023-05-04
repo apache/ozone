@@ -109,7 +109,7 @@ public class TestRecursiveAclWithFSO {
       setBucketAcl(objectStore, volume.getName(), "bucket1", aclWorldAll);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
 
-      /**
+      /*
        *                       buck-1
        *                        |
        *                        a
@@ -166,8 +166,6 @@ public class TestRecursiveAclWithFSO {
       // (since file2 is a child)
       removeAclsFromKey(objectStore, ozoneBucket, file2);
     }
-    OzoneObj ozoneObj;
-    List<OzoneAcl> aclList1;
 
     UserGroupInformation.setLoginUser(user2);
     try (OzoneClient client = cluster.newClient()) {
