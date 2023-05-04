@@ -29,12 +29,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.junit.After;
@@ -179,7 +175,8 @@ public class TestOMSnapshotCreateResponse {
       String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           "dtkey" + i);
       omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-      // These are the keys that should be deleted, not sentinels.
+      // These are the keys that should be deleted.
+      // Thus not added to sentinelKeys list.
     }
 
     return sentinelKeys;
@@ -194,29 +191,8 @@ public class TestOMSnapshotCreateResponse {
   private Set<String> addTestKeysToDeletedDirTable(
       String volumeName, String bucketName) throws IOException {
 
-    // First add volume entry to volumeTable for volumeId lookup
-    final OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
-        .setVolume(volumeName)
-        .setAdminName("bilbo")
-        .setOwnerName("bilbo")
-        .build();
-    String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
-    omMetadataManager.getVolumeTable().addCacheEntry(
-        new CacheKey<>(dbVolumeKey),
-        CacheValue.get(1L, omVolumeArgs));
-    omMetadataManager.getVolumeTable().put(dbVolumeKey, omVolumeArgs);
-
-    // Add bucket entry to bucketTable for bucketId lookup
-    final OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .build();
-    final String dbBucketKey = omMetadataManager.getBucketKey(
-        omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-    omMetadataManager.getBucketTable().addCacheEntry(
-        new CacheKey<>(dbBucketKey),
-        CacheValue.get(2L, omBucketInfo));
-    omMetadataManager.getBucketTable().put(dbBucketKey, omBucketInfo);
+    OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
+        omMetadataManager, volumeName, bucketName);
 
     final OmKeyInfo dummyOmKeyInfo = new OmKeyInfo.Builder()
         .setBucketName(bucketName)
@@ -238,7 +214,7 @@ public class TestOMSnapshotCreateResponse {
     char bucketIdLastChar = dbKeyPfx.charAt(offset);
 
     String dbKeyPfxBefore =  dbKeyPfx.substring(0, offset) +
-        (char) (bucketIdLastChar - 1) + dbBucketKey.substring(offset);
+        (char) (bucketIdLastChar - 1) + dbKeyPfx.substring(offset);
     for (int i = 0; i < 3; i++) {
       String dtKey = dbKeyPfxBefore + "dir" + i;
       omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
@@ -246,7 +222,7 @@ public class TestOMSnapshotCreateResponse {
     }
 
     String dbKeyPfxAfter =  dbKeyPfx.substring(0, offset) +
-        (char) (bucketIdLastChar + 1) + dbBucketKey.substring(offset);
+        (char) (bucketIdLastChar + 1) + dbKeyPfx.substring(offset);
     for (int i = 0; i < 3; i++) {
       String dtKey = dbKeyPfxAfter + "dir" + i;
       omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
@@ -257,7 +233,8 @@ public class TestOMSnapshotCreateResponse {
     for (int i = 0; i < 10; i++) {
       String dtKey = dbKeyPfx + "dir" + i;
       omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
-      // These are the keys that should be deleted, not sentinels.
+      // These are the keys that should be deleted.
+      // Thus not added to sentinelKeys list.
     }
 
     return sentinelKeys;
