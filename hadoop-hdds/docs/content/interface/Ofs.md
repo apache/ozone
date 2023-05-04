@@ -201,6 +201,7 @@ $ ozone fs -touch /tmp/key1
 ```
 
 ### For a sharable /tmp directory common to all users
+
 To enable the sticky-bit common /tmp directory, update the ozone-site.xml with
 the following property
 
