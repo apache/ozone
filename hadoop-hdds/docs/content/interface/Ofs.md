@@ -166,7 +166,7 @@ In order to be compatible with legacy Hadoop applications that use /tmp/,
 we have a special temp mount located at the root of the FS.
 This feature may be expanded in the feature to support custom mount paths.
 
-Currently ozone supports two configurations for /tmp.  The first (default), 
+Currently Ozone supports two configurations for /tmp.  The first (default), 
 is a tmp directory for each user comprised of a mount volume with a 
 user specific temp bucket.  The second (configurable through ozone-site.xml), 
 a sticky-bit like tmp directory common to all users comprised of a mount 
