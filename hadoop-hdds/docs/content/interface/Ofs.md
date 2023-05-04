@@ -183,7 +183,8 @@ $ ozone sh volume setacl tmp -al world::a
 
 These commands only need to be done **once per cluster**.
 
-### For /tmp directory per user (default)  
+### For /tmp directory per user (default)
+
 Then, **each user** needs to mkdir first to initialize their own temp bucket
 once.
 
