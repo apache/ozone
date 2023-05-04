@@ -73,6 +73,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
+        // TODO: If snapshotInfo is not null but omSnapshotManager is null,
+        //  abort OM and prompt the user to enable snapshot feature first.
         omFromSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
@@ -127,7 +129,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
       }
     } catch (IOException ex) {
-      // Case of IOException for fromProtobuf will not hanppen
+      // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
       throw new IllegalStateException(ex);

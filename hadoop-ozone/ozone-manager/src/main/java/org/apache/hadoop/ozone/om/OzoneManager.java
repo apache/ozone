@@ -790,7 +790,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
 
-    if (fsSnapshotEnabled) {
+    if (isFilesystemSnapshotEnabled()) {
       omSnapshotManager = new OmSnapshotManager(this);
     } else {
       omSnapshotManager = null;

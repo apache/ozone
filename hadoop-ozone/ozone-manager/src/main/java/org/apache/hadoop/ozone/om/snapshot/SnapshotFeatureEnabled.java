@@ -25,8 +25,7 @@ import java.lang.annotation.Target;
 
 /**
  * Annotation used to check that snapshot feature is enabled or disabled.
- * not include the associated layout feature. Helps to keep the method logic
- * and upgrade related cross cutting concern separate.
+ * TODO: Rename this to RequireSnapshotFeatureState.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
