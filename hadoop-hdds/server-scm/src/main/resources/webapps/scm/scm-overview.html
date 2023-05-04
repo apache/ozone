@@ -56,10 +56,10 @@
     </thead>
     <tbody>
         <tr ng-repeat="typestat in nodeStatus|filter:search|orderBy:columnName:reverse">
-            <td>{{typestat.hostname}}</td>
+            <td><a href="{{typestat.portval.toLowerCase()}}://{{typestat.hostname}}:{{typestat.portno}}" target="_blank">{{typestat.hostname}}</a></td>
             <td>{{typestat.opstate}}</td>
             <td>{{typestat.comstate}}</td>
-        </tr>
+       </tr>
     </tbody>
 </table>
 <div>

@@ -3541,15 +3541,6 @@
       However this parameter allows the namespace to support non-S3 compatible characters.
     </description>
   </property>
-  <property>
-    <name>ozone.om.snapshot.cache.max.size</name>
-    <value>10</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Size of the OM Snapshot LRU cache.  This is the maximum number of open OM Snapshot RocksDb instances
-      that will be held in memory at any time.
-    </description>
-  </property>
 
   <property>
     <name>ozone.om.container.location.cache.size</name>
@@ -3687,7 +3678,12 @@
     <value>10</value>
     <tag>OZONE, OM</tag>
     <description>
-      Maximum number of entries allowed in the snapshot cache.
+      Size of the OM Snapshot LRU cache.
+
+      This is a soft limit of open OM Snapshot RocksDB instances that will be
+      held.  The actual number of cached instance could exceed this limit if
+      more than this number of snapshot instances are still in-use by snapDiff
+      or other tasks.
     </description>
   </property>
 

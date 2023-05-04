@@ -30,6 +30,7 @@ If you have any questions, please don't hesitate to contact
 
  * **email**: use dev@ozone.apache.org.
  * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
+ * **GitHub Discussions**: You can also interact with the community using [GitHub Discussions](https://github.com/apache/ozone/discussions). 
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
 ## Building from source

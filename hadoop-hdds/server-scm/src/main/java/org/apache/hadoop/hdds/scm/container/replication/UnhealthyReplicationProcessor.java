@@ -65,6 +65,18 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           ReplicationQueue queue, HealthResult healthResult);
 
   /**
+   * Check if the pending operation limit is reached. For under replicated
+   * containers, this is the limit of inflight replicas which are scheduled
+   * to be created. For over replicated containers, which sends delete commands
+   * there is no limit.
+   * @param rm The ReplicationManager instance
+   * @param inflightLimit The limit of operations allowed
+   * @return True if the limit is reached, false otherwise.
+   */
+  protected abstract boolean inflightOperationLimitReached(
+      ReplicationManager rm, long inflightLimit);
+
+  /**
    * Read messages from the ReplicationManager under replicated queue and,
    * form commands to correct replication. The commands are added
    * to the event queue and the PendingReplicaOps are adjusted.
@@ -79,8 +91,19 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
     List<HealthResult> failedOnes = new LinkedList<>();
+    // Getting the limit requires iterating over all nodes registered in
+    // NodeManager and counting the healthy ones. This is somewhat expensive
+    // so we get get the count once per iteration as it should not change too
+    // often.
+    long inflightLimit = replicationManager.getReplicationInFlightLimit();
     while (true) {
       if (!replicationManager.shouldRun()) {
+        break;
+      }
+      if (inflightLimit > 0 &&
+          inflightOperationLimitReached(replicationManager, inflightLimit)) {
+        LOG.info("The maximum number of pending replicas ({}) are scheduled. " +
+            "Ending the iteration.", inflightLimit);
         break;
       }
       HealthResult healthResult =

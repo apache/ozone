@@ -184,10 +184,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotDeleteResponse(
           omResponse.build(), tableKey, snapshotInfo);
 
-      // Evict the snapshot entry from cache, and close the snapshot DB
-      // Nothing happens if the key doesn't exist in cache (snapshot not loaded)
-      ozoneManager.getOmSnapshotManager().getSnapshotCache()
-          .invalidate(tableKey);
+      // No longer need to invalidate the entry in the snapshot cache here.
 
     } catch (IOException ex) {
       exception = ex;
