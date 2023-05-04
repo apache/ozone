@@ -38,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -122,6 +123,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Recon's 'lite' version of SCM.
  */
+@Singleton
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
@@ -686,6 +688,10 @@ public class ReconStorageContainerManagerFacade
   @Override
   public SCMNodeDetails getScmNodeDetails() {
     return reconNodeDetails;
+  }
+
+  public DBStore getScmDBStore() {
+    return dbStore;
   }
 
   public EventQueue getEventQueue() {

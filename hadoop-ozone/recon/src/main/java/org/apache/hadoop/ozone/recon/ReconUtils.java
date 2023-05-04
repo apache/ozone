@@ -109,6 +109,7 @@ public class ReconUtils {
       String fileName = sourceDir.concat(".tar");
       fileOutputStream = new FileOutputStream(fileName);
       tarOs = new TarArchiveOutputStream(fileOutputStream);
+      tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       File folder = new File(sourceDir);
       File[] filesInDir = folder.listFiles();
       if (filesInDir != null) {

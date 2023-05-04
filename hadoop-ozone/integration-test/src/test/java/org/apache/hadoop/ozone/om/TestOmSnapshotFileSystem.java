@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -59,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -411,15 +411,19 @@ public class TestOmSnapshotFileSystem {
     deleteSnapshot(snapshotName);
 
     // Can't access keys in snapshot anymore with FS API. Should throw exception
-    final String errorMsg = "no longer active";
-    LambdaTestUtils.intercept(OMException.class, errorMsg,
+    final String errorMsg1 = "no longer active";
+    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg1,
         () -> o3fs.listStatus(snapshotRoot));
-    LambdaTestUtils.intercept(OMException.class, errorMsg,
+    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg1,
         () -> o3fs.listStatus(snapshotParent));
 
-    LambdaTestUtils.intercept(OMException.class, errorMsg,
+    // Note: Different error message due to inconsistent FNFE client-side
+    //  handling in BasicOzoneClientAdapterImpl#getFileStatus
+    // TODO: Reconciliation?
+    final String errorMsg2 = "No such file or directory";
+    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg2,
         () -> o3fs.getFileStatus(snapshotKey1));
-    LambdaTestUtils.intercept(OMException.class, errorMsg,
+    LambdaTestUtils.intercept(FileNotFoundException.class, errorMsg2,
         () -> o3fs.getFileStatus(snapshotKey2));
   }
 

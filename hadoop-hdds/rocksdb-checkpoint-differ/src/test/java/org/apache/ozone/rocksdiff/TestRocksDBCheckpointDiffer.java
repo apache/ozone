@@ -42,6 +42,7 @@ import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -51,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -66,6 +68,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
@@ -100,6 +106,7 @@ public class TestRocksDBCheckpointDiffer {
   private File metadataDirDir;
   private File compactionLogDir;
   private File sstBackUpDir;
+  private ConfigurationSource config;
 
   @BeforeEach
   public void init() {
@@ -119,6 +126,18 @@ public class TestRocksDBCheckpointDiffer {
 
     sstBackUpDir = new File(metadataDirName, sstBackUpDirName);
     createDir(sstBackUpDir, metadataDirName + "/" + sstBackUpDirName);
+
+    config = Mockito.mock(ConfigurationSource.class);
+
+    Mockito.when(config.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(MINUTES.toMillis(10));
+
+    Mockito.when(config.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
   }
 
   private void createDir(File file, String filePath) {
@@ -246,8 +265,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            0L,
-            0L);
+            config);
     boolean exceptionThrown = false;
     long createdTime = System.currentTimeMillis();
 
@@ -320,8 +338,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            TimeUnit.DAYS.toMillis(1),
-            MINUTES.toMillis(5));
+            config);
 
     RocksDB rocksDB =
         createRocksDBInstanceAndWriteKeys(activeDbDirName, differ);
@@ -821,8 +838,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            0L,
-            0L);
+            config);
     Set<String> actualFileNodesRemoved =
         differ.pruneBackwardDag(originalDag, levelToBeRemoved);
     Assertions.assertEquals(expectedDag, originalDag);
@@ -884,8 +900,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            0L,
-            0L);
+            config);
     Set<String> actualFileNodesRemoved =
         differ.pruneForwardDag(originalDag, levelToBeRemoved);
     Assertions.assertEquals(expectedDag, originalDag);
@@ -1066,8 +1081,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            MINUTES.toMillis(10),
-            0L);
+            config);
 
     differ.loadAllCompactionLogs();
 
@@ -1162,8 +1176,7 @@ public class TestRocksDBCheckpointDiffer {
             sstBackUpDirName,
             compactionLogDirName,
             activeDbDirName,
-            MINUTES.toMillis(10),
-            0L);
+            config);
 
     differ.loadAllCompactionLogs();
     differ.pruneSstFiles();

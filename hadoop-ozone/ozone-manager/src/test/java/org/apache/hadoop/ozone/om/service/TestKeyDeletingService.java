@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.BeforeClass;
@@ -430,8 +432,14 @@ public class TestKeyDeletingService {
     // key1 belongs to snapshot, so it should not be deleted when
     // KeyDeletingService runs. But key2 can be reclaimed as it doesn't
     // belong to any snapshot scope.
-    Assert.assertTrue(metadataManager.getDeletedTable().isExist(ozoneKey1));
-    Assert.assertFalse(metadataManager.getDeletedTable().isExist(ozoneKey2));
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = metadataManager.getDeletedTable().getRangeKVs(
+        null, 100, ozoneKey1);
+    Assert.assertTrue(rangeKVs.size() > 0);
+    rangeKVs
+        = metadataManager.getDeletedTable().getRangeKVs(
+        null, 100, ozoneKey2);
+    Assert.assertTrue(rangeKVs.size() == 0);
   }
 
   private void createVolumeAndBucket(KeyManager keyManager, String volumeName,

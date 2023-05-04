@@ -55,8 +55,10 @@ public class OMTrashRecoverResponse extends OmKeyResponse {
     String trashKey = omMetadataManager
         .getOzoneKey(omKeyInfo.getVolumeName(),
             omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+    String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+        omKeyInfo.getObjectID(), trashKey);
     RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager
-        .getDeletedTable().get(trashKey);
+        .getDeletedTable().get(deleteKey);
     if (repeatedOmKeyInfo.getOmKeyInfoList().contains(omKeyInfo)) {
       omMetadataManager.getDeletedTable()
               .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());

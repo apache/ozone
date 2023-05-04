@@ -499,10 +499,10 @@ public final class OmUtils {
   /**
    * Verify bucket name is a valid DNS name.
    */
-  public static void validateBucketName(String bucketName)
+  public static void validateBucketName(String bucketName, boolean isStrictS3)
       throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName);
+      HddsClientUtils.verifyResourceName(bucketName, isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid bucket name: " + bucketName,
           OMException.ResultCodes.INVALID_BUCKET_NAME);
