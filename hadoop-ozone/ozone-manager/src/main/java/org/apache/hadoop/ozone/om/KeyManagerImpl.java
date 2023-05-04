@@ -406,7 +406,9 @@ public class KeyManagerImpl implements KeyManager {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
-        value.setFile(true);
+        if (value != null) {
+          value.setFile(true);
+        }
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
