@@ -90,8 +90,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   @Override
   @SnapshotFeatureEnabled(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    // Reject if snapshot feature is disabled
-//    checkFsSnapshotEnabled(ozoneManager);
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name

@@ -18,23 +18,14 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.upgrade.MockOmRequest;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureAspect;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.IOException;
-
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -46,14 +37,6 @@ public class TestSnapshotFeatureEnabledAspect {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-//  private OzoneConfiguration configuration = new OzoneConfiguration();
-
-  @Before
-  public void setUp() throws IOException {
-//    configuration.set("ozone.metadata.dirs",
-//        temporaryFolder.newFolder().getAbsolutePath());
-  }
 
   /**
    * Check Aspect implementation with SnapshotFeatureEnabledUtil.
@@ -77,25 +60,4 @@ public class TestSnapshotFeatureEnabledAspect {
             "Ozone snapshot feature is disabled",
         () -> aspect.checkLayoutFeature(joinPoint));
   }
-
-  /**
-   * Check Aspect implementation with mocked OzoneManager.
-   */
-//  @Test
-//  public void testPreExecuteFeatureCheck() throws Exception {
-//
-//    OzoneManager om = mock(OzoneManager.class);
-//    when(om.isFilesystemSnapshotEnabled()).thenReturn(false);
-//
-//    MockOmRequest mockOmRequest = new MockOmRequest();
-//    SnapshotFeatureEnabledAspect aspect = new SnapshotFeatureEnabledAspect();
-//
-//    JoinPoint joinPoint = mock(JoinPoint.class);
-//    when(joinPoint.getArgs()).thenReturn(new Object[]{om});
-//    when(joinPoint.getTarget()).thenReturn(mockOmRequest);
-//
-//    LambdaTestUtils.intercept(OMException.class,
-//        "cannot be invoked",
-//        () -> aspect.beforeRequestApplyTxn(joinPoint));
-//  }
 }

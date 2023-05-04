@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

@@ -54,7 +54,6 @@ import java.net.InetAddress;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
@@ -570,15 +569,4 @@ public abstract class OMClientRequest implements RequestAuditor {
       throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
     }
   }
-
-  /**
-   * Helper method that throws OMException if filesystem snapshot is disabled.
-   */
-  protected static void checkFsSnapshotEnabled(OzoneManager ozoneManager)
-      throws OMException {
-    if (!ozoneManager.isFilesystemSnapshotEnabled()) {
-      throw new OMException("Snapshot is not enabled", FEATURE_NOT_ENABLED);
-    }
-  }
-
 }
