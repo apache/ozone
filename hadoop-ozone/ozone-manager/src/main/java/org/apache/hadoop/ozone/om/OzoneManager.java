@@ -2719,7 +2719,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.PREFIX, prefix);
     auditMap.put(OzoneConsts.MAX_NUM_OF_BUCKETS,
         String.valueOf(maxNumOfBuckets));
-    auditMap.put(OzoneConsts.IS_SNAPSHOT, String.valueOf(isSnapshot));
+    auditMap.put(OzoneConsts.HAS_SNAPSHOT, String.valueOf(hasSnapshot));
 
     try {
       if (isAclEnabled) {
