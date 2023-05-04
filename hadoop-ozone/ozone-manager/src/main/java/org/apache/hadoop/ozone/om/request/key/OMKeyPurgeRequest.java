@@ -80,10 +80,21 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
-        // TODO: [SNAPSHOT] As a workaround before HDDS-8529 is merged,
-        //  if snapshotInfo is not null but omSnapshotManager is null,
-        //  abort OM and prompt the user to enable snapshot feature first
-        //  in order to keep OM consistent.
+        if (snapshotInfo != null && omSnapshotManager == null) {
+          // TODO: [SNAPSHOT] As a workaround before HDDS-8529 is merged,
+          //  if snapshotInfo is not null but omSnapshotManager is null,
+          //  abort OM and prompt the user to enable snapshot feature first
+          //  in order to keep OM consistent.
+          //  Remove this once HDDS-8529 is done.
+          throw new IllegalStateException("Unable to process the current " +
+              "OMKeyPurgeRequest as a result of OmSnapshotManager not being " +
+              "initialized. Please enable Ozone snapshot feature in " +
+              "ozone-site.xml for this OM by setting " +
+              "ozone.filesystem.snapshot.enabled to true. After this request " +
+              "is successfully applied, Ozone snapshot feature can be safely " +
+              "disabled again. " +
+              "This workaround would not be required when HDDS-8529 is done");
+        }
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
