@@ -39,20 +39,20 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEAT
  * 'Aspect' for checking whether snapshot feature is enabled.
  * All methods annotated with the specific annotation will have pre-processing
  * done here to check layout version compatibility.
- * Note: Append to
+ * Note: Append class to
  *  hadoop-ozone/ozone-manager/src/main/resources/META-INF/aop.xml
  * if the annotation doesn't seem to take affect on other classes' methods.
  */
 @Aspect
-public class SnapshotFeatureEnabledAspect {
+public class RequireSnapshotFeatureStateAspect {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(SnapshotFeatureEnabledAspect.class);
+      .getLogger(RequireSnapshotFeatureStateAspect.class);
 
-  @Before("@annotation(SnapshotFeatureEnabled) && execution(* *(..))")
+  @Before("@annotation(RequireSnapshotFeatureState) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
     boolean desiredFeatureState = ((MethodSignature) joinPoint.getSignature())
-        .getMethod().getAnnotation(SnapshotFeatureEnabled.class)
+        .getMethod().getAnnotation(RequireSnapshotFeatureState.class)
         .value();
     boolean isFeatureEnabled;
     final Object[] args = joinPoint.getArgs();
@@ -74,8 +74,10 @@ public class SnapshotFeatureEnabledAspect {
         isFeatureEnabled = (boolean) method.invoke(joinPoint.getTarget());
       } catch (Exception ex) {
         // Exception being thrown here means this is not called from the UT.
-        // Thus this is an unhandled usage. Add more case handling as needed.
-        throw new NotImplementedException("Unhandled use case. Please impl");
+        // Thus this is an unhandled usage.
+        // Add more case handling logic as needed.
+        throw new NotImplementedException(
+            "Unhandled use case. Please implement.");
       }
     }
     checkIsAllowed(joinPoint.getSignature().toShortString(),
@@ -106,36 +108,12 @@ public class SnapshotFeatureEnabledAspect {
     }
   }
 
-//  @Pointcut("execution(* " +
-//      "org.apache.hadoop.ozone.om.request.OMClientRequest+.preExecute(..)) " +
-//      "&& @this(org.apache.hadoop.ozone.om.upgrade.BelongsToLayoutVersion)")
-//  public void omRequestPointCut() {
-//  }
-
-//  @Before("omRequestPointCut()")
-//  public void beforeRequestApplyTxn(final JoinPoint joinPoint)
-//      throws OMException {
-//
-//    BelongsToLayoutVersion annotation = joinPoint.getTarget().getClass()
-//        .getAnnotation(BelongsToLayoutVersion.class);
-//    if (annotation == null) {
-//      return;
-//    }
-//
-//    Object[] args = joinPoint.getArgs();
-//    OzoneManager om = (OzoneManager) args[0];
-//
-//    LayoutFeature lf = annotation.value();
-//    checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
-//        om.getVersionManager(), lf.name());
-//  }
-
   /**
    * Note: Without this, it occasionally throws NoSuchMethodError when running
    * the test.
    */
-  public static SnapshotFeatureEnabledAspect aspectOf() {
-    return new SnapshotFeatureEnabledAspect();
+  public static RequireSnapshotFeatureStateAspect aspectOf() {
+    return new RequireSnapshotFeatureStateAspect();
   }
 
 }

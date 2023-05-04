@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
  * Class to test annotation based interceptor that checks whether
  * Ozone snapshot feature is enabled.
  */
-public class TestSnapshotFeatureEnabledAspect {
+public class TestRequireSnapshotFeatureStateAspect {
 
   /**
    * Check Aspect implementation with SnapshotFeatureEnabledUtil.
@@ -39,7 +39,8 @@ public class TestSnapshotFeatureEnabledAspect {
   @Test
   public void testSnapshotFeatureEnabledAnnotation() throws Exception {
     SnapshotFeatureEnabledUtil testObj = new SnapshotFeatureEnabledUtil();
-    SnapshotFeatureEnabledAspect aspect = new SnapshotFeatureEnabledAspect();
+    RequireSnapshotFeatureStateAspect
+        aspect = new RequireSnapshotFeatureStateAspect();
 
     JoinPoint joinPoint = mock(JoinPoint.class);
     when(joinPoint.getTarget()).thenReturn(testObj);

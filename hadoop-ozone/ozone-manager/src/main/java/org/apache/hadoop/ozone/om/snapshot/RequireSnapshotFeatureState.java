@@ -24,11 +24,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation used to check that snapshot feature is enabled or disabled.
- * TODO: Rename this to RequireSnapshotFeatureState.
+ * Annotation used to check that the snapshot feature in desired state.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SnapshotFeatureEnabled {
+public @interface RequireSnapshotFeatureState {
   boolean value();
 }

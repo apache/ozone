@@ -26,7 +26,7 @@ public class SnapshotFeatureEnabledUtil {
   /**
    * This is an example of an "API" that requires snapshot feature enabled.
    */
-  @SnapshotFeatureEnabled(true)
+  @RequireSnapshotFeatureState(true)
   public String snapshotMethod() {
     return "yay";
   }

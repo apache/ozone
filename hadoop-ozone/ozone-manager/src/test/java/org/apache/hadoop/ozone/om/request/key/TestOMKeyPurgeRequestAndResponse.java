@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
