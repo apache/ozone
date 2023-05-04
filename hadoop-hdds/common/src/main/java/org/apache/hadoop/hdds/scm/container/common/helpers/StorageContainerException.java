@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import java.io.IOException;
@@ -99,6 +100,5 @@ public class StorageContainerException extends IOException {
   public ContainerProtos.Result getResult() {
     return result;
   }
-
 
 }
