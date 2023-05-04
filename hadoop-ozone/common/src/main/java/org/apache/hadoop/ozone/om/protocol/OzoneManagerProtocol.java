@@ -383,7 +383,7 @@ public interface OzoneManagerProtocol
    *   the maximum number of buckets to return. It ensures
    *   the size of the result will not exceed this limit.
    * @param isSnapshot
-   *   set the flag to list bucket which have snapshots.
+  * flag to list bucket which have snapshots.
    * @return a list of buckets.
    * @throws IOException
    */
