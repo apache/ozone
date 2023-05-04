@@ -407,6 +407,8 @@ public class KeyManagerImpl implements KeyManager {
       } else {
         value = getOmKeyInfo(volumeName, bucketName, keyName);
         if (value != null) {
+          // For Legacy & OBS buckets, any key is a file by default. This is to
+          // keep getKeyInfo compatible with OFS clients.
           value.setFile(true);
         }
       }
