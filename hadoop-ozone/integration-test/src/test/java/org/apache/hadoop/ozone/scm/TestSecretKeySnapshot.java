@@ -256,10 +256,11 @@ public final class TestSecretKeySnapshot {
 
     // Wait for the next rotation, assert that the updates can be synchronized
     // normally post snapshot.
-    ManagedSecretKey currentKeyAtSnapshot = leaderSecretKeyManager.getCurrentSecretKey();
+    ManagedSecretKey currentKeyPostSnapshot =
+        leaderSecretKeyManager.getCurrentSecretKey();
     GenericTestUtils.waitFor(() ->
             !leaderSecretKeyManager.getCurrentSecretKey()
-                .equals(currentKeyAtSnapshot),
+                .equals(currentKeyPostSnapshot),
         ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
     assertEquals(leaderSecretKeyManager.getSortedKeys(),
         followerSecretKeyManager.getSortedKeys());
