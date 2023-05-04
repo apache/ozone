@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -91,6 +92,9 @@ public class TestOzoneSnapshotRestore {
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);

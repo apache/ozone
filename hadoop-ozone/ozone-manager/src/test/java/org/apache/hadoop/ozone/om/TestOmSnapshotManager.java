@@ -70,6 +70,9 @@ public class TestOmSnapshotManager {
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
+    // Enable filesystem snapshot feature for the test regardless of the default
+    configuration.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
+        true);
 
     // Only allow one entry in cache so each new one causes an eviction
     configuration.setInt(
