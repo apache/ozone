@@ -90,7 +90,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REP
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validateSnapshotsExistAndActive;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -545,8 +544,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     boolean forceFullDiff)
       throws IOException {
 
-    validateSnapshotsExistAndActive(ozoneManager, volume, bucket, fromSnapshot,
-        toSnapshot);
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
     int index = getIndexFromToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
@@ -564,21 +562,28 @@ public final class OmSnapshotManager implements AutoCloseable {
     // To avoid the complexity, we just check that snapshots are active
     // before returning the response. It is like an optimistic lock to achieve
     // similar behaviour and make sure client gets consistent response.
-    validateSnapshotsExistAndActive(ozoneManager, volume, bucket, fromSnapshot,
-        toSnapshot);
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
   }
 
-  private void verifySnapshotInfoForSnapDiff(final SnapshotInfo fromSnapshot,
-                                             final SnapshotInfo toSnapshot)
+  private void validateSnapshotsExistAndActive(final String volumeName,
+                                               final String bucketName,
+                                               final String fromSnapshotName,
+                                               final String toSnapshotName)
       throws IOException {
+    SnapshotInfo fromSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, fromSnapshotName);
+    SnapshotInfo toSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, toSnapshotName);
+
     // Block SnapDiff if either of the snapshots is not active.
-    checkSnapshotActive(fromSnapshot);
-    checkSnapshotActive(toSnapshot);
+    checkSnapshotActive(fromSnapInfo);
+    checkSnapshotActive(toSnapInfo);
+
     // Check snapshot creation time
-    if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
-          " should be older than to toSnapshot:" + toSnapshot.getName());
+    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
+      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
+          " should be older than to toSnapshot:" + toSnapInfo.getName());
     }
   }
 

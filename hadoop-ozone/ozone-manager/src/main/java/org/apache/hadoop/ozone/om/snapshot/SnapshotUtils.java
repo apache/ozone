@@ -45,32 +45,6 @@ public final class SnapshotUtils {
     throw new IllegalStateException("SnapshotUtils should not be initialized.");
   }
 
-  public static void validateSnapshotsExistAndActive(
-      final OzoneManager ozoneManager,
-      final String volumeName,
-      final String bucketName,
-      final String fromSnapshotName,
-      final String toSnapshotName
-  ) throws IOException {
-    SnapshotInfo fromSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
-        bucketName, fromSnapshotName);
-    SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
-        bucketName, toSnapshotName);
-
-    if ((fromSnapInfo.getSnapshotStatus() !=
-        SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) ||
-        (toSnapInfo.getSnapshotStatus() !=
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-      // TODO: [SNAPSHOT] Throw custom snapshot exception.
-      throw new IOException("Cannot generate snapshot diff for non-active " +
-          "snapshots.");
-    }
-    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
-          " should be older than to toSnapshot:" + toSnapInfo.getName());
-    }
-  }
-
   public static SnapshotInfo getSnapshotInfo(final OzoneManager ozoneManager,
                                              final String volumeName,
                                              final String bucketName,

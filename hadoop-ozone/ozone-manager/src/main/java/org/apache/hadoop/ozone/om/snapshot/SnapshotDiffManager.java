@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -100,7 +101,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validateSnapshotsExistAndActive;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
@@ -158,9 +159,8 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private final String sstBackupDirForSnapDiffJobs;
 
-  private boolean snapshotForceFullDiff;
-  private final boolean isNativeRocksToolsLoaded;
-  private final ManagedSSTDumpTool sstDumpTool;
+  private final boolean snapshotForceFullDiff;
+  private final Optional<ManagedSSTDumpTool> sstDumpTool;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffManager(ManagedRocksDB db,
@@ -225,7 +225,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
     this.sstDumpTool = initSSTDumpTool(ozoneManager.getConfiguration());
-    this.isNativeRocksToolsLoaded = sstDumpTool != null;
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
@@ -243,10 +242,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.loadJobsOnStartUp();
   }
 
-  private ManagedSSTDumpTool initSSTDumpTool(OzoneConfiguration conf) {
+  private Optional<ManagedSSTDumpTool> initSSTDumpTool(OzoneConfiguration conf) {
     if (!NativeLibraryLoader.getInstance()
         .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
-      return null;
+      return Optional.empty();
     }
 
     try {
@@ -265,9 +264,9 @@ public class SnapshotDiffManager implements AutoCloseable {
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
               new ThreadPoolExecutor.DiscardPolicy());
-      return new ManagedSSTDumpTool(execService, bufferSize);
+      return Optional.of(new ManagedSSTDumpTool(execService, bufferSize));
     } catch (NativeLibraryNotLoadedException e) {
-      return null;
+      return Optional.empty();
     }
   }
 
@@ -373,9 +372,9 @@ public class SnapshotDiffManager implements AutoCloseable {
                                                     final boolean forceFullDiff
   ) throws IOException {
 
-    SnapshotInfo fsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+    SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
         volume, bucket, fromSnapshot);
-    SnapshotInfo tsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+    SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
         volume, bucket, toSnapshot);
 
     String snapDiffJobKey = fsInfo.getSnapshotID() + DELIMITER +
@@ -407,8 +406,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     case REJECTED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), REJECTED, defaultWaitTime);
+              fromSnapshot, toSnapshot, new ArrayList<>(), null),
+          REJECTED, defaultWaitTime);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
@@ -426,8 +425,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final SnapshotDiffJob snapDiffJob,
       final String volume,
       final String bucket,
-      final OmSnapshot fromSnapshot,
-      final OmSnapshot toSnapshot,
+      final String fromSnapshot,
+      final String toSnapshot,
       final int index,
       final int pageSize
   ) throws IOException {
@@ -606,6 +605,20 @@ public class SnapshotDiffManager implements AutoCloseable {
     return snapDiffJob;
   }
 
+  private void validateSnapshotsAreActive(final String volumeName,
+                                          final String bucketName,
+                                          final String fromSnapshotName,
+                                          final String toSnapshotName)
+      throws IOException {
+    SnapshotInfo fromSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
+        bucketName, fromSnapshotName);
+    SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
+        bucketName, toSnapshotName);
+
+    checkSnapshotActive(fromSnapInfo);
+    checkSnapshotActive(toSnapInfo);
+  }
+
   private void generateSnapshotDiffReport(final String jobKey,
                                           final String jobId,
                                           final String volume,
@@ -614,10 +627,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                                           final String toSnapshotName,
                                           final boolean forceFullDiff) {
     LOG.info("Started snap diff report generation for volume: {} " +
-            "bucket: {}, fromSnapshot: {} and toSnapshot: {}," +
-            " fromSnapshot: {}, toSnapshot: {} ",
-        volume, bucket, fsInfo.getName(), tsInfo.getName(), fromSnapshot,
-        toSnapshot);
+            "bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+        volume, bucket, fromSnapshotName, toSnapshotName);
 
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
@@ -630,17 +641,17 @@ public class SnapshotDiffManager implements AutoCloseable {
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
     try {
-      validateSnapshotsExistAndActive(ozoneManager, volume, bucket,
-          fromSnapshotName, toSnapshotName);
+      validateSnapshotsAreActive(volume, bucket, fromSnapshotName,
+          toSnapshotName);
 
       String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshotName);
       String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshotName);
 
       OmSnapshot fromSnapshot = snapshotCache.get(fsKey);
       OmSnapshot toSnapshot = snapshotCache.get(tsKey);
-      SnapshotInfo fsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+      SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
           volume, bucket, fromSnapshotName);
-      SnapshotInfo tsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+      SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
           volume, bucket, toSnapshotName);
 
       Files.createDirectories(path);
@@ -680,8 +691,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
 
-      validateSnapshotsExistAndActive(ozoneManager, volume, bucket,
-          fromSnapshotName, toSnapshotName);
+      validateSnapshotsAreActive(volume, bucket, fromSnapshotName,
+          toSnapshotName);
       Table<String, OmKeyInfo> fsKeyTable = fromSnapshot.getMetadataManager()
           .getKeyTable(bucketLayout);
       Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
@@ -694,8 +705,8 @@ public class SnapshotDiffManager implements AutoCloseable {
           path.toString());
 
       if (bucketLayout.isFileSystemOptimized()) {
-        validateSnapshotsExistAndActive(ozoneManager, volume, bucket,
-            fromSnapshotName, toSnapshotName);
+        validateSnapshotsAreActive(volume, bucket, fromSnapshotName,
+            toSnapshotName);
 
         Table<String, OmDirectoryInfo> fsDirTable =
             fromSnapshot.getMetadataManager().getDirectoryTable();
@@ -709,8 +720,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             path.toString());
       }
 
-      validateSnapshotsExistAndActive(ozoneManager, volume, bucket,
-          fromSnapshotName, toSnapshotName);
+      validateSnapshotsAreActive(volume, bucket, fromSnapshotName,
+          toSnapshotName);
       long totalDiffEntries = generateDiffReport(jobId,
           objectIDsToCheckMap,
           objectIdToKeyNameMapForFromSnapshot,
@@ -719,16 +730,16 @@ public class SnapshotDiffManager implements AutoCloseable {
       updateJobStatusToDone(jobKey, totalDiffEntries);
     } catch (ExecutionException | IOException | RocksDBException exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
-      LOG.error("Caught checked exception during diff report generation for " +
+      LOG.info("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
-          volume, bucket, fsInfo.getName(), tsInfo.getName(), exception);
+          volume, bucket, fromSnapshotName, toSnapshotName, exception);
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     } catch (Exception exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
-      LOG.error("Caught unchecked exception during diff report generation " +
+      LOG.warn("Caught unchecked exception during diff report generation " +
               "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
-          volume, bucket, fsInfo.getName(), tsInfo.getName(), exception);
+          volume, bucket, fromSnapshotName, toSnapshotName, exception);
       // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(exception);
     } finally {
@@ -765,7 +776,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // Workaround to handle deletes if native rocksDb tool for reading
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-    if (!isNativeRocksToolsLoaded) {
+    if (!sstDumpTool.isPresent()) {
       deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
           tablesToLookUp));
     }
@@ -774,7 +785,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       addToObjectIdMap(fsTable,
           tsTable,
           deltaFiles,
-          isNativeRocksToolsLoaded,
+          sstDumpTool.isPresent(),
           oldObjIdToKeyMap,
           newObjIdToKeyMap,
           objectIDsToCheck,
@@ -820,8 +831,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
 
-    try (Stream<String> keysToCheck = nativeRocksToolsLoaded
-                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool)
+    try (Stream<String> keysToCheck =
+             nativeRocksToolsLoaded && sstDumpTool.isPresent()
+                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get())
                  : sstFileReader.getKeyStream()) {
       keysToCheck.forEach(key -> {
         try {
@@ -929,6 +941,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   ) throws RocksDBException, IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
+      // TODO: [SNAPSHOT] HDDS-8202: Change it to custom snapshot exception.
       throw new IOException(
           String.format("Expected diff contains more than max allowed key " +
                   "changes for a snapDiff job. EstimatedTotalKeys: %s, " +
