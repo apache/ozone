@@ -1111,11 +1111,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         // We should return only the keys, whose keys match with prefix and
         // the keys after the startBucket.
         if (key.startsWith(seekPrefix) && key.compareTo(startKey) >= 0) {
-          if (isSnapshot && !listSnapshot(
-              volumeName, omBucketInfo.getBucketName()).isEmpty()) {
+          if (!hasSnapshot) {
+            // Snapshot filter off
             result.add(omBucketInfo);
             currentCount++;
-          } else if (!isSnapshot) {
+          } else if (
+              !listSnapshot(volumeName, omBucketInfo.getBucketName())
+                  .isEmpty()) {
+            // Snapshot filter on.
+            // Add to result list only when the bucket has at least one snapshot
             result.add(omBucketInfo);
             currentCount++;
           }
