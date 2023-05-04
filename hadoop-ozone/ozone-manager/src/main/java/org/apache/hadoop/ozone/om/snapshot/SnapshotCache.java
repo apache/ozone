@@ -55,17 +55,17 @@ public class SnapshotCache {
   private final CacheLoader<String, OmSnapshot> cacheLoader;
   // Soft-limit of the total number of snapshot DB instances allowed to be open
   // on the leader OM.
-  private final int cacheSize;
+  private final int cacheSizeLimit;
 
   public SnapshotCache(
       OmSnapshotManager omSnapshotManager,
       CacheLoader<String, OmSnapshot> cacheLoader,
-      int cacheSize) {
+      int cacheSizeLimit) {
     this.dbMap = new ConcurrentHashMap<>();
     this.instancesEligibleForClosure = new LinkedHashSet<>();
     this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
-    this.cacheSize = cacheSize;
+    this.cacheSizeLimit = cacheSizeLimit;
   }
 
   /**
@@ -159,6 +159,12 @@ public class SnapshotCache {
     // TODO: [SNAPSHOT] Check thread safety with release
     instancesEligibleForClosure.remove(omSnapshot);
 
+    // Check if any entries can be cleaned up.
+    // At this point, cache size might temporarily exceed cacheSizeLimit
+    // even if there are entries that can be evicted, which is fine since it
+    // is a soft limit.
+    cleanup();
+
     return omSnapshot;
   }
 
@@ -193,7 +199,7 @@ public class SnapshotCache {
    * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
    */
   private void cleanup() {
-    long numOfInstToClose = (long) dbMap.size() - cacheSize;
+    long numOfInstToClose = (long) dbMap.size() - cacheSizeLimit;
     while (numOfInstToClose > 0L) {
       // Get the first instance in the clean up list
       OmSnapshot omSnapshot = instancesEligibleForClosure.iterator().next();
@@ -225,10 +231,10 @@ public class SnapshotCache {
 
     // Print warning message if actual cache size is exceeding the soft limit
     // even after the cleanup procedure above.
-    if ((long) dbMap.size() > cacheSize) {
+    if ((long) dbMap.size() > cacheSizeLimit) {
       LOG.warn("Current snapshot cache size ({}) is exceeding configured "
           + "soft-limit ({}) after possible evictions.",
-          dbMap.size(), cacheSize);
+          dbMap.size(), cacheSizeLimit);
 
       Preconditions.checkState(instancesEligibleForClosure.size() == 0);
     }
