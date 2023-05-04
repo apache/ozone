@@ -186,7 +186,7 @@ public final class DBStoreBuilder {
    *
    * @return DBStore
    */
-  public RDBStore build() throws IOException {
+  public DBStore build() throws IOException {
     if (StringUtil.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
       throw new IOException("Required parameter is missing. Please make sure "

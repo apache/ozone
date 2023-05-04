@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableConfig;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.TestRDBStore;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -55,6 +54,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
+import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,7 +93,7 @@ public class TestRDBSnapshotProvider {
       configSet.add(newConfig);
     }
     testDir = tempDir;
-    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
+    rdbStore = newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
@@ -178,9 +178,9 @@ public class TestRDBSnapshotProvider {
 
   public void compareDB(File db1, File db2, int columnFamilyUsed)
       throws Exception {
-    try (RDBStore rdbStore1 = TestRDBStore.newRDBStore(db1, getNewDBOptions(),
+    try (RDBStore rdbStore1 = newRDBStore(db1, getNewDBOptions(),
              configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
-         RDBStore rdbStore2 = TestRDBStore.newRDBStore(db2, getNewDBOptions(),
+         RDBStore rdbStore2 = newRDBStore(db2, getNewDBOptions(),
              configSet, MAX_DB_UPDATES_SIZE_THRESHOLD)) {
       // all entries should be same from two DB
       for (int i = 0; i < columnFamilyUsed; i++) {
