@@ -22,9 +22,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,9 +32,6 @@ import static org.mockito.Mockito.when;
  * Ozone snapshot feature is enabled.
  */
 public class TestSnapshotFeatureEnabledAspect {
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   /**
    * Check Aspect implementation with SnapshotFeatureEnabledUtil.

@@ -55,11 +55,6 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
   private int numKeys = 10;
 
-  @Before
-  public void setUp() throws Exception {
-    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
-  }
-
   /**
    * Creates volume, bucket and key entries and adds to OM DB and then
    * deletes these keys to move them to deletedKeys table.

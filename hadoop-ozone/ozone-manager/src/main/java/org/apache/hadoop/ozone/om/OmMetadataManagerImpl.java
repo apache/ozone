@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -1475,6 +1476,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           if (omSnapshotManager != null) {
             latestSnapshot = getLatestSnapshot(
                 keySplit[1], keySplit[2], omSnapshotManager);
+          } else {
+            LOG.debug("omSnapshotManager is not initialized. " +
+                "Ozone snapshot feature might have been disabled.");
           }
           String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
@@ -1553,8 +1557,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Get the latest OmSnapshot for a snapshot path.
    */
   public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
-                                       OmSnapshotManager snapshotManager)
+                                      OmSnapshotManager snapshotManager)
       throws IOException {
+
+    Preconditions.checkNotNull(snapshotManager);
 
     String latestPathSnapshot =
         snapshotChainManager.getLatestPathSnapshot(volumeName

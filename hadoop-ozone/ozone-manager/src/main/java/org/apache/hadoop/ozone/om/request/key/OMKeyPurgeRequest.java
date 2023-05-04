@@ -80,6 +80,10 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
+        // TODO: [SNAPSHOT] As a workaround before HDDS-8529 is merged,
+        //  if snapshotInfo is not null but omSnapshotManager is null,
+        //  abort OM and prompt the user to enable snapshot feature first
+        //  in order to keep OM consistent.
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),

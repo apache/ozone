@@ -158,6 +158,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final int maxPageSize;
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
+    // TODO: [SNAPSHOT] HDDS-8529: Refactor the constructor in a way that when
+    //  ozoneManager.isFilesystemSnapshotEnabled() is false, already committed
+    //  Ratis transactions can still apply in validateAndUpdateCache even when
+    //  snapshot feature is disabled. Affected requests:
+    //  1. OMKeyPurgeRequest#validateAndUpdateCache
+    //  2. OMDirectoriesPurgeRequestWithFSO#validateAndUpdateCache
+
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();

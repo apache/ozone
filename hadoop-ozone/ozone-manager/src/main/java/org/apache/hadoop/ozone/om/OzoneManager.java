@@ -790,11 +790,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
 
+    // TODO: [SNAPSHOT] Remove this condition when HDDS-8529 is done.
     if (isFilesystemSnapshotEnabled()) {
       omSnapshotManager = new OmSnapshotManager(this);
     } else {
       omSnapshotManager = null;
-      // TODO: [Snapshot] Check all usages of omSnapshotManager.
     }
 
     // Snapshot metrics

@@ -174,9 +174,16 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      OmSnapshot latestSnapshot =
-          metadataManager.getLatestSnapshot(deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(), omSnapshotManager);
+      OmSnapshot latestSnapshot = null;
+      if (omSnapshotManager != null) {
+        latestSnapshot = metadataManager.getLatestSnapshot(
+            deletedDirInfo.getVolumeName(),
+            deletedDirInfo.getBucketName(),
+            omSnapshotManager);
+      } else {
+        LOG.debug("omSnapshotManager is not initialized. " +
+            "Ozone snapshot feature might have been disabled.");
+      }
 
       if (latestSnapshot != null) {
         Table<String, OmDirectoryInfo> prevDirTable =
