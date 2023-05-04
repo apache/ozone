@@ -50,12 +50,15 @@ public class RequireSnapshotFeatureStateAspect {
       .getLogger(RequireSnapshotFeatureStateAspect.class);
 
   @Before("@annotation(RequireSnapshotFeatureState) && execution(* *(..))")
-  public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
+  public void checkFeatureState(JoinPoint joinPoint) throws IOException {
     boolean desiredFeatureState = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(RequireSnapshotFeatureState.class)
         .value();
     boolean isFeatureEnabled;
     final Object[] args = joinPoint.getArgs();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("joinPoint.getTarget() = {}", joinPoint.getTarget());
+    }
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();

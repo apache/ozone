@@ -54,6 +54,6 @@ public class TestRequireSnapshotFeatureStateAspect {
     LambdaTestUtils.intercept(OMException.class,
         "Operation snapshotMethod cannot be invoked because " +
             "Ozone snapshot feature is disabled",
-        () -> aspect.checkLayoutFeature(joinPoint));
+        () -> aspect.checkFeatureState(joinPoint));
   }
 }
