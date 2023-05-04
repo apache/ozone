@@ -122,6 +122,11 @@ public class TestOmSnapshotManager {
         .checkForSnapshot(second.getVolumeName(),
         second.getBucketName(), getSnapshotPrefix(second.getName()));
 
+    // As a workaround, invalidate all cache entries in order to trigger
+    // instances close in this test case, since JVM GC most likely would not
+    // have triggered and closed the instances yet at this point.
+    omSnapshotManager.getSnapshotCache().invalidateAll();
+
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();
   }

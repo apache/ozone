@@ -44,6 +44,14 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
       ContainerHealthResult.OverReplicatedHealthResult healthResult) {
     queue.enqueue(healthResult);
   }
+
+  @Override
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    // No limit for delete operations
+    return false;
+  }
+
   @Override
   protected int sendDatanodeCommands(
       ReplicationManager replicationManager,

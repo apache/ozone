@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
@@ -31,10 +32,15 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntConsumer;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
@@ -44,10 +50,13 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
+
 /**
  * Single point to schedule the downloading tasks based on priorities.
  */
-public class ReplicationSupervisor {
+public final class ReplicationSupervisor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationSupervisor.class);
@@ -74,45 +83,131 @@ public class ReplicationSupervisor {
    */
   private final Set<AbstractReplicationTask> inFlight;
 
-  private final Map<Class, AtomicInteger> taskCounter =
+  private final Map<Class<?>, AtomicInteger> taskCounter =
       new ConcurrentHashMap<>();
   private int maxQueueSize;
 
-  @VisibleForTesting
-  ReplicationSupervisor(
-      StateContext context, ExecutorService executor, Clock clock,
-      int maxQueueSize) {
-    this.inFlight = ConcurrentHashMap.newKeySet();
-    this.executor = executor;
-    this.context = context;
-    this.clock = clock;
-    this.maxQueueSize = maxQueueSize;
-  }
+  private final AtomicReference<HddsProtos.NodeOperationalState> state
+      = new AtomicReference<>();
+  private final IntConsumer executorThreadUpdater;
+  private final ReplicationConfig replicationConfig;
+  private final DatanodeConfiguration datanodeConfig;
 
-  public ReplicationSupervisor(
-      StateContext context, ReplicationConfig replicationConfig, Clock clock,
-      int maxQueueSize) {
-    this(context,
-        new ThreadPoolExecutor(
+  /**
+   * Builder for {@link ReplicationSupervisor}.
+   */
+  public static class Builder {
+    private StateContext context;
+    private ReplicationConfig replicationConfig;
+    private DatanodeConfiguration datanodeConfig;
+    private ExecutorService executor;
+    private Clock clock;
+    private IntConsumer executorThreadUpdater = threadCount -> { };
+
+    public Builder clock(Clock newClock) {
+      clock = newClock;
+      return this;
+    }
+
+    public Builder executor(ExecutorService newExecutor) {
+      executor = newExecutor;
+      return this;
+    }
+
+    public Builder replicationConfig(ReplicationConfig newReplicationConfig) {
+      replicationConfig = newReplicationConfig;
+      return this;
+    }
+
+    public Builder datanodeConfig(DatanodeConfiguration newDatanodeConfig) {
+      datanodeConfig = newDatanodeConfig;
+      return this;
+    }
+
+    public Builder stateContext(StateContext newContext) {
+      context = newContext;
+      return this;
+    }
+
+    public Builder executorThreadUpdater(IntConsumer newUpdater) {
+      executorThreadUpdater = newUpdater;
+      return this;
+    }
+
+    public ReplicationSupervisor build() {
+      if (replicationConfig == null || datanodeConfig == null) {
+        ConfigurationSource conf = new OzoneConfiguration();
+        if (replicationConfig == null) {
+          replicationConfig =
+              conf.getObject(ReplicationServer.ReplicationConfig.class);
+        }
+        if (datanodeConfig == null) {
+          datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+        }
+      }
+
+      if (clock == null) {
+        clock = Clock.system(ZoneId.systemDefault());
+      }
+
+      if (executor == null) {
+        ThreadPoolExecutor tpe = new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
-            replicationConfig.getReplicationMaxStreams(), 60, TimeUnit.SECONDS,
+            replicationConfig.getReplicationMaxStreams(),
+            60, TimeUnit.SECONDS,
             new PriorityBlockingQueue<>(),
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("ContainerReplicationThread-%d")
-                .build()),
-        clock, maxQueueSize);
+                .build());
+        executor = tpe;
+        executorThreadUpdater = threadCount -> {
+          tpe.setMaximumPoolSize(threadCount);
+          tpe.setCorePoolSize(threadCount);
+        };
+      }
+
+      return new ReplicationSupervisor(context, executor, replicationConfig,
+          datanodeConfig, clock, executorThreadUpdater);
+    }
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  private ReplicationSupervisor(StateContext context, ExecutorService executor,
+      ReplicationConfig replicationConfig, DatanodeConfiguration datanodeConfig,
+      Clock clock, IntConsumer executorThreadUpdater) {
+    this.inFlight = ConcurrentHashMap.newKeySet();
+    this.context = context;
+    this.executor = executor;
+    this.replicationConfig = replicationConfig;
+    this.datanodeConfig = datanodeConfig;
+    maxQueueSize = datanodeConfig.getCommandQueueLimit();
+    this.clock = clock;
+    this.executorThreadUpdater = executorThreadUpdater;
+
+    // set initial state
+    if (context != null) {
+      DatanodeDetails dn = context.getParent().getDatanodeDetails();
+      if (dn != null) {
+        nodeStateUpdated(dn.getPersistedOpState());
+      }
+    }
   }
 
   /**
    * Queue an asynchronous download of the given container.
    */
   public void addTask(AbstractReplicationTask task) {
-    if (getTotalInFlightReplications() >= maxQueueSize) {
+    final int max = maxQueueSize;
+    if (getTotalInFlightReplications() >= max) {
       LOG.warn("Ignored {} command for container {} in Replication Supervisor"
               + "as queue reached max size of {}.",
-          task.getClass(), task.getContainerId(), maxQueueSize);
+          task.getClass(), task.getContainerId(), max);
       return;
     }
+
     if (inFlight.add(task)) {
       if (task.getPriority() != ReplicationCommandPriority.LOW) {
         // Low priority tasks are not included in the replication queue sizes
@@ -178,10 +273,32 @@ public class ReplicationSupervisor {
     return inFlight.size();
   }
 
+  public int getMaxQueueSize() {
+    return maxQueueSize;
+  }
+
+  public void nodeStateUpdated(HddsProtos.NodeOperationalState newState) {
+    if (state.getAndSet(newState) != newState) {
+      int threadCount = replicationConfig.getReplicationMaxStreams();
+      int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
+
+      if (isMaintenance(newState) || isDecommission(newState)) {
+        threadCount *= 2;
+        newMaxQueueSize *= 2;
+      }
+
+      LOG.info("Node state updated to {}, scaling executor pool size to {}",
+          newState, threadCount);
+
+      maxQueueSize = newMaxQueueSize;
+      executorThreadUpdater.accept(threadCount);
+    }
+  }
+
   /**
    * An executable form of a replication task with status handling.
    */
-  public final class TaskRunner implements Comparable, Runnable {
+  public final class TaskRunner implements Comparable<TaskRunner>, Runnable {
     private final AbstractReplicationTask task;
 
     public TaskRunner(AbstractReplicationTask task) {
@@ -257,8 +374,8 @@ public class ReplicationSupervisor {
     }
 
     @Override
-    public int compareTo(Object o) {
-      return TASK_RUNNER_COMPARATOR.compare(this, (TaskRunner) o);
+    public int compareTo(TaskRunner o) {
+      return TASK_RUNNER_COMPARATOR.compare(this, o);
     }
 
     @Override

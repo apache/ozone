@@ -2189,7 +2189,7 @@ public class LegacyReplicationManager {
         final long dataSizeRequired = Math.max(container.getUsedBytes(),
             currentContainerSize);
         final List<DatanodeDetails> excludeList = replicas.stream()
-                .filter(r -> !r.getDatanodeDetails().isDecomissioned())
+                .filter(r -> !r.getDatanodeDetails().isDecommissioned())
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         excludeList.addAll(replicationInFlight);

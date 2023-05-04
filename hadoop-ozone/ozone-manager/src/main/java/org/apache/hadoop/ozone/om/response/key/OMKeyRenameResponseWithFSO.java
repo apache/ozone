@@ -34,13 +34,13 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE;
 
 /**
  * Response for RenameKey request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
-    SNAPSHOT_RENAMED_KEY_TABLE})
+    SNAPSHOT_RENAMED_TABLE})
 public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   private boolean isRenameDirectory;
@@ -91,20 +91,19 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
           .deleteWithBatch(batchOperation, getFromKeyName());
       omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
+    }
 
-      boolean isSnapshotBucket = OMClientRequestUtils.
-          isSnapshotBucket(omMetadataManager, getRenameKeyInfo());
-      String renameDbKey = omMetadataManager.getRenameKey(
-          getRenameKeyInfo().getVolumeName(),
-          getRenameKeyInfo().getBucketName(),
-          getRenameKeyInfo().getObjectID());
-
-      String renamedKey = omMetadataManager.getSnapshotRenamedKeyTable()
-          .get(renameDbKey);
-      if (isSnapshotBucket && renamedKey == null) {
-        omMetadataManager.getSnapshotRenamedKeyTable().putWithBatch(
-            batchOperation, renameDbKey, getFromKeyName());
-      }
+    boolean isSnapshotBucket = OMClientRequestUtils.
+        isSnapshotBucket(omMetadataManager, getRenameKeyInfo());
+    String renameDbKey = omMetadataManager.getRenameKey(
+        getRenameKeyInfo().getVolumeName(),
+        getRenameKeyInfo().getBucketName(),
+        getRenameKeyInfo().getObjectID());
+    String renamedKey = omMetadataManager.getSnapshotRenamedTable()
+        .get(renameDbKey);
+    if (isSnapshotBucket && renamedKey == null) {
+      omMetadataManager.getSnapshotRenamedTable().putWithBatch(
+          batchOperation, renameDbKey, getFromKeyName());
     }
 
     if (fromKeyParent != null) {
