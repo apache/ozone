@@ -47,7 +47,7 @@ public class ListBucketHandler extends VolumeHandler {
 
   @CommandLine.Option(names = {"--has-snapshot"},
       description = "Only show buckets that have at least one active snapshot.")
-  private boolean bucketWithSnapshot;
+  private boolean filterByHasSnapshot;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
