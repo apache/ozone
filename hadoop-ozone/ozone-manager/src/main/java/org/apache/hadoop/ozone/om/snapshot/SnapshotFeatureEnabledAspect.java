@@ -49,7 +49,7 @@ public class SnapshotFeatureEnabledAspect {
   private static final Logger LOG = LoggerFactory
       .getLogger(SnapshotFeatureEnabledAspect.class);
 
-  @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
+  @Before("@annotation(SnapshotFeatureEnabled) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
     boolean desiredFeatureState = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(SnapshotFeatureEnabled.class)

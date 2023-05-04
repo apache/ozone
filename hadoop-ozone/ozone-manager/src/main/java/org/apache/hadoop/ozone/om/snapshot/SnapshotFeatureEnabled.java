@@ -24,7 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation used to "disallow" an API if current layout version does
+ * Annotation used to check that snapshot feature is enabled or disabled.
  * not include the associated layout feature. Helps to keep the method logic
  * and upgrade related cross cutting concern separate.
  */
