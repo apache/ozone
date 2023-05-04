@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -71,6 +72,9 @@ public class ChunkKeyHandler extends KeyHandler implements
   private XceiverClientSpi xceiverClient;
   private OzoneManagerProtocol ozoneManagerClient;
 
+  @CommandLine.ParentCommand
+  private OzoneDebug parent;
+
   private String getChunkLocationPath(String containerLocation) {
     return containerLocation + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
   }
@@ -79,7 +83,7 @@ public class ChunkKeyHandler extends KeyHandler implements
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException {
     containerOperationClient = new
-            ContainerOperationClient(createOzoneConfiguration());
+            ContainerOperationClient(parent.getOzoneConf());
     xceiverClientManager = containerOperationClient
             .getXceiverClientManager();
     ozoneManagerClient = client.getObjectStore().getClientProxy()
@@ -149,8 +153,7 @@ public class ChunkKeyHandler extends KeyHandler implements
         tempchunks = entry.getValue().getBlockData().getChunksList();
         ContainerProtos.ContainerDataProto containerData =
                 containerOperationClient.readContainer(
-                        keyLocation.getContainerID(),
-                        keyLocation.getPipeline());
+                    keyLocation.getContainerID(), pipeline);
         for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
           String fileName = containerLayoutVersion.getChunkFile(new File(
               getChunkLocationPath(containerData.getContainerPath())),
