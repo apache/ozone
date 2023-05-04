@@ -56,12 +56,16 @@ public class BackgroundContainerMetadataScanner extends
   @VisibleForTesting
   @Override
   public void scanContainer(Container<?> container) throws IOException {
+    // Full data scan also does a metadata scan. If a full data scan was done
+    // recently, we can skip this metadata scan.
     if (ContainerUtils.recentlyScanned(container, minScanGap)) {
       LOG.debug("Skipping metadata scan of container {} which was " +
           "recently scanned", container.getContainerData().getContainerID());
       return;
     }
 
+    // Do not update the scan timestamp, since this was just a metadata scan,
+    // not a full scan.
     if (!container.scanMetaData()) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(

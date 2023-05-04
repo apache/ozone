@@ -76,15 +76,15 @@ public class BackgroundContainerDataScanner extends
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData);
-    if (c.scanData(throttler, canceler)) {
-      Instant now = Instant.now();
-      logScanCompleted(containerData, now);
-      controller.updateDataScanTimestamp(containerId, now);
-    } else {
+    if (!c.scanData(throttler, canceler)) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(containerId);
     }
+
     metrics.incNumContainersScanned();
+    Instant now = Instant.now();
+    logScanCompleted(containerData, now);
+    controller.updateDataScanTimestamp(containerId, now);
   }
 
   @Override

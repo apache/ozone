@@ -19,80 +19,87 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.commons.compress.utils.Lists;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
-import org.mockito.verification.VerificationMode;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
-import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 /**
  * Unit tests for the on-demand container scanner.
  */
-@RunWith(MockitoJUnitRunner.class)
-public class TestOnDemandContainerDataScanner {
+@MockitoSettings(strictness = Strictness.LENIENT)
+public class TestOnDemandContainerDataScanner extends
+    TestContainerScannersAbstract {
 
-  private final AtomicLong containerIdSeq = new AtomicLong(100);
-
-  @Mock
-  private Container<ContainerData> healthy;
-
-  @Mock
-  private Container<ContainerData> openContainer;
-
-  @Mock
-  private Container<ContainerData> corruptData;
-
-  private ContainerScannerConfiguration conf;
-  private ContainerController controller;
-
-  @Before
+  @BeforeEach
   public void setup() {
-    conf = newInstanceOf(ContainerScannerConfiguration.class);
-    conf.setMetadataScanInterval(0);
-    conf.setDataScanInterval(0);
-    controller = mockContainerController();
+    super.setup();
   }
 
-  @After
+  @Test
+  @Override
+  public void testRecentlyScannedContainerIsSkipped() throws Exception {
+    setScannedTimestampRecent(healthy);
+    scanContainer(healthy);
+    Mockito.verify(healthy, never()).scanData(any(), any());
+  }
+
+  @Test
+  @Override
+  public void testPreviouslyScannedContainerIsScanned() throws Exception {
+    // If the last scan time is before than the configured gap, the container
+    // should be scanned.
+    setScannedTimestampOld(healthy);
+    scanContainer(healthy);
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+  }
+
+  @Test
+  @Override
+  public void testUnscannedContainerIsScanned() throws Exception {
+    // If there is no last scanned time, the container should be scanned.
+    Mockito.when(healthy.getContainerData().lastDataScanTime()).thenReturn(Optional.empty());
+    scanContainer(healthy);
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+  }
+
+  @AfterEach
   public void tearDown() {
     OnDemandContainerDataScanner.shutdown();
   }
 
   @Test
-  public void testOnDemandContainerScanner() throws Exception {
-    //Without initialization,
-    // there shouldn't be interaction with containerController
-    OnDemandContainerDataScanner.scanContainer(corruptData);
-    Mockito.verifyZeroInteractions(controller);
+  public void testScanTimestampUpdated() throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
-    testContainerMarkedUnhealthy(healthy, never());
-    testContainerMarkedUnhealthy(corruptData, atLeastOnce());
-    testContainerMarkedUnhealthy(openContainer, never());
+    Optional<Future<?>> scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    Assertions.assertTrue(scanFuture.isPresent());
+    scanFuture.get().get();
+    Mockito.verify(controller, atLeastOnce())
+        .updateDataScanTimestamp(
+            eq(healthy.getContainerData().getContainerID()), any());
   }
 
   @Test
@@ -102,7 +109,8 @@ public class TestOnDemandContainerDataScanner {
     OnDemandContainerDataScanner.shutdown();
     OnDemandContainerDataScanner.shutdown();
     //There shouldn't be an interaction after shutdown:
-    testContainerMarkedUnhealthy(corruptData, never());
+    OnDemandContainerDataScanner.scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, never());
   }
 
   @Test
@@ -119,13 +127,13 @@ public class TestOnDemandContainerDataScanner {
         });
     Optional<Future<?>> onGoingScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
-    Assert.assertTrue(onGoingScan.isPresent());
-    Assert.assertFalse(onGoingScan.get().isDone());
+    Assertions.assertTrue(onGoingScan.isPresent());
+    Assertions.assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
     Optional<Future<?>> secondScan = OnDemandContainerDataScanner
         .scanContainer(corruptData);
     //Then the second scan is not scheduled and the first scan can still finish
-    Assert.assertFalse(secondScan.isPresent());
+    Assertions.assertFalse(secondScan.isPresent());
     latch.countDown();
     onGoingScan.get().get();
     Mockito.verify(controller, atLeastOnce()).
@@ -133,97 +141,71 @@ public class TestOnDemandContainerDataScanner {
   }
 
   @Test
-  public void testScanTimestampUpdated() throws Exception {
+  @Override
+  public void testScannerMetrics() throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
-    Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
-    Assert.assertTrue(scanFuture.isPresent());
-    scanFuture.get().get();
-    Mockito.verify(controller, atLeastOnce())
-        .updateDataScanTimestamp(
-            eq(healthy.getContainerData().getContainerID()), any());
+    ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(
+        corruptData));
+    resultFutureList.add(
+        OnDemandContainerDataScanner.scanContainer(openContainer));
+    resultFutureList.add(
+        OnDemandContainerDataScanner.scanContainer(openCorruptMetadata));
+    resultFutureList.add(OnDemandContainerDataScanner.scanContainer(healthy));
+    waitOnScannerToFinish(resultFutureList);
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    //Containers with shouldScanData = false shouldn't increase
+    // the number of scanned containers
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(2, metrics.getNumContainersScanned());
   }
 
   @Test
-  public void testUnscannedContainerIsScanned() throws Exception {
+  @Override
+  public void testScannerMetricsUnregisters() {
     OnDemandContainerDataScanner.init(conf, controller);
-
-    // If there is no last scanned time, the container should be scanned.
-    ContainerTestUtils.setupMockContainer(healthy,
-        true, true, containerIdSeq);
-    Mockito.when(healthy.getContainerData().lastDataScanTime()).thenReturn(Optional.empty());
-    Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
-    Assert.assertTrue(scanFuture.isPresent());
-    scanFuture.get().get();
-    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+    String metricsName = OnDemandContainerDataScanner.getMetrics().getName();
+    assertNotNull(DefaultMetricsSystem.instance().getSource(metricsName));
+    OnDemandContainerDataScanner.shutdown();
+    OnDemandContainerDataScanner.scanContainer(healthy);
+    assertNull(DefaultMetricsSystem.instance().getSource(metricsName));
   }
 
   @Test
-  public void testRecentlyScannedContainerIsSkipped() throws Exception {
-    OnDemandContainerDataScanner.init(conf, controller);
+  @Override
+  public void testUnhealthyContainersDetected() throws Exception {
+    // Without initialization,
+    // there shouldn't be interaction with containerController
+    OnDemandContainerDataScanner.scanContainer(corruptData);
+    Mockito.verifyZeroInteractions(controller);
 
-    // If the last scan time is within the configured gap, the container
-    // should be skipped.
-    ContainerTestUtils.setupMockContainer(healthy,
-        true, true, containerIdSeq);
-    Instant recentLastScanTime = Instant.now()
-        .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
-        .plus(1, ChronoUnit.MINUTES);
-    Mockito.when(healthy.getContainerData().lastDataScanTime())
-        .thenReturn(Optional.of(recentLastScanTime));
-    Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
-    // Scan should not have been scheduled.
-    Assert.assertFalse(scanFuture.isPresent());
-    Mockito.verify(healthy, never()).scanData(any(), any());
+    scanContainer(healthy);
+    verifyContainerMarkedUnhealthy(healthy, never());
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+    scanContainer(openCorruptMetadata);
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
+    scanContainer(openContainer);
+    verifyContainerMarkedUnhealthy(openContainer, never());
   }
 
-  @Test
-  public void testPreviouslyScannedContainerIsScanned() throws Exception {
+  private void scanContainer(Container<ContainerData> container)
+      throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
-
-    // If the last scan time is before than the configured gap, the container
-    // should be scanned.
-    ContainerTestUtils.setupMockContainer(healthy,
-        true, true, containerIdSeq);
-    Instant oldLastScanTime = Instant.now()
-        .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
-        .minus(10, ChronoUnit.MINUTES);
-    Mockito.when(healthy.getContainerData().lastDataScanTime())
-        .thenReturn(Optional.of(oldLastScanTime));
     Optional<Future<?>> scanFuture =
-        OnDemandContainerDataScanner.scanContainer(healthy);
-    Assert.assertTrue(scanFuture.isPresent());
-    scanFuture.get().get();
-    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
-  }
-
-  private void testContainerMarkedUnhealthy(
-      Container<?> container, VerificationMode invocationTimes)
-      throws InterruptedException, ExecutionException, IOException {
-    Optional<Future<?>> result =
         OnDemandContainerDataScanner.scanContainer(container);
-    if (result.isPresent()) {
-      result.get().get();
+    if (scanFuture.isPresent()) {
+      scanFuture.get().get();
     }
-    Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
-        container.getContainerData().getContainerID());
   }
 
-  private ContainerController mockContainerController() {
-    // healthy container
-    ContainerTestUtils.setupMockContainer(healthy,
-        true, true, containerIdSeq);
-
-    // unhealthy container (corrupt data)
-    ContainerTestUtils.setupMockContainer(corruptData,
-        true, false, containerIdSeq);
-
-    // unhealthy container (corrupt metadata)
-    ContainerTestUtils.setupMockContainer(openContainer,
-        false, false, containerIdSeq);
-
-    return mock(ContainerController.class);
+  private void waitOnScannerToFinish(
+      ArrayList<Optional<Future<?>>> resultFutureList)
+      throws ExecutionException, InterruptedException {
+    for (Optional<Future<?>> future : resultFutureList) {
+      if (future.isPresent()) {
+        future.get().get();
+      }
+    }
   }
 }

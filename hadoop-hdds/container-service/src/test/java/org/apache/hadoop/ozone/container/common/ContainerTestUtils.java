@@ -176,7 +176,7 @@ public final class ContainerTestUtils {
       boolean scanMetaDataSuccess, boolean scanDataSuccess,
       AtomicLong containerIdSeq) {
     setupMockContainer(c, shouldScanData, scanDataSuccess, containerIdSeq);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
   }
 
   public static void setupMockContainer(
@@ -184,10 +184,6 @@ public final class ContainerTestUtils {
       boolean scanDataSuccess, AtomicLong containerIdSeq) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
-//    when(data.getState()).thenReturn(
-//        ContainerProtos.ContainerDataProto.State.CLOSED);
-//    when(c.getContainerState()).thenReturn(
-//        ContainerProtos.ContainerDataProto.State.CLOSED);
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
