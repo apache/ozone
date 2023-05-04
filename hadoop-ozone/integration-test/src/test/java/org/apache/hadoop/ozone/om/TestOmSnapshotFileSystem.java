@@ -108,8 +108,6 @@ public class TestOmSnapshotFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
-
-
   @Rule
   public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
 

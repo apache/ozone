@@ -25,6 +25,7 @@ import java.lang.annotation.Target;
 
 /**
  * Annotation used to check that the snapshot feature in desired state.
+ * Can be generalized into checking arbitrary config state.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

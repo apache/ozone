@@ -2210,10 +2210,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       stopTrashEmptier();
       metadataManager.stop();
-      // omSnapshotManager is null if ozone.filesystem.snapshot.enabled is false
-      if (omSnapshotManager != null) {
-        omSnapshotManager.close();
-      }
+      omSnapshotManager.close();
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
       unregisterMXBean();
@@ -3675,7 +3672,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           termIndex, checkpointTrxnInfo.getTermIndex());
     }
 
-    if (oldOmMetadataManagerStopped && omSnapshotManager != null) {
+    if (oldOmMetadataManagerStopped) {
       // Close snapDiff's rocksDB instance only if metadataManager gets closed.
       omSnapshotManager.close();
     }

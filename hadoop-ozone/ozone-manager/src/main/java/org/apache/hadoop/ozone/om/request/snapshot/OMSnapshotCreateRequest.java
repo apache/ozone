@@ -90,7 +90,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   @Override
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
