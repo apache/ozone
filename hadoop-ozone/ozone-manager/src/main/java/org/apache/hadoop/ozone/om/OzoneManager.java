@@ -3679,7 +3679,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           termIndex, checkpointTrxnInfo.getTermIndex());
     }
 
-    if (oldOmMetadataManagerStopped) {
+    if (oldOmMetadataManagerStopped && omSnapshotManager != null) {
       // Close snapDiff's rocksDB instance only if metadataManager gets closed.
       omSnapshotManager.close();
     }
