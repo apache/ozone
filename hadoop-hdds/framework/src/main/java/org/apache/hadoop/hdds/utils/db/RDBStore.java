@@ -255,7 +255,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public Table<byte[], byte[]> getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws IOException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);

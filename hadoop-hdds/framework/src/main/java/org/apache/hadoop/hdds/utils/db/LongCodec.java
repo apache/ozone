@@ -20,11 +20,26 @@ package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.primitives.Longs;
 
+import java.nio.ByteBuffer;
 
 /**
  * Codec to convert Long to/from byte array.
  */
-public class LongCodec implements Codec<Long> {
+public final class LongCodec implements Codec<Long> {
+  @Override
+  public boolean supportByteBuffer() {
+    return true;
+  }
+
+  @Override
+  public ByteBuffer toByteBuffer(Long object) {
+    return ByteBuffer.wrap(toPersistedFormat(object));
+  }
+
+  @Override
+  public Long fromByteBuffer(ByteBuffer rawData) {
+    return rawData.getLong();
+  }
 
   @Override
   public byte[] toPersistedFormat(Long object) {

@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +40,6 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 class RDBTable implements Table<byte[], byte[]> {
-
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
@@ -63,6 +63,10 @@ class RDBTable implements Table<byte[], byte[]> {
 
   public ColumnFamily getColumnFamily() {
     return family;
+  }
+
+  public void put(ByteBuffer key, ByteBuffer value) throws IOException {
+    db.put(family, key, value);
   }
 
   @Override

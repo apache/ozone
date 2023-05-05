@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -49,7 +50,7 @@ import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_
  */
 public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
-  private final Table<byte[], byte[]> rawTable;
+  private final RDBTable rawTable;
 
   private final CodecRegistry codecRegistry;
 
@@ -69,8 +70,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param keyType
    * @param valueType
    */
-  public TypedTable(
-      Table<byte[], byte[]> rawTable,
+  public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType) throws IOException {
     this(rawTable, codecRegistry, keyType, valueType,
@@ -86,8 +86,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param cacheType
    * @throws IOException
    */
-  public TypedTable(
-      Table<byte[], byte[]> rawTable,
+  public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType,
       CacheType cacheType) throws IOException {
@@ -119,6 +118,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void put(KEY key, VALUE value) throws IOException {
+    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
+    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
+    if (keyCodec.supportByteBuffer() && valueCodec.supportByteBuffer()) {
+      final ByteBuffer k = keyCodec.toByteBuffer(key);
+      final ByteBuffer v = valueCodec.toByteBuffer(value);
+      rawTable.put(k, v);
+      return;
+    }
+
     byte[] keyData = codecRegistry.asRawData(key);
     byte[] valueData = codecRegistry.asRawData(value);
     rawTable.put(keyData, valueData);

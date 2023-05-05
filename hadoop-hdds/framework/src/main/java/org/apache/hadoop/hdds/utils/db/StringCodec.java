@@ -18,17 +18,31 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hdds.StringUtils;
 
 /**
  * Codec to convert String to/from byte array.
  */
-public class StringCodec implements Codec<String> {
+public final class StringCodec implements Codec<String> {
+  @Override
+  public boolean supportByteBuffer() {
+    return true;
+  }
 
   @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
+  public ByteBuffer toByteBuffer(String object) {
+    return ByteBuffer.wrap(toPersistedFormat(object));
+  }
+
+  @Override
+  public String fromByteBuffer(ByteBuffer rawData) {
+    return StringUtils.bytes2String(rawData);
+  }
+
+  @Override
+  public byte[] toPersistedFormat(String object) {
     if (object != null) {
       return StringUtils.string2Bytes(object);
     } else {
