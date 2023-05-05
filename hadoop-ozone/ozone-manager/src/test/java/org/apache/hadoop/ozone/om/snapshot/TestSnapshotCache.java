@@ -119,13 +119,13 @@ class TestSnapshotCache {
     OmSnapshot omSnapshot1 = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
 
     snapshotCache.release(dbKey1);
     // Entry will not be immediately evicted
     assertEquals(1, snapshotCache.size());
     // Entry is queued for eviction as its ref count reaches zero
-    assertEquals(1, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(1, snapshotCache.getPendingEvictionList().size());
   }
 
   @Test
@@ -135,13 +135,13 @@ class TestSnapshotCache {
     OmSnapshot omSnapshot1 = snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
 
     snapshotCache.release(omSnapshot1);
     // Entry will not be immediately evicted
     assertEquals(1, snapshotCache.size());
     // Entry is queued for eviction as its ref count reaches zero
-    assertEquals(1, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(1, snapshotCache.getPendingEvictionList().size());
   }
 
   @Test
@@ -179,20 +179,20 @@ class TestSnapshotCache {
     OmSnapshot omSnapshot3 = snapshotCache.get(dbKey3);
     assertNotNull(omSnapshot3);
     assertEquals(3, snapshotCache.size());
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
 
     snapshotCache.release(dbKey1);
     // Entry will not be immediately evicted
     assertEquals(3, snapshotCache.size());
-    assertEquals(1, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(1, snapshotCache.getPendingEvictionList().size());
 
     snapshotCache.invalidate(dbKey1);
     assertEquals(2, snapshotCache.size());
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
 
     snapshotCache.invalidateAll();
     assertEquals(0, snapshotCache.size());
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
   }
 
   private void assertEntryExistence(String key, boolean shouldExist) {
@@ -218,21 +218,21 @@ class TestSnapshotCache {
     assertEquals(1, snapshotCache.size());
     snapshotCache.release(dbKey1);
     assertEquals(1, snapshotCache.size());
-    assertEquals(1, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(1, snapshotCache.getPendingEvictionList().size());
 
     final String dbKey2 = "dbKey2";
     snapshotCache.get(dbKey2);
     assertEquals(2, snapshotCache.size());
     snapshotCache.release(dbKey2);
     assertEquals(2, snapshotCache.size());
-    assertEquals(2, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(2, snapshotCache.getPendingEvictionList().size());
 
     final String dbKey3 = "dbKey3";
     snapshotCache.get(dbKey3);
     assertEquals(3, snapshotCache.size());
     snapshotCache.release(dbKey3);
     assertEquals(3, snapshotCache.size());
-    assertEquals(3, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(3, snapshotCache.getPendingEvictionList().size());
 
     final String dbKey4 = "dbKey4";
     snapshotCache.get(dbKey4);
@@ -240,7 +240,7 @@ class TestSnapshotCache {
     // it was release()d.
     assertEquals(3, snapshotCache.size());
     assertEntryExistence(dbKey1, false);
-    assertEquals(2, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(2, snapshotCache.getPendingEvictionList().size());
   }
 
   @Test
@@ -264,7 +264,7 @@ class TestSnapshotCache {
     // dbKey1 would not have been evicted because it is not release()d
     assertEquals(4, snapshotCache.size());
     assertEntryExistence(dbKey1, true);
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
 
     // Releasing dbKey2 at this point should immediately trigger its eviction
     // because the cache size exceeded the soft limit
@@ -272,7 +272,7 @@ class TestSnapshotCache {
     assertEquals(3, snapshotCache.size());
     assertEntryExistence(dbKey2, false);
     assertEntryExistence(dbKey1, true);
-    assertEquals(0, snapshotCache.getInstancesEligibleForClosure().size());
+    assertEquals(0, snapshotCache.getPendingEvictionList().size());
   }
 
   // TODO: [SNAPSHOT]

@@ -23,69 +23,104 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Reference counting interface. Used by OmSnapshot in SnapshotCache.
- * TODO: Rename this interface.
+ * Add reference counter to an object instance.
  */
-public interface ReferenceCounted {
+public class ReferenceCounted<T> implements AutoCloseable {
+
+  /**
+   * Object that is being reference counted. e.g. OmSnapshot
+   */
+  private final T obj;
 
   /**
    * A map of thread IDs holding the reference of the object and its count.
    */
-  ConcurrentHashMap<Long, Long> THREAD_MAP = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Long, Long> threadMap;
 
   /**
    * Sum of reference counts from all threads.
    */
-  AtomicLong REF_COUNT = new AtomicLong(0L);
+  private final AtomicLong refCount;
+
+  public ReferenceCounted(T obj) {
+    this.threadMap = new ConcurrentHashMap<>();
+    this.refCount = new AtomicLong(0L);
+    this.obj = obj;
+  }
 
   /**
-   * Save current thread tid here since it shouldn't change once initialized.
+   * @return Object being referenced counted.
    */
-  long TID = Thread.currentThread().getId();
+  public T get() {
+    return obj;
+  }
 
-  default long incrementRefCount() {
+  public long incrementRefCount() { // TODO: [SNAPSHOT] Rename to increment()
+    long tid = Thread.currentThread().getId();
+
     // Put the new mapping if absent, atomically
-    THREAD_MAP.putIfAbsent(TID, 0L);
+    threadMap.putIfAbsent(tid, 0L);
 
     // Update the value and do some checks, atomically
-    THREAD_MAP.computeIfPresent(TID, (k, v) -> {
+    threadMap.computeIfPresent(tid, (k, v) -> {
       long newVal = v + 1;
       Preconditions.checkState(newVal > 0L, "Thread reference count overflown");
 
-      long newValTotal = REF_COUNT.incrementAndGet();
+      long newValTotal = refCount.incrementAndGet();
       Preconditions.checkState(newValTotal > 0L,
           "Total reference count overflown");
 
       return newVal;
     });
 
-    return REF_COUNT.get();
+    return refCount.get();
   }
 
-  default long decrementRefCount() {
-    Preconditions.checkState(THREAD_MAP.containsKey(TID),
+  public long decrementRefCount() {
+    long tid = Thread.currentThread().getId();
+
+    Preconditions.checkState(threadMap.containsKey(tid),
         "Current thread have not holden reference before");
 
-    Preconditions.checkNotNull(THREAD_MAP.get(TID), "This thread " + TID +
+    Preconditions.checkNotNull(threadMap.get(tid), "This thread " + tid +
         " has not incremented the reference count before.");
 
     // Atomically update value and purge entry if count reaches zero
-    THREAD_MAP.computeIfPresent(TID, (k, v) -> {
+    threadMap.computeIfPresent(tid, (k, v) -> {
       long newValue = v - 1L;
-      Preconditions.checkState(newValue < 0L, "Reference count underflow");
+      Preconditions.checkState(newValue >= 0L, "Reference count underflow");
 
-      long newValTotal = REF_COUNT.decrementAndGet();
-      Preconditions.checkState(newValTotal < 0L,
+      long newValTotal = refCount.decrementAndGet();
+      Preconditions.checkState(newValTotal >= 0L,
           "Total reference count underflow");
 
       // Remove entry by returning null here when thread ref count reaches zero
       return newValue != 0L ? newValue : null;
     });
 
-    return REF_COUNT.get();
+    return refCount.get();
   }
 
-  default long getRefCountTotal() {
-    return REF_COUNT.get();
+  /**
+   * @return The total number of times the object has been held reference to.
+   */
+  public long getTotalRefCount() {
+    return refCount.get();
+  }
+
+  /**
+   * @return Number of times current thread has held reference to the object.
+   */
+  public long getCurrentThreadRefCount() {
+    long tid = Thread.currentThread().getId();
+    return threadMap.getOrDefault(tid, 0L);
+  }
+
+  @Override
+  public void close() throws Exception {
+    // Decrease ref count by 1 when close() is called on this object
+    // so it is eligible to be used with try-with-resources.
+    // TODO: Double check.
+    decrementRefCount();
   }
 }
