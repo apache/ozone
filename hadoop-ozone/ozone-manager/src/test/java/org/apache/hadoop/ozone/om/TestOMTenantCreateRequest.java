@@ -49,7 +49,6 @@ import static org.mockito.Mockito.when;
 /**
  * Tests create tenant request.
  */
-
 public class TestOMTenantCreateRequest {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -105,7 +104,7 @@ public class TestOMTenantCreateRequest {
 
   @Test
   public void
-  testAcceptS3CompliantTenantIdCreationRegardlessOfStrictS3Setting()
+      testAcceptS3CompliantTenantIdCreationRegardlessOfStrictS3Setting()
       throws Exception {
     boolean[] omStrictS3Configs = {true, false};
     for (boolean isStrictS3 : omStrictS3Configs) {

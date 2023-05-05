@@ -1374,7 +1374,7 @@ public class RpcClient implements ClientProtocol {
 
     Map< OmKeyLocationInfo, Map<DatanodeDetails, OzoneInputStream> > result
         = new LinkedHashMap<>();
-    
+
     verifyVolumeName(volumeName);
     OmKeyInfo keyInfo = getKeyInfo(volumeName, bucketName, keyName, true);
     List<OmKeyLocationInfo> keyLocationInfos
