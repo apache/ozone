@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -39,14 +40,14 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
  */
 public class SnapshotCache {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotCache.class);
+  static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
 
   // Snapshot cache internal hash map.
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: Wrap SoftReference<> around the value?
   private final ConcurrentHashMap<String, OmSnapshot> dbMap;
+
   // Linked hash set that holds OmSnapshot instances whose reference count
   // has reached zero.
   // Sorted in last used order. Least-recently-used entry at the beginning.
@@ -68,11 +69,38 @@ public class SnapshotCache {
     this.cacheSizeLimit = cacheSizeLimit;
   }
 
+  @VisibleForTesting
+  ConcurrentHashMap<String, OmSnapshot> getDbMap() {
+    return dbMap;
+  }
+
+  @VisibleForTesting
+  LinkedHashSet<OmSnapshot> getInstancesEligibleForClosure() {
+    return instancesEligibleForClosure;
+  }
+
   /**
    * @return number of DB instances currently held in cache.
    */
   public int size() {
     return dbMap.size();
+  }
+
+  /**
+   * Immediately invalidate an entry.
+   * @param key DB snapshot table key
+   */
+  public void invalidate(String key) throws IOException {
+    dbMap.computeIfPresent(key, (k, v) -> {
+      instancesEligibleForClosure.remove(v);
+      try {
+        v.close();
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to close snapshot: " + key, e);
+      }
+      // Remove the entry from map by returning null
+      return null;
+    });
   }
 
   /**
@@ -83,6 +111,7 @@ public class SnapshotCache {
 
     while (it.hasNext()) {
       Map.Entry<String, OmSnapshot> entry = it.next();
+      instancesEligibleForClosure.remove(entry.getValue());
       // TODO: If wrapped with SoftReference<>, entry.getValue() could be null?
       entry.getValue().close();
       it.remove();
@@ -200,7 +229,7 @@ public class SnapshotCache {
    */
   private void cleanup() {
     long numOfInstToClose = (long) dbMap.size() - cacheSizeLimit;
-    while (numOfInstToClose > 0L) {
+    while (instancesEligibleForClosure.size() > 0 && numOfInstToClose > 0L) {
       // Get the first instance in the clean up list
       OmSnapshot omSnapshot = instancesEligibleForClosure.iterator().next();
       LOG.debug("Evicting OmSnapshot instance {} with table key {}",
@@ -218,6 +247,8 @@ public class SnapshotCache {
           "Cache map entry removal failure. The cache is in an inconsistent "
               + "state. Expected OmSnapshot instance: " + omSnapshot
               + ", actual: " + result);
+
+      instancesEligibleForClosure.remove(result);
 
       // Close the instance, which also closes its DB handle.
       try {
