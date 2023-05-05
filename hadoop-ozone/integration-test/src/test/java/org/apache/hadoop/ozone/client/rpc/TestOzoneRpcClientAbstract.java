@@ -2251,17 +2251,20 @@ public abstract class TestOzoneRpcClientAbstract {
     //Create 10 buckets in  vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameA = "bucket-a-";
     for (int i = 0; i < 10; i++) {
-      bucketName = bucketBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5);
+      bucketName = bucketBaseNameA +
+          i + "-" + RandomStringUtils.randomNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
-      bucketName = bucketBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5);
+      bucketName = bucketBaseNameA +
+          i + "-" + RandomStringUtils.randomNumeric(5);
       volB.createBucket(bucketName);
       store.createSnapshot(volumeB, bucketName, null);
     }
     //Create 10 buckets in vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameB = "bucket-b-";
     for (int i = 0; i < 10; i++) {
-      bucketName = bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5);
+      bucketName = bucketBaseNameB +
+          i + "-" + RandomStringUtils.randomNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
       volB.createBucket(
