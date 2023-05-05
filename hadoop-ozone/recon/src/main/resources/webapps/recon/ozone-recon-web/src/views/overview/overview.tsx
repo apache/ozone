@@ -41,6 +41,7 @@ interface IClusterStateResponse {
   buckets: number;
   keys: number;
   openContainers: number;
+  deletedContainers: number;
 }
 
 interface IOverviewState {
@@ -58,6 +59,7 @@ interface IOverviewState {
   lastUpdatedOMDBFull: number;
   omStatus: string;
   openContainers: number;
+  deletedContainers: number;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -84,7 +86,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       lastUpdatedOMDBDelta: 0,
       lastUpdatedOMDBFull: 0,
       omStatus: '',
-      openContainers: 0
+      openContainers: 0,
+      deletedContainers: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -115,6 +118,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         openContainers: clusterState.openContainers,
+        deletedContainers: clusterState.deletedContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
@@ -158,7 +162,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers } = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers } = this.state;
       
     const datanodesElement = (
       <span>
@@ -226,6 +230,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
         </Row>
       </div>

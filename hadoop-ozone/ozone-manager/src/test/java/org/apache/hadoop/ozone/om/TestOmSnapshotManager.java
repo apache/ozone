@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -71,10 +70,13 @@ public class TestOmSnapshotManager {
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
+    // Enable filesystem snapshot feature for the test regardless of the default
+    configuration.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
+        true);
 
     // Only allow one entry in cache so each new one causes an eviction
     configuration.setInt(
-        OzoneConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
+        OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE, 1);
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();
@@ -122,6 +124,11 @@ public class TestOmSnapshotManager {
     omSnapshotManager
         .checkForSnapshot(second.getVolumeName(),
         second.getBucketName(), getSnapshotPrefix(second.getName()));
+
+    // As a workaround, invalidate all cache entries in order to trigger
+    // instances close in this test case, since JVM GC most likely would not
+    // have triggered and closed the instances yet at this point.
+    omSnapshotManager.getSnapshotCache().invalidateAll();
 
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();

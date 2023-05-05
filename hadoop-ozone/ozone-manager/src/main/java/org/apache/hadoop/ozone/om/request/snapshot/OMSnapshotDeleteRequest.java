@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotDeleteResponse;
+import org.apache.hadoop.ozone.om.snapshot.RequireSnapshotFeatureState;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
@@ -66,6 +67,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
   @Override
   @DisallowedUntilLayoutVersion(SNAPSHOT_SUPPORT)
+  @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
@@ -187,10 +189,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotDeleteResponse(
           omResponse.build(), tableKey, snapshotInfo);
 
-      // Evict the snapshot entry from cache, and close the snapshot DB
-      // Nothing happens if the key doesn't exist in cache (snapshot not loaded)
-      ozoneManager.getOmSnapshotManager().getSnapshotCache()
-          .invalidate(tableKey);
+      // No longer need to invalidate the entry in the snapshot cache here.
 
     } catch (IOException ex) {
       exception = ex;
