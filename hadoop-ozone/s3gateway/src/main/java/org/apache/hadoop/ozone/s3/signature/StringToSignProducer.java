@@ -310,7 +310,6 @@ public final class StringToSignProducer {
   ) throws OS3Exception, DateTimeParseException {
     switch (header) {
     case HOST:
-      // TODO: Placeholder for any host validations.
       break;
     case X_AMAZ_DATE:
       LocalDateTime date = LocalDateTime.parse(headerValue, TIME_FORMATTER);
