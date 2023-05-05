@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -84,10 +85,11 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
             volumeName, bucketName, fromKeyName, toKeyName));
     OMKeyRenameRequest omKeyRenameRequest =
         getOMKeyRenameRequest(modifiedOmRequest);
-    Assert.assertThrows(
-        OMException.class, () ->
+    OMClientResponse response =
             omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper));
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
+        response.getOMResponse().getStatus());
   }
 
   @Override
