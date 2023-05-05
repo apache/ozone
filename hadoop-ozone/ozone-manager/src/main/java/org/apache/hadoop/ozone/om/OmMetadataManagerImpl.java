@@ -1116,8 +1116,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             result.add(omBucketInfo);
             currentCount++;
           } else if (
-              !listSnapshot(volumeName, omBucketInfo.getBucketName())
-                  .isEmpty()) {
+              snapshotChainManager.getLatestPathSnapshot(volumeName +
+                      OM_KEY_PREFIX + omBucketInfo.getBucketName()) != null) {
             // Snapshot filter on.
             // Add to result list only when the bucket has at least one snapshot
             result.add(omBucketInfo);

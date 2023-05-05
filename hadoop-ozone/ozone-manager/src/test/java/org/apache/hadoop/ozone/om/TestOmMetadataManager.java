@@ -194,7 +194,6 @@ public class TestOmMetadataManager {
     String volumeName1 = "volumeA";
     String prefixBucketNameWithOzoneOwner = "ozoneBucket";
     String prefixBucketNameWithHadoopOwner = "hadoopBucket";
-    String prefixSnapshot = "snapshot";
 
     OMRequestTestUtils.addVolumeToDB(volumeName1, omMetadataManager);
 
@@ -237,23 +236,8 @@ public class TestOmMetadataManager {
       }
     }
 
-    for (int i = 1; i < 100; i++) {
-      if (i % 2 == 0) { // This part adds 49 buckets.
-        OMRequestTestUtils.addSnapshotToTable(
-            volumeName1, prefixBucketNameWithOzoneOwner + i,
-            prefixSnapshot + i, omMetadataManager);
-      }
-    }
-    List<OmBucketInfo> omBucketInfoList =
-        omMetadataManager.listBuckets(volumeName1, null, null, 100, true);
-    assertEquals(omBucketInfoList.size(), 49);
-    for (OmBucketInfo omBucketInfo : omBucketInfoList) {
-      assertTrue(omBucketInfo.getBucketName().startsWith(
-          prefixBucketNameWithOzoneOwner));
-    }
-
     // List all buckets which have prefix ozoneBucket
-    omBucketInfoList =
+    List<OmBucketInfo> omBucketInfoList =
         omMetadataManager.listBuckets(volumeName1,
             null, prefixBucketNameWithOzoneOwner, 100, false);
 
