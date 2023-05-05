@@ -81,7 +81,7 @@ function ozonecmd_case
   # exception as mentioned in HDDS-3812
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled ${RATIS_OPTS}"
-  # Add JVM parameter for Java 11 and Java 17
+  # Add JVM parameter for Java 17
   OZONE_MODULE_ACCESS_ARGS=""
 
   # Get the version string
@@ -89,15 +89,11 @@ function ozonecmd_case
 
   # Extract the major version number
   JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
-  echo "Java Major Version Detected=${JAVA_MAJOR_VERSION}"
 
   # populate JVM args based on java version
-    case $JAVA_MAJOR_VERSION in
-        17)  OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
-             ;;
-        *)   echo "Skip setting module access args for detected java version."
-             ;;
-    esac
+  if [[ "${JAVA_MAJOR_VERSION}" == "17" ]]; then
+      OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
+  fi
 
   case ${subcmd} in
     auditparser)
@@ -201,6 +197,7 @@ function ozonecmd_case
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
+      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-recon"
     ;;
     fs)
