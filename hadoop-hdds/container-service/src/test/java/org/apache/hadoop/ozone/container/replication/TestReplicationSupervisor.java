@@ -23,11 +23,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CountDownLatch;
@@ -35,12 +33,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -49,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -67,7 +66,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -76,6 +74,7 @@ import javax.annotation.Nonnull;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -102,12 +101,6 @@ public class TestReplicationSupervisor {
   };
   private final AtomicReference<ContainerReplicator> replicatorRef =
       new AtomicReference<>();
-  private final AtomicReference<ContainerReplicator> pushReplicatorRef =
-      new AtomicReference<>();
-  private final ContainerReplicator pullReplicator =
-      task -> replicatorRef.get().replicate(task);
-  private final ContainerReplicator pushReplicator =
-      task -> pushReplicatorRef.get().replicate(task);
 
   private ContainerSet set;
 
@@ -286,11 +279,14 @@ public class TestReplicationSupervisor {
 
   @Test
   public void testDownloadAndImportReplicatorFailure() throws IOException {
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, newDirectExecutorService(),
-            clock, 1000);
-
     OzoneConfiguration conf = new OzoneConfiguration();
+
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .executor(newDirectExecutorService())
+        .clock(clock)
+        .build();
+
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
@@ -302,10 +298,10 @@ public class TestReplicationSupervisor {
 
     final String testDir = GenericTestUtils.getTempPath(
         TestReplicationSupervisor.class.getSimpleName() +
-            "-" + UUID.randomUUID().toString());
+            "-" + UUID.randomUUID());
     MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
     Mockito.when(volumeSet.getVolumesList())
-        .thenReturn(Collections.singletonList(
+        .thenReturn(singletonList(
             new HddsVolume.Builder(testDir).conf(conf).build()));
     ContainerImporter importer =
         new ContainerImporter(conf, set, null, volumeSet);
@@ -402,8 +398,10 @@ public class TestReplicationSupervisor {
     ReplicationServer.ReplicationConfig repConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     repConf.setReplicationMaxStreams(1);
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(null, repConf, clock, 1000);
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .replicationConfig(repConf)
+        .clock(clock)
+        .build();
 
     final CountDownLatch indicateRunning = new CountDownLatch(1);
     final CountDownLatch completeRunning = new CountDownLatch(1);
@@ -461,8 +459,8 @@ public class TestReplicationSupervisor {
 
   private static class BlockingTask extends AbstractReplicationTask {
 
-    private CountDownLatch runningLatch;
-    private CountDownLatch waitForCompleteLatch;
+    private final CountDownLatch runningLatch;
+    private final CountDownLatch waitForCompleteLatch;
 
     BlockingTask(long containerId, long deadlineEpochMs, long term,
         CountDownLatch running, CountDownLatch waitForCompletion) {
@@ -516,8 +514,15 @@ public class TestReplicationSupervisor {
   private ReplicationSupervisor supervisorWith(
       Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
       ExecutorService executor) {
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(context, executor, clock, 1000);
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationServer.ReplicationConfig repConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .replicationConfig(repConf)
+        .executor(executor)
+        .clock(clock)
+        .build();
     replicatorRef.set(replicatorFactory.apply(supervisor));
     return supervisor;
   }
@@ -556,7 +561,7 @@ public class TestReplicationSupervisor {
     byte[] missingIndexes = new byte[1];
     missingIndexes[0] = 4;
 
-    List<DatanodeDetails> target = Collections.singletonList(
+    List<DatanodeDetails> target = singletonList(
         MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd =
         new ReconstructECContainersCommand(containerId,
@@ -644,44 +649,57 @@ public class TestReplicationSupervisor {
   }
 
   @Test
-  public void testMaxQueueSize() throws InterruptedException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ReplicationServer.ReplicationConfig replicationConfig
-        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+  public void testMaxQueueSize() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Integer[] count = new Integer[1];
-    count[0] = 0;
-    Lock lock = new ReentrantLock();
+    final int maxQueueSize = 2;
+    DatanodeConfiguration datanodeConfig = new DatanodeConfiguration();
+    datanodeConfig.setCommandQueueLimit(maxQueueSize);
 
-    ReplicationSupervisor rs = new ReplicationSupervisor(null,
-        replicationConfig, Clock.system(ZoneId.systemDefault()), 2);
+    final int replicationMaxStreams = 5;
+    ReplicationServer.ReplicationConfig repConf =
+        new ReplicationServer.ReplicationConfig();
+    repConf.setReplicationMaxStreams(replicationMaxStreams);
 
-    ContainerReplicator replicator = task -> {
-      try {
-        count[0]++;
-        lock.lock();
-      } finally {
-        lock.unlock();
-      }
-    };
+    AtomicInteger threadPoolSize = new AtomicInteger();
 
-    lock.lock();
-    try {
-      //schedule 100 container replication
-      Random random = new Random();
-      for (int i = 0; i < 100; i++) {
-        List<DatanodeDetails> sources = new ArrayList<>();
-        sources.add(datanodes.get(random.nextInt(datanodes.size())));
-        rs.addTask(new ReplicationTask(fromSources(i, sources), replicator));
-      }
-      // in progress task will be 2
-      Assertions.assertTrue(count[0] == 2);
-    } finally {
-      lock.unlock();
+    ReplicationSupervisor rs = ReplicationSupervisor.newBuilder()
+        .executor(new DiscardingExecutorService())
+        .executorThreadUpdater(threadPoolSize::set)
+        .datanodeConfig(datanodeConfig)
+        .replicationConfig(repConf)
+        .build();
+
+    scheduleTasks(datanodes, rs);
+
+    // in progress task will be limited by max. queue size,
+    // since all tasks are discarded by the executor, none of them complete
+    Assert.assertEquals(maxQueueSize, rs.getTotalInFlightReplications());
+
+    // queue size is doubled
+    rs.nodeStateUpdated(HddsProtos.NodeOperationalState.DECOMMISSIONING);
+    Assert.assertEquals(2 * maxQueueSize, rs.getMaxQueueSize());
+    Assert.assertEquals(2 * replicationMaxStreams, threadPoolSize.get());
+
+    // can schedule more tasks
+    scheduleTasks(datanodes, rs);
+    Assert.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
+
+    // queue size is restored
+    rs.nodeStateUpdated(HddsProtos.NodeOperationalState.IN_SERVICE);
+    Assert.assertEquals(maxQueueSize, rs.getMaxQueueSize());
+    Assert.assertEquals(replicationMaxStreams, threadPoolSize.get());
+  }
+
+  //schedule 10 container replication
+  private void scheduleTasks(
+      List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
+    for (int i = 0; i < 10; i++) {
+      List<DatanodeDetails> sources =
+          singletonList(datanodes.get(i % datanodes.size()));
+      rs.addTask(new ReplicationTask(fromSources(i, sources), noopReplicator));
     }
-    rs.shutdownAfterFinish();
   }
 }

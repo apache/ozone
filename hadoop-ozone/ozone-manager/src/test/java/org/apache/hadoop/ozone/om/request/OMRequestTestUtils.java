@@ -840,11 +840,8 @@ public final class OMRequestTestUtils {
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo =
-        omMetadataManager.getDeletedTable().get(ozoneKey);
-
-    repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omKeyInfo,
-        repeatedOmKeyInfo, trxnLogIndex, true);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        omKeyInfo, null, trxnLogIndex, true);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 

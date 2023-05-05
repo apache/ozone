@@ -3780,4 +3780,13 @@
       Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.max.allowed.keys.changed.per.job</name>
+    <value>10000000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max numbers of keys changed allowed for a snapshot diff job.
+    </description>
+  </property>
 </configuration>
