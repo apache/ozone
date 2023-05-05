@@ -21,11 +21,13 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
@@ -67,6 +70,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +91,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -114,6 +119,7 @@ public class TestContainerEndpoint {
 
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
+  private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
@@ -190,6 +196,8 @@ public class TestContainerEndpoint {
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
+    containerStateManager = reconContainerManager
+        .getContainerStateManager();
   }
 
   @Before
@@ -1000,8 +1008,169 @@ public class TestContainerEndpoint {
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L);
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+  protected ContainerWithPipeline getTestContainer(
+      HddsProtos.LifeCycleState state, long containerId)
+      throws IOException, TimeoutException {
+    ContainerID localContainerID = ContainerID.valueOf(containerId);
+    Pipeline localPipeline = getRandomPipeline();
+    reconPipelineManager.addPipeline(localPipeline);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(localContainerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(localPipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(state)
+            .build();
+    return new ContainerWithPipeline(containerInfo, localPipeline);
+  }
+
+  @Test
+  public void testGetSCMDeletedContainers() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 102L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 103L));
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(102L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(102L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(103L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(103L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(2, 0);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(2, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(102, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+
+    deletedContainerInfo = deletedContainerInfoList.get(1);
+    Assertions.assertEquals(103, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersLimitParam() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 104L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 105L));
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(1, 0);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(104, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersPrevKeyParam() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 106L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 107L));
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(2, 106L);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(107, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
   }
 
   @Test

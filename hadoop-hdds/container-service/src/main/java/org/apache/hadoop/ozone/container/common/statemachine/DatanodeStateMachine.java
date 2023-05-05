@@ -196,7 +196,12 @@ public class DatanodeStateMachine implements Closeable {
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
-    supervisor = new ReplicationSupervisor(context, replicationConfig, clock);
+    supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .datanodeConfig(dnConf)
+        .replicationConfig(replicationConfig)
+        .clock(clock)
+        .build();
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -222,10 +227,12 @@ public class DatanodeStateMachine implements Closeable {
             pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getContainerDeleteThreads(), clock))
+            dnConf.getContainerDeleteThreads(), clock,
+            dnConf.getCommandQueueLimit()))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
-        .addHandler(new SetNodeOperationalStateCommandHandler(conf))
+        .addHandler(new SetNodeOperationalStateCommandHandler(conf,
+            supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
         .setConnectionManager(connectionManager)

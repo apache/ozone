@@ -253,7 +253,6 @@ share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
 share/ozone/lib/spring-beans.jar
 share/ozone/lib/spring-core.jar
-share/ozone/lib/spring-jcl.jar
 share/ozone/lib/spring-jdbc.jar
 share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar

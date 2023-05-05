@@ -25,7 +25,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
@@ -70,7 +69,6 @@ public class TestObjectGet {
   private HttpHeaders headers;
   private ObjectEndpoint rest;
   private OzoneClient client;
-  private ByteArrayInputStream body;
   private ContainerRequestContext context;
 
   @Before
@@ -89,7 +87,6 @@ public class TestObjectGet {
     rest.setOzoneConfiguration(new OzoneConfiguration());
     headers = Mockito.mock(HttpHeaders.class);
     rest.setHeaders(headers);
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
@@ -101,7 +98,7 @@ public class TestObjectGet {
   @Test
   public void get() throws IOException, OS3Exception {
     //WHEN
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", null, 0, null);
 
     //THEN
     OzoneInputStream ozoneInputStream =
@@ -123,7 +120,7 @@ public class TestObjectGet {
   public void inheritRequestHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", null, 0, null);
 
     Assert.assertEquals(CONTENT_TYPE1,
         response.getHeaderString("Content-Type"));
@@ -156,8 +153,7 @@ public class TestObjectGet {
 
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryParameter);
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    Response response = rest.get("b1", "key1", null, 0, null, body);
+    Response response = rest.get("b1", "key1", null, 0, null);
 
     Assert.assertEquals(CONTENT_TYPE2,
         response.getHeaderString("Content-Type"));
@@ -177,15 +173,14 @@ public class TestObjectGet {
   public void getRangeHeader() throws IOException, OS3Exception {
     Response response;
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", null, 0, null);
     Assert.assertEquals("1", response.getHeaderString("Content-Length"));
     Assert.assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", null, 0, null);
     Assert.assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
     Assert.assertEquals(
@@ -196,8 +191,7 @@ public class TestObjectGet {
   @Test
   public void getStatusCode() throws IOException, OS3Exception {
     Response response;
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", null, 0, null);
     Assert.assertEquals(response.getStatus(),
         Response.Status.OK.getStatusCode());
 
@@ -205,7 +199,7 @@ public class TestObjectGet {
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
     Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
-    response = rest.get("b1", "key1", null, 0, null, body);
+    response = rest.get("b1", "key1", null, 0, null);
     Assert.assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());
   }

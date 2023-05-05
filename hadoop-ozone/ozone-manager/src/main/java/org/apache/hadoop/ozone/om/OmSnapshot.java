@@ -69,6 +69,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private final String snapshotName;
   // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
+  private final KeyManager keyManager;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -82,6 +83,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
+    this.keyManager = keyManager;
     this.omMetadataManager = keyManager.getMetadataManager();
   }
 
@@ -135,7 +137,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    // TODO: handle denormalization
+    // TODO: [SNAPSHOT] handle denormalization
     return omMetadataReader.getAcl(normalizeOzoneObj(obj));
   }
 
@@ -258,8 +260,25 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     omMetadataManager.getStore().close();
   }
 
+  @Override
+  protected void finalize() throws Throwable {
+    // Verify that the DB handle has been closed, log warning otherwise
+    // https://softwareengineering.stackexchange.com/a/288724
+    if (!omMetadataManager.getStore().isClosed()) {
+      LOG.warn("{} is not closed properly. snapshotName: {}",
+          // Print hash code for debugging
+          omMetadataManager.getStore().toString(),
+          snapshotName);
+    }
+    super.finalize();
+  }
+
   @VisibleForTesting
   public OMMetadataManager getMetadataManager() {
     return omMetadataManager;
+  }
+
+  public KeyManager getKeyManager() {
+    return keyManager;
   }
 }

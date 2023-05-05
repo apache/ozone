@@ -258,18 +258,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
-   * with #deleting# prefix in OM DB.
-   *
-   * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} represent keys and blocks.
-   * @throws IOException
-   */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
-
-  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
@@ -382,7 +370,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
 
-  Table<String, String> getSnapshotRenamedKeyTable();
+  Table<String, String> getSnapshotRenamedTable();
 
   /**
    * Gets the OM Meta table.
@@ -479,6 +467,15 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzoneDeletePathKey(long objectId, String pathKey);
 
   /**
+   * Given ozone delete path key return the corresponding
+   * DB path key for directory table.
+   *
+   * @param ozoneDeletePath - ozone delete path
+   * @return DB directory key as String.
+   */
+  String getOzoneDeletePathDirKey(String ozoneDeletePath);
+
+  /**
    * Returns DB key name of an open file in OM metadata store. Should be
    * #open# prefix followed by actual leaf node name.
    *
@@ -495,7 +492,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in
-   * snapshotRenamedKeyTable.
+   * snapshotRenamedTable.
    *
    * @param volume   - volume name
    * @param bucket   - bucket name
@@ -544,4 +541,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   long getBucketId(String volume, String bucket) throws IOException;
 
+  /**
+   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * @param deletedKey - key to be purged from the deletedTable
+   * @return {@link BlockGroup}
+   */
+  List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
 }

@@ -30,8 +30,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Tests for {@link DatanodeIdYaml}.
@@ -94,6 +95,50 @@ class TestDatanodeIdYaml {
     assertNotNull(original.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
     assertEquals(original.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
         read.getPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+  }
+
+  @Test
+  void testWriteReadBeforeWebUIPortLayoutVersion(@TempDir File dir)
+      throws IOException {
+    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    File file = new File(dir, "datanode.yaml");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+    layoutStorage.initialize();
+
+    DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
+    DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
+
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.HTTP));
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.HTTPS));
+    assertNull(read.getPort(DatanodeDetails.Port.Name.HTTP));
+    assertNull(read.getPort(DatanodeDetails.Port.Name.HTTPS));
+  }
+
+  @Test
+  void testWriteReadAfterWebUIPortLayoutVersion(@TempDir File dir)
+      throws IOException {
+    DatanodeDetails original = MockDatanodeDetails.randomDatanodeDetails();
+    File file = new File(dir, "datanode.yaml");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+        UUID.randomUUID().toString(),
+        HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.layoutVersion());
+    layoutStorage.initialize();
+
+    DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
+    DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
+
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.HTTP));
+    assertNotNull(original.getPort(DatanodeDetails.Port.Name.HTTPS));
+    assertEquals(original.getPort(DatanodeDetails.Port.Name.HTTP),
+        read.getPort(DatanodeDetails.Port.Name.HTTP));
+    assertEquals(original.getPort(DatanodeDetails.Port.Name.HTTPS),
+        read.getPort(DatanodeDetails.Port.Name.HTTPS));
   }
 
 }

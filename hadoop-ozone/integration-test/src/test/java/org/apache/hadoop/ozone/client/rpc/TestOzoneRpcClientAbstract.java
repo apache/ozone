@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -60,6 +61,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -701,8 +703,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Bucket or Volume name has an unsupported" +
-            " character : #",
+        "Invalid bucket name: invalid#bucket",
         () -> volume.createBucket(bucketName));
   }
 
@@ -830,6 +831,35 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket newBucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, newBucket.getName());
     Assert.assertEquals(StorageType.SSD, newBucket.getStorageType());
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteBucketWithTheSamePrefix(BucketLayout bucketLayout)
+      throws Exception {
+    /*
+    * This test case simulates the following operations:
+    * 1. (op1) Create a bucket named "bucket1".
+    * 2. (op2) Create another bucket named "bucket11",
+    *          which has the same prefix as "bucket1".
+    * 3. (op3) Put a key in the "bucket11".
+    * 4. (op4) Delete the "bucket1". This operation should succeed.
+    * */
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName1 = "bucket1";
+    String bucketName2 = "bucket11";
+    String keyName = "key";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(bucketName1, bucketArgs);
+    volume.createBucket(bucketName2, bucketArgs);
+    OzoneBucket bucket2 = volume.getBucket(bucketName2);
+    bucket2.createKey(keyName, 1).close();
+    volume.deleteBucket(bucketName1);
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(bucketName1));
   }
 
   @Test
@@ -2091,16 +2121,25 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     createTestKey(bucket, fromKeyName, value);
-
-    // Rename to empty string should fail.
+    BucketLayout bucketLayout = bucket.getBucketLayout();
     OMException oe = null;
     String toKeyName = "";
-    try {
+
+    if (!bucketLayout.isFileSystemOptimized()) {
+      // Rename to an empty string should fail only in non FSO buckets
+      try {
+        bucket.renameKey(fromKeyName, toKeyName);
+      } catch (OMException e) {
+        oe = e;
+      }
+      Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
+    } else {
+      // Rename to an empty key in FSO should be okay, as we are handling the
+      // empty dest key on the server side and the source key name will be used
       bucket.renameKey(fromKeyName, toKeyName);
-    } catch (OMException e) {
-      oe = e;
+      OzoneKey emptyRenameKey = bucket.getKey(fromKeyName);
+      Assert.assertEquals(fromKeyName, emptyRenameKey.getName());
     }
-    Assert.assertEquals(ResultCodes.INVALID_KEY_NAME, oe.getResult());
 
     toKeyName = UUID.randomUUID().toString();
     bucket.renameKey(fromKeyName, toKeyName);
@@ -4034,14 +4073,15 @@ public abstract class TestOzoneRpcClientAbstract {
         omKeyInfo.getKeyLocationVersions().size());
 
     if (expectedCount == 1) {
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
-          .getOzoneManager().getMetadataManager()
-          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
+      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+          .getRangeKVs(null, 100,
+              cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
-      Assert.assertNotNull(repeatedOmKeyInfo);
+      Assert.assertTrue(rangeKVs.size() > 0);
       Assert.assertEquals(expectedCount,
-          repeatedOmKeyInfo.getOmKeyInfoList().size());
+          rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
@@ -4087,7 +4127,7 @@ public abstract class TestOzoneRpcClientAbstract {
             HddsProtos.ReplicationFactor.ONE),
         currentReplicationConfig);
     ECReplicationConfig ecReplicationConfig =
-        new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 1024);
+        new ECReplicationConfig(3, 2, EcCodec.RS, (int) OzoneConsts.MB);
     bucket.setReplicationConfig(ecReplicationConfig);
 
     // Get the bucket and check the updated config.

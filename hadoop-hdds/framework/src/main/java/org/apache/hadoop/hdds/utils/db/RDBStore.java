@@ -19,9 +19,10 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,21 +30,20 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
+import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -67,7 +67,7 @@ public class RDBStore implements DBStore {
   private final RocksDatabase db;
   private final File dbLocation;
   private final CodecRegistry codecRegistry;
-  private ObjectName statMBeanName;
+  private RocksDBStoreMetrics metrics;
   private final RDBCheckpointManager checkPointManager;
   private final String checkpointsParentDir;
   private final String snapshotsParentDir;
@@ -81,12 +81,12 @@ public class RDBStore implements DBStore {
 
   @VisibleForTesting
   public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families, long maxDbUpdatesSizeThreshold)
+                  Set<TableConfig> families,
+                  long maxDbUpdatesSizeThreshold)
       throws IOException {
     this(dbFile, options, new ManagedWriteOptions(), families,
         new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
-        maxDbUpdatesSizeThreshold);
+        maxDbUpdatesSizeThreshold, true, null);
   }
 
   @SuppressWarnings("parameternumber")
@@ -94,9 +94,10 @@ public class RDBStore implements DBStore {
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanNameName, boolean enableCompactionLog,
-                  long maxTimeAllowedForSnapshotInDag,
-                  long compactionDagDaemonInterval,
-                  long maxDbUpdatesSizeThreshold)
+                  long maxDbUpdatesSizeThreshold,
+                  boolean createCheckpointDirs,
+                  ConfigurationSource configuration)
+
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -109,11 +110,10 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(),
-            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
+            dbLocation.toString(), configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -122,46 +122,35 @@ public class RDBStore implements DBStore {
       db = RocksDatabase.open(dbFile, dbOptions, writeOptions,
           families, readOnly);
 
-      if (dbOptions.statistics() != null) {
-        Map<String, String> jmxProperties = new HashMap<>();
-        jmxProperties.put("dbName", dbJmxBeanName);
-        statMBeanName = HddsUtils.registerWithJmxProperties(
-            "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(), db,
-                dbJmxBeanName));
-        if (statMBeanName == null) {
-          LOG.warn("jmx registration failed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        } else {
-          LOG.debug("jmx registration succeed during RocksDB init, db path :{}",
-              dbJmxBeanName);
-        }
+      // dbOptions.statistics() only contribute to part of RocksDB metrics in
+      // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
+      metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
+          dbJmxBeanName);
+      if (metrics == null) {
+        LOG.warn("Metrics registration failed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
+      } else {
+        LOG.debug("Metrics registration succeed during RocksDB init, " +
+            "db path :{}", dbJmxBeanName);
       }
 
       //create checkpoints directory if not exists.
-      checkpointsParentDir =
-          dbLocation.getParent() + OM_KEY_PREFIX + OM_CHECKPOINT_DIR;
-      File checkpointsDir = new File(checkpointsParentDir);
-      if (!checkpointsDir.exists()) {
-        boolean success = checkpointsDir.mkdir();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB checkpoint directory: " +
-              checkpointsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        checkpointsParentDir = null;
+      } else {
+        Path checkpointsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
+        checkpointsParentDir = checkpointsParentDirPath.toString();
+        Files.createDirectories(checkpointsParentDirPath);
       }
-
       //create snapshot checkpoint directory if does not exist.
-      snapshotsParentDir = Paths.get(dbLocation.getParent(),
-          OM_SNAPSHOT_CHECKPOINT_DIR).toString();
-      File snapshotsDir = new File(snapshotsParentDir);
-      if (!snapshotsDir.exists()) {
-        boolean success = snapshotsDir.mkdirs();
-        if (!success) {
-          throw new IOException(
-              "Unable to create RocksDB snapshot checkpoint directory: " +
-              snapshotsParentDir);
-        }
+      if (!createCheckpointDirs) {
+        snapshotsParentDir = null;
+      } else {
+        Path snapshotsParentDirPath =
+            Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
+        snapshotsParentDir = snapshotsParentDirPath.toString();
+        Files.createDirectories(snapshotsParentDirPath);
       }
 
       if (enableCompactionLog) {
@@ -219,9 +208,9 @@ public class RDBStore implements DBStore {
 
   @Override
   public void close() throws IOException {
-    if (statMBeanName != null) {
-      MBeans.unregister(statMBeanName);
-      statMBeanName = null;
+    if (metrics != null) {
+      metrics.unregister();
+      metrics = null;
     }
 
     RDBMetrics.unRegister();
@@ -273,12 +262,6 @@ public class RDBStore implements DBStore {
   public void commitBatchOperation(BatchOperation operation)
       throws IOException {
     ((RDBBatchOperation) operation).commit(db);
-  }
-
-
-  @VisibleForTesting
-  protected ObjectName getStatMBeanName() {
-    return statMBeanName;
   }
 
   @Override
@@ -405,9 +388,11 @@ public class RDBStore implements DBStore {
           long currSequenceNumber = result.sequenceNumber();
           if (checkValidStartingSeqNumber &&
               currSequenceNumber > 1 + sequenceNumber) {
-            throw new SequenceNumberNotFoundException("Unable to read data from"
-                + " RocksDB wal to get delta updates. It may have already been"
-                + " flushed to SSTs.");
+            throw new SequenceNumberNotFoundException("Unable to read full data"
+                + " from RocksDB wal to get delta updates. It may have"
+                + " partially been flushed to SSTs. Requested sequence number"
+                + " is " + sequenceNumber + " and first available sequence" +
+                " number is " + currSequenceNumber + " in wal.");
           }
           // If the above condition was not satisfied, then it is OK to reset
           // the flag.
@@ -443,6 +428,12 @@ public class RDBStore implements DBStore {
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
       dbUpdatesWrapper.setDBUpdateSuccess(false);
+    } finally {
+      if (dbUpdatesWrapper.getData().size() > 0) {
+        rdbMetrics.incWalUpdateDataSize(cumulativeDBUpdateLogBatchSize);
+        rdbMetrics.incWalUpdateSequenceCount(
+            dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
+      }
     }
     dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;

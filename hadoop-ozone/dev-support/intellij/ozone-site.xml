@@ -16,6 +16,10 @@
 -->
 <configuration>
   <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>LEGACY</value>
+  </property>
+  <property>
     <name>hdds.profiler.endpoint.enabled</name>
     <value>true</value>
   </property>
@@ -90,5 +94,10 @@
   <property>
     <name>ozone.scm.dead.node.interval</name>
     <value>10m</value>
+  </property>
+
+  <property>
+    <name>ozone.metastore.rocksdb.statistics</name>
+    <value>ALL</value>
   </property>
 </configuration>

@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -118,6 +119,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Recon's 'lite' version of SCM.
  */
+@Singleton
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
@@ -191,17 +193,13 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
-        conf,
-        nodeManager,
+        conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
-        eventQueue,
-        scmhaManager,
-        scmContext);
+        eventQueue, scmhaManager, scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         conf, Clock.system(ZoneId.systemDefault()));
     this.containerManager = new ReconContainerManager(conf,
-        dbStore,
-        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore, ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager, reconContainerMetadataManager,
         scmhaManager, sequenceIdGen, pendingOps);
@@ -221,17 +219,12 @@ public class ReconStorageContainerManagerFacade
 
     ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(
-        pipelineManager,
-        nodeManager,
-        scmServiceProvider,
-        reconTaskStatusDao,
-        reconTaskConfig);
+        pipelineManager, nodeManager, scmServiceProvider,
+        reconTaskStatusDao, reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
-        containerManager,
-        scmServiceProvider,
+        containerManager, scmServiceProvider,
         reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig);
+        containerPlacementPolicy, reconTaskConfig);
 
     StaleNodeHandler staleNodeHandler =
         new ReconStaleNodeHandler(nodeManager, pipelineManager,
@@ -248,7 +241,8 @@ public class ReconStorageContainerManagerFacade
             containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            null, 0);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
     // Use the same executor for both ICR and FCR.
@@ -671,6 +665,10 @@ public class ReconStorageContainerManagerFacade
   @Override
   public SCMNodeDetails getScmNodeDetails() {
     return reconNodeDetails;
+  }
+
+  public DBStore getScmDBStore() {
+    return dbStore;
   }
 
   public EventQueue getEventQueue() {

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
@@ -237,14 +238,27 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Checks if the OperationalState is Node is Decomissioned or Decomissioning.
-   * @return True if OperationalState is Decommissioned or Decomissioning.
+   * @return true if the node is or being decommissioned
    */
-  public boolean isDecomissioned() {
-    return this.getPersistedOpState() ==
-            HddsProtos.NodeOperationalState.DECOMMISSIONED ||
-            this.getPersistedOpState() ==
-            HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  public boolean isDecommissioned() {
+    return isDecommission(getPersistedOpState());
+  }
+
+  public static boolean isDecommission(HddsProtos.NodeOperationalState state) {
+    return state == HddsProtos.NodeOperationalState.DECOMMISSIONED ||
+        state == HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  }
+
+  /**
+   * @return true if node is in or entering maintenance
+   */
+  public boolean isMaintenance() {
+    return isMaintenance(getPersistedOpState());
+  }
+
+  public static boolean isMaintenance(HddsProtos.NodeOperationalState state) {
+    return state == HddsProtos.NodeOperationalState.IN_MAINTENANCE ||
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
   }
 
   /**
@@ -805,7 +819,11 @@ public class DatanodeDetails extends NodeImpl implements
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
       @BelongsToHDDSLayoutVersion(RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS)
-      RATIS_DATASTREAM;
+      RATIS_DATASTREAM,
+      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
+      HTTP,
+      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
+      HTTPS;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());
