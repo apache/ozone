@@ -25,11 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
+
 import com.google.gson.GsonBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,7 +53,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
+
 import org.kohsuke.MetaInfServices;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -110,15 +114,25 @@ public class ChunkKeyHandler extends KeyHandler implements
       ContainerLayoutVersion containerLayoutVersion =
           ContainerLayoutVersion.getConfiguredVersion(getConf());
       JsonArray responseArrayList = new JsonArray();
+      Pipeline pipeline = null;
       for (OmKeyLocationInfo keyLocation : locationInfos) {
         ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
         ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
         long containerId = keyLocation.getContainerID();
         chunkPaths.clear();
-        Pipeline pipeline = keyLocation.getPipeline();
-        if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
-          pipeline = Pipeline.newBuilder(pipeline).setReplicationConfig(
-              StandaloneReplicationConfig.getInstance(ONE)).build();
+        Pipeline pipelineFromKeyBlock = keyLocation.getPipeline();
+        if (pipelineFromKeyBlock.getType() != HddsProtos.ReplicationType
+            .STAND_ALONE) {
+          pipelineFromKeyBlock = Pipeline.newBuilder(pipelineFromKeyBlock)
+              .setReplicationConfig(
+                  StandaloneReplicationConfig.getInstance(ONE)).build();
+        }
+        // when pipeline changes close client instance for the older pipeline
+        if (pipelineFromKeyBlock != pipeline) {
+          pipeline = pipelineFromKeyBlock;
+          if (xceiverClient != null) {
+            xceiverClient.close();
+          }
         }
         xceiverClient = xceiverClientManager.acquireClientForReadData(pipeline);
         // Datanode is queried to get chunk information.Thus querying the
@@ -186,6 +200,10 @@ public class ChunkKeyHandler extends KeyHandler implements
       Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
       String prettyJson = gson2.toJson(result);
       System.out.println(prettyJson);
+    } finally {
+      if (xceiverClient != null) {
+        xceiverClient.close();
+      }
     }
   }
 
