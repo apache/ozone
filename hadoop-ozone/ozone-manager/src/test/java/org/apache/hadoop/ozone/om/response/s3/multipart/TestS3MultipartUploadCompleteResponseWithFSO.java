@@ -383,7 +383,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName = omMetadataManager.getOzoneDeletePathKey(
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo().getObjectID(), multipartKey);
+        omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo().getObjectID(),
+        multipartKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

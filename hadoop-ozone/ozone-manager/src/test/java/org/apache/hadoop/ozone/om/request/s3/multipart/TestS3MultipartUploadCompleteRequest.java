@@ -70,7 +70,8 @@ public class TestS3MultipartUploadCompleteRequest
     checkDeleteTableCount(volumeName, bucketName, keyName, 0, uploadId);
 
     // Do it twice to test overwrite
-    uploadId = checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName);
+    uploadId = checkValidateAndUpdateCacheSuccess(volumeName, bucketName,
+        keyName);
     // After overwrite, one entry must be in delete table
     checkDeleteTableCount(volumeName, bucketName, keyName, 1, uploadId);
   }
