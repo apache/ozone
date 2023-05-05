@@ -2,6 +2,7 @@
   "/api/v1/*": "/$1",
   "/containers/:id/keys": "/keys",
   "/utilization/fileCount": "/fileSizeCounts",
+  "/utilization/containerCount": "/containerCount",
   "/namespace/du?path=/&files=true": "/root",
   "/namespace/du?path=/vol:id&files=true": "/volume",
   "/namespace/du?path=/vol:id/&files=true": "/volume",
