@@ -19,15 +19,11 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 
 import com.google.common.base.Preconditions;
-
-import org.apache.commons.lang3.ClassUtils;
 
 /**
  * Collection of available codecs.
@@ -123,15 +119,9 @@ public final class CodecRegistry {
    * @return Codec for the typed object.
    */
   private <T> Codec<T> getCodec(Class<T> format) {
-    final List<Class<?>> classes = new ArrayList<>();
-    classes.add(format);
-    classes.addAll(ClassUtils.getAllSuperclasses(format));
-    classes.addAll(ClassUtils.getAllInterfaces(format));
-    for (Class<?> clazz : classes) {
-      final Codec<?> codec = valueCodecs.get(clazz);
-      if (codec != null) {
-        return (Codec<T>) codec;
-      }
+    final Codec<?> codec = valueCodecs.get(format);
+    if (codec != null) {
+      return (Codec<T>) codec;
     }
     throw new IllegalStateException(
         "Codec is not registered for type: " + format);
