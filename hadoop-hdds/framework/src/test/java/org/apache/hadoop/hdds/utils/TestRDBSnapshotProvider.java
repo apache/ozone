@@ -54,6 +54,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
+import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,7 +93,7 @@ public class TestRDBSnapshotProvider {
       configSet.add(newConfig);
     }
     testDir = tempDir;
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
@@ -177,20 +178,22 @@ public class TestRDBSnapshotProvider {
 
   public void compareDB(File db1, File db2, int columnFamilyUsed)
       throws Exception {
-    try (RDBStore rdbStore1 = new RDBStore(db1, getNewDBOptions(),
+    try (RDBStore rdbStore1 = newRDBStore(db1, getNewDBOptions(),
              configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
-         RDBStore rdbStore2 = new RDBStore(db2, getNewDBOptions(),
+         RDBStore rdbStore2 = newRDBStore(db2, getNewDBOptions(),
              configSet, MAX_DB_UPDATES_SIZE_THRESHOLD)) {
       // all entries should be same from two DB
       for (int i = 0; i < columnFamilyUsed; i++) {
+        final String name = families.get(i);
+        final Table<byte[], byte[]> table1 = rdbStore1.getTable(name);
+        final Table<byte[], byte[]> table2 = rdbStore2.getTable(name);
         try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator
-                 = rdbStore1.getTable(families.get(i)).iterator()) {
+                 = table1.iterator()) {
           while (iterator.hasNext()) {
             KeyValue<byte[], byte[]> keyValue = iterator.next();
             byte[] key = keyValue.getKey();
             byte[] value1 = keyValue.getValue();
-            byte[] value2 = rdbStore2.getTable(families.get(i))
-                .getIfExist(key);
+            byte[] value2 = table2.getIfExist(key);
             assertArrayEquals(value1, value2);
           }
         }

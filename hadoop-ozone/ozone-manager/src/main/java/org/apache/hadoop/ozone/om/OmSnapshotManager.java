@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -325,17 +324,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   private CodecRegistry createCodecRegistryForSnapDiff() {
-    CodecRegistry registry = new CodecRegistry();
-
-    // Integers are used for indexing persistent list.
-    registry.addCodec(Integer.class, new IntegerCodec());
+    final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
-
-    return registry;
+    return registry.build();
   }
 
   /**

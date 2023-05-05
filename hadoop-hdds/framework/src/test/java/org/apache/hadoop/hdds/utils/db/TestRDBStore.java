@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
+      Set<TableConfig> families,
+      long maxDbUpdatesSizeThreshold)
+      throws IOException {
+    return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
+        CodecRegistry.newBuilder().build(), false, 1000, null, false,
+        maxDbUpdatesSizeThreshold, true, null);
+  }
+
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -78,7 +88,7 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
@@ -244,7 +254,7 @@ public class TestRDBStore {
     Assertions.assertNotNull(checkpoint);
 
     RDBStore restoredStoreFromCheckPoint =
-        new RDBStore(checkpoint.getCheckpointLocation().toFile(),
+        newRDBStore(checkpoint.getCheckpointLocation().toFile(),
             options, configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
 
     // Let us make sure that our estimate is not off by 10%
@@ -348,7 +358,7 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet,
+    rdbStore = newRDBStore(rdbStore.getDbLocation(), options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
       try (Table table = rdbStore.getTable(family)) {

@@ -79,16 +79,6 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
 
-  @VisibleForTesting
-  public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families,
-                  long maxDbUpdatesSizeThreshold)
-      throws IOException {
-    this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, true, null);
-  }
-
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
