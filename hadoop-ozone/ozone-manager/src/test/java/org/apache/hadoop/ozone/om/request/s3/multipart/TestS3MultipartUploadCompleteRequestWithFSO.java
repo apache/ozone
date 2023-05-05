@@ -89,22 +89,6 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             omMetadataManager);
   }
 
-  @Override
-  protected String getMultipartKey(String volumeName, String bucketName,
-      String keyName, String multipartUploadID) throws IOException {
-    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-            omMetadataManager, volumeName,
-            bucketName, keyName, 0);
-
-    Assert.assertNotNull("key not found in DB!", keyStatus);
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-    return omMetadataManager.getMultipartKey(volumeId, bucketId,
-            keyStatus.getKeyInfo().getParentObjectID(),
-            keyStatus.getTrimmedName(), multipartUploadID);
-  }
-
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
     Path keyPath = Paths.get(keyName);

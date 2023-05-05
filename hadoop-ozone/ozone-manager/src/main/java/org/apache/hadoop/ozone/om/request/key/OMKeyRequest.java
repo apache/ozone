@@ -796,9 +796,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Prepare key for deletion service on overwrite.
    *
-   * @param dbOzoneKey key to point to an object in RocksDB
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
-   * @param omMetadataManager
    * @param trxnLogIndex
    * @param isRatisEnabled
    * @return Old keys eligible for deletion.
