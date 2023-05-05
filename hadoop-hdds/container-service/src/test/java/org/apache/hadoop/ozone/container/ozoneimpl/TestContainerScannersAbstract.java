@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public abstract class TestContainerScannersAbstract {
 
-  protected final AtomicLong containerIdSeq = new AtomicLong(100);
+  private static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
 
   @Mock
   protected Container<ContainerData> healthy;
@@ -126,20 +126,20 @@ public abstract class TestContainerScannersAbstract {
   private ContainerController mockContainerController() {
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
-        true, true, true, containerIdSeq);
+        true, true, true, CONTAINER_SEQ_ID);
 
     // Open container (only metadata can be scanned)
     ContainerTestUtils.setupMockContainer(openContainer,
-        false, true, false, containerIdSeq);
+        false, true, false, CONTAINER_SEQ_ID);
 
     // unhealthy container (corrupt data)
     ContainerTestUtils.setupMockContainer(corruptData,
-        true, true, false, containerIdSeq);
+        true, true, false, CONTAINER_SEQ_ID);
 
     // unhealthy container (corrupt metadata). To simulate container still
     // being open while metadata is corrupted, shouldScanData will return false.
     ContainerTestUtils.setupMockContainer(openCorruptMetadata,
-        false, false, false, containerIdSeq);
+        false, false, false, CONTAINER_SEQ_ID);
 
     Collection<Container<?>> containers = Arrays.asList(
         healthy, corruptData, openCorruptMetadata);
