@@ -18,27 +18,29 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.nio.ByteBuffer;
-
 import com.google.common.primitives.Ints;
+
+import javax.annotation.Nonnull;
+import java.util.function.IntFunction;
 
 /**
  * Codec to convert Integer to/from byte array.
  */
 public final class IntegerCodec implements Codec<Integer> {
   @Override
-  public boolean supportByteBuffer() {
+  public boolean supportCodecBuffer() {
     return true;
   }
 
   @Override
-  public ByteBuffer toByteBuffer(Integer object) {
-    return ByteBuffer.wrap(toPersistedFormat(object));
+  public CodecBuffer toCodecBuffer(@Nonnull Integer object,
+      IntFunction<CodecBuffer> allocator) {
+    return allocator.apply(Integer.BYTES).putInt(object);
   }
 
   @Override
-  public Integer fromByteBuffer(ByteBuffer rawData) {
-    return rawData.getInt();
+  public Integer fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return buffer.asReadOnlyByteBuffer().getInt();
   }
 
   @Override

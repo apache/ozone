@@ -20,24 +20,25 @@ package org.apache.hadoop.hdds.utils.db;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.function.IntFunction;
 
 /**
  * Codec interface to serialize/deserialize objects to/from bytes.
  * A codec implementation must support the byte[] methods
- * and may optionally support the {@link ByteBuffer} methods.
+ * and may optionally support the {@link CodecBuffer} methods.
  *
  * @param <T> The object type.
  */
 public interface Codec<T> {
   /**
-   * Does this {@link Codec} support the {@link ByteBuffer} methods?
+   * Does this {@link Codec} support the {@link CodecBuffer} methods?
    * If this method returns true, this class must implement both
-   * {@link #toByteBuffer(Object)} and {@link #fromByteBuffer(ByteBuffer)}.
+   * {@link #toCodecBuffer(Object, IntFunction)} and
+   * {@link #fromCodecBuffer(CodecBuffer)}.
    *
-   * @return ture iff this class supports the {@link ByteBuffer} methods.
+   * @return ture iff this class supports the {@link CodecBuffer} methods.
    */
-  default boolean supportByteBuffer() {
+  default boolean supportCodecBuffer() {
     return false;
   }
 
@@ -45,20 +46,32 @@ public interface Codec<T> {
    * Serialize the given object to bytes.
    *
    * @param object The object to be serialized.
-   * @return the serialized bytes.
+   * @param allocator To allocate a buffer.
+   * @return a buffer storing the serialized bytes.
    */
-  default ByteBuffer toByteBuffer(@Nonnull T object) throws IOException {
+  default CodecBuffer toCodecBuffer(@Nonnull T object,
+      IntFunction<CodecBuffer> allocator) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Deserialize an object from the given buffer.
-   * The position of the given buffer is incremented by the serialized size.
+   * Serialize the given object to bytes.
    *
-   * @param buffer Serialized bytes of an object.
+   * @param object The object to be serialized.
+   * @return a direct buffer storing the serialized bytes.
+   */
+  default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
+      throws IOException {
+    return toCodecBuffer(object, CodecBuffer::allocateDirect);
+  }
+
+  /**
+   * Deserialize an object from the given buffer.
+   *
+   * @param buffer Storing the serialized bytes of an object.
    * @return the deserialized object.
    */
-  default T fromByteBuffer(@Nonnull ByteBuffer buffer) throws IOException {
+  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws IOException {
     throw new UnsupportedOperationException();
   }
 

@@ -18,7 +18,8 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.nio.ByteBuffer;
+import java.util.function.IntFunction;
+import javax.annotation.Nonnull;
 
 import org.apache.hadoop.hdds.StringUtils;
 
@@ -27,18 +28,20 @@ import org.apache.hadoop.hdds.StringUtils;
  */
 public final class StringCodec implements Codec<String> {
   @Override
-  public boolean supportByteBuffer() {
+  public boolean supportCodecBuffer() {
     return true;
   }
 
   @Override
-  public ByteBuffer toByteBuffer(String object) {
-    return ByteBuffer.wrap(toPersistedFormat(object));
+  public CodecBuffer toCodecBuffer(@Nonnull String object,
+      IntFunction<CodecBuffer> allocator) {
+    final byte[] array = toPersistedFormat(object);
+    return allocator.apply(array.length).put(array);
   }
 
   @Override
-  public String fromByteBuffer(ByteBuffer rawData) {
-    return StringUtils.bytes2String(rawData);
+  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return StringUtils.bytes2String(buffer.asReadOnlyByteBuffer());
   }
 
   @Override

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -120,10 +119,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void put(KEY key, VALUE value) throws IOException {
     final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
     final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
-    if (keyCodec.supportByteBuffer() && valueCodec.supportByteBuffer()) {
-      final ByteBuffer k = keyCodec.toByteBuffer(key);
-      final ByteBuffer v = valueCodec.toByteBuffer(value);
-      rawTable.put(k, v);
+    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+      try(CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
+          CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
+        rawTable.put(k.asReadOnlyByteBuffer(), v.asReadOnlyByteBuffer());
+      }
       return;
     }
 
