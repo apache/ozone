@@ -631,14 +631,14 @@ public final class OzoneManagerDoubleBuffer {
     try {
       while (currentBuffer.size() == 0) {
         wait(1000L);
-        if  (currentBuffer.size() == 0) {
+        if (currentBuffer.size() == 0) {
           // Both buffers are empty, so notify twice
           flushNotifier.notifyFlush();
           flushNotifier.notifyFlush();
         }
       }
       return true;
-    }  catch (InterruptedException ex) {
+    } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       if (isRunning.get()) {
         final String message = "OMDoubleBuffer flush thread " +
@@ -708,7 +708,7 @@ public final class OzoneManagerDoubleBuffer {
 
     int notifyFlush() {
       int retval = flushLatches.size();
-      for (CountDownLatch l: flushLatches) {
+      for (CountDownLatch l : flushLatches) {
         l.countDown();
       }
       return retval;
