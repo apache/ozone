@@ -89,6 +89,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
@@ -565,7 +567,7 @@ public class ReplicationManager implements SCMService {
     datanodes.sort(Comparator.comparingInt(Pair::getLeft));
     DatanodeDetails datanode = datanodes.get(0).getRight();
     int currentCount = datanodes.get(0).getLeft();
-    if (currentCount + additionalCmdCount >= datanodeReplicationLimit) {
+    if (currentCount + additionalCmdCount >= getReplicationLimit(datanode)) {
       addExcludedNode(datanode);
     }
     return datanode;
@@ -587,11 +589,13 @@ public class ReplicationManager implements SCMService {
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
-        int totalCount = getDatanodeQueuedReplicationCount(dn);
-        if (totalCount >= datanodeReplicationLimit) {
-          LOG.debug("Datanode {} has reached the maximum number of queued " +
-              "commands, replication + reconstruction * {}: {})",
-              dn, reconstructionCommandWeight, totalCount);
+        int totalCount = getQueuedReplicationCount(dn);
+        int replicationLimit = getReplicationLimit(dn);
+        if (totalCount >= replicationLimit) {
+          LOG.debug("Datanode {} has reached the maximum of {} queued " +
+              "commands for state {}, replication + reconstruction * {}: {}",
+              dn, replicationLimit, dn.getPersistedOpState(),
+              reconstructionCommandWeight, totalCount);
           addExcludedNode(dn);
           continue;
         }
@@ -604,7 +608,7 @@ public class ReplicationManager implements SCMService {
     return datanodeWithCommandCount;
   }
 
-  private int getDatanodeQueuedReplicationCount(DatanodeDetails datanode)
+  private int getQueuedReplicationCount(DatanodeDetails datanode)
       throws NodeNotFoundException {
     Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
         datanode, Type.replicateContainerCommand,
@@ -816,10 +820,9 @@ public class ReplicationManager implements SCMService {
     LOG.debug("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
     // If there is an existing mapping, we may need to remove it
-    excludedNodes.computeIfPresent(datanode, (k, v) -> {
+    excludedNodes.computeIfPresent(datanode, (dn, v) -> {
       try {
-        if (getDatanodeQueuedReplicationCount(datanode)
-            < datanodeReplicationLimit) {
+        if (getQueuedReplicationCount(dn) < getReplicationLimit(dn)) {
           // Returning null removes the entry from the map
           return null;
         } else {
@@ -1366,6 +1369,13 @@ public class ReplicationManager implements SCMService {
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
           lastTimeToBeReadyInMillis = clock.millis();
+          // It this SCM was previously a leader and transitioned to a follower
+          // and then back to a leader in a short time, there may be old pending
+          // Ops in the ContainerReplicaPendingOps table. They are no longer
+          // needed as the DN will discard any commands when the term changes.
+          // Therefore we should clear the table so RM starts from a clean
+          // state.
+          containerReplicaPendingOps.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
         if (rmConf.isLegacyEnabled()) {
@@ -1474,6 +1484,15 @@ public class ReplicationManager implements SCMService {
   
   public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
     return containerReplicaPendingOps;
+  }
+
+  private int getReplicationLimit(DatanodeDetails datanode) {
+    HddsProtos.NodeOperationalState state = datanode.getPersistedOpState();
+    int limit = datanodeReplicationLimit;
+    if (isMaintenance(state) || isDecommission(state)) {
+      limit *= 2;
+    }
+    return limit;
   }
 
   /**

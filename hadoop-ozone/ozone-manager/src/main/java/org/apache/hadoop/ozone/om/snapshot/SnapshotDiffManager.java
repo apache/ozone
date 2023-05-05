@@ -91,6 +91,8 @@ import java.util.concurrent.SynchronousQueue;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -131,6 +133,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final ManagedColumnFamilyOptions familyOptions;
   // TODO: [SNAPSHOT] Use different wait time based of job status.
   private final long defaultWaitTime;
+  private final long maxAllowedKeyChangesForASnapDiff;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -156,9 +159,8 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private final String sstBackupDirForSnapDiffJobs;
 
-  private boolean isNativeRocksToolsLoaded;
-
-  private ManagedSSTDumpTool sstDumpTool;
+  private final boolean isNativeRocksToolsLoaded;
+  private final ManagedSSTDumpTool sstDumpTool;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffManager(ManagedRocksDB db,
@@ -180,6 +182,12 @@ public class SnapshotDiffManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT,
         TimeUnit.MILLISECONDS
     );
+
+    this.maxAllowedKeyChangesForASnapDiff = ozoneManager.getConfiguration()
+        .getLong(
+            OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB,
+            OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
+        );
 
     int threadPoolSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
@@ -212,6 +220,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     createEmptySnapDiffDir(path);
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
+    this.sstDumpTool = initSSTDumpTool(ozoneManager.getConfiguration());
+    this.isNativeRocksToolsLoaded = sstDumpTool != null;
+
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
     // inefficient. Especially, when OM node restarts and loses its leadership.
@@ -226,16 +237,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     // When we build snapDiff HA aware, we will revisit this.
     // Details: https://github.com/apache/ozone/pull/4438#discussion_r1149788226
     this.loadJobsOnStartUp();
-
-    isNativeRocksToolsLoaded = NativeLibraryLoader.getInstance()
-            .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-    if (isNativeRocksToolsLoaded) {
-      isNativeRocksToolsLoaded = initSSTDumpTool(
-          ozoneManager.getConfiguration());
-    }
   }
 
-  private boolean initSSTDumpTool(OzoneConfiguration conf) {
+  private ManagedSSTDumpTool initSSTDumpTool(OzoneConfiguration conf) {
+    if (!NativeLibraryLoader.getInstance()
+        .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
+      return null;
+    }
+
     try {
       int threadPoolSize = conf.getInt(
               OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
@@ -252,11 +261,10 @@ public class SnapshotDiffManager implements AutoCloseable {
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
               new ThreadPoolExecutor.DiscardPolicy());
-      sstDumpTool = new ManagedSSTDumpTool(execService, bufferSize);
+      return new ManagedSSTDumpTool(execService, bufferSize);
     } catch (NativeLibraryNotLoadedException e) {
-      return false;
+      return null;
     }
-    return true;
   }
 
   /**
@@ -786,7 +794,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                                 PersistentMap<byte[], byte[]> newObjIdToKeyMap,
                                 PersistentSet<byte[]> objectIDsToCheck,
                                 Map<String, String> tablePrefixes)
-      throws IOException, NativeLibraryNotLoadedException {
+      throws IOException, NativeLibraryNotLoadedException, RocksDBException {
 
     Set<String> deltaFiles = isNativeRocksToolsLoadedDeltaFilesPair.getRight();
     if (deltaFiles.isEmpty()) {
@@ -797,6 +805,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     boolean isDirectoryTable =
         fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
+    validateEstimatedKeyChangesAreInLimits(sstFileReader);
+
     try (Stream<String> keysToCheck = nativeRocksToolsLoaded
                  ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool)
                  : sstFileReader.getKeyStream()) {
@@ -900,6 +910,20 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
 
     return deltaFiles;
+  }
+
+  private void validateEstimatedKeyChangesAreInLimits(
+      ManagedSstFileReader sstFileReader
+  ) throws RocksDBException, IOException {
+    if (sstFileReader.getEstimatedTotalKeys() >
+        maxAllowedKeyChangesForASnapDiff) {
+      throw new IOException(
+          String.format("Expected diff contains more than max allowed key " +
+                  "changes for a snapDiff job. EstimatedTotalKeys: %s, " +
+                  "AllowMaxTotalKeys: %s.",
+              sstFileReader.getEstimatedTotalKeys(),
+              maxAllowedKeyChangesForASnapDiff));
+    }
   }
 
   private long generateDiffReport(

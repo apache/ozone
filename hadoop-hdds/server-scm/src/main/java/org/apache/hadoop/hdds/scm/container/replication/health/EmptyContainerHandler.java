@@ -101,14 +101,15 @@ public class EmptyContainerHandler extends AbstractCheck {
    */
   private void deleteContainerReplicas(final ContainerInfo containerInfo,
       final Set<ContainerReplica> replicas) {
-    Preconditions.assertTrue(containerInfo.getState() ==
-        HddsProtos.LifeCycleState.CLOSED);
-    Preconditions.assertTrue(containerInfo.getNumberOfKeys() == 0);
+    Preconditions.assertSame(HddsProtos.LifeCycleState.CLOSED,
+        containerInfo.getState(), "container state");
+    Preconditions.assertSame(0L, containerInfo.getNumberOfKeys(),
+        "key count");
 
     for (ContainerReplica rp : replicas) {
-      Preconditions.assertTrue(
-          rp.getState() == ContainerReplicaProto.State.CLOSED);
-      Preconditions.assertTrue(rp.getKeyCount() == 0);
+      Preconditions.assertSame(ContainerReplicaProto.State.CLOSED,
+          rp.getState(), "replica state");
+      Preconditions.assertSame(0, rp.getKeyCount(), "replica key count");
 
       try {
         replicationManager.sendDeleteCommand(containerInfo,

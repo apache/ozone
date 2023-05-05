@@ -73,6 +73,29 @@ public class TestContainerReplicaPendingOps {
   }
 
   @Test
+  public void testClear() {
+    pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
+    pendingOps.scheduleDeleteReplica(new ContainerID(2), dn1, 0, deadline);
+
+    Assertions.assertEquals(1,
+        pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
+    Assertions.assertEquals(1,
+        pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE));
+
+    pendingOps.clear();
+
+    Assertions.assertEquals(0,
+        pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
+    Assertions.assertEquals(0,
+        pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE));
+    Assertions.assertEquals(0,
+        pendingOps.getPendingOps(new ContainerID(1)).size());
+    Assertions.assertEquals(0,
+        pendingOps.getPendingOps(new ContainerID(2)).size());
+
+  }
+
+  @Test
   public void testCanAddReplicasForAdd() {
     pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 0, deadline);
     pendingOps.scheduleAddReplica(new ContainerID(1), dn2, 0, deadline);

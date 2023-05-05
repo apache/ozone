@@ -11,6 +11,7 @@
     "containers": 3230,
     "missingContainers": 1002,
     "openContainers": 5,
+    "deletedContainers": 4,
     "volumes": 5,
     "buckets": 156,
     "keys": 253000
