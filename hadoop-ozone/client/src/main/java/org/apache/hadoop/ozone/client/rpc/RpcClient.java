@@ -610,7 +610,6 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void createBucket(String volumeName, String bucketName)
       throws IOException {
-    verifyVolumeName(volumeName);
     // Set acls of current user.
     createBucket(volumeName, bucketName,
         BucketArgs.newBuilder().build());
@@ -620,6 +619,7 @@ public class RpcClient implements ClientProtocol {
   public void createBucket(
       String volumeName, String bucketName, BucketArgs bucketArgs)
       throws IOException {
+    verifyVolumeName(volumeName);
     Preconditions.checkNotNull(bucketArgs);
     verifyCountsQuota(bucketArgs.getQuotaInNamespace());
     verifySpaceQuota(bucketArgs.getQuotaInBytes());
@@ -1815,6 +1815,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void abortMultipartUpload(String volumeName,
        String bucketName, String keyName, String uploadID) throws IOException {
+    verifyVolumeName(volumeName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
