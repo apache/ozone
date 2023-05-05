@@ -630,12 +630,11 @@ public final class OzoneManagerDoubleBuffer {
   private synchronized boolean canFlush() {
     try {
       while (currentBuffer.size() == 0) {
+        // canFlush() only gets called when the readyBuffer is empty.
+        // Since both buffers are empty, notify once for each.
+        flushNotifier.notifyFlush();
+        flushNotifier.notifyFlush();
         wait(1000L);
-        if (currentBuffer.size() == 0) {
-          // Both buffers are empty, so notify twice
-          flushNotifier.notifyFlush();
-          flushNotifier.notifyFlush();
-        }
       }
       return true;
     } catch (InterruptedException ex) {
