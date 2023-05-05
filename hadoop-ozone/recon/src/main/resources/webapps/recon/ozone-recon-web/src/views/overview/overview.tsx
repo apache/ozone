@@ -42,6 +42,7 @@ interface IClusterStateResponse {
   keys: number;
   openContainers: number;
   deletedContainers: number;
+  keysPendingDeletion: number;
 }
 
 interface IOverviewState {
@@ -60,6 +61,7 @@ interface IOverviewState {
   omStatus: string;
   openContainers: number;
   deletedContainers: number;
+  keysPendingDeletion: number;
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -87,7 +89,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       lastUpdatedOMDBFull: 0,
       omStatus: '',
       openContainers: 0,
-      deletedContainers: 0
+      deletedContainers: 0,
+      keysPendingDeletion: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -118,6 +121,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         openContainers: clusterState.openContainers,
+        keysPendingDeletion: clusterState.keysPendingDeletion,
         deletedContainers: clusterState.deletedContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
@@ -162,7 +166,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers } = this.state;
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers, keysPendingDeletion} = this.state;
       
     const datanodesElement = (
       <span>
@@ -233,6 +237,9 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Pending Key Deletions' data={keysPendingDeletion.toString()} icon='delete' />
           </Col>
         </Row>
       </div>
