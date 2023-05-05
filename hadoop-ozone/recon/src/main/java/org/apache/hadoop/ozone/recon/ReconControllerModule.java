@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
+import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -119,7 +119,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
     bind(MetricsServiceProviderFactory.class).in(Singleton.class);
 
-    bind(ReconHttpClient.class).in(Singleton.class);
+    bind(SolrHttpClient.class).in(Singleton.class);
     bind(SolrAccessAuditsService.class).in(Singleton.class);
   }
 

@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
-import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
+import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -57,7 +57,7 @@ public class TestSolrUtil {
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
-  private ReconHttpClient reconHttpClient;
+  private SolrHttpClient solrHttpClient;
   private String solrAuditResp;
   private SolrUtil solrUtilUnderTest;
 
@@ -85,7 +85,7 @@ public class TestSolrUtil {
     ozoneConfiguration =
         reconTestInjector.getInstance(OzoneConfiguration.class);
     solrUtilUnderTest = reconTestInjector.getInstance(SolrUtil.class);
-    reconHttpClient = mock(ReconHttpClient.class);
+    solrHttpClient = mock(SolrHttpClient.class);
     solrAuditResp = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -744,12 +744,12 @@ public class TestSolrUtil {
   @Test
   public void testQueryLogs() throws IOException {
     // Setup
-    when(reconHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
+    when(solrHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
         solrAuditResp);
     String startDate = String.valueOf(Instant.now().toEpochMilli() + 100000);
     // Run the test
     solrUtilUnderTest.queryLogs("/", "key", startDate,
-        reconHttpClient);
+        solrHttpClient);
 
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
         solrUtilUnderTest.getEntityReadAccessHeatMapResponse();
@@ -773,10 +773,10 @@ public class TestSolrUtil {
     ozoneConfiguration.set(OZONE_SOLR_ADDRESS_KEY, "");
     String startDate = String.valueOf(Instant.now().toEpochMilli() + 100000);
     // Run the test
-    when(reconHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
+    when(solrHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
         solrAuditResp);
     solrUtilUnderTest.queryLogs("/", "key", startDate,
-        reconHttpClient);
+        solrHttpClient);
   }
 
 }

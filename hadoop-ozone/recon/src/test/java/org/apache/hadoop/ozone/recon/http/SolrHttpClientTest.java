@@ -71,19 +71,19 @@ import static org.mockito.Mockito.when;
  * This class test heep client calls to Recon dependent services.
  */
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({HttpClients.class, ReconHttpClient.class, EntityUtils.class})
+@PrepareForTest({HttpClients.class, SolrHttpClient.class, EntityUtils.class})
 @PowerMockIgnore({"org.apache.http.conn.ssl.*", "javax.net.ssl.*",
     "javax.crypto.*"})
-public class ReconHttpClientTest {
+public class SolrHttpClientTest {
 
-  private ReconHttpClient reconHttpClientUnderTest;
+  private SolrHttpClient solrHttpClientUnderTest;
   private String solrAuditResp;
 
   @SuppressWarnings("checkstyle:methodlength")
   @Before
   public void setUp() throws Exception {
-    reconHttpClientUnderTest = new ReconHttpClient();
-    MockitoAnnotations.initMocks(ReconHttpClient.class);
+    solrHttpClientUnderTest = new SolrHttpClient();
+    MockitoAnnotations.initMocks(SolrHttpClient.class);
     solrAuditResp = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -916,7 +916,7 @@ public class ReconHttpClientTest {
         .thenAnswer((Answer) invocation -> solrAuditResp);
     // Run the test
     final String result =
-        reconHttpClientUnderTest.sendPost("localhost", 8995,
+        solrHttpClientUnderTest.sendPost("localhost", 8995,
             "/solr/ranger_audits/query", urlParameters);
     JsonElement jsonElement = JsonParser.parseString(result);
     JsonObject jsonObject = jsonElement.getAsJsonObject();
@@ -951,7 +951,7 @@ public class ReconHttpClientTest {
 
     // Run the test
     final String result =
-        reconHttpClientUnderTest.sendRequest(httpRequestWrapper);
+        solrHttpClientUnderTest.sendRequest(httpRequestWrapper);
 
     // Verify the results
     assertEquals(StringUtils.EMPTY, result);

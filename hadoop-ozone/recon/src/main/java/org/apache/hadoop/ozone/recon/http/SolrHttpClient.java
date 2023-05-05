@@ -57,12 +57,17 @@ import java.util.List;
  * GET and POST requests to Apache Solr.
  */
 @Singleton
-public class ReconHttpClient {
+public class SolrHttpClient {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ReconHttpClient.class);
+      LoggerFactory.getLogger(SolrHttpClient.class);
+
+  private static CloseableHttpClient httpClient;
+  private static HttpClientContext context;
 
   public static CloseableHttpClient getCloseableHttpClient() {
-    CloseableHttpClient httpClient = null;
+    if (null != httpClient) {
+      return httpClient;
+    }
     try {
       System.setProperty("sun.security.krb5.debug", "true");
       System.setProperty("javax.security.auth.useSubjectCredsOnly", "false");
@@ -92,7 +97,10 @@ public class ReconHttpClient {
   }
 
   private static HttpClientContext getHttpClientContext() {
-    HttpClientContext context = HttpClientContext.create();
+    if (null != context) {
+      return context;
+    }
+    context = HttpClientContext.create();
     BasicCredentialsProvider credentialsProvider =
         new BasicCredentialsProvider();
     // This may seem odd, but specifying 'null' as principal
@@ -126,9 +134,10 @@ public class ReconHttpClient {
              getHttpClientContext())) {
       Instant end = Instant.now();
       int statusCode = response.getStatusLine().getStatusCode();
-      LOG.info("Status Code: {}", statusCode);
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("Time taken by Solr Query to return: {} milliseconds", duration);
+      LOG.info(
+          "Status Code: {}. Time taken by Solr Query to return: {} " +
+              "milliseconds", statusCode, duration);
       //Verify response
       if (statusCode == 200) {
         entityResponse = EntityUtils.toString(response.getEntity());

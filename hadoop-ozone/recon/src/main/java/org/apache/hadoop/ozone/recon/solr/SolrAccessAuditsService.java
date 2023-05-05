@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
+import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -55,7 +55,7 @@ public class SolrAccessAuditsService extends AccessAuditsService {
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
-  private ReconHttpClient reconHttpClient;
+  private SolrHttpClient solrHttpClient;
 
   @Inject
   public SolrAccessAuditsService(OzoneConfiguration ozoneConfiguration,
@@ -63,9 +63,9 @@ public class SolrAccessAuditsService extends AccessAuditsService {
                                      namespaceSummaryManager,
                                  ReconOMMetadataManager omMetadataManager,
                                  OzoneStorageContainerManager reconSCM,
-                                 ReconHttpClient reconHttpClient)
+                                 SolrHttpClient solrHttpClient)
       throws AuthenticationException, IOException {
-    this.reconHttpClient = reconHttpClient;
+    this.solrHttpClient = solrHttpClient;
     this.ozoneConfiguration = ozoneConfiguration;
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
@@ -152,7 +152,7 @@ public class SolrAccessAuditsService extends AccessAuditsService {
         reconNamespaceSummaryManager, omMetadataManager, reconSCM,
         ozoneConfiguration);
     solrUtil.queryLogs(normalizePath(path), entityType, startDate,
-        reconHttpClient);
+        solrHttpClient);
     return solrUtil.getEntityReadAccessHeatMapResponse();
   }
 

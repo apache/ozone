@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.api.types.LastXUnit;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
-import org.apache.hadoop.ozone.recon.http.ReconHttpClient;
+import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -253,7 +253,7 @@ public class SolrUtil {
   }
 
   public void queryLogs(String path, String entityType, String startDate,
-                        ReconHttpClient reconHttpClient) {
+                        SolrHttpClient solrHttpClient) {
     try {
       SecurityUtil.doAsCurrentUser((PrivilegedExceptionAction<Void>) () -> {
         InetSocketAddress solrAddress =
@@ -270,7 +270,7 @@ public class SolrUtil {
         validateAndAddSolrReqParam(entityType, "resType", urlParameters);
         validateStartDate(startDate, urlParameters);
         final String solrAuditResp =
-            reconHttpClient.sendRequest(
+            solrHttpClient.sendRequest(
                 prepareHttpRequest(urlParameters, solrAddress,
                     "/solr/ranger_audits/query"));
         LOG.info("Solr Response: {}", solrAuditResp);

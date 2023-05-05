@@ -37,7 +37,7 @@ public final class ReconConfigKeys {
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
   public static final String OZONE_SOLR_ADDRESS_KEY =
-      "ozone.solr.address";
+      "solr.address";
   public static final String OZONE_RECON_SOLR_TIMEZONE_KEY =
       "ozone.recon.solr.timezone";
   public static final String OZONE_RECON_ADDRESS_DEFAULT =

@@ -102,7 +102,7 @@ public class ReconInternalComponentFilter implements Filter {
   @Override
   public void doFilter(ServletRequest servletRequest,
       ServletResponse servletResponse, FilterChain filterChain)
-      throws IOException {
+      throws IOException, ServletException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Filtering request to {} through internal feature filter.",
           ((HttpServletRequest) servletRequest).getRequestURL());

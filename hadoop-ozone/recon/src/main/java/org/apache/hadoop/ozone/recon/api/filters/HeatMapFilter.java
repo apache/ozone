@@ -53,7 +53,7 @@ public class HeatMapFilter implements Filter {
   @Override
   public void doFilter(ServletRequest servletRequest,
                        ServletResponse servletResponse, FilterChain filterChain)
-      throws IOException {
+      throws IOException, ServletException {
     String reason;
     int errCode = HttpStatus.SC_FAILED_DEPENDENCY;
     HttpServletResponse httpResponse = (HttpServletResponse)servletResponse;
@@ -61,6 +61,8 @@ public class HeatMapFilter implements Filter {
       reason = "Solr Address Not Configured";
       httpResponse.setStatus(errCode, reason);
       httpResponse.sendError(errCode, reason);
+    } else {
+      filterChain.doFilter(servletRequest, servletResponse);
     }
   }
 
