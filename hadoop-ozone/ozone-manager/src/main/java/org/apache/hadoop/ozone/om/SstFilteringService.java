@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
@@ -46,6 +47,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -66,7 +68,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
  * all the irrelevant and safe to delete sst files that don't correspond
  * to the bucket on which the snapshot was taken.
  */
-public class SstFilteringService extends BackgroundService {
+public class SstFilteringService extends BackgroundService
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SstFilteringService.class);
@@ -101,6 +104,8 @@ public class SstFilteringService extends BackgroundService {
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
   }
+
+  private final Semaphore bootstrapStateLock = new Semaphore(1);
 
   private class SstFilteringTask implements BackgroundTask {
 
@@ -152,7 +157,12 @@ public class SstFilteringService extends BackgroundService {
                       new File(snapshotCheckpointDir),
                       dbName, true, Optional.of(Boolean.TRUE), false)) {
             RocksDatabase db = rdbStore.getDb();
-            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            try {
+              lockBootstrapState();
+              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            } finally {
+              unlockBootstrapState();
+            }
           }
 
           // mark the snapshot as filtered by writing to the file
@@ -169,6 +179,8 @@ public class SstFilteringService extends BackgroundService {
       // nothing to return here
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
+
+
 
     /**
      * @param snapshotInfo
@@ -213,6 +225,17 @@ public class SstFilteringService extends BackgroundService {
 
   public AtomicLong getSnapshotFilteredCount() {
     return snapshotFilteredCount;
+  }
+
+
+  @Override
+  public void lockBootstrapState() throws InterruptedException {
+    bootstrapStateLock.acquire();
+  }
+
+  @Override
+  public void unlockBootstrapState() {
+    bootstrapStateLock.release();
   }
 
 }
