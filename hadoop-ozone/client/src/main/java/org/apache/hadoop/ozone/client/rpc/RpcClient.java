@@ -1200,10 +1200,10 @@ public class RpcClient implements ClientProtocol {
   @Override
   public List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
                                        String prevBucket, int maxListResult,
-                                       boolean isSnapshot)
+                                       boolean hasSnapshot)
       throws IOException {
     List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
-        volumeName, prevBucket, bucketPrefix, maxListResult, isSnapshot);
+        volumeName, prevBucket, bucketPrefix, maxListResult, hasSnapshot);
 
     return buckets.stream().map(bucket -> 
             OzoneBucket.newBuilder(conf, this)

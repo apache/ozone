@@ -2711,7 +2711,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName, String startKey,
                                         String prefix, int maxNumOfBuckets,
-                                        boolean isSnapshot)
+                                        boolean hasSnapshot)
       throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
@@ -2729,7 +2729,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketLists();
       return bucketManager.listBuckets(volumeName,
-          startKey, prefix, maxNumOfBuckets, isSnapshot);
+          startKey, prefix, maxNumOfBuckets, hasSnapshot);
     } catch (IOException ex) {
       metrics.incNumBucketListFails();
       auditSuccess = false;

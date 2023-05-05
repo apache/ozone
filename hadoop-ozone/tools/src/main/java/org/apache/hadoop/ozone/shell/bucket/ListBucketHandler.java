@@ -58,7 +58,7 @@ public class ListBucketHandler extends VolumeHandler {
     OzoneVolume vol = objectStore.getVolume(volumeName);
     Iterator<? extends OzoneBucket> bucketIterator =
         vol.listBuckets(listOptions.getPrefix(),
-            listOptions.getStartItem(), bucketWithSnapshot);
+            listOptions.getStartItem(), filterByHasSnapshot);
     List<Object> bucketList = new ArrayList<>();
     int counter = 0;
     while (bucketIterator.hasNext() && counter < listOptions.getLimit()) {

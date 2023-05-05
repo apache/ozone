@@ -382,14 +382,14 @@ public interface OzoneManagerProtocol
    * @param maxNumOfBuckets
    *   the maximum number of buckets to return. It ensures
    *   the size of the result will not exceed this limit.
-   * @param isSnapshot
+   * @param hasSnapshot
   * flag to list bucket which have snapshots.
    * @return a list of buckets.
    * @throws IOException
    */
   List<OmBucketInfo> listBuckets(String volumeName,
                                  String startBucketName, String bucketPrefix,
-                                 int maxNumOfBuckets, boolean isSnapshot)
+                                 int maxNumOfBuckets, boolean hasSnapshot)
       throws IOException;
 
   /**

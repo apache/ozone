@@ -377,14 +377,14 @@ public class OzoneVolume extends WithMetadata {
    * buckets if bucket prefix is null.
    *
    * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Buckets are listed after this bucket
-   * @param isSnapshot Set the flag to list the buckets which have snapshot
+   * @param prevBucket   Buckets are listed after this bucket
+   * @param hasSnapshot  Set the flag to list the buckets which have snapshot
    * @return {@code Iterator<OzoneBucket>}
    */
   public Iterator<? extends OzoneBucket> listBuckets(String bucketPrefix,
                                                      String prevBucket,
-                                                     boolean isSnapshot) {
-    return new BucketIterator(bucketPrefix, prevBucket, isSnapshot);
+                                                     boolean hasSnapshot) {
+    return new BucketIterator(bucketPrefix, prevBucket, hasSnapshot);
   }
 
   /**
@@ -502,20 +502,22 @@ public class OzoneVolume extends WithMetadata {
     private Iterator<OzoneBucket> currentIterator;
     private OzoneBucket currentValue;
 
-    private boolean isSnapshot;
+    private boolean hasSnapshot;
 
     /**
      * Creates an Iterator to iterate over all buckets after prevBucket in
      * the volume.
      * If prevBucket is null it iterates from the first bucket in the volume.
      * The returned buckets match bucket prefix.
+     *
      * @param bucketPrefix
+     * @param hasSnapshot
      */
     BucketIterator(String bucketPrefix, String prevBucket,
-                   boolean isSnapshot) {
+                   boolean hasSnapshot) {
       this.bucketPrefix = bucketPrefix;
       this.currentValue = null;
-      this.isSnapshot = isSnapshot;
+      this.hasSnapshot = hasSnapshot;
       this.currentIterator = getNextListOfBuckets(prevBucket).iterator();
     }
 
@@ -545,7 +547,7 @@ public class OzoneVolume extends WithMetadata {
     private List<OzoneBucket> getNextListOfBuckets(String prevBucket) {
       try {
         return proxy.listBuckets(name, bucketPrefix, prevBucket,
-            listCacheSize, isSnapshot);
+            listCacheSize, hasSnapshot);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

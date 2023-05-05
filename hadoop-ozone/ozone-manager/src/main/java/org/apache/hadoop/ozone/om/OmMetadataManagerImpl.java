@@ -1050,7 +1050,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                         final String startBucket,
                                         final String bucketPrefix,
                                         final int maxNumOfBuckets,
-                                        boolean isSnapshot)
+                                        boolean hasSnapshot)
       throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();
     if (Strings.isNullOrEmpty(volumeName)) {
