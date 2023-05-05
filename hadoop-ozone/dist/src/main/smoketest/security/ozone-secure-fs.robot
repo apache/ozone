@@ -70,7 +70,7 @@ Create bucket with non-admin owner(testuser2)
                   Should not contain  ${result}       PERMISSION_DENIED
     ${result} =   Execute     ozone sh key list ${volume4}/bucket1
                   Should not contain  ${result}       PERMISSION_DENIED
-    ${result} =   Execute     ozone sh key delete ${volume4}/bucket1/key1
+    ${result} =   Execute     ozone sh key delete --skipTrash ${volume4}/bucket1/key1
                   Should not contain  ${result}       PERMISSION_DENIED
     ${result} =   Execute     ozone sh bucket delete ${volume4}/bucket1
                   Should not contain  ${result}       PERMISSION_DENIED
