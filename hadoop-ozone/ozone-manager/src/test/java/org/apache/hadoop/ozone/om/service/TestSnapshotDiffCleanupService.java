@@ -53,6 +53,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
@@ -149,6 +151,9 @@ public class TestSnapshotDiffCleanupService {
         OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT,
         TimeUnit.MILLISECONDS)
     ).thenReturn(TimeUnit.DAYS.toMillis(7));
+
+    when(config.getBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
+        OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT)).thenReturn(true);
 
     when(ozoneManager.getConfiguration()).thenReturn(config);
 

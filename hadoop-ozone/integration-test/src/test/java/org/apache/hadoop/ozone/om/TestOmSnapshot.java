@@ -163,6 +163,8 @@ public class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
