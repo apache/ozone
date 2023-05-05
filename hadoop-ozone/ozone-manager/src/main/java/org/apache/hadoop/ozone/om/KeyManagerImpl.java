@@ -101,6 +101,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 
+import static java.lang.String.format;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -404,20 +405,21 @@ public class KeyManagerImpl implements KeyManager {
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
-        if (bucketLayout.isLegacy() && value != null && !value.isFile()) {
-          value = null; // Legacy buckets do not report key info for directories
+        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        if (value != null) {
+          // For Legacy & OBS buckets, any key is a file by default. This is to
+          // keep getKeyInfo compatible with OFS clients.
+          value.setFile(true);
         }
       }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         throw ex;
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Get key failed for volume:{} bucket:{} key:{}", volumeName,
-                bucketName, keyName, ex);
-      }
-      throw new OMException(ex.getMessage(), KEY_NOT_FOUND);
+      throw new OMException(
+          format("Error reading key metadata: /%s/%s/%s",
+              volumeName, bucketName, keyName),
+          ex, INTERNAL_ERROR);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
@@ -434,24 +436,6 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(value);
     }
     return value;
-  }
-
-  private OmKeyInfo getOmKeyInfoDirectoryAware(String volumeName,
-            String bucketName, String keyName) throws IOException {
-    OmKeyInfo keyInfo = getOmKeyInfo(volumeName, bucketName, keyName);
-
-    // Check if the key is a directory.
-    if (keyInfo != null) {
-      keyInfo.setFile(true);
-      return keyInfo;
-    }
-
-    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-    OmKeyInfo dirKeyInfo = getOmKeyInfo(volumeName, bucketName, dirKey);
-    if (dirKeyInfo != null) {
-      dirKeyInfo.setFile(false);
-    }
-    return dirKeyInfo;
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,

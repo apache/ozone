@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
@@ -391,6 +392,72 @@ public class ContainerEndpoint {
   }
 
   /**
+   * This API will return all DELETED containers in SCM in below JSON format.
+   * {
+   * containers: [
+   * {
+   *  containerId: 1,
+   *  state: DELETED,
+   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   *  numOfKeys: 3,
+   *  inStateSince: <stateEnterTime>
+   * },
+   * {
+   *  containerId: 2,
+   *  state: DELETED,
+   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   *  numOfKeys: 6,
+   *  inStateSince: <stateEnterTime>
+   * }
+   * ]
+   * }
+   * @param limit limits the number of deleted containers
+   * @param prevKey previous container Id to skip
+   * @return Response of delete containers.
+   */
+  @GET
+  @Path("/deleted")
+  public Response getSCMDeletedContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
+    List<DeletedContainerInfo> deletedContainerInfoList = new ArrayList<>();
+    try {
+      List<ContainerInfo> containers =
+          containerManager.getContainers(ContainerID.valueOf(prevKey), limit,
+              HddsProtos.LifeCycleState.DELETED);
+      containers = containers.stream()
+          .filter(containerInfo -> !(containerInfo.getContainerID() == prevKey))
+          .collect(
+              Collectors.toList());
+      containers.forEach(containerInfo -> {
+        DeletedContainerInfo deletedContainerInfo = new DeletedContainerInfo();
+        deletedContainerInfo.setContainerID(containerInfo.getContainerID());
+        deletedContainerInfo.setPipelineID(containerInfo.getPipelineID());
+        deletedContainerInfo.setNumberOfKeys(containerInfo.getNumberOfKeys());
+        deletedContainerInfo.setContainerState(containerInfo.getState().name());
+        deletedContainerInfo.setStateEnterTime(
+            containerInfo.getStateEnterTime().toEpochMilli());
+        deletedContainerInfo.setLastUsed(
+            containerInfo.getLastUsed().toEpochMilli());
+        deletedContainerInfo.setUsedBytes(containerInfo.getUsedBytes());
+        deletedContainerInfo.setReplicationConfig(
+            containerInfo.getReplicationConfig());
+        deletedContainerInfo.setReplicationFactor(
+            containerInfo.getReplicationFactor().name());
+        deletedContainerInfoList.add(deletedContainerInfo);
+      });
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(deletedContainerInfoList).build();
+  }
+
+  /**
    * Helper function to extract the blocks for a given container from a given
    * OM Key.
    * @param matchedKeys List of OM Key Info locations
@@ -412,10 +479,6 @@ public class ContainerEndpoint {
       }
     }
     return blockIds;
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
   /** This method retrieves set of keys/files/dirs which are mapped to

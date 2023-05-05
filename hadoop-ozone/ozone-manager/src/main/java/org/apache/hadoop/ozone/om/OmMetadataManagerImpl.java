@@ -187,7 +187,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
    * |----------------------------------------------------------------------|
-   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName -> KeyInfo    |
+   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
+   * |                  |                                      KeyInfo      |
    * |----------------------------------------------------------------------|
    *
    * Snapshot Tables:
@@ -196,7 +197,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
-   * |snapshotRenamedKeyTable| /volumeName/bucketName/objectID -> /v/b/origKey |
+   * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
+   * |                       |  1. /volumeId/bucketId/parentId/dirName         |
+   * |                       |  2. /volumeId/bucketId/parentId/fileName        |
+   * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
    */
 
@@ -224,8 +228,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  public static final String SNAPSHOT_RENAMED_KEY_TABLE =
-      "snapshotRenamedKeyTable";
+  public static final String SNAPSHOT_RENAMED_TABLE =
+      "snapshotRenamedTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -248,7 +252,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_KEY_TABLE
+      SNAPSHOT_RENAMED_TABLE
   };
 
   private DBStore store;
@@ -258,15 +262,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table userTable;
   private Table volumeTable;
   private Table bucketTable;
-  private Table keyTable;
+  private Table<String, OmKeyInfo> keyTable;
   private Table deletedTable;
   private Table openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table<String, S3SecretValue> s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
-  private Table dirTable;
-  private Table fileTable;
+  private Table<String, OmDirectoryInfo> dirTable;
+  private Table<String, OmKeyInfo> fileTable;
   private Table openFileTable;
   private Table transactionInfoTable;
   private Table metaTable;
@@ -277,7 +281,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table tenantStateTable;
 
   private Table snapshotInfoTable;
-  private Table snapshotRenamedKeyTable;
+  private Table snapshotRenamedTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -576,7 +580,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
-        .addTable(SNAPSHOT_RENAMED_KEY_TABLE)
+        .addTable(SNAPSHOT_RENAMED_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -697,12 +701,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
-    // volumeName/bucketName/objectID -> renamedKey (renamed key for key table)
-    snapshotRenamedKeyTable = this.store.getTable(SNAPSHOT_RENAMED_KEY_TABLE,
+    // volumeName/bucketName/objectID -> renamedKey or renamedDir
+    snapshotRenamedTable = this.store.getTable(SNAPSHOT_RENAMED_TABLE,
         String.class, String.class);
-    checkTableStatus(snapshotRenamedKeyTable, SNAPSHOT_RENAMED_KEY_TABLE,
+    checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
-    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedKeyTable.
+    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
   }
 
   /**
@@ -942,7 +946,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         bucketLayout.isFileSystemOptimized() ?
                 OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
                         bucketId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX :
-                bucketKey;
+            OzoneFSUtils.addTrailingSlashIfNeeded(bucketKey);
 
     // Check key/file Table
     Table<String, OmKeyInfo> table = getKeyTable(bucketLayout);
@@ -968,7 +972,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return true;
   }
 
-
   /**
    * Checks if a key starting with a given keyPrefix exists in the table cache.
    *
@@ -976,22 +979,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param table     - table to be searched.
    * @return true if the key is present in the cache.
    */
-  private boolean isKeyPresentInTableCache(String keyPrefix,
-                                           Table table) {
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
+  private <T> boolean isKeyPresentInTableCache(String keyPrefix,
+                                           Table<String, T> table) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<T>>> iterator =
         table.cacheIterator();
     while (iterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+      Map.Entry<CacheKey<String>, CacheValue<T>> entry =
           iterator.next();
       String key = entry.getKey().getCacheKey();
-      OmKeyInfo omKeyInfo = entry.getValue().getCacheValue();
+      Object value = entry.getValue().getCacheValue();
+
       // Making sure that entry is not for delete key request.
-      if (key.startsWith(keyPrefix) && omKeyInfo != null) {
+      if (key.startsWith(keyPrefix) && value != null) {
         return true;
       }
     }
     return false;
   }
+
   /**
    * Checks if a key starts with the given prefix is present in the table.
    *
@@ -1000,20 +1005,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return true if the key is present in the table
    * @throws IOException
    */
-  private boolean isKeyPresentInTable(String keyPrefix,
-                                      Table<String, OmKeyInfo> table)
+  private <T> boolean isKeyPresentInTable(String keyPrefix,
+                                      Table<String, T> table)
       throws IOException {
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, T>>
              keyIter = table.iterator()) {
-      KeyValue<String, OmKeyInfo> kv = keyIter.seek(keyPrefix);
+      KeyValue<String, T> kv = keyIter.seek(keyPrefix);
 
       // Iterate through all the entries in the table which start with
       // the current bucket's prefix.
       while (kv != null && kv.getKey().startsWith(keyPrefix)) {
         // Check the entry in db is not marked for delete. This can happen
         // while entry is marked for delete, but it is not flushed to DB.
-        CacheValue<OmKeyInfo> cacheValue =
-            table.getCacheValue(new CacheKey(kv.getKey()));
+        CacheValue<T> cacheValue =
+            table.getCacheValue(new CacheKey<>(kv.getKey()));
 
         // Case 1: We found an entry, but no cache entry.
         if (cacheValue == null) {
@@ -1785,8 +1790,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, String> getSnapshotRenamedKeyTable() {
-    return snapshotRenamedKeyTable;
+  public Table<String, String> getSnapshotRenamedTable() {
+    return snapshotRenamedTable;
   }
 
   /**

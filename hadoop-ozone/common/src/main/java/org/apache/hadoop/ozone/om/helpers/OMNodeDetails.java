@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.commons.lang3.StringUtils;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -26,13 +24,19 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.NodeState;
 import org.apache.hadoop.hdds.NodeDetails;
+import org.apache.http.client.utils.URIBuilder;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
@@ -160,23 +164,28 @@ public final class OMNodeDetails extends NodeDetails {
     }
   }
 
-  public String getOMDBCheckpointEnpointUrl(boolean isHttpPolicy) {
-    if (isHttpPolicy) {
-      if (StringUtils.isNotEmpty(getHttpAddress())) {
-        return "http://" + getHttpAddress() +
-            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
-            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true&" +
-            OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true";
+  public URL getOMDBCheckpointEndpointUrl(boolean isHttp, boolean flush,
+      List<String> sstList) throws IOException {
+    URL url;
+    try {
+      URIBuilder urlBuilder = new URIBuilder().
+          setScheme(isHttp ? "http" : "https").
+          setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
+          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT).
+          addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
+          addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
+              flush ? "true" : "false");
+      if (sstList != null && !sstList.isEmpty()) {
+        for (String s: sstList) {
+          urlBuilder.addParameter(
+              OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST, s);
+        }
       }
-    } else {
-      if (StringUtils.isNotEmpty(getHttpsAddress())) {
-        return "https://" + getHttpsAddress() +
-            OZONE_DB_CHECKPOINT_HTTP_ENDPOINT +
-            "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true&" +
-            OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true";
-      }
+      url = urlBuilder.build().toURL();
+    } catch (URISyntaxException | MalformedURLException e) {
+      throw new IOException("Could not get OM DB Checkpoint Endpoint Url", e);
     }
-    return null;
+    return url;
   }
 
   public String getOMPrintInfo() {

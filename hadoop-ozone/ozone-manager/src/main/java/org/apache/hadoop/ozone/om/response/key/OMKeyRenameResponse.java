@@ -31,12 +31,12 @@ import java.io.IOException;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE;
 
 /**
  * Response for RenameKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, SNAPSHOT_RENAMED_KEY_TABLE})
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, SNAPSHOT_RENAMED_TABLE})
 public class OMKeyRenameResponse extends OmKeyResponse {
 
   private String fromKeyName;
@@ -85,16 +85,16 @@ public class OMKeyRenameResponse extends OmKeyResponse {
             renameKeyInfo);
 
     // Check if the bucket is in snapshot scope, if yes
-    // add the key to snapshotRenamedKeyTable.
+    // add the key to snapshotRenamedTable.
     boolean isSnapshotBucket = OMClientRequestUtils.
         isSnapshotBucket(omMetadataManager, renameKeyInfo);
     String renameDbKey = omMetadataManager.getRenameKey(
         renameKeyInfo.getVolumeName(), renameKeyInfo.getBucketName(),
         renameKeyInfo.getObjectID());
-    String renamedKey = omMetadataManager.getSnapshotRenamedKeyTable()
+    String renamedKey = omMetadataManager.getSnapshotRenamedTable()
         .get(renameDbKey);
     if (isSnapshotBucket && renamedKey == null) {
-      omMetadataManager.getSnapshotRenamedKeyTable().putWithBatch(
+      omMetadataManager.getSnapshotRenamedTable().putWithBatch(
           batchOperation, renameDbKey, fromDbKey);
     }
   }

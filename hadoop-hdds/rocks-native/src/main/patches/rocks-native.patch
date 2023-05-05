@@ -31,7 +31,7 @@ index 9261ba47d..09ed123e5 100644
  
  }  // namespace ROCKSDB_NAMESPACE
 diff --git a/table/sst_file_dumper.cc b/table/sst_file_dumper.cc
-index eefbaaeee..3f2b42324 100644
+index eefbaaeee..503ec7aa6 100644
 --- a/table/sst_file_dumper.cc
 +++ b/table/sst_file_dumper.cc
 @@ -45,7 +45,7 @@ SstFileDumper::SstFileDumper(const Options& options,
@@ -153,30 +153,36 @@ index eefbaaeee..3f2b42324 100644
    }
  
    return Status::OK();
-@@ -478,7 +481,7 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
+@@ -478,21 +481,26 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
  
      if (print_kv) {
        if (!decode_blob_index_ || ikey.type != kTypeBlobIndex) {
 -        fprintf(stdout, "%s => %s\n",
-+        fprintf(out_, "%s => %s\n",
++        fprintf(out_, "%lu %s => %lu %s\n",
++                ikey.DebugString(true, output_hex_).length(),
                  ikey.DebugString(true, output_hex_).c_str(),
++                value.ToString(output_hex_).length(),
                  value.ToString(output_hex_).c_str());
        } else {
-@@ -486,12 +489,12 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
+         BlobIndex blob_index;
  
          const Status s = blob_index.DecodeFrom(value);
          if (!s.ok()) {
 -          fprintf(stderr, "%s => error decoding blob index\n",
-+          fprintf(err_, "%s => error decoding blob index\n",
++          fprintf(err_, "%lu %s => 25 error decoding blob index\n",
++                  ikey.DebugString(true, output_hex_).length(),
                    ikey.DebugString(true, output_hex_).c_str());
            continue;
          }
  
 -        fprintf(stdout, "%s => %s\n",
-+        fprintf(out_, "%s => %s\n",
++        fprintf(out_, "%lu %s => %lu %s\n",
++                ikey.DebugString(true, output_hex_).length(),
                  ikey.DebugString(true, output_hex_).c_str(),
++                blob_index.DebugString(output_hex_).length(),
                  blob_index.DebugString(output_hex_).c_str());
        }
+     }
 diff --git a/table/sst_file_dumper.h b/table/sst_file_dumper.h
 index 7be876390..ea07154da 100644
 --- a/table/sst_file_dumper.h
