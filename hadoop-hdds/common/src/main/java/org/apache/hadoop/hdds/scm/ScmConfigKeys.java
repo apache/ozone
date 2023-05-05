@@ -581,6 +581,11 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";
+
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
+      "ozone.scm.ha.dbtransactionbuffer.flush.interval";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
   /**
    * Never constructed.
    */

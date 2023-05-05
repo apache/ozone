@@ -39,6 +39,10 @@ public interface SCMHADBTransactionBuffer
   void setLatestSnapshot(SnapshotInfo latestSnapshot);
 
   void flush() throws IOException;
+  
+  default boolean shouldFlush() {
+    return true;
+  }
 
   void init() throws IOException;
 }
