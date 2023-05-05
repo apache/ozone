@@ -1369,6 +1369,13 @@ public class ReplicationManager implements SCMService {
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
           lastTimeToBeReadyInMillis = clock.millis();
+          // It this SCM was previously a leader and transitioned to a follower
+          // and then back to a leader in a short time, there may be old pending
+          // Ops in the ContainerReplicaPendingOps table. They are no longer
+          // needed as the DN will discard any commands when the term changes.
+          // Therefore we should clear the table so RM starts from a clean
+          // state.
+          containerReplicaPendingOps.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
         if (rmConf.isLegacyEnabled()) {
