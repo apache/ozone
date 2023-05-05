@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Reference counting interface. Used by OmSnapshot in SnapshotCache.
  * TODO: Rename this interface.
  */
-public interface RefCount {
+public interface ReferenceCounted {
 
   /**
    * A map of thread IDs holding the reference of the object and its count.

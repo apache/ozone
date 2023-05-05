@@ -49,13 +49,13 @@ public class SnapshotCache {
   private final ConcurrentHashMap<String, OmSnapshot> dbMap;
 
   // Linked hash set that holds OmSnapshot instances whose reference count
-  // has reached zero.
-  // Sorted in last used order. Least-recently-used entry at the beginning.
+  // has reached zero. Those entries are eligible to be evicted and closed.
+  // Sorted in last used order. Least-recently-used entry placed at the beginning.
   private final LinkedHashSet<OmSnapshot> instancesEligibleForClosure;
   private final OmSnapshotManager omSnapshotManager;
   private final CacheLoader<String, OmSnapshot> cacheLoader;
-  // Soft-limit of the total number of snapshot DB instances allowed to be open
-  // on the leader OM.
+  // Soft-limit of the total number of snapshot DB instances allowed to be
+  // opened on the OM.
   private final int cacheSizeLimit;
 
   public SnapshotCache(
@@ -269,6 +269,23 @@ public class SnapshotCache {
 
       Preconditions.checkState(instancesEligibleForClosure.size() == 0);
     }
+  }
+
+  /**
+   * Check cache consistency.
+   * @return true if the cache internal structure is consistent to the best of
+   * its knowledge, false if found to be inconsistent and details logged.
+   */
+  public boolean isConsistent() {
+    // Using dbMap as the source of truth in this cache, whether dbMap entries
+    // are in OM DB's snapshotInfoTable is out of the scope of this check.
+
+    // TODO: [SNAPSHOT]
+    // 1. Objects in instancesEligibleForClosure must have ref count equals 0
+    // 2. Objects in instancesEligibleForClosure should still be in dbMap
+    // 3. instancesEligibleForClosure must be empty if cache size exceeds limit
+
+    return true;
   }
 
 }
