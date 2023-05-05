@@ -20,8 +20,8 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -76,8 +77,9 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     try {
-      OmSnapshot omFromSnapshot = (OmSnapshot) omSnapshotManager
-          .checkForSnapshot(fromSnapshot.getVolumeName(),
+      ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot =
+          omSnapshotManager.checkForSnapshot(
+              fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),
               getSnapshotPrefix(fromSnapshot.getName()));
 
@@ -94,17 +96,19 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<String> movedDirs =
           moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
-      OmSnapshot omNextSnapshot = null;
+      ReferenceCounted<IOmMetadataReader> rcOmNextSnapshot = null;
 
       if (nextSnapshot != null) {
-        omNextSnapshot = (OmSnapshot) omSnapshotManager
-            .checkForSnapshot(nextSnapshot.getVolumeName(),
-                nextSnapshot.getBucketName(),
-                getSnapshotPrefix(nextSnapshot.getName()));
+        rcOmNextSnapshot = omSnapshotManager.checkForSnapshot(
+            nextSnapshot.getVolumeName(),
+            nextSnapshot.getBucketName(),
+            getSnapshotPrefix(nextSnapshot.getName()));
       }
 
+      // Passed references of RC<> to Response,
+      // thus Response is responsible for decrementing ref count.
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), omFromSnapshot, omNextSnapshot,
+          omResponse.build(), rcOmFromSnapshot, rcOmNextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
 
     } catch (IOException ex) {
@@ -113,7 +117,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
-      // TODO: [SNAPSHOT] Call snapshotCache.release()
     }
 
     return omClientResponse;

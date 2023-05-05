@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -361,8 +362,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   public SnapshotDiffResponse getSnapshotDiffReport(
       final String volume,
       final String bucket,
-      final OmSnapshot fromSnapshot,
-      final OmSnapshot toSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcFromSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcToSnapshot,
       final SnapshotInfo fsInfo,
       final SnapshotInfo tsInfo,
       final int index,
@@ -377,32 +378,62 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
 
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+    OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+
     switch (snapDiffJob.getStatus()) {
     case QUEUED:
-      return submitSnapDiffJob(snapDiffJobKey, volume, bucket, fromSnapshot,
-          toSnapshot, fsInfo, tsInfo, index, pageSize, forceFullDiff);
+      // This is the only case where RC<>s are passed to a thread executor.
+      // rcFromSnapshot and rcToSnapshot must not be closed here.
+      return submitSnapDiffJob(snapDiffJobKey, volume, bucket, rcFromSnapshot,
+          rcToSnapshot, fsInfo, tsInfo, index, pageSize, forceFullDiff);
     case IN_PROGRESS:
-      return new SnapshotDiffResponse(
-          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), IN_PROGRESS, defaultWaitTime);
+      try {
+        return new SnapshotDiffResponse(
+            new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
+                fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+                null), IN_PROGRESS, defaultWaitTime);
+      } finally {
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
+      }
     case FAILED:
-      return new SnapshotDiffResponse(
-          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), FAILED, defaultWaitTime);
+      try {
+        return new SnapshotDiffResponse(
+            new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
+                fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+                null), FAILED, defaultWaitTime);
+      } finally {
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
+      }
     case DONE:
-      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
-          bucket, fromSnapshot, toSnapshot, index, pageSize);
-      return new SnapshotDiffResponse(report, DONE, 0L);
+      try {
+        SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
+            bucket, fromSnapshot, toSnapshot, index, pageSize);
+        return new SnapshotDiffResponse(report, DONE, 0L);
+      } finally {
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
+      }
     case REJECTED:
-      return new SnapshotDiffResponse(
-          new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-          fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-          null), REJECTED, defaultWaitTime);
+      try {
+        return new SnapshotDiffResponse(
+            new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
+                fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
+                null), REJECTED, defaultWaitTime);
+      } finally {
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
+      }
     default:
-      throw new IllegalStateException("Unknown snapshot job status: " +
-          snapDiffJob.getStatus());
+      try {
+        throw new IllegalStateException("Unknown snapshot job status: " +
+            snapDiffJob.getStatus());
+      } finally {
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
+      }
     }
   }
 
@@ -476,8 +507,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String jobKey,
       final String volume,
       final String bucket,
-      final OmSnapshot fromSnapshot,
-      final OmSnapshot toSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcFromSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcToSnapshot,
       final SnapshotInfo fsInfo,
       final SnapshotInfo tsInfo,
       final int index,
@@ -489,6 +520,9 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
 
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+    OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+
     // This is only possible if another thread tired to submit the request,
     // and it got rejected. In this scenario, return the Rejected job status
     // with wait time.
@@ -496,6 +530,9 @@ public class SnapshotDiffManager implements AutoCloseable {
       LOG.info("Snap diff job has been removed for for volume: {}, " +
           "bucket: {}, fromSnapshot: {} and toSnapshot: {}.",
           volume, bucket, fromSnapshot.getName(), toSnapshot.getName());
+      // Decrement snapshot instances ref count
+      rcFromSnapshot.close();
+      rcToSnapshot.close();
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(),
               volume, bucket, fromSnapshot.getName(), toSnapshot.getName(),
@@ -509,8 +546,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       if (snapDiffJob.getStatus() == DONE) {
         SnapshotDiffReportOzone report = createPageResponse(snapDiffJob, volume,
             bucket, fromSnapshot, toSnapshot, index, pageSize);
+        // Decrement snapshot instances ref count
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
         return new SnapshotDiffResponse(report, DONE, 0L);
       } else {
+        // Decrement snapshot instances ref count
+        rcFromSnapshot.close();
+        rcToSnapshot.close();
         // Otherwise, return the same status as in DB with wait time.
         return new SnapshotDiffResponse(
             new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
@@ -520,7 +563,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
 
     return submitSnapDiffJob(jobKey, snapDiffJob.getJobId(), volume, bucket,
-        fromSnapshot, toSnapshot, fsInfo, tsInfo, forceFullDiff);
+        rcFromSnapshot, rcToSnapshot, fsInfo, tsInfo, forceFullDiff);
   }
 
   @SuppressWarnings("parameternumber")
@@ -529,8 +572,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String jobId,
       final String volume,
       final String bucket,
-      final OmSnapshot fromSnapshot,
-      final OmSnapshot toSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcFromSnapshot,
+      final ReferenceCounted<IOmMetadataReader> rcToSnapshot,
       final SnapshotInfo fsInfo,
       final SnapshotInfo tsInfo,
       final boolean forceFullDiff
@@ -542,18 +585,24 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
 
+    String fromSnapshotName = ((OmSnapshot) rcFromSnapshot.get()).getName();
+    String toSnapshotName = ((OmSnapshot) rcToSnapshot.get()).getName();
+
     // Submit the request to the executor if job is still in queued status.
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
       executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
-          volume, bucket, fromSnapshot, toSnapshot, fsInfo, tsInfo,
+          volume, bucket, rcFromSnapshot, rcToSnapshot, fsInfo, tsInfo,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
+      // DO NOT decrement snapshot instance ref count, executor is responsible
+      // for it in this case.
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), IN_PROGRESS, defaultWaitTime);
+              ((OmSnapshot) rcFromSnapshot.get()).getName(),
+              ((OmSnapshot) rcToSnapshot.get()).getName(),
+              new ArrayList<>(), null), IN_PROGRESS, defaultWaitTime);
     } catch (RejectedExecutionException exception) {
       // Remove the entry from job table so that client can retry.
       // If entry is not removed, client has to wait till cleanup service
@@ -563,19 +612,25 @@ public class SnapshotDiffManager implements AutoCloseable {
       LOG.info("Exceeded the snapDiff parallel requests progressing " +
           "limit. Removed the jobKey: {}. Please retry after {}.",
           jobKey, defaultWaitTime);
+      // Decrement snapshot instances ref count
+      rcFromSnapshot.close();
+      rcToSnapshot.close();
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), REJECTED, defaultWaitTime);
+              fromSnapshotName, toSnapshotName,
+              new ArrayList<>(), null), REJECTED, defaultWaitTime);
     } catch (Exception exception) {
       // Remove the entry from job table as well.
       snapDiffJobTable.remove(jobKey);
       LOG.error("Failure in job submission to the executor. Removed the" +
               " jobKey: {}.", jobKey, exception);
+      // Decrement snapshot instances ref count
+      rcFromSnapshot.close();
+      rcToSnapshot.close();
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volume, bucket,
-              fromSnapshot.getName(), toSnapshot.getName(), new ArrayList<>(),
-              null), FAILED, defaultWaitTime);
+              fromSnapshotName, toSnapshotName,
+              new ArrayList<>(), null), FAILED, defaultWaitTime);
     }
   }
 
@@ -609,14 +664,22 @@ public class SnapshotDiffManager implements AutoCloseable {
                                           final String jobId,
                                           final String volume,
                                           final String bucket,
-                                          final OmSnapshot fromSnapshot,
-                                          final OmSnapshot toSnapshot,
+                                          final ReferenceCounted
+                                              <IOmMetadataReader>
+                                              rcFromSnapshot,
+                                          final ReferenceCounted
+                                              <IOmMetadataReader>
+                                              rcToSnapshot,
                                           final SnapshotInfo fsInfo,
                                           final SnapshotInfo tsInfo,
                                           final boolean forceFullDiff) {
-    LOG.info("Started snap diff report generation for volume: {} " +
-            "bucket: {}, fromSnapshot: {} and toSnapshot: {}," +
-            " fromSnapshot: {}, toSnapshot: {} ",
+
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+    OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+
+    LOG.info("Started snap diff report generation for volume: '{}', " +
+            "bucket: '{}', fromSnapshot: '{}' and toSnapshot: '{}'," +
+            " fromSnapshot: '{}', toSnapshot: '{}'",
         volume, bucket, fsInfo.getName(), tsInfo.getName(), fromSnapshot,
         toSnapshot);
 
@@ -710,6 +773,8 @@ public class SnapshotDiffManager implements AutoCloseable {
               tablePrefixes);
         } catch (NativeLibraryNotLoadedException ex) {
           // This code should be never executed.
+          fromSnapshot.close();
+          toSnapshot.close();
           throw new IllegalStateException(ex);
         }
       }
@@ -748,6 +813,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                 tablePrefixes);
           } catch (NativeLibraryNotLoadedException ex) {
             // This code should be never executed.
+            fromSnapshot.close();
+            toSnapshot.close();
             throw new IllegalStateException(ex);
           }
         }
@@ -780,6 +847,13 @@ public class SnapshotDiffManager implements AutoCloseable {
       dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
       // Delete SST files backup directory.
       deleteDir(path);
+
+      try {
+        fromSnapshot.close();
+        toSnapshot.close();
+      } catch (IOException e) {
+        throw new IllegalStateException(e);
+      }
     }
   }
 
@@ -1239,8 +1313,6 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     submitSnapDiffJob(jobKey, jobId, volume, bucket, snapshotCache.get(fsKey),
         snapshotCache.get(tsKey), fsInfo, tsInfo, forceFullDiff);
-
-    // TODO: [SNAPSHOT] Call snapshotCache.release() when the diff job is done
   }
 
   @Override

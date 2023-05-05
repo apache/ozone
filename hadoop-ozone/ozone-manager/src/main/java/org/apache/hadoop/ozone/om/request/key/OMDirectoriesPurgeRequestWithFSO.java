@@ -24,8 +24,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -64,7 +65,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
-    OmSnapshot omFromSnapshot = null;
+    ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot = null;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -73,10 +74,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
-        omFromSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
-            .checkForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+        rcOmFromSnapshot = ozoneManager.getOmSnapshotManager().checkForSnapshot(
+            snapshotInfo.getVolumeName(),
+            snapshotInfo.getBucketName(),
+            getSnapshotPrefix(snapshotInfo.getName()));
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
@@ -139,17 +140,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
-      if (omFromSnapshot != null) {
-        ozoneManager.getOmSnapshotManager().getSnapshotCache()
-            .release(omFromSnapshot);
-      }
     }
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, omFromSnapshot);
+            getBucketLayout(), volBucketInfoMap, rcOmFromSnapshot);
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 

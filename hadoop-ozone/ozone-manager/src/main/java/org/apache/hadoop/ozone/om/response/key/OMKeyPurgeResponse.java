@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
@@ -38,13 +40,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
-  private OmSnapshot fromSnapshot;
+  private ReferenceCounted<IOmMetadataReader> rcFromSnapshot;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> keyList, OmSnapshot fromSnapshot) {
+      @Nonnull List<String> keyList,
+      ReferenceCounted<IOmMetadataReader> rcFromSnapshot) {
     super(omResponse);
     this.purgeKeyList = keyList;
-    this.fromSnapshot = fromSnapshot;
+    this.rcFromSnapshot = rcFromSnapshot;
   }
 
   /**
@@ -60,13 +63,16 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (fromSnapshot != null) {
+    if (rcFromSnapshot != null) {
+      OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = fromSnapshotStore.initBatchOperation()) {
         processKeys(writeBatch, fromSnapshot.getMetadataManager());
         fromSnapshotStore.commitBatchOperation(writeBatch);
       }
+      // Decrement ref count
+      rcFromSnapshot.close();
     } else {
       processKeys(batchOperation, omMetadataManager);
     }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -45,15 +46,17 @@ public class SnapshotCache {
   // Snapshot cache internal hash map.
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
-  // TODO: Wrap SoftReference<> around the value?
-  private final ConcurrentHashMap<String, ReferenceCounted<OmSnapshot>> dbMap;
+  // TODO: Also wrap SoftReference<> around the value?
+  private final ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader>>
+      dbMap;
 
   // Linked hash set that holds OmSnapshot instances whose reference count
   // has reached zero. Those entries are eligible to be evicted and closed.
   // Sorted in last used order.
   // Least-recently-used entry located at the beginning.
   // TODO: Check thread safety. Try ConcurrentHashMultiset ?
-  private final LinkedHashSet<ReferenceCounted<OmSnapshot>> pendingEvictionList;
+  private final LinkedHashSet<ReferenceCounted<IOmMetadataReader>>
+      pendingEvictionList;
   private final OmSnapshotManager omSnapshotManager;
   private final CacheLoader<String, OmSnapshot> cacheLoader;
   // Soft-limit of the total number of snapshot DB instances allowed to be
@@ -72,12 +75,12 @@ public class SnapshotCache {
   }
 
   @VisibleForTesting
-  ConcurrentHashMap<String, ReferenceCounted<OmSnapshot>> getDbMap() {
+  ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader>> getDbMap() {
     return dbMap;
   }
 
   @VisibleForTesting
-  LinkedHashSet<ReferenceCounted<OmSnapshot>> getPendingEvictionList() {
+  LinkedHashSet<ReferenceCounted<IOmMetadataReader>> getPendingEvictionList() {
     return pendingEvictionList;
   }
 
@@ -96,7 +99,7 @@ public class SnapshotCache {
     dbMap.computeIfPresent(key, (k, v) -> {
       pendingEvictionList.remove(v);
       try {
-        v.get().close();
+        ((OmSnapshot) v.get()).close();
       } catch (IOException e) {
         throw new IllegalStateException("Failed to close snapshot: " + key, e);
       }
@@ -109,13 +112,13 @@ public class SnapshotCache {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() throws IOException {
-    Iterator<Map.Entry<String, ReferenceCounted<OmSnapshot>>>
+    Iterator<Map.Entry<String, ReferenceCounted<IOmMetadataReader>>>
         it = dbMap.entrySet().iterator();
 
     while (it.hasNext()) {
-      Map.Entry<String, ReferenceCounted<OmSnapshot>> entry = it.next();
+      Map.Entry<String, ReferenceCounted<IOmMetadataReader>> entry = it.next();
       pendingEvictionList.remove(entry.getValue());
-      OmSnapshot omSnapshot = entry.getValue().get();
+      OmSnapshot omSnapshot = (OmSnapshot) entry.getValue().get();
       // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
       omSnapshot.close();
       it.remove();
@@ -133,16 +136,16 @@ public class SnapshotCache {
   }
 
   /**
-   * Get or load OmSnapshot.
-   * Must call release() when OmSnapshot is no longer used.
+   * Get or load OmSnapshot. Must be close()d after use.
    * TODO: [SNAPSHOT] Can add reason enum to param list later.
    * @param key snapshot table key
    * @return an OmSnapshot instance, or null on error
    */
-  public OmSnapshot get(String key) throws IOException {
+  public ReferenceCounted<IOmMetadataReader> get(String key)
+      throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist.
-    ReferenceCounted<OmSnapshot> rcOmSnapshot =
+    ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
         dbMap.computeIfAbsent(key, k -> {
           LOG.info("Loading snapshot. Table key: {}", k);
           try {
@@ -184,10 +187,8 @@ public class SnapshotCache {
     // Increment the reference count on the instance.
     rcOmSnapshot.incrementRefCount();
 
-    OmSnapshot omSnapshot = rcOmSnapshot.get();
-
     // Remove instance from clean up list when it exists.
-    // TODO: [SNAPSHOT] Check thread safety with release
+    // TODO: [SNAPSHOT] Check thread safety with release()
     pendingEvictionList.remove(rcOmSnapshot);
 
     // Check if any entries can be cleaned up.
@@ -196,7 +197,7 @@ public class SnapshotCache {
     // is a soft limit.
     cleanup();
 
-    return omSnapshot;
+    return rcOmSnapshot;
   }
 
   /**
@@ -204,7 +205,7 @@ public class SnapshotCache {
    * @param key snapshot table key
    */
   public void release(String key) {
-    ReferenceCounted<OmSnapshot> rcOmSnapshot = dbMap.get(key);
+    ReferenceCounted<IOmMetadataReader> rcOmSnapshot = dbMap.get(key);
     Preconditions.checkNotNull(rcOmSnapshot,
         "Key '" + key + "' does not exist in cache");
 
@@ -233,18 +234,19 @@ public class SnapshotCache {
     long numEntriesToEvict = (long) dbMap.size() - cacheSizeLimit;
     while (pendingEvictionList.size() > 0 && numEntriesToEvict > 0L) {
       // Get the first instance in the clean up list
-      ReferenceCounted<OmSnapshot> rcOmSnapshot =
+      ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
           pendingEvictionList.iterator().next();
+      OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
       LOG.debug("Evicting OmSnapshot instance {} with table key {}",
-          rcOmSnapshot, rcOmSnapshot.get().getSnapshotTableKey());
+          rcOmSnapshot, omSnapshot.getSnapshotTableKey());
       // Sanity check
       Preconditions.checkState(rcOmSnapshot.getTotalRefCount() == 0L,
           "Illegal state: OmSnapshot reference count non-zero ("
               + rcOmSnapshot.getTotalRefCount() + ") but shows up in the "
               + "clean up list");
 
-      final String key = rcOmSnapshot.get().getSnapshotTableKey();
-      final ReferenceCounted<OmSnapshot> result = dbMap.remove(key);
+      final String key = omSnapshot.getSnapshotTableKey();
+      final ReferenceCounted<IOmMetadataReader> result = dbMap.remove(key);
       // Sanity check
       Preconditions.checkState(rcOmSnapshot == result,
           "Cache map entry removal failure. The cache is in an inconsistent "
@@ -255,7 +257,7 @@ public class SnapshotCache {
 
       // Close the instance, which also closes its DB handle.
       try {
-        rcOmSnapshot.get().close();
+        ((OmSnapshot) rcOmSnapshot.get()).close();
       } catch (IOException ex) {
         throw new IllegalStateException("Error while closing snapshot DB", ex);
       }

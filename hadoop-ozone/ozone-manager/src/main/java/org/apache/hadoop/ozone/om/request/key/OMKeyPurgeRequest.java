@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -75,26 +76,27 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     try {
-      OmSnapshot omFromSnapshot = null;
+      ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot = null;
       if (fromSnapshot != null) {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
-        omFromSnapshot = (OmSnapshot) omSnapshotManager
-            .checkForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+        rcOmFromSnapshot = omSnapshotManager.checkForSnapshot(
+            snapshotInfo.getVolumeName(),
+            snapshotInfo.getBucketName(),
+            getSnapshotPrefix(snapshotInfo.getName()));
       }
 
+      // Note: OMKeyPurgeResponse is responsible for decrementing ref count
+      // for rcOmFromSnapshot.
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList, omFromSnapshot);
+          keysToBePurgedList, rcOmFromSnapshot);
     } catch (IOException ex) {
       omClientResponse = new OMKeyPurgeResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
-      // TODO: [SNAPSHOT] Call snapshotCache.release()
     }
 
     return omClientResponse;

@@ -914,8 +914,8 @@ public class TestOmSnapshot {
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     RDBStore snapshotDBStore = (RDBStore)
-            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix).get())
             .getMetadataManager().getStore();
 
     for (String table : snapshotDBStore.getTableNames().values()) {

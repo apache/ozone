@@ -21,12 +21,14 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -43,22 +45,23 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
-  private OmSnapshot fromSnapshot;
-  private OmSnapshot nextSnapshot;
+  private ReferenceCounted<IOmMetadataReader> rcFromSnapshot;
+  private ReferenceCounted<IOmMetadataReader> rcNextSnapshot;
   private List<SnapshotMoveKeyInfos> nextDBKeysList;
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
   private List<HddsProtos.KeyValue> renamedKeysList;
   private List<String> movedDirs;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-       @Nonnull OmSnapshot omFromSnapshot, OmSnapshot omNextSnapshot,
-       List<SnapshotMoveKeyInfos> nextDBKeysList,
-       List<SnapshotMoveKeyInfos> reclaimKeysList,
-       List<HddsProtos.KeyValue> renamedKeysList,
-       List<String> movedDirs) {
+      @Nonnull ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot,
+      ReferenceCounted<IOmMetadataReader> rcOmNextSnapshot,
+      List<SnapshotMoveKeyInfos> nextDBKeysList,
+      List<SnapshotMoveKeyInfos> reclaimKeysList,
+      List<HddsProtos.KeyValue> renamedKeysList,
+      List<String> movedDirs) {
     super(omResponse);
-    this.fromSnapshot = omFromSnapshot;
-    this.nextSnapshot = omNextSnapshot;
+    this.rcFromSnapshot = rcOmFromSnapshot;
+    this.rcNextSnapshot = rcOmNextSnapshot;
     this.nextDBKeysList = nextDBKeysList;
     this.reclaimKeysList = reclaimKeysList;
     this.renamedKeysList = renamedKeysList;
@@ -78,7 +81,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (nextSnapshot != null) {
+    if (rcNextSnapshot != null) {
+      OmSnapshot nextSnapshot = (OmSnapshot) rcNextSnapshot.get();
       DBStore nextSnapshotStore = nextSnapshot.getMetadataManager().getStore();
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
@@ -87,6 +91,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         processDirs(writeBatch, nextSnapshot.getMetadataManager());
         nextSnapshotStore.commitBatchOperation(writeBatch);
       }
+      // Decrement ref count
+      rcNextSnapshot.close();
     } else {
       // Handle the case where there is no next Snapshot.
       processKeys(batchOperation, omMetadataManager, nextDBKeysList, true);
@@ -94,6 +100,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     // Update From Snapshot Deleted Table.
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
     DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
     try (BatchOperation fromSnapshotBatchOp =
              fromSnapshotStore.initBatchOperation()) {
@@ -101,11 +108,14 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           reclaimKeysList, false);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
     }
+    // Decrement ref count
+    rcFromSnapshot.close();
   }
 
   private void processDirs(BatchOperation batchOp,
                            OMMetadataManager omMetadataManager)
       throws IOException {
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
     for (String movedDirsKey : movedDirs) {
       OmKeyInfo keyInfo = fromSnapshot.getMetadataManager().getDeletedDirTable()
           .get(movedDirsKey);

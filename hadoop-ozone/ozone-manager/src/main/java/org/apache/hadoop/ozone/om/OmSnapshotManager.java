@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
@@ -467,15 +468,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
-  public IOmMetadataReader checkForSnapshot(String volumeName,
-                                            String bucketName, String keyname)
+  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(String volumeName,
+      String bucketName, String keyname)
       throws IOException {
     if (keyname == null) {
       return ozoneManager.getOmMetadataReader();
     }
 
     // see if key is for a snapshot
-    String[] keyParts = keyname.split("/");
+    String[] keyParts = keyname.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
       if (snapshotName == null || snapshotName.isEmpty()) {
@@ -555,11 +556,10 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
     final String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
-    final OmSnapshot fs = snapshotCache.get(fsKey);
-    final OmSnapshot ts = snapshotCache.get(tsKey);
-    return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
-            fsInfo, tsInfo, index, pageSize, forceFullDiff);
-    // TODO: [SNAPSHOT] Call snapshotCache.release()
+
+    return snapshotDiffManager.getSnapshotDiffReport(
+        volume, bucket, snapshotCache.get(fsKey), snapshotCache.get(tsKey),
+        fsInfo, tsInfo, index, pageSize, forceFullDiff);
   }
 
   private void verifySnapshotInfoForSnapDiff(final SnapshotInfo fromSnapshot,

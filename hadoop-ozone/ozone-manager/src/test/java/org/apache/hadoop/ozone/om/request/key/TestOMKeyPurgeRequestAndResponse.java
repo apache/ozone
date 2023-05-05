@@ -23,12 +23,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -212,9 +214,11 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
           deletedKey));
     }
 
-    OmSnapshot omSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName,
-            getSnapshotPrefix("snap1"));
+    ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+        ozoneManager.getOmSnapshotManager().checkForSnapshot(
+            volumeName, bucketName, getSnapshotPrefix("snap1"));
+
+    OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
 
     // The keys should be present in the snapshot's deletedTable
     for (String deletedKey : deletedKeyNames) {
@@ -243,7 +247,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
              omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-          omResponse, deletedKeyNames, omSnapshot);
+          omResponse, deletedKeyNames, rcOmSnapshot);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.
@@ -255,5 +259,8 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       Assert.assertFalse(omSnapshot.getMetadataManager()
           .getDeletedTable().isExist(deletedKey));
     }
+
+    omSnapshot = null;
+    rcOmSnapshot.close();
   }
 }

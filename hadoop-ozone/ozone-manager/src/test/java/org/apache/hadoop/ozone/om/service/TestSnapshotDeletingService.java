@@ -132,7 +132,7 @@ public class TestSnapshotDeletingService {
 
     OmSnapshot bucket1snap3 = (OmSnapshot) om.getOmSnapshotManager()
         .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
-            getSnapshotPrefix("bucket1snap3"));
+            getSnapshotPrefix("bucket1snap3")).get();
 
     // Check bucket1key1 added to next non deleted snapshot db.
     RepeatedOmKeyInfo omKeyInfo =
