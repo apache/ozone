@@ -81,8 +81,8 @@ public interface Codec<T> {
    * the implementation of this method may safely return the given object.
    *
    * @param object The object to be copied.
-   * @return the same object if the given object is immutable;
-   *         otherwise, return a new copy of the given object.
+   * @return a copy of the given object.  When the given object is immutable,
+   *         the returned object can possibly be the same as the given object.
    */
   T copyObject(T object);
 }

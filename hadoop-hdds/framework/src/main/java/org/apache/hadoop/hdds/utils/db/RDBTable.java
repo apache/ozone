@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 class RDBTable implements Table<byte[], byte[]> {
 
+
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
 
