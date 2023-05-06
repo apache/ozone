@@ -317,7 +317,7 @@
                             </execution>
                             <execution>
                                 <id>copy-lib-file</id>
-                                <phase>process-sources</phase>
+                                <phase>process-classes</phase>
                                 <configuration>
                                     <tasks>
                                         <copy toDir="${project.build.outputDirectory}">

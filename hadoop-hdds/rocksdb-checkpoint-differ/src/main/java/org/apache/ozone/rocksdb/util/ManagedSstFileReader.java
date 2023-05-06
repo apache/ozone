@@ -58,9 +58,7 @@ public class ManagedSstFileReader {
   public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
     final Spliterator<T> spliterator =
         Spliterators.spliteratorUnknownSize(itr, 0);
-    return StreamSupport.stream(spliterator, false).onClose(() -> {
-      itr.close();
-    });
+    return StreamSupport.stream(spliterator, false).onClose(itr::close);
   }
 
   public Stream<String> getKeyStream() throws RocksDBException,
