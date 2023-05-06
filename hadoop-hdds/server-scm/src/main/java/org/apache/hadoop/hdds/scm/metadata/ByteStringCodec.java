@@ -27,6 +27,7 @@ import java.io.IOException;
  * Codec to serialize/deserialize a {@link ByteString}.
  */
 public class ByteStringCodec implements Codec<ByteString> {
+  private static final byte[] EMPTY = {};
 
   /**
    * Convert object to raw persisted format.
@@ -36,7 +37,7 @@ public class ByteStringCodec implements Codec<ByteString> {
   @Override
   public byte[] toPersistedFormat(ByteString object) throws IOException {
     if (object == null) {
-      return new byte[0];
+      return EMPTY;
     }
     return object.toByteArray();
   }
@@ -64,6 +65,6 @@ public class ByteStringCodec implements Codec<ByteString> {
     if (object == null) {
       return ByteString.EMPTY;
     }
-    return ByteString.copyFrom(object.toByteArray());
+    return object;
   }
 }
