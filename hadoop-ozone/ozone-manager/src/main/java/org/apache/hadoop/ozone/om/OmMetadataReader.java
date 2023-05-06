@@ -377,11 +377,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     String volumeName = obj.getVolumeName();
     String bucketName = obj.getBucketName();
     String keyName = obj.getKeyName();
-    boolean isGetKeyAcl =
-        volumeName != null && bucketName != null && keyName != null;
-    if (isGetKeyAcl) {
-      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-          Pair.of(volumeName, bucketName), false);
+    if (obj.getResourceType() == ResourceType.KEY) {
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLinkWithoutAcl(
+          Pair.of(volumeName, bucketName));
       volumeName = resolvedBucket.realVolume();
       bucketName = resolvedBucket.realBucket();
     }

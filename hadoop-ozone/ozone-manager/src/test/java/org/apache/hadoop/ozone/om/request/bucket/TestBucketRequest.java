@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -92,7 +91,7 @@ public class TestBucketRequest {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
-    when(ozoneManager.resolveBucketLink(any(Pair.class), anyBoolean()))
+    when(ozoneManager.resolveBucketLinkWithoutAcl(any(Pair.class)))
         .thenAnswer(invocation -> new ResolvedBucket(
             invocation.getArgument(0), invocation.getArgument(0)));
   }

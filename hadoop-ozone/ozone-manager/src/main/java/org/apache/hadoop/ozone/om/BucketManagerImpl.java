@@ -154,12 +154,19 @@ public class BucketManagerImpl implements BucketManager {
 
     String volume = ozObject.getVolumeName();
     String bucket = ozObject.getBucketName();
-    // Check link bucket self ACL when 'DELETE' or 'READ_ACL'
-    if (context.getAclRights() != ACLType.DELETE
-        && context.getAclRights() != ACLType.READ_ACL) {
+
+    boolean bucketNeedResolved =
+        ozObject.getResourceType() == OzoneObj.ResourceType.BUCKET
+        && (context.getAclRights() != ACLType.DELETE
+            && context.getAclRights() != ACLType.READ_ACL);
+    boolean keyNeedResolved =
+        ozObject.getResourceType() == OzoneObj.ResourceType.KEY;
+
+    if (bucketNeedResolved || keyNeedResolved) {
       try {
-        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(
-            ozObject.getVolumeName(), ozObject.getBucketName()), false);
+        ResolvedBucket resolvedBucket =
+            ozoneManager.resolveBucketLinkWithoutAcl(
+            Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
         volume = resolvedBucket.realVolume();
         bucket = resolvedBucket.realBucket();
       } catch (IOException e) {

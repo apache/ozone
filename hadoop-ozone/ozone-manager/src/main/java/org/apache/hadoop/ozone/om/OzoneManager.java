@@ -4210,6 +4210,41 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         visited, userGroupInformation, remoteAddress, hostName);
   }
 
+  public ResolvedBucket resolveBucketLinkWithoutAcl(
+      Pair<String, String> volumeAndBucket) throws IOException {
+    Pair<String, String> resolved =
+        resolveBucketLinkWithoutAcl(volumeAndBucket, new HashSet<>());
+    return new ResolvedBucket(volumeAndBucket, resolved);
+  }
+
+  /**
+   * Resolves bucket symlinks without checking acl.
+   *
+   * @param volumeAndBucket the bucket to be resolved (if it is a link)
+   * @param visited collects link buckets visited during the resolution to
+   *   avoid infinite loops
+   * @return bucket location possibly updated with its actual volume and bucket
+   *   after following bucket links
+   * @throws IOException (most likely OMException) if ACL check fails, bucket is
+   *   not found, loop is detected in the links, etc.
+   */
+  private Pair<String, String> resolveBucketLinkWithoutAcl(
+      Pair<String, String> volumeAndBucket,
+      Set<Pair<String, String>> visited) throws IOException {
+    String volumeName = volumeAndBucket.getLeft();
+    String bucketName = volumeAndBucket.getRight();
+    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
+    if (!info.isLink()) {
+      return volumeAndBucket;
+    }
+    if (!visited.add(volumeAndBucket)) {
+      throw new OMException("Detected loop in bucket links",
+          DETECTED_LOOP_IN_BUCKET_LINKS);
+    }
+    return resolveBucketLinkWithoutAcl(
+        Pair.of(info.getSourceVolume(), info.getSourceBucket()), visited);
+  }
+
   @VisibleForTesting
   public void setExitManagerForTesting(ExitManager exitManagerForTesting) {
     exitManager = exitManagerForTesting;
