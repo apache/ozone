@@ -106,8 +106,10 @@ public final class DatanodeStoreCache {
 
   public void shutdownCache() {
     if (miniClusterMode) {
-      LOG.info("Skip clearing cache in mini cluster mode. Entries left: {}",
-          new TreeSet<>(datanodeStoreMap.keySet()));
+      if (!datanodeStoreMap.isEmpty()) {
+        LOG.info("Skip clearing cache in mini cluster mode. Entries left: {}",
+            new TreeSet<>(datanodeStoreMap.keySet()));
+      }
       return;
     }
 
