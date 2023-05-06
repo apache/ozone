@@ -55,7 +55,7 @@ public final class CodecRegistry {
         .addCodec(byte[].class, new ByteArrayCodec());
   }
 
-  private static class CodecMap {
+  private static final class CodecMap {
     private final Map<Class<?>, Codec<?>> map;
 
     private CodecMap(Map<Class<?>, Codec<?>> map) {
