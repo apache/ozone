@@ -157,11 +157,8 @@ public class SstFilteringService extends BackgroundService
                       new File(snapshotCheckpointDir),
                       dbName, true, Optional.of(Boolean.TRUE), false)) {
             RocksDatabase db = rdbStore.getDb();
-            try {
-              lockBootstrapState();
+            try (BootstrapStateHandler handler =  lockBootstrapState()) {
               db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
-            } finally {
-              unlockBootstrapState();
             }
           }
 
@@ -229,8 +226,10 @@ public class SstFilteringService extends BackgroundService
 
 
   @Override
-  public void lockBootstrapState() throws InterruptedException {
+  public BootstrapStateHandler lockBootstrapState()
+      throws InterruptedException {
     bootstrapStateLock.acquire();
+    return this;
   }
 
   @Override

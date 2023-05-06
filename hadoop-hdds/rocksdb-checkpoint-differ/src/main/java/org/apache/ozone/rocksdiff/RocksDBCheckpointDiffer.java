@@ -1164,12 +1164,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     Set<String> sstFileNodesRemoved =
         pruneSstFileNodesFromDag(lastCompactionSstFiles);
-    try {
-      lockBootstrapState();
+    try (BootstrapStateHandler handler = lockBootstrapState()) {
       removeSstFiles(sstFileNodesRemoved);
       deleteOlderSnapshotsCompactionFiles(olderSnapshotsLogFilePaths);
-    } finally {
-      unlockBootstrapState();
     }
   }
 
@@ -1473,11 +1470,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           .map(node -> node.getFileName())
           .collect(Collectors.toSet());
     }
-    try {
-      lockBootstrapState();
+    try (BootstrapStateHandler handler = lockBootstrapState()) {
       removeSstFiles(nonLeafSstFiles);
-    } finally {
-      unlockBootstrapState();
     }
   }
 
@@ -1523,9 +1517,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public void lockBootstrapState() {
+  public BootstrapStateHandler lockBootstrapState() {
     try {
       bootstrapStateLock.acquire();
+      return this;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }

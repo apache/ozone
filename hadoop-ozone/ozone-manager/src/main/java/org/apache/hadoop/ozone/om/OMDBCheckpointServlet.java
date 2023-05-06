@@ -141,31 +141,27 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try {
-      lockBootstrapState();
-      try (TarArchiveOutputStream archiveOutputStream =
-               new TarArchiveOutputStream(destination)) {
-        archiveOutputStream
-            .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-        archiveOutputStream
-            .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-        getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
-            includeSnapshotData(request));
+    try (BootstrapStateHandler handler = lockBootstrapState();
+         TarArchiveOutputStream archiveOutputStream =
+             new TarArchiveOutputStream(destination)) {
+      archiveOutputStream
+          .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      archiveOutputStream
+          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+      getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
+          includeSnapshotData(request));
 
-        // Exclude file
-        Map<Object, Path> finalCopyFiles = new HashMap<>();
-        copyFiles.forEach((o, path) -> {
-          String fName = path.getFileName().toString();
-          if (!toExcludeList.contains(fName)) {
-            finalCopyFiles.put(o, path);
-          } else {
-            excludedList.add(fName);
-          }
-        });
-        writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
-      }
-    } finally {
-      unlockBootstrapState();
+      // Exclude file
+      Map<Object, Path> finalCopyFiles = new HashMap<>();
+      copyFiles.forEach((o, path) -> {
+        String fName = path.getFileName().toString();
+        if (!toExcludeList.contains(fName)) {
+          finalCopyFiles.put(o, path);
+        } else {
+          excludedList.add(fName);
+        }
+      });
+      writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
     }
   }
 
@@ -308,7 +304,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   }
 
   @Override
-  public void lockBootstrapState() throws InterruptedException {
+  public BootstrapStateHandler lockBootstrapState()
+      throws InterruptedException {
     OzoneManager om = (OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
 
@@ -320,7 +317,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
 
     // Then wait for the double buffer to be flushed.
     om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
-
+    return this;
   }
 
   @Override

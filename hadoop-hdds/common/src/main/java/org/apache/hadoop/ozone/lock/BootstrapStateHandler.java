@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.lock;
 
 /** Bootstrap state lock interface. */
-public interface BootstrapStateHandler {
-  void lockBootstrapState() throws InterruptedException;
+public interface BootstrapStateHandler extends AutoCloseable {
+  BootstrapStateHandler lockBootstrapState() throws InterruptedException;
   void unlockBootstrapState();
+  default void close() {
+    unlockBootstrapState();
+  }
 }

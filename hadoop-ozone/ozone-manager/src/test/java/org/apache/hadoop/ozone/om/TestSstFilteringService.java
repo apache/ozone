@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -224,19 +225,20 @@ public class TestSstFilteringService {
     Assert.assertTrue(
         processedSnapshotIds.contains(snapshotInfo.getSnapshotID()));
 
+    long count;
     // Prevent the new snapshot from being filtered
-    sstFilteringService.lockBootstrapState();
-    long count = sstFilteringService.getSnapshotFilteredCount().get();
-    writeClient.createSnapshot("vol1", "buck2", "snapshot2");
+    try (BootstrapStateHandler handler =
+             sstFilteringService.lockBootstrapState()) {
+      count = sstFilteringService.getSnapshotFilteredCount().get();
+      writeClient.createSnapshot("vol1", "buck2", "snapshot2");
 
-    // Confirm that it is not filtered
-    assertThrows(TimeoutException.class, () -> GenericTestUtils.waitFor(
-        () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
-        1000, 10000));
-    assertEquals(count, sstFilteringService.getSnapshotFilteredCount().get());
-
+      // Confirm that it is not filtered
+      assertThrows(TimeoutException.class, () -> GenericTestUtils.waitFor(
+          () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
+          1000, 10000));
+      assertEquals(count, sstFilteringService.getSnapshotFilteredCount().get());
+    }
     // Now allow filtering
-    sstFilteringService.unlockBootstrapState();
     GenericTestUtils.waitFor(
         () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
         1000, 10000);

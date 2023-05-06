@@ -487,11 +487,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .setClientId(clientId.toString())
         .build();
 
-    try {
-      lockBootstrapState();
+    try (BootstrapStateHandler handler = lockBootstrapState()) {
       submitRequest(omRequest);
-    } finally {
-      unlockBootstrapState();
     }
   }
 
@@ -521,8 +518,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   @Override
-  public void lockBootstrapState() throws InterruptedException {
+  public BootstrapStateHandler lockBootstrapState() throws InterruptedException {
     bootstrapStateLock.acquire();
+    return this;
   }
 
   @Override

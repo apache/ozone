@@ -634,14 +634,13 @@ public class TestOMDbCheckpointServlet {
 
     // Confirm the other processes are locked out when the bootstrap
     //  servlet takes the lock.
-    spyServlet.lockBootstrapState();
-    confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
-    confirmServletLocksOutOtherHandler(snapshotDeletingService,
-        executorService);
-    confirmServletLocksOutOtherHandler(sstFilteringService, executorService);
-    confirmServletLocksOutOtherHandler(differ, executorService);
-    spyServlet.unlockBootstrapState();
-
+    try (BootstrapStateHandler handler = spyServlet.lockBootstrapState()) {
+      confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
+      confirmServletLocksOutOtherHandler(snapshotDeletingService,
+          executorService);
+      confirmServletLocksOutOtherHandler(sstFilteringService, executorService);
+      confirmServletLocksOutOtherHandler(differ, executorService);
+    }
     // Confirm the bootstrap servlet is locked out when any of the other
     //  processes takes the lock.
     confirmOtherHandlerLocksOutServlet(keyDeletingService, spyServlet,
@@ -675,12 +674,12 @@ public class TestOMDbCheckpointServlet {
   private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
-    handler.lockBootstrapState();
-    Future<Boolean> test = checkLock(servlet, executorService);
-    // Servlet should fail to lock when other handler has taken it.
-    Assert.assertThrows(TimeoutException.class,
-        () -> test.get(500, TimeUnit.MILLISECONDS));
-    handler.unlockBootstrapState();
+    try (BootstrapStateHandler h = handler.lockBootstrapState()) {
+      Future<Boolean> test = checkLock(servlet, executorService);
+      // Servlet should fail to lock when other handler has taken it.
+      Assert.assertThrows(TimeoutException.class,
+          () -> test.get(500, TimeUnit.MILLISECONDS));
+    }
   }
 
   // Confirm lock is available by having handler take and release it.
