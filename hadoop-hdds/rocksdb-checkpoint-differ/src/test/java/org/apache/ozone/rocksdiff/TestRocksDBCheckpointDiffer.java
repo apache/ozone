@@ -1072,7 +1072,8 @@ public class TestRocksDBCheckpointDiffer {
       List<String> compactionLogs,
       Set<String> expectedNodes,
       int expectedNumberOfLogFilesDeleted
-  ) throws IOException, ExecutionException, InterruptedException {
+  ) throws IOException, ExecutionException, InterruptedException,
+      TimeoutException {
     List<File> filesCreated = new ArrayList<>();
 
     for (int i = 0; i < compactionLogs.size(); i++) {
@@ -1127,7 +1128,7 @@ public class TestRocksDBCheckpointDiffer {
   //  then release the lock and confirm that the consumer does finish.
   private void waitForLock(RocksDBCheckpointDiffer differ,
                            Consumer<RocksDBCheckpointDiffer> c)
-      throws InterruptedException, ExecutionException {
+      throws InterruptedException, ExecutionException, TimeoutException {
     differ.lockBootstrapState();
 
     Future<Boolean> future = executorService.submit(
@@ -1135,11 +1136,13 @@ public class TestRocksDBCheckpointDiffer {
           c.accept(differ);
           return true;
         });
+    // Confirm that the consumer doesn't finish with lock taken.
     assertThrows(TimeoutException.class,
         () -> future.get(5000, TimeUnit.MILLISECONDS));
 
+    // Confirm consumer finishes when unlocked.
     differ.unlockBootstrapState();
-    assertTrue(future.get());
+    assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
   }
 
   private static Stream<Arguments> sstFilePruningScenarios() {
@@ -1189,7 +1192,8 @@ public class TestRocksDBCheckpointDiffer {
       String compactionLog,
       List<String> initialFiles,
       List<String> expectedFiles
-  ) throws IOException, ExecutionException, InterruptedException {
+  ) throws IOException, ExecutionException, InterruptedException,
+      TimeoutException {
     createFileWithContext(metadataDirName + "/" + compactionLogDirName
             + "/compaction_log" + COMPACTION_LOG_FILE_NAME_SUFFIX,
         compactionLog);

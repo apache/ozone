@@ -141,8 +141,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    // Exclude file
-    Map<Object, Path> finalCopyFiles = new HashMap<>();
     try {
       lockBootstrapState();
       try (TarArchiveOutputStream archiveOutputStream =
@@ -153,6 +151,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
             .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
         getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
             includeSnapshotData(request));
+
+        // Exclude file
+        Map<Object, Path> finalCopyFiles = new HashMap<>();
         copyFiles.forEach((o, path) -> {
           String fName = path.getFileName().toString();
           if (!toExcludeList.contains(fName)) {
@@ -311,10 +312,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     OzoneManager om = (OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
 
+    // First lock all the handlers.
     keyDeletingService.lockBootstrapState();
     sstFilteringService.lockBootstrapState();
     rocksDbCheckpointDiffer.lockBootstrapState();
     snapshotDeletingService.lockBootstrapState();
+
+    // Then wait for the double buffer to be flushed.
     om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
 
   }
