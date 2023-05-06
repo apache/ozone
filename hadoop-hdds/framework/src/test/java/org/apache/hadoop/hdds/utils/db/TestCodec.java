@@ -41,7 +41,7 @@ public final class TestCodec {
     obj = null;
 
     // loop until gc has completed.
-    for(int i = 0; weakRef.get() != null; i++) {
+    for (int i = 0; weakRef.get() != null; i++) {
       LOG.info("gc {}", i);
       System.gc();
       Thread.sleep(100);

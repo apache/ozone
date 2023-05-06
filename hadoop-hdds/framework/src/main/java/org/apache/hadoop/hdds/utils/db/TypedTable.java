@@ -120,8 +120,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
     final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
     if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
-      try(CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
-          CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
+      try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
+           CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
         rawTable.put(k.asReadOnlyByteBuffer(), v.asReadOnlyByteBuffer());
       }
       return;
