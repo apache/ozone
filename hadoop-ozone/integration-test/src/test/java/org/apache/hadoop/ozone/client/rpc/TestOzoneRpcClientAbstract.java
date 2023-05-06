@@ -4095,6 +4095,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  @Flaky("HDDS-8550")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
