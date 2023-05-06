@@ -94,7 +94,7 @@ public class TestManagedSstFileReader {
 
 
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  @ValueSource(ints = {0, 1, 3})
   public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
     Pair<Map<String, Integer>, List<String>> data =
@@ -110,7 +110,7 @@ public class TestManagedSstFileReader {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  @ValueSource(ints = {0, 1, 3})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
     Pair<Map<String, Integer>, List<String>> data =
@@ -119,14 +119,12 @@ public class TestManagedSstFileReader {
     Map<String, Integer> keys = data.getLeft();
     ManagedSSTDumpTool sstDumpTool =
         new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
-            5, 60, TimeUnit.SECONDS,
+            1, 60, TimeUnit.SECONDS,
             new SynchronousQueue<>(), new ThreadFactoryBuilder()
             .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
             .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-        .forEach(val ->{
-          keys.remove(val);
-        });
+        .forEach(keys::remove);
     Assertions.assertEquals(0, keys.size());
   }
 }

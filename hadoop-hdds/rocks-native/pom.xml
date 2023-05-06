@@ -265,7 +265,7 @@
                             </execution>
                             <execution>
                                 <id>build-rocksjava</id>
-                                <phase>process-resources</phase>
+                                <phase>generate-resources</phase>
                                 <configuration>
                                     <tasks>
                                         <exec executable="chmod" failonerror="true">
@@ -288,7 +288,7 @@
                             </execution>
                             <execution>
                                 <id>build-rocks-tools</id>
-                                <phase>process-classes</phase>
+                                <phase>process-resources</phase>
                                 <configuration>
                                     <tasks>
                                         <mkdir dir="${project.build.directory}/native/rocksdb"/>
@@ -317,7 +317,7 @@
                             </execution>
                             <execution>
                                 <id>copy-lib-file</id>
-                                <phase>process-test-classes</phase>
+                                <phase>process-sources</phase>
                                 <configuration>
                                     <tasks>
                                         <copy toDir="${project.build.outputDirectory}">
