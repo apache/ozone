@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -196,7 +197,8 @@ public class TestOmSnapshotManager {
     return SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,
-        snapshotId);
+        snapshotId,
+        Time.now());
   }
 
 }

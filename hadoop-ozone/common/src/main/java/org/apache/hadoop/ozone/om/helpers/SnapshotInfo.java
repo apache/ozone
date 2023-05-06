@@ -27,8 +27,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 
 import com.google.common.base.Preconditions;
 
-import org.apache.hadoop.util.Time;
-
 import java.time.format.DateTimeFormatter;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -479,15 +477,15 @@ public final class SnapshotInfo implements Auditable {
   public static SnapshotInfo newInstance(String volumeName,
                                          String bucketName,
                                          String snapshotName,
-                                         String snapshotId) {
+                                         String snapshotId,
+                                         long creationTime) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
-    long initialTime = Time.now();
     if (StringUtils.isBlank(snapshotName)) {
-      snapshotName = generateName(initialTime);
+      snapshotName = generateName(creationTime);
     }
     builder.setSnapshotID(snapshotId)
         .setName(snapshotName)
-        .setCreationTime(initialTime)
+        .setCreationTime(creationTime)
         .setDeletionTime(INVALID_TIMESTAMP)
         .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
