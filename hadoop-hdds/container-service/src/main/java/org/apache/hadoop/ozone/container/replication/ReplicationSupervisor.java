@@ -161,8 +161,13 @@ public final class ReplicationSupervisor {
                 .build());
         executor = tpe;
         executorThreadUpdater = threadCount -> {
-          tpe.setMaximumPoolSize(threadCount);
-          tpe.setCorePoolSize(threadCount);
+          if (threadCount < tpe.getCorePoolSize()) {
+            tpe.setCorePoolSize(threadCount);
+            tpe.setMaximumPoolSize(threadCount);
+          } else {
+            tpe.setMaximumPoolSize(threadCount);
+            tpe.setCorePoolSize(threadCount);
+          }
         };
       }
 
