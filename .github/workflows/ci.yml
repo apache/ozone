@@ -333,10 +333,10 @@ jobs:
           - flaky
       fail-fast: false
     steps:
-      - name: Checkout project
+      - name: Checkout project with history
         uses: actions/checkout@v3
         with:
-          - fetch-depth: 0
+            fetch-depth: 0
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:
