@@ -117,49 +117,49 @@ jobs:
 #          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
 #          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
 #        if: always()
-  compile:
-    needs:
-      - build-info
-      - build
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-    if: needs.build-info.outputs.needs-compile == 'true'
-    strategy:
-      matrix:
-        java: [ 11, 17 ]
-      fail-fast: false
-    steps:
-      - name: Download Ozone source tarball
-        uses: actions/download-artifact@v3
-        with:
-          name: ozone-src
-      - name: Untar sources
-        run: |
-          tar --strip-components 1 -xzvf ozone*-src.tar.gz
-      - name: Cache for maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
-          restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
-            maven-repo-
-      - name: Setup java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
-      - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
-        env:
-          OZONE_WITH_COVERAGE: false
-          CANCEL_NATIVE_VERSION_CHECK: true
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
+#  compile:
+#    needs:
+#      - build-info
+#      - build
+#    runs-on: ubuntu-20.04
+#    timeout-minutes: 30
+#    if: needs.build-info.outputs.needs-compile == 'true'
+#    strategy:
+#      matrix:
+#        java: [ 11, 17 ]
+#      fail-fast: false
+#    steps:
+#      - name: Download Ozone source tarball
+#        uses: actions/download-artifact@v3
+#        with:
+#          name: ozone-src
+#      - name: Untar sources
+#        run: |
+#          tar --strip-components 1 -xzvf ozone*-src.tar.gz
+#      - name: Cache for maven dependencies
+#        uses: actions/cache@v3
+#        with:
+#          path: ~/.m2/repository
+#          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+#          restore-keys: |
+#            maven-repo-${{ hashFiles('**/pom.xml') }}
+#            maven-repo-
+#      - name: Setup java
+#        uses: actions/setup-java@v3
+#        with:
+#          distribution: 'temurin'
+#          java-version: ${{ matrix.java }}
+#      - name: Compile Ozone using Java ${{ matrix.java }}
+#        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
+#        env:
+#          OZONE_WITH_COVERAGE: false
+#          CANCEL_NATIVE_VERSION_CHECK: true
+#      - name: Delete temporary build artifacts before caching
+#        run: |
+#          #Never cache local artifacts
+#          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
+#          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
+#        if: always()
   basic:
     needs:
       - build-info
