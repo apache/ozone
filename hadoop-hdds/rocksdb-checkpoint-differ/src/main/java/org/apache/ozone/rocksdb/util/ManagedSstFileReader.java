@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -117,8 +118,8 @@ public class ManagedSstFileReader {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
               @Override
-              protected String getTransformedValue(KeyValue value) {
-                return value.getKey();
+              protected String getTransformedValue(Optional<KeyValue> value) {
+                return value.map(KeyValue::getKey).orElse(null);
               }
             };
           }

@@ -124,7 +124,9 @@ public class TestManagedSstFileReader {
             .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
             .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-        .forEach(keys::remove);
+        .forEach(val ->{
+          keys.remove(val);
+        });
     Assertions.assertEquals(0, keys.size());
   }
 }

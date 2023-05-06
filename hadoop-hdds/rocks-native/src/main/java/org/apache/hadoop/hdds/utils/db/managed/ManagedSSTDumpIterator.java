@@ -55,9 +55,9 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   public static final int PATTERN_TYPE_GROUP_NUMBER = 3;
   private static final Pattern PATTERN_MATCHER = Pattern.compile(PATTERN_REGEX);
   private BufferedReader processOutput;
-  private KeyValue currentKey;
+  private Optional<KeyValue> currentKey;
   private char[] charBuffer;
-  private KeyValue nextKey;
+  private Optional<KeyValue> nextKey;
 
   private ManagedSSTDumpTool.SSTDumpToolTask sstDumpToolTask;
   private AtomicBoolean open;
@@ -95,8 +95,12 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
         break;
       }
     }
-    return value.length() > 0 ? Optional.of(Integer.valueOf(value.toString()))
-        : Optional.empty();
+    try {
+      return value.length() > 0 ? Optional.of(Integer.valueOf(value.toString()))
+          : Optional.empty();
+    } catch (NumberFormatException e) {
+      return getNextNumberInStream();
+    }
   }
 
   /**
@@ -124,13 +128,17 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
                     ManagedOptions options)
-      throws NativeLibraryNotLoadedException {
+      throws NativeLibraryNotLoadedException, IOException {
     String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = new BufferedReader(new InputStreamReader(
         sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
+    processOutput.readLine();
+    processOutput.readLine();
     charBuffer = new char[8192];
     open = new AtomicBoolean(true);
+    currentKey = Optional.empty();
+    nextKey = Optional.empty();
     next();
   }
 
@@ -159,7 +167,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   @Override
   public boolean hasNext() {
     checkSanityOfProcess();
-    return nextKey != null;
+    return nextKey.isPresent();
   }
 
   /**
@@ -168,7 +176,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
    * @param value
    * @return transformed Value
    */
-  protected abstract T getTransformedValue(KeyValue value);
+  protected abstract T getTransformedValue(Optional<KeyValue> value);
 
   /**
    * Returns the next record from SSTDumpTool.
@@ -180,7 +188,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   public T next() {
     checkSanityOfProcess();
     currentKey = nextKey;
-    nextKey = null;
+    nextKey = Optional.empty();
     boolean keyFound = false;
     while (!keyFound) {
       try {
@@ -197,10 +205,11 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
                 valueLength.get());
             if (valueStr.length() == valueLength.get()) {
               keyFound = true;
-              nextKey = new KeyValue(matcher.group(PATTERN_KEY_GROUP_NUMBER),
+              nextKey = Optional.of(
+                  new KeyValue(matcher.group(PATTERN_KEY_GROUP_NUMBER),
                   matcher.group(PATTERN_SEQ_GROUP_NUMBER),
                   matcher.group(PATTERN_TYPE_GROUP_NUMBER),
-                  valueStr);
+                  valueStr));
             }
           }
         }
@@ -208,7 +217,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
         throw new RuntimeIOException(e);
       }
     }
-    return currentKey != null ? getTransformedValue(currentKey) : null;
+    return getTransformedValue(currentKey);
   }
 
   @Override
