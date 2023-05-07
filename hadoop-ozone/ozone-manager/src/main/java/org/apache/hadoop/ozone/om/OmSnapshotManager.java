@@ -157,7 +157,18 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
+  /**
+   * TODO: [SNAPSHOT] HDDS-8529: Refactor the constructor in a way that when
+   *  ozoneManager.isFilesystemSnapshotEnabled() returns false,
+   *  no snapshot-related background job or initialization would run,
+   *  except for applying previously committed Ratis transactions in e.g.:
+   *  1. {@link OMKeyPurgeRequest#validateAndUpdateCache}
+   *  2. {@link OMDirectoriesPurgeRequestWithFSO#validateAndUpdateCache}
+   */
   public OmSnapshotManager(OzoneManager ozoneManager) {
+    LOG.info("Ozone filesystem snapshot feature is {}.",
+        ozoneManager.isFilesystemSnapshotEnabled() ? "enabled" : "disabled");
+
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
@@ -258,17 +269,21 @@ public final class OmSnapshotManager implements AutoCloseable {
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
-        diffCleanupServiceInterval,
-        diffCleanupServiceTimeout,
-        ozoneManager,
-        snapshotDiffDb,
-        snapDiffJobCf,
-        snapDiffPurgedJobCf,
-        snapDiffReportCf,
-        codecRegistry
-    );
-    this.snapshotDiffCleanupService.start();
+    if (ozoneManager.isFilesystemSnapshotEnabled()) {
+      this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
+          diffCleanupServiceInterval,
+          diffCleanupServiceTimeout,
+          ozoneManager,
+          snapshotDiffDb,
+          snapDiffJobCf,
+          snapDiffPurgedJobCf,
+          snapDiffReportCf,
+          codecRegistry
+      );
+      this.snapshotDiffCleanupService.start();
+    } else {
+      this.snapshotDiffCleanupService = null;
+    }
   }
 
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
@@ -474,7 +489,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public IOmMetadataReader checkForSnapshot(String volumeName,
                                             String bucketName, String keyname)
       throws IOException {
-    if (keyname == null) {
+    if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
 
