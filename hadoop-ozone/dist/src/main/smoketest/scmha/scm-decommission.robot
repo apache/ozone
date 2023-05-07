@@ -39,7 +39,8 @@ Transfer Leader to non-primordial node Follower
 
 Decommission SCM Primordial Node
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
-    ${node_count} =         Get Line Count          ${result}
+    ${nodes_in_quorum} =    Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
+    ${node_count} =         Get Line Count          ${nodes_in_quorum}
     ${node_count_pre} =     Convert to String       ${node_count}
     ${n} =                  Evaluate                ${node_count}-1
     ${node_count_expect} =  Convert to String       ${n}
@@ -51,7 +52,8 @@ Decommission SCM Primordial Node
                             LOG                     ${decommission_res}
                             Should Contain          ${decommission_res}                         Decommissioned
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
-    ${node_count} =         Get Line Count          ${result}
+    ${nodes_in_quorum} =    Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
+    ${node_count} =         Get Line Count          ${nodes_in_quorum}
     ${node_count_post} =    Convert to String       ${node_count}
                             LOG                     SCM Instance Count after SCM Decommission: ${node_count_post}
                             Should be Equal         ${node_count_expect}                        ${node_count_post}
