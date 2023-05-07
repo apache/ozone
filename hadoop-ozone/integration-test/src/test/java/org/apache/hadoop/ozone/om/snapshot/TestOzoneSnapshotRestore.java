@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  * Tests Snapshot Restore function.
  */
 @Timeout(value = 300)
+@Flaky("HDDS-7889")
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneCluster cluster;
