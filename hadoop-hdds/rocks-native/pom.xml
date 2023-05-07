@@ -288,7 +288,7 @@
                             </execution>
                             <execution>
                                 <id>build-rocks-tools</id>
-                                <phase>process-resources</phase>
+                                <phase>process-classes</phase>
                                 <configuration>
                                     <tasks>
                                         <mkdir dir="${project.build.directory}/native/rocksdb"/>
@@ -363,7 +363,7 @@
                         <artifactId>native-maven-plugin</artifactId>
                         <executions>
                             <execution>
-                                <phase>generate-resources</phase>
+                                <phase>compile</phase>
                                 <goals>
                                     <goal>javah</goal>
                                 </goals>
@@ -418,7 +418,7 @@
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
-                                <phase>generate-resources</phase>
+                                <phase>compile</phase>
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
