@@ -24,10 +24,13 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +50,9 @@ import java.util.stream.IntStream;
  * ManagedSstFileReader tests.
  */
 public class TestManagedSstFileReader {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestManagedSstFileReader.class);
   private String createRandomSSTFile(Map<String, Integer> records)
       throws IOException, RocksDBException {
     Map<String, Integer> keys = records instanceof TreeMap ?
@@ -123,6 +129,7 @@ public class TestManagedSstFileReader {
             new SynchronousQueue<>(), new ThreadFactoryBuilder()
             .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
             .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
+    LOG.info("Initialized SSTdumpTool");
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
         .forEach(keys::remove);
     Assertions.assertEquals(0, keys.size());
