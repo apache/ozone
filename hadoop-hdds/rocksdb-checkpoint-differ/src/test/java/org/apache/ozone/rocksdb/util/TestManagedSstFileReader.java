@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -126,11 +127,7 @@ public class TestManagedSstFileReader {
     Map<String, Integer> keys = data.getLeft();
     LOG.info("Initializing SSTdumpTools {}", numberOfFiles);
     ManagedSSTDumpTool sstDumpTool =
-        new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
-            1, 60, TimeUnit.SECONDS,
-            new SynchronousQueue<>(), new ThreadFactoryBuilder()
-            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
-            .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
+        new ManagedSSTDumpTool(new ForkJoinPool(1), 256);
     LOG.info("Initialized SSTdumpTool");
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
         .forEach(key -> {
