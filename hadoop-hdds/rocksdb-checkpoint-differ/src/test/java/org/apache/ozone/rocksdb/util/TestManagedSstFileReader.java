@@ -123,6 +123,7 @@ public class TestManagedSstFileReader {
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
     Map<String, Integer> keys = data.getLeft();
+    LOG.info("Initializing SSTdumpTool");
     ManagedSSTDumpTool sstDumpTool =
         new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
             1, 60, TimeUnit.SECONDS,
