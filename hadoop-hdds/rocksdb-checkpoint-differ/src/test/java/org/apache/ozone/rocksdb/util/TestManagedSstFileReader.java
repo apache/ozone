@@ -141,6 +141,7 @@ public class TestManagedSstFileReader {
         });
     LOG.info("Done {}", numberOfFiles);
     Assertions.assertEquals(0, keys.size());
+    LOG.info("Dones {}", numberOfFiles);
     executorService.shutdown();
     try {
       executorService.awaitTermination(5, TimeUnit.SECONDS);
@@ -148,5 +149,6 @@ public class TestManagedSstFileReader {
       LOG.error("Failed to shutdown Report Manager", e);
       Thread.currentThread().interrupt();
     }
+    LOG.info("Dones2 {}", numberOfFiles);
   }
 }
