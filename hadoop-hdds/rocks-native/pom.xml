@@ -363,7 +363,7 @@
                         <artifactId>native-maven-plugin</artifactId>
                         <executions>
                             <execution>
-                                <phase>compile</phase>
+                                <phase>generate-resources</phase>
                                 <goals>
                                     <goal>javah</goal>
                                 </goals>
@@ -397,7 +397,7 @@
                         <executions>
                             <execution>
                                 <id>copy-jars</id>
-                                <phase>process-resources</phase>
+                                <phase>process-sources</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>
                                 </goals>
@@ -418,7 +418,7 @@
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
-                                <phase>compile</phase>
+                                <phase>generate-resources</phase>
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
