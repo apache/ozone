@@ -133,9 +133,10 @@ public class TestManagedSstFileReader {
     LOG.info("Initialized SSTdumpTool");
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
         .forEach(key -> {
-          LOG.info("{}", key);
+          LOG.info("{} {}", numberOfFiles, key);
           keys.remove(key);
         });
+    LOG.info("Done {}", numberOfFiles);
     Assertions.assertEquals(0, keys.size());
   }
 }
