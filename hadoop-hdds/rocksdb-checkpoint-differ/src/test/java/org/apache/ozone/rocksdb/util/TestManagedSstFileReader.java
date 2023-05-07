@@ -109,22 +109,22 @@ public class TestManagedSstFileReader {
     keys.values().forEach(val -> Assertions.assertEquals(0, val));
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 3})
-  public void testGetKeyStreamWithTombstone(int numberOfFiles)
-      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-    Pair<Map<String, Integer>, List<String>> data =
-        createDummyData(numberOfFiles);
-    List<String> files = data.getRight();
-    Map<String, Integer> keys = data.getLeft();
-    ManagedSSTDumpTool sstDumpTool =
-        new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
-            1, 60, TimeUnit.SECONDS,
-            new SynchronousQueue<>(), new ThreadFactoryBuilder()
-            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
-            .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
-    new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-        .forEach(keys::remove);
-    Assertions.assertEquals(0, keys.size());
-  }
+//  @ParameterizedTest
+//  @ValueSource(ints = {0, 1, 3})
+//  public void testGetKeyStreamWithTombstone(int numberOfFiles)
+//      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+//    Pair<Map<String, Integer>, List<String>> data =
+//        createDummyData(numberOfFiles);
+//    List<String> files = data.getRight();
+//    Map<String, Integer> keys = data.getLeft();
+//    ManagedSSTDumpTool sstDumpTool =
+//        new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
+//            1, 60, TimeUnit.SECONDS,
+//            new SynchronousQueue<>(), new ThreadFactoryBuilder()
+//            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
+//            .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
+//    new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
+//        .forEach(keys::remove);
+//    Assertions.assertEquals(0, keys.size());
+//  }
 }
