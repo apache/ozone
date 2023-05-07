@@ -95,6 +95,7 @@ public class NativeLibraryLoader {
   }
 
   public synchronized boolean loadLibrary(final String libraryName) {
+    LOG.info("Loading {}", libraryName);
     if (isLibraryLoaded(libraryName)) {
       return true;
     }

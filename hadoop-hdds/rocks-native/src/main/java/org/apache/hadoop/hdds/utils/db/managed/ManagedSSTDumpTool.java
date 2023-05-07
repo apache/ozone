@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -34,8 +36,11 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 public class ManagedSSTDumpTool {
 
   static {
+    final Logger LOG =
+        LoggerFactory.getLogger(ManagedSSTDumpTool.class);
     NativeLibraryLoader.getInstance()
         .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+    LOG.info("Loaded");
   }
 
   private int bufferCapacity;
