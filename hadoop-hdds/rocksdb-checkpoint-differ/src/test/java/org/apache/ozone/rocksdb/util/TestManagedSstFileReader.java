@@ -132,7 +132,10 @@ public class TestManagedSstFileReader {
             .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
     LOG.info("Initialized SSTdumpTool");
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-        .forEach(keys::remove);
+        .forEach(key -> {
+          LOG.info("{}", key);
+          keys.remove(key);
+        });
     Assertions.assertEquals(0, keys.size());
   }
 }
