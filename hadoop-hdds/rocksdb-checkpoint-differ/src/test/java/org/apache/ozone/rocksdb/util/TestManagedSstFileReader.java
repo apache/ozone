@@ -93,38 +93,38 @@ public class TestManagedSstFileReader {
   }
 
 
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 3})
-  public void testGetKeyStream(int numberOfFiles)
-      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-    Pair<Map<String, Integer>, List<String>> data =
-        createDummyData(numberOfFiles);
-    List<String> files = data.getRight();
-    Map<String, Integer> keys = data.getLeft();
-    new ManagedSstFileReader(files).getKeyStream().forEach(
-        key -> {
-          Assertions.assertEquals(keys.get(key), 1);
-          keys.remove(key);
-        });
-    keys.values().forEach(val -> Assertions.assertEquals(0, val));
-  }
-
 //  @ParameterizedTest
 //  @ValueSource(ints = {0, 1, 3})
-//  public void testGetKeyStreamWithTombstone(int numberOfFiles)
+//  public void testGetKeyStream(int numberOfFiles)
 //      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
 //    Pair<Map<String, Integer>, List<String>> data =
 //        createDummyData(numberOfFiles);
 //    List<String> files = data.getRight();
 //    Map<String, Integer> keys = data.getLeft();
-//    ManagedSSTDumpTool sstDumpTool =
-//        new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
-//            1, 60, TimeUnit.SECONDS,
-//            new SynchronousQueue<>(), new ThreadFactoryBuilder()
-//            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
-//            .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
-//    new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-//        .forEach(keys::remove);
-//    Assertions.assertEquals(0, keys.size());
+//    new ManagedSstFileReader(files).getKeyStream().forEach(
+//        key -> {
+//          Assertions.assertEquals(keys.get(key), 1);
+//          keys.remove(key);
+//        });
+//    keys.values().forEach(val -> Assertions.assertEquals(0, val));
 //  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 3})
+  public void testGetKeyStreamWithTombstone(int numberOfFiles)
+      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+    Pair<Map<String, Integer>, List<String>> data =
+        createDummyData(numberOfFiles);
+    List<String> files = data.getRight();
+    Map<String, Integer> keys = data.getLeft();
+    ManagedSSTDumpTool sstDumpTool =
+        new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
+            1, 60, TimeUnit.SECONDS,
+            new SynchronousQueue<>(), new ThreadFactoryBuilder()
+            .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
+            .build(), new ThreadPoolExecutor.DiscardPolicy()), 256);
+    new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
+        .forEach(keys::remove);
+    Assertions.assertEquals(0, keys.size());
+  }
 }
