@@ -119,11 +119,12 @@ public class TestManagedSstFileReader {
   @ValueSource(ints = {0, 1, 3})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+    LOG.info("Initializing SSTdumpTool {}", numberOfFiles);
     Pair<Map<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
     Map<String, Integer> keys = data.getLeft();
-    LOG.info("Initializing SSTdumpTool");
+    LOG.info("Initializing SSTdumpTools {}", numberOfFiles);
     ManagedSSTDumpTool sstDumpTool =
         new ManagedSSTDumpTool(new ThreadPoolExecutor(0,
             1, 60, TimeUnit.SECONDS,
