@@ -47,7 +47,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -105,7 +104,8 @@ public class SstFilteringService extends BackgroundService
     snapshotFilteredCount = new AtomicLong(0);
   }
 
-  private final Semaphore bootstrapStateLock = new Semaphore(1);
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
 
   private class SstFilteringTask implements BackgroundTask {
 
@@ -157,7 +157,7 @@ public class SstFilteringService extends BackgroundService
                       new File(snapshotCheckpointDir),
                       dbName, true, Optional.of(Boolean.TRUE), false)) {
             RocksDatabase db = rdbStore.getDb();
-            try (BootstrapStateHandler handler =  lockBootstrapState()) {
+            try (BootstrapStateHandler.Lock lock = getLock().lock()) {
               db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
             }
           }
@@ -224,17 +224,8 @@ public class SstFilteringService extends BackgroundService
     return snapshotFilteredCount;
   }
 
-
   @Override
-  public BootstrapStateHandler lockBootstrapState()
-      throws InterruptedException {
-    bootstrapStateLock.acquire();
-    return this;
+  public BootstrapStateHandler.Lock getLock() {
+    return lock;
   }
-
-  @Override
-  public void unlockBootstrapState() {
-    bootstrapStateLock.release();
-  }
-
 }

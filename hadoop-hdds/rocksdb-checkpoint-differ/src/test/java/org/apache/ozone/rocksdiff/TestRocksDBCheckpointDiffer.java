@@ -49,6 +49,7 @@ import java.util.stream.Stream;
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -1129,19 +1130,20 @@ public class TestRocksDBCheckpointDiffer {
   private void waitForLock(RocksDBCheckpointDiffer differ,
                            Consumer<RocksDBCheckpointDiffer> c)
       throws InterruptedException, ExecutionException, TimeoutException {
-    differ.lockBootstrapState();
 
-    Future<Boolean> future = executorService.submit(
-        () -> {
-          c.accept(differ);
-          return true;
-        });
-    // Confirm that the consumer doesn't finish with lock taken.
-    assertThrows(TimeoutException.class,
-        () -> future.get(5000, TimeUnit.MILLISECONDS));
+    Future<Boolean> future;
+    try (BootstrapStateHandler.Lock lock = differ.getLock().lock()) {
 
+      future = executorService.submit(
+          () -> {
+            c.accept(differ);
+            return true;
+          });
+      // Confirm that the consumer doesn't finish with lock taken.
+      assertThrows(TimeoutException.class,
+          () -> future.get(5000, TimeUnit.MILLISECONDS));
+    }
     // Confirm consumer finishes when unlocked.
-    differ.unlockBootstrapState();
     assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
   }
 

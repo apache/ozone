@@ -67,7 +67,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.concurrent.Semaphore;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -174,7 +173,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private final ScheduledExecutorService executor;
   private boolean closed;
   private final long maxAllowedTimeInDag;
-  private final Semaphore bootstrapStateLock = new Semaphore(1);
+  private final BootstrapStateHandler.Lock lock
+      = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
 
@@ -1164,9 +1164,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     Set<String> sstFileNodesRemoved =
         pruneSstFileNodesFromDag(lastCompactionSstFiles);
-    try (BootstrapStateHandler handler = lockBootstrapState()) {
+    try (BootstrapStateHandler.Lock lock = getLock().lock()) {
       removeSstFiles(sstFileNodesRemoved);
       deleteOlderSnapshotsCompactionFiles(olderSnapshotsLogFilePaths);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -1470,8 +1472,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           .map(node -> node.getFileName())
           .collect(Collectors.toSet());
     }
-    try (BootstrapStateHandler handler = lockBootstrapState()) {
+    try (BootstrapStateHandler.Lock lock = getLock().lock()) {
       removeSstFiles(nonLeafSstFiles);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -1517,17 +1521,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public BootstrapStateHandler lockBootstrapState() {
-    try {
-      bootstrapStateLock.acquire();
-      return this;
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public void unlockBootstrapState() {
-    bootstrapStateLock.release();
+  public BootstrapStateHandler.Lock getLock() {
+    return lock;
   }
 }

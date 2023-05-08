@@ -76,7 +76,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
-  private final Semaphore bootstrapStateLock = new Semaphore(1);
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
 
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
@@ -487,7 +488,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         .setClientId(clientId.toString())
         .build();
 
-    try (BootstrapStateHandler handler = lockBootstrapState()) {
+    try (BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock()) {
       submitRequest(omRequest);
     }
   }
@@ -517,14 +518,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
   }
 
-  @Override
-  public BootstrapStateHandler lockBootstrapState() throws InterruptedException {
-    bootstrapStateLock.acquire();
-    return this;
-  }
-
-  @Override
-  public void unlockBootstrapState() {
-    bootstrapStateLock.release();
+  public BootstrapStateHandler.Lock getLock() {
+    return lock;
   }
 }

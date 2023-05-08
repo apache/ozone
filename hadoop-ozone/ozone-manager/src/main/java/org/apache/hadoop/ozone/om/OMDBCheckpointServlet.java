@@ -83,10 +83,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private transient BootstrapStateHandler keyDeletingService;
-  private transient BootstrapStateHandler sstFilteringService;
-  private transient BootstrapStateHandler rocksDbCheckpointDiffer;
-  private transient BootstrapStateHandler snapshotDeletingService;
+  private BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -118,12 +115,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+    lock = new Lock(om);
 
-    keyDeletingService = om.getKeyManager().getDeletingService();
-    sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
-    rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
-        .getRocksDBCheckpointDiffer();
-    snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
   }
 
   @Override
@@ -141,7 +134,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (BootstrapStateHandler handler = lockBootstrapState();
+    try (BootstrapStateHandler.Lock lock = getLock().lock();
          TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(destination)) {
       archiveOutputStream
@@ -304,29 +297,48 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   }
 
   @Override
-  public BootstrapStateHandler lockBootstrapState()
-      throws InterruptedException {
-    OzoneManager om = (OzoneManager) getServletContext()
-        .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
-
-    // First lock all the handlers.
-    keyDeletingService.lockBootstrapState();
-    sstFilteringService.lockBootstrapState();
-    rocksDbCheckpointDiffer.lockBootstrapState();
-    snapshotDeletingService.lockBootstrapState();
-
-    // Then wait for the double buffer to be flushed.
-    om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
-    return this;
+  public BootstrapStateHandler.Lock getLock() {
+    return lock;
   }
 
-  @Override
-  public void unlockBootstrapState() {
-    snapshotDeletingService.unlockBootstrapState();
-    rocksDbCheckpointDiffer.unlockBootstrapState();
-    sstFilteringService.unlockBootstrapState();
-    keyDeletingService.unlockBootstrapState();
+  static class Lock extends BootstrapStateHandler.Lock
+      {
+    private final BootstrapStateHandler keyDeletingService;
+    private final BootstrapStateHandler sstFilteringService;
+    private final BootstrapStateHandler rocksDbCheckpointDiffer;
+    private final BootstrapStateHandler snapshotDeletingService;
+    private final OzoneManager om;
+
+    public Lock(OzoneManager om) {
+      this.om = om;
+      keyDeletingService = om.getKeyManager().getDeletingService();
+      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
+      rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
+          .getRocksDBCheckpointDiffer();
+      snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+
+    }
+
+    @Override
+    public BootstrapStateHandler.Lock lock()
+        throws InterruptedException {
+      // First lock all the handlers.
+      keyDeletingService.getLock().lock();
+      sstFilteringService.getLock().lock();
+      rocksDbCheckpointDiffer.getLock().lock();
+      snapshotDeletingService.getLock().lock();
+
+      // Then wait for the double buffer to be flushed.
+      om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      return this;
+    }
+
+    @Override
+    public void unlock() {
+      snapshotDeletingService.getLock().unlock();
+      rocksDbCheckpointDiffer.getLock().unlock();
+      sstFilteringService.getLock().unlock();
+      keyDeletingService.getLock().unlock();
+    }
   }
-
-
 }

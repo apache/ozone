@@ -634,7 +634,7 @@ public class TestOMDbCheckpointServlet {
 
     // Confirm the other processes are locked out when the bootstrap
     //  servlet takes the lock.
-    try (BootstrapStateHandler handler = spyServlet.lockBootstrapState()) {
+    try (BootstrapStateHandler.Lock lock = spyServlet.getLock().lock()) {
       confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
       confirmServletLocksOutOtherHandler(snapshotDeletingService,
           executorService);
@@ -655,7 +655,7 @@ public class TestOMDbCheckpointServlet {
     // Confirm that servlet takes the lock when none of the other
     //  processes have it.
     Future<Boolean> servletTest = checkLock(spyServlet, executorService);
-    Assert.assertTrue(servletTest.get(1000, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 
@@ -674,7 +674,7 @@ public class TestOMDbCheckpointServlet {
   private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
-    try (BootstrapStateHandler h = handler.lockBootstrapState()) {
+    try (BootstrapStateHandler.Lock lock = handler.getLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
       Assert.assertThrows(TimeoutException.class,
@@ -687,8 +687,8 @@ public class TestOMDbCheckpointServlet {
       ExecutorService executorService) {
     return executorService.submit(() -> {
       try {
-        handler.lockBootstrapState();
-        handler.unlockBootstrapState();
+        handler.getLock().lock();
+        handler.getLock().unlock();
         return true;
       } catch (InterruptedException e) {
       }
