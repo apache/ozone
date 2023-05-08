@@ -178,8 +178,6 @@ public class SstFilteringService extends BackgroundService
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-
-
     /**
      * @param snapshotInfo
      * @return a list of pairs (tableName,keyPrefix).

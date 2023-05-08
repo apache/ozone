@@ -1132,6 +1132,7 @@ public class TestRocksDBCheckpointDiffer {
       throws InterruptedException, ExecutionException, TimeoutException {
 
     Future<Boolean> future;
+    // Take the lock and start the consumer.
     try (BootstrapStateHandler.Lock lock =
         differ.getBoostrapStateLock().lock()) {
       future = executorService.submit(

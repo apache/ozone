@@ -315,7 +315,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
       rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
           .getRocksDBCheckpointDiffer();
       snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
-
     }
 
     @Override

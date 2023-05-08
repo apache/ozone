@@ -614,6 +614,7 @@ public class TestOMDbCheckpointServlet {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
 
+    // Get the bootstrap state handlers
     KeyManager keyManager = cluster.getOzoneManager().getKeyManager();
     BootstrapStateHandler keyDeletingService =
         keyManager.getDeletingService();
@@ -624,6 +625,7 @@ public class TestOMDbCheckpointServlet {
     BootstrapStateHandler differ =
         cluster.getOzoneManager().getMetadataManager()
             .getStore().getRocksDBCheckpointDiffer();
+
     ExecutorService executorService = Executors.newCachedThreadPool();
 
     OMDBCheckpointServlet omDbCheckpointServlet = new OMDBCheckpointServlet();
@@ -634,10 +636,9 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(cluster.getOzoneManager());
     doReturn(servletContext).when(spyServlet).getServletContext();
 
-
     spyServlet.init();
 
-    // Confirm the other processes are locked out when the bootstrap
+    // Confirm the other handlers are locked out when the bootstrap
     //  servlet takes the lock.
     try (BootstrapStateHandler.Lock lock =
         spyServlet.getBoostrapStateLock().lock()) {
@@ -647,8 +648,8 @@ public class TestOMDbCheckpointServlet {
       confirmServletLocksOutOtherHandler(sstFilteringService, executorService);
       confirmServletLocksOutOtherHandler(differ, executorService);
     }
-    // Confirm the bootstrap servlet is locked out when any of the other
-    //  processes takes the lock.
+    // Confirm the servlet is locked out when any of the other
+    //  handlers takes the lock.
     confirmOtherHandlerLocksOutServlet(keyDeletingService, spyServlet,
         executorService);
     confirmOtherHandlerLocksOutServlet(snapshotDeletingService, spyServlet,
@@ -659,7 +660,7 @@ public class TestOMDbCheckpointServlet {
         executorService);
 
     // Confirm that servlet takes the lock when none of the other
-    //  processes have it.
+    //  handlers have it.
     Future<Boolean> servletTest = checkLock(spyServlet, executorService);
     Assert.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
 
@@ -667,7 +668,8 @@ public class TestOMDbCheckpointServlet {
 
   }
 
-  // Confirms handler can't take look the servlet already has.
+  // Confirms handler can't take look the servlet already has.  Assumes
+  // the servlet has already taken the lock.
   private void confirmServletLocksOutOtherHandler(BootstrapStateHandler handler,
       ExecutorService executorService) {
     Future<Boolean> test = checkLock(handler, executorService);
