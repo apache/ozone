@@ -35,6 +35,8 @@ execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test s3g kinit.robot
 
+execute_robot_test s3g -v datanode:datanode1 security/cert-rotation.robot
+
 execute_robot_test s3g freon
 
 execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
