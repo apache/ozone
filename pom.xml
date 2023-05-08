@@ -304,6 +304,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <lz4.version>1.9.3</lz4.version>
     <snappy.version>1.1.8</snappy.version>
     <zstd.version>1.4.9</zstd.version>
+
+    <vault.driver.version>5.1.0</vault.driver.version>
   </properties>
 
 
@@ -1549,6 +1551,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-client</artifactId>
         <version>${curator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.bettercloud</groupId>
+        <artifactId>vault-java-driver</artifactId>
+        <version>${vault.driver.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -123,14 +123,14 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore, S3SecretCache {
+    S3SecretStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
   /**
    * OM RocksDB Structure .
    * <p>
-   * OM DB stores metadata as KV pairs in different column families.
+   * OM DB stores metadata as KV pairs iThis n different column families.
    * <p>
    * OM DB Schema:
    *
@@ -1722,18 +1722,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     s3SecretTable.delete(kerberosId);
-  }
-
-  @Override
-  public void put(String kerberosId, S3SecretValue secretValue, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
-        CacheValue.get(txId, secretValue));
-  }
-
-  @Override
-  public void invalidate(String id, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(id),
-        CacheValue.get(txId));
   }
 
   @Override
