@@ -255,7 +255,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.LIST,
             bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       }
       metrics.incNumListStatus();
