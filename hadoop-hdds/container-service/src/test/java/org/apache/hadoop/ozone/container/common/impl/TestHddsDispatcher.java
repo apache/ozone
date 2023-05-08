@@ -182,7 +182,7 @@ public class TestHddsDispatcher {
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDir).datanodeUuid(dd.getUuidString())
             .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    // state of cluster : capacity-used (140) > 100  ,datanode volume
+    // state of cluster : available (140) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
     SpaceUsageSource spaceUsage = fixed(500, 140, 360);
 
