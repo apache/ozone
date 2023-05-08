@@ -141,6 +141,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
@@ -376,29 +377,31 @@ public final class TestSecureOzoneCluster {
           UserGroupInformation.loginUserFromKeytabAndReturnUGI(
               testUserPrincipal, testUserKeytab.getCanonicalPath());
       ugi.setAuthenticationMethod(KERBEROS);
-      SCMSecurityProtocol scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(conf, ugi);
-      assertNotNull(scmSecurityProtocolClient);
-      String caCert = scmSecurityProtocolClient.getCACertificate();
-      assertNotNull(caCert);
-      // Get some random certificate, used serial id 100 which will be
-      // unavailable as our serial id is time stamp. Serial id 1 is root CA,
-      // and it is persisted in DB.
-      LambdaTestUtils.intercept(SCMSecurityException.class,
-          "Certificate not found",
-          () -> scmSecurityProtocolClient.getCertificate("100"));
+      try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
+          getScmSecurityClient(conf, ugi)) {
+        assertNotNull(securityClient);
+        String caCert = securityClient.getCACertificate();
+        assertNotNull(caCert);
+        // Get some random certificate, used serial id 100 which will be
+        // unavailable as our serial id is time stamp. Serial id 1 is root CA,
+        // and it is persisted in DB.
+        LambdaTestUtils.intercept(SCMSecurityException.class,
+            "Certificate not found",
+            () -> securityClient.getCertificate("100"));
+      }
 
       // Case 2: User without Kerberos credentials should fail.
       ugi = UserGroupInformation.createRemoteUser("test");
       ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-      SCMSecurityProtocol finalScmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(conf, ugi);
+      try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
+          getScmSecurityClient(conf, ugi)) {
 
-      String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
-          finalScmSecurityProtocolClient::getCACertificate);
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
-          () -> finalScmSecurityProtocolClient.getCertificate("1"));
+        String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
+        LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+            securityClient::getCACertificate);
+        LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+            () -> securityClient.getCertificate("1"));
+      }
     } finally {
       if (scm != null) {
         scm.stop();
