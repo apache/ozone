@@ -26,14 +26,14 @@ import java.util.function.IntFunction;
 /**
  * Codec to serialize/deserialize a {@link ByteString}.
  */
-public class ByteStringCodec implements Codec<ByteString> {
+public final class ByteStringCodec implements Codec<ByteString> {
   private static final ByteStringCodec INSTANCE = new ByteStringCodec();
 
   public static ByteStringCodec getInstance() {
     return INSTANCE;
   }
 
-  private ByteStringCodec() {}
+  private ByteStringCodec() { }
 
   @Override
   public boolean supportCodecBuffer() {

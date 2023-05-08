@@ -50,7 +50,8 @@ public final class TestCodecRegistry {
     assertGetCodec(ByteStringCodec.class, ByteString.EMPTY);
   }
 
-  <T> void assertGetCodecFromClass(Class<?> expectedCodecClass, Class<T> format) {
+  <T> void assertGetCodecFromClass(Class<?> expectedCodecClass,
+      Class<T> format) {
     final Codec<T> codec = registry.getCodecFromClass(format);
     LOG.info("format {}", format);
     LOG.info("codec {}", codec.getClass());
