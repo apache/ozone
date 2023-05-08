@@ -16,18 +16,40 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.metadata;
+package org.apache.hadoop.hdds.utils.db;
 
 import com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.utils.db.Codec;
 
-import java.io.IOException;
+import javax.annotation.Nonnull;
+import java.util.function.IntFunction;
 
 /**
  * Codec to serialize/deserialize a {@link ByteString}.
  */
 public class ByteStringCodec implements Codec<ByteString> {
-  private static final byte[] EMPTY = {};
+  private static final ByteStringCodec INSTANCE = new ByteStringCodec();
+
+  public static ByteStringCodec getInstance() {
+    return INSTANCE;
+  }
+
+  private ByteStringCodec() {}
+
+  @Override
+  public boolean supportCodecBuffer() {
+    return true;
+  }
+
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull ByteString object,
+      IntFunction<CodecBuffer> allocator) {
+    return allocator.apply(object.size()).put(object.asReadOnlyByteBuffer());
+  }
+
+  @Override
+  public ByteString fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return ByteString.copyFrom(buffer.asReadOnlyByteBuffer());
+  }
 
   /**
    * Convert object to raw persisted format.
@@ -35,9 +57,9 @@ public class ByteStringCodec implements Codec<ByteString> {
    * @param object The original java object. Should not be null.
    */
   @Override
-  public byte[] toPersistedFormat(ByteString object) throws IOException {
+  public byte[] toPersistedFormat(ByteString object) {
     if (object == null) {
-      return EMPTY;
+      return EMPTY_BYTE_ARRAY;
     }
     return object.toByteArray();
   }
@@ -48,7 +70,7 @@ public class ByteStringCodec implements Codec<ByteString> {
    * @param rawData Byte array from the key/value store. Should not be null.
    */
   @Override
-  public ByteString fromPersistedFormat(byte[] rawData) throws IOException {
+  public ByteString fromPersistedFormat(byte[] rawData) {
     if (rawData == null) {
       return ByteString.EMPTY;
     }

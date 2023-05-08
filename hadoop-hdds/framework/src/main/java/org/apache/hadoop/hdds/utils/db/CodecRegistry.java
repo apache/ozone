@@ -97,7 +97,7 @@ public final class CodecRegistry {
     if (rawData == null) {
       return null;
     }
-    return getCodec(format).fromPersistedFormat(rawData);
+    return getCodecFromClass(format).fromPersistedFormat(rawData);
   }
 
   /**
@@ -111,7 +111,7 @@ public final class CodecRegistry {
     if (object == null) {
       return null;
     }
-    return getCodec(format).copyObject(object);
+    return getCodecFromClass(format).copyObject(object);
   }
 
   /**
@@ -138,19 +138,7 @@ public final class CodecRegistry {
    * @return Codec for the given object.
    */
   public <SUPER, T extends SUPER> Codec<SUPER> getCodec(T object) {
-    Class<T> format = (Class<T>) object.getClass();
-    return getCodec(format);
-  }
-
-  /**
-   * Get a codec for the given class
-   * including its super classes/interfaces.
-   *
-   * @param <T>    Type of the typed object.
-   * @param <SUPER> A super class/interface type.
-   * @return Codec for the given class.
-   */
-  private <SUPER, T extends SUPER> Codec<SUPER> getCodec(Class<T> clazz) {
+    final Class<T> clazz = (Class<T>) object.getClass();
     Codec<?> codec = valueCodecs.get(clazz);
     if (codec == null) {
       codec = valueCodecs.get(ClassUtils.getAllSuperclasses(clazz));
@@ -160,6 +148,22 @@ public final class CodecRegistry {
     }
     if (codec != null) {
       return (Codec<SUPER>) codec;
+    }
+    throw new IllegalStateException(
+        "Codec is not registered for type: " + clazz);
+  }
+
+  /**
+   * Get a codec for the given class
+   * including its super classes/interfaces.
+   *
+   * @param <T>    Type of the typed object.
+   * @return Codec for the given class.
+   */
+  <T> Codec<T> getCodecFromClass(Class<T> clazz) {
+    final Codec<?> codec = valueCodecs.get(clazz);
+    if (codec != null) {
+      return (Codec<T>) codec;
     }
     throw new IllegalStateException(
         "Codec is not registered for type: " + clazz);
