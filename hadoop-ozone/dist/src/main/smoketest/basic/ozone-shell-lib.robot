@@ -86,7 +86,6 @@ Test ozone shell
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
-                    Run Keyword         Test Delete key with and without Trash   ${protocol}       ${server}       ${volume}
 
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -208,9 +207,10 @@ Test prefix Acls
 
 Test Delete key with and without Trash
     [arguments]    ${protocol}         ${server}       ${volume}
+                   Execute               ozone sh volume create ${protocol}${server}/${volume}
                    Execute               ozone sh bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
                    Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key1 /opt/hadoop/NOTICE.txt
-                   Execute               ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bso/key1
+                   Execute               ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bfso/key1
     ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
                    Should not contain    ${result}     key1
                    Execute               ozone sh bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
