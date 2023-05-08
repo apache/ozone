@@ -115,6 +115,7 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
+  private BootstrapStateHandler.Lock lock;
   private File metaDir;
   private String snapshotDirName;
   private String snapshotDirName2;
@@ -180,6 +181,7 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
 
+    lock = new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
 
     requestMock = mock(HttpServletRequest.class);
@@ -202,6 +204,9 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
+
+    when(omDbCheckpointServletMock.getBoostrapStateLock())
+        .thenReturn(lock);
   }
 
   @Test
