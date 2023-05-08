@@ -639,7 +639,8 @@ public class TestOMDbCheckpointServlet {
 
     // Confirm the other processes are locked out when the bootstrap
     //  servlet takes the lock.
-    try (BootstrapStateHandler.Lock lock = spyServlet.getBoostrapStateLock().lock()) {
+    try (BootstrapStateHandler.Lock lock =
+        spyServlet.getBoostrapStateLock().lock()) {
       confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
       confirmServletLocksOutOtherHandler(snapshotDeletingService,
           executorService);
@@ -679,7 +680,8 @@ public class TestOMDbCheckpointServlet {
   private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
-    try (BootstrapStateHandler.Lock lock = handler.getBoostrapStateLock().lock()) {
+    try (BootstrapStateHandler.Lock lock =
+        handler.getBoostrapStateLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
       Assert.assertThrows(TimeoutException.class,

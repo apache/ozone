@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.lock;
 
 import java.util.concurrent.Semaphore;
 
-/** Bootstrap state lock interface. */
+/** Bootstrap state handler interface. */
 public interface BootstrapStateHandler {
   Lock getBoostrapStateLock();
 
-  static class Lock implements AutoCloseable {
+  /** Bootstrap state handler lock implementation. */
+  class Lock implements AutoCloseable {
     private Semaphore semaphore = new Semaphore(1);
     public Lock lock() throws InterruptedException {
       semaphore.acquire();

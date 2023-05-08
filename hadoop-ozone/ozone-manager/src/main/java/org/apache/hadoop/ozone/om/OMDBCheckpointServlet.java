@@ -83,7 +83,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private BootstrapStateHandler.Lock lock;
+  private transient BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -301,15 +301,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     return lock;
   }
 
-  static class Lock extends BootstrapStateHandler.Lock
-      {
+  static class Lock extends BootstrapStateHandler.Lock {
     private final BootstrapStateHandler keyDeletingService;
     private final BootstrapStateHandler sstFilteringService;
     private final BootstrapStateHandler rocksDbCheckpointDiffer;
     private final BootstrapStateHandler snapshotDeletingService;
     private final OzoneManager om;
 
-    public Lock(OzoneManager om) {
+    Lock(OzoneManager om) {
       this.om = om;
       keyDeletingService = om.getKeyManager().getDeletingService();
       sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
