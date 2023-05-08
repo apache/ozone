@@ -313,7 +313,20 @@ public final class RocksDatabase {
         counter.decrementAndGet();
       }
     }
-    
+
+    public void batchPut(ManagedWriteBatch writeBatch, ByteBuffer key,
+        ByteBuffer value) throws IOException {
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.put(getHandle(), key, value);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchPut key " + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
     public void markClosed() {
       isClosed.set(true);
     }

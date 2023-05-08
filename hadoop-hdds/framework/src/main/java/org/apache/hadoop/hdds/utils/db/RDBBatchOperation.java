@@ -28,9 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -42,7 +43,7 @@ import java.util.function.Supplier;
 public class RDBBatchOperation implements BatchOperation {
   static final Logger LOG = LoggerFactory.getLogger(RDBBatchOperation.class);
 
-  private static final Object DELETE_OP = new Object();
+  private enum Op { DELETE }
 
   private static void debug(Supplier<String> message) {
     if (LOG.isTraceEnabled()) {
@@ -59,21 +60,22 @@ public class RDBBatchOperation implements BatchOperation {
   }
 
   /**
+   * The key type of {@link RDBBatchOperation.OpCache.FamilyCache#ops}.
    * To implement {@link #equals(Object)} and {@link #hashCode()}
-   * based on the contents of {@link #bytes}.
-   * <p>
-   * Note that it is incorrect to directly use
-   * {@link #bytes#equals(Object)} and {@link #bytes#hashCode()} here since
-   * they do not use the contents of {@link #bytes} in the computations.
-   * These methods simply inherit from {@link Object).
+   * based on the contents of {@link #buffer}.
    */
-  private static final class ByteArray {
-    private final byte[] bytes;
+  private static final class Bytes {
+    private final ByteBuffer buffer;
+    /** Cache the hash value. */
     private final int hash;
 
-    ByteArray(byte[] bytes) {
-      this.bytes = bytes;
-      this.hash = Arrays.hashCode(bytes);
+    Bytes(ByteBuffer buffer) {
+      this.buffer = Objects.requireNonNull(buffer, "buffer == null");
+      this.hash = buffer.hashCode();
+    }
+
+    Bytes(byte[] array) {
+      this(ByteBuffer.wrap(array));
     }
 
     @Override
@@ -83,8 +85,9 @@ public class RDBBatchOperation implements BatchOperation {
       } else if (obj == null || getClass() != obj.getClass()) {
         return false;
       }
-      final ByteArray that = (ByteArray) obj;
-      return Arrays.equals(this.bytes, that.bytes);
+      final Bytes that = (Bytes) obj;
+      return this.hash == that.hash
+          && Objects.equals(this.buffer, that.buffer);
     }
 
     @Override
@@ -99,12 +102,12 @@ public class RDBBatchOperation implements BatchOperation {
     private class FamilyCache {
       private final ColumnFamily family;
       /**
-       * A (dbKey -> dbValue) map, where the dbKey type is {@link ByteArray}
-       * (see the javadoc of ByteArray) and the dbValue type is {@link Object}.
-       * When dbValue is a byte[], it represents a put-op.
-       * Otherwise, it represents a delete-op (dbValue is {@link #DELETE_OP)}).
+       * A (dbKey -> dbValue) map, where the dbKey type is {@link Bytes}
+       * and the dbValue type is {@link Object}.
+       * When dbValue is a byte[]/{@link ByteBuffer}, it represents a put-op.
+       * Otherwise, it represents a delete-op (dbValue is {@link Op#DELETE}).
        */
-      private final Map<ByteArray, Object> ops = new HashMap<>();
+      private final Map<Bytes, Object> ops = new HashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -121,13 +124,18 @@ public class RDBBatchOperation implements BatchOperation {
       void prepareBatchWrite() throws IOException {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
-        for (Map.Entry<ByteArray, Object> op : ops.entrySet()) {
-          final byte[] key = op.getKey().bytes;
+        for (Map.Entry<Bytes, Object> op : ops.entrySet()) {
+          final ByteBuffer key = op.getKey().buffer;
           final Object value = op.getValue();
-          if (value instanceof byte[]) {
-            family.batchPut(writeBatch, key, (byte[])value);
+          if (value instanceof ByteBuffer) {
+            family.batchPut(writeBatch, key, (ByteBuffer) value);
+          } else if (value instanceof byte[]) {
+            family.batchPut(writeBatch, key.array(), (byte[])value);
+          } else if (value == Op.DELETE) {
+            family.batchDelete(writeBatch, key.array());
           } else {
-            family.batchDelete(writeBatch, key);
+            throw new IllegalStateException("Unexpected value: " + value
+                + ", class=" + value.getClass().getSimpleName());
           }
         }
         ops.clear();
@@ -137,12 +145,22 @@ public class RDBBatchOperation implements BatchOperation {
       }
 
       void putOrDelete(byte[] key, Object val) {
-        Preconditions.checkState(!isCommit, "%s is already committed.", this);
         final int keyLen = key.length;
         final int valLen = val instanceof byte[] ? ((byte[]) val).length : 0;
-        batchSize += keyLen + valLen;
+        putOrDelete(new Bytes(key), keyLen, val, valLen);
+      }
 
-        final Object previousVal = ops.put(new ByteArray(key), val);
+      void putOrDelete(ByteBuffer key, Object val) {
+        final int keyLen = key.remaining();
+        final int valLen = val instanceof ByteBuffer ?
+            ((ByteBuffer) val).remaining() : 0;
+        putOrDelete(new Bytes(key), keyLen, val, valLen);
+      }
+
+      void putOrDelete(Bytes key, int keyLen, Object val, int valLen) {
+        Preconditions.checkState(!isCommit, "%s is already committed.", this);
+        batchSize += keyLen + valLen;
+        final Object previousVal = ops.put(key, val);
         if (previousVal != null) {
           final boolean isPut = previousVal instanceof byte[];
           final int preLen = isPut ? ((byte[]) previousVal).length : 0;
@@ -155,7 +173,12 @@ public class RDBBatchOperation implements BatchOperation {
         debug(() -> String.format("%s %s, %s; key=%s", this,
             valLen == 0 ? delString(keyLen) : putString(keyLen, valLen),
             batchSizeDiscardedString(),
-            StringUtils.bytes2HexString(key).toUpperCase()));
+            StringUtils.bytes2HexString(key.buffer).toUpperCase()));
+      }
+
+      void put(ByteBuffer key, ByteBuffer value) {
+        putCount++;
+        putOrDelete(key, value);
       }
 
       void put(byte[] key, byte[] value) {
@@ -165,7 +188,7 @@ public class RDBBatchOperation implements BatchOperation {
 
       void delete(byte[] key) {
         delCount++;
-        putOrDelete(key, DELETE_OP);
+        putOrDelete(key, Op.DELETE);
       }
 
       String putString(int keySize, int valueSize) {
@@ -192,6 +215,11 @@ public class RDBBatchOperation implements BatchOperation {
 
     /** A (family name -> {@link FamilyCache}) map. */
     private final Map<String, FamilyCache> name2cache = new HashMap<>();
+
+    void put(ColumnFamily f, ByteBuffer key, ByteBuffer value) {
+      name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
+          .put(key, value);
+    }
 
     void put(ColumnFamily f, byte[] key, byte[] value) {
       name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
@@ -278,6 +306,11 @@ public class RDBBatchOperation implements BatchOperation {
 
   public void delete(ColumnFamily family, byte[] key) throws IOException {
     opCache.delete(family, key);
+  }
+
+  public void put(ColumnFamily family, ByteBuffer key, ByteBuffer value)
+      throws IOException {
+    opCache.put(family, key, value);
   }
 
   public void put(ColumnFamily family, byte[] key, byte[] value)
