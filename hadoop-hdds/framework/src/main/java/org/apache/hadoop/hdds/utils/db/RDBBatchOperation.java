@@ -22,13 +22,14 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -65,17 +66,33 @@ public class RDBBatchOperation implements BatchOperation {
    * based on the contents of {@link #buffer}.
    */
   private static final class Bytes {
-    private final ByteBuffer buffer;
+    private final byte[] array;
+    private final CodecBuffer buffer;
     /** Cache the hash value. */
     private final int hash;
 
-    Bytes(ByteBuffer buffer) {
+    Bytes(CodecBuffer buffer) {
+      this.array = null;
       this.buffer = Objects.requireNonNull(buffer, "buffer == null");
       this.hash = buffer.hashCode();
     }
 
     Bytes(byte[] array) {
-      this(ByteBuffer.wrap(array));
+      this.array = array;
+      this.buffer = null;
+      this.hash = Arrays.hashCode(array);
+    }
+
+    byte[] array() {
+      return array;
+    }
+
+    ByteBuffer asReadOnlyByteBuffer() {
+      return buffer.asReadOnlyByteBuffer();
+    }
+
+    void release() {
+      buffer.release();
     }
 
     @Override
@@ -86,8 +103,13 @@ public class RDBBatchOperation implements BatchOperation {
         return false;
       }
       final Bytes that = (Bytes) obj;
-      return this.hash == that.hash
-          && Objects.equals(this.buffer, that.buffer);
+      if (this.hash != that.hash) {
+        return false;
+      }
+      if (this.array != null) {
+        return Arrays.equals(this.array, that.array);
+      }
+      return this.asReadOnlyByteBuffer().equals(that.asReadOnlyByteBuffer());
     }
 
     @Override
@@ -125,12 +147,16 @@ public class RDBBatchOperation implements BatchOperation {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
         for (Map.Entry<Bytes, Object> op : ops.entrySet()) {
-          final ByteBuffer key = op.getKey().buffer;
+          final Bytes key = op.getKey();
           final Object value = op.getValue();
-          if (value instanceof ByteBuffer) {
-            family.batchPut(writeBatch, key, (ByteBuffer) value);
-          } else if (value instanceof byte[]) {
-            family.batchPut(writeBatch, key.array(), (byte[])value);
+          if (value instanceof byte[]) {
+            family.batchPut(writeBatch, key.array(), (byte[]) value);
+          } else if (value instanceof CodecBuffer) {
+            final CodecBuffer buffer = (CodecBuffer) value;
+            // always release the key with the value
+            buffer.getReleased().thenAccept(r -> key.release());
+            family.batchPut(writeBatch, key.asReadOnlyByteBuffer(),
+                buffer.asReadOnlyByteBuffer());
           } else if (value == Op.DELETE) {
             family.batchDelete(writeBatch, key.array());
           } else {
@@ -138,45 +164,63 @@ public class RDBBatchOperation implements BatchOperation {
                 + ", class=" + value.getClass().getSimpleName());
           }
         }
-        ops.clear();
 
         debug(() -> String.format("  %s %s, #put=%s, #del=%s", this,
             batchSizeDiscardedString(), putCount, delCount));
       }
 
-      void putOrDelete(byte[] key, Object val) {
-        final int keyLen = key.length;
-        final int valLen = val instanceof byte[] ? ((byte[]) val).length : 0;
-        putOrDelete(new Bytes(key), keyLen, val, valLen);
+      void clear() {
+        for (Object value : ops.values()) {
+          if (value instanceof CodecBuffer) {
+            // by the setup, the key will also be released
+            ((CodecBuffer) value).release();
+          }
+        }
+        ops.clear();
       }
 
-      void putOrDelete(ByteBuffer key, Object val) {
-        final int keyLen = key.remaining();
-        final int valLen = val instanceof ByteBuffer ?
-            ((ByteBuffer) val).remaining() : 0;
-        putOrDelete(new Bytes(key), keyLen, val, valLen);
+      void putOrDelete(byte[] key, byte[] val) {
+        putOrDelete(new Bytes(key), key.length, val, val.length);
+      }
+
+      void putOrDelete(CodecBuffer key, CodecBuffer val) {
+        putOrDelete(new Bytes(key), key.readableBytes(),
+            val, val.readableBytes());
       }
 
       void putOrDelete(Bytes key, int keyLen, Object val, int valLen) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         batchSize += keyLen + valLen;
-        final Object previousVal = ops.put(key, val);
-        if (previousVal != null) {
-          final boolean isPut = previousVal instanceof byte[];
-          final int preLen = isPut ? ((byte[]) previousVal).length : 0;
+        // remove previous first in order to do release
+        final Object previous = ops.remove(key);
+        if (previous != null) {
+          final boolean isPut = previous != Op.DELETE;
+          final int preLen;
+          if (!isPut) {
+            preLen = 0;
+          } else if (previous instanceof CodecBuffer) {
+            final CodecBuffer buffer = (CodecBuffer) previous;
+            preLen = buffer.readableBytes();
+            buffer.release(); // key will also be released
+          } else if (previous instanceof byte[]) {
+            preLen = ((byte[]) previous).length;
+          } else {
+            throw new IllegalStateException("Unexpected previous: " + previous
+                + ", class=" + previous.getClass().getSimpleName());
+          }
           discardedSize += keyLen + preLen;
           discardedCount++;
           debug(() -> String.format("%s overwriting a previous %s", this,
               isPut ? "put (value: " + byteSize2String(preLen) + ")" : "del"));
         }
+        ops.put(key, val);
 
         debug(() -> String.format("%s %s, %s; key=%s", this,
             valLen == 0 ? delString(keyLen) : putString(keyLen, valLen),
-            batchSizeDiscardedString(),
-            StringUtils.bytes2HexString(key.buffer).toUpperCase()));
+            batchSizeDiscardedString(), null));
       }
 
-      void put(ByteBuffer key, ByteBuffer value) {
+      void put(CodecBuffer key, CodecBuffer value) {
         putCount++;
         putOrDelete(key, value);
       }
@@ -188,7 +232,7 @@ public class RDBBatchOperation implements BatchOperation {
 
       void delete(byte[] key) {
         delCount++;
-        putOrDelete(key, Op.DELETE);
+        putOrDelete(new Bytes(key), key.length, Op.DELETE, 0);
       }
 
       String putString(int keySize, int valueSize) {
@@ -216,7 +260,7 @@ public class RDBBatchOperation implements BatchOperation {
     /** A (family name -> {@link FamilyCache}) map. */
     private final Map<String, FamilyCache> name2cache = new HashMap<>();
 
-    void put(ColumnFamily f, ByteBuffer key, ByteBuffer value) {
+    void put(ColumnFamily f, CodecBuffer key, CodecBuffer value) {
       name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
           .put(key, value);
     }
@@ -232,9 +276,16 @@ public class RDBBatchOperation implements BatchOperation {
     }
 
     /** Prepare batch write for the entire cache. */
-    void prepareBatchWrite() throws IOException {
+    Closeable prepareBatchWrite() throws IOException {
       for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
         e.getValue().prepareBatchWrite();
+      }
+      return this::clear;
+    }
+
+    void clear() {
+      for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
+        e.getValue().clear();
       }
       name2cache.clear();
     }
@@ -286,16 +337,18 @@ public class RDBBatchOperation implements BatchOperation {
   public void commit(RocksDatabase db) throws IOException {
     debug(() -> String.format("%s: commit %s",
         name, opCache.getCommitString()));
-    opCache.prepareBatchWrite();
-    db.batchWrite(writeBatch);
+    try (Closeable autoClear = opCache.prepareBatchWrite()) {
+      db.batchWrite(writeBatch);
+    }
   }
 
   public void commit(RocksDatabase db, ManagedWriteOptions writeOptions)
       throws IOException {
     debug(() -> String.format("%s: commit-with-writeOptions %s",
         name, opCache.getCommitString()));
-    opCache.prepareBatchWrite();
-    db.batchWrite(writeBatch, writeOptions);
+    try (Closeable autoClear = opCache.prepareBatchWrite()) {
+      db.batchWrite(writeBatch, writeOptions);
+    }
   }
 
   @Override
@@ -308,7 +361,7 @@ public class RDBBatchOperation implements BatchOperation {
     opCache.delete(family, key);
   }
 
-  public void put(ColumnFamily family, ByteBuffer key, ByteBuffer value)
+  public void put(ColumnFamily family, CodecBuffer key, CodecBuffer value)
       throws IOException {
     opCache.put(family, key, value);
   }

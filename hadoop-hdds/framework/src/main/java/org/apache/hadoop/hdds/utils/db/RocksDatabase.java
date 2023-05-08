@@ -319,9 +319,9 @@ public final class RocksDatabase {
       assertClosed();
       try {
         counter.incrementAndGet();
-        writeBatch.put(getHandle(), key, value);
+        writeBatch.put(getHandle(), key.duplicate(), value);
       } catch (RocksDBException e) {
-        throw toIOException(this, "batchPut key " + bytes2String(key), e);
+        throw toIOException(this, "batchPut ByteBuffer key " + bytes2String(key), e);
       } finally {
         counter.decrementAndGet();
       }
