@@ -112,6 +112,11 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public boolean shouldFlush(long snapshotWaitTime) {
+    return true;
+  }
+
+  @Override
   public void init() throws IOException {
 
   }

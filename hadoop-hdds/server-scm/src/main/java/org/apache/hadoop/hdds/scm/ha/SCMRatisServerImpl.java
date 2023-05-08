@@ -52,6 +52,7 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.SnapshotManagementRequest;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
@@ -225,6 +226,25 @@ public class SCMRatisServerImpl implements SCMRatisServer {
             .get(requestTimeout, TimeUnit.MILLISECONDS);
     if (LOG.isDebugEnabled()) {
       LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
+    }
+    return SCMRatisResponse.decode(raftClientReply);
+  }
+
+  @Override
+  public SCMRatisResponse submitSnapshotRequest() throws IOException {
+    final long requestTimeout = ozoneConf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+        "Ratis request timeout cannot be less than 1000ms.");
+    
+    final SnapshotManagementRequest req = SnapshotManagementRequest.newCreate(
+        clientId, getDivision().getId(), getDivision().getGroup().getGroupId(),
+        nextCallId(), requestTimeout);
+    final RaftClientReply raftClientReply = server.snapshotManagement(req);
+    if (LOG.isDebugEnabled()) {
+      LOG.info("Snapshot request with Reply {}", raftClientReply);
     }
     return SCMRatisResponse.decode(raftClientReply);
   }

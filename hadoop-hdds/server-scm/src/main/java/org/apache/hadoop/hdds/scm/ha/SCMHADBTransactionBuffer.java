@@ -40,9 +40,7 @@ public interface SCMHADBTransactionBuffer
 
   void flush() throws IOException;
   
-  default boolean shouldFlush() {
-    return true;
-  }
+  boolean shouldFlush(long snapshotWaitTime);
 
   void init() throws IOException;
 }

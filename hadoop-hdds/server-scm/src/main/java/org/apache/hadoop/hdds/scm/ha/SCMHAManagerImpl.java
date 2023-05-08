@@ -67,6 +67,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
+  private SCMHATransactionBufferMonitorService monitorService;
 
   /**
    * Creates SCMHAManager instance.
@@ -84,6 +85,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
           scm.getSCMHANodeDetails().getPeerNodeDetails(),
           scm.getScmCertificateClient());
       grpcServer = new InterSCMGrpcProtocolService(conf, scm);
+      monitorService = new SCMHATransactionBufferMonitorService(
+          (SCMHADBTransactionBuffer) transactionBuffer, scm.getScmContext(),
+          conf, ratisServer);
     } else {
       this.transactionBuffer = new SCMDBTransactionBufferImpl();
       this.scmSnapshotProvider = null;

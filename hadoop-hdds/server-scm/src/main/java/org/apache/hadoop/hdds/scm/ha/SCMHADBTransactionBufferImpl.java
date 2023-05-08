@@ -44,6 +44,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
+  private long txFlushPending = 0;
+  private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
@@ -114,6 +116,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           TRANSACTION_INFO_KEY, latestTrxInfo);
 
       metadataStore.getStore().commitBatchOperation(currentBatchOperation);
+      txFlushPending = 0;
+      lastSnapshotTimeMs = scm.getSystemClock().millis();
       currentBatchOperation.close();
       this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
       // reset batch operation
@@ -155,6 +159,12 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     } finally {
       rwLock.writeLock().unlock();
     }
+  }
+  
+  @Override
+  public boolean shouldFlush(long snapshotWaitTime) {
+    long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
+    return txFlushPending > 0 && timeDiff > snapshotWaitTime;
   }
 
   @Override

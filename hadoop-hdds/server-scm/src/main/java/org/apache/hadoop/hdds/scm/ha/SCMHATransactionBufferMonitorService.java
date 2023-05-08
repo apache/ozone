@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,27 +36,27 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
  */
 public class SCMHATransactionBufferMonitorService extends BackgroundService
     implements SCMService {
-
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMHATransactionBufferMonitorService.class);
-
   private static final int SERVICE_CORE_POOL_SIZE = 1;
+  
+  private SCMRatisServer server;
   private final SCMContext scmContext;
+  private SCMHADBTransactionBuffer transactionBuffer;
+  private long flushInterval = 0;
 
   /**
    * SCMService related variables.
    */
   private final Lock serviceLock = new ReentrantLock();
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
-  private SCMHADBTransactionBuffer transactionBuffer;
-  private final Clock clock;
 
   @SuppressWarnings("parameternumber")
   public SCMHATransactionBufferMonitorService(
       SCMHADBTransactionBuffer transactionBuffer,
-      SCMContext scmContext, SCMServiceManager serviceManager,
+      SCMContext scmContext,
       ConfigurationSource conf,
-      Clock clock) {
+      SCMRatisServer server) {
     super("SCMHATransactionBufferMonitorService",
         conf.getTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
             OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
@@ -66,12 +65,13 @@ public class SCMHATransactionBufferMonitorService extends BackgroundService
         conf.getTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
             OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS));
-    this.transactionBuffer = transactionBuffer;
-    this.clock = clock;
+    this.flushInterval = conf.getTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     this.scmContext = scmContext;
-
-    // register SCMBlockDeletingService to SCMServiceManager
-    serviceManager.register(this);
+    this.transactionBuffer = transactionBuffer;
+    this.server = server;
   }
 
   @Override
@@ -94,12 +94,12 @@ public class SCMHATransactionBufferMonitorService extends BackgroundService
         return EmptyTaskResult.newResult();
       }
 
-      if (LOG.isDebugEnabled()) {
+      if (transactionBuffer.shouldFlush(flushInterval)) {
         LOG.debug("Running TransactionFlushTask");
-      }
-
-      if (transactionBuffer.shouldFlush()) {
-        transactionBuffer.flush();
+        SCMRatisResponse reply = server.submitSnapshotRequest();
+        if (!reply.isSuccess()) {
+          LOG.error("Submit snapshot request failed", reply.getException());
+        }
       }
 
       return EmptyTaskResult.newResult();
@@ -110,7 +110,7 @@ public class SCMHATransactionBufferMonitorService extends BackgroundService
   public void notifyStatusChanged() {
     serviceLock.lock();
     try {
-      if (scmContext.isLeaderReady() && !scmContext.isInSafeMode() &&
+      if (scmContext.isLeader() && !scmContext.isInSafeMode() &&
           serviceStatus != ServiceStatus.RUNNING) {
         serviceStatus = ServiceStatus.RUNNING;
       } else {

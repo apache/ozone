@@ -64,6 +64,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public SCMRatisResponse submitSnapshotRequest() throws IOException {
+        throw new IOException("submitSnapshotRequest is called.");
+      }
+
+      @Override
       public void stop() throws IOException {
       }
 
