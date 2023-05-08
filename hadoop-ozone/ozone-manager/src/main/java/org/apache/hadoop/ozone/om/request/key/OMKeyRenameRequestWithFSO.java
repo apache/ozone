@@ -146,7 +146,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       }
 
       if (fromKeyFileStatus.getKeyInfo().isHsync()) {
-        throw new OMException("Open file cannot be renamed", RENAME_OPEN_FILE);
+        throw new OMException("Open file cannot be renamed since it is " +
+            "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
+            bucketName + ", key=" + fromKeyName, RENAME_OPEN_FILE);
       }
 
       // source existed
