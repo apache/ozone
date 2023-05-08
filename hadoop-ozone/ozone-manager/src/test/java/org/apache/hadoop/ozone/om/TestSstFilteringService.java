@@ -228,7 +228,7 @@ public class TestSstFilteringService {
     long count;
     // Prevent the new snapshot from being filtered
     try (BootstrapStateHandler.Lock lock =
-             sstFilteringService.getLock().lock()) {
+             sstFilteringService.getBoostrapStateLock().lock()) {
       count = sstFilteringService.getSnapshotFilteredCount().get();
       writeClient.createSnapshot("vol1", "buck2", "snapshot2");
 

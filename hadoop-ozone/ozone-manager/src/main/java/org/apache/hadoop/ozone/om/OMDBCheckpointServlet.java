@@ -134,7 +134,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (BootstrapStateHandler.Lock lock = getLock().lock();
+    try (BootstrapStateHandler.Lock lock = getBoostrapStateLock().lock();
          TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(destination)) {
       archiveOutputStream
@@ -297,7 +297,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   }
 
   @Override
-  public BootstrapStateHandler.Lock getLock() {
+  public BootstrapStateHandler.Lock getBoostrapStateLock() {
     return lock;
   }
 
@@ -323,10 +323,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     public BootstrapStateHandler.Lock lock()
         throws InterruptedException {
       // First lock all the handlers.
-      keyDeletingService.getLock().lock();
-      sstFilteringService.getLock().lock();
-      rocksDbCheckpointDiffer.getLock().lock();
-      snapshotDeletingService.getLock().lock();
+      keyDeletingService.getBoostrapStateLock().lock();
+      sstFilteringService.getBoostrapStateLock().lock();
+      rocksDbCheckpointDiffer.getBoostrapStateLock().lock();
+      snapshotDeletingService.getBoostrapStateLock().lock();
 
       // Then wait for the double buffer to be flushed.
       om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
@@ -335,10 +335,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
 
     @Override
     public void unlock() {
-      snapshotDeletingService.getLock().unlock();
-      rocksDbCheckpointDiffer.getLock().unlock();
-      sstFilteringService.getLock().unlock();
-      keyDeletingService.getLock().unlock();
+      snapshotDeletingService.getBoostrapStateLock().unlock();
+      rocksDbCheckpointDiffer.getBoostrapStateLock().unlock();
+      sstFilteringService.getBoostrapStateLock().unlock();
+      keyDeletingService.getBoostrapStateLock().unlock();
     }
   }
 }
