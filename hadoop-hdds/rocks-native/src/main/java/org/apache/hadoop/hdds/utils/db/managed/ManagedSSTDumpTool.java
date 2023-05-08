@@ -36,11 +36,8 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 public class ManagedSSTDumpTool {
 
   static {
-    final Logger LOG =
-        LoggerFactory.getLogger(ManagedSSTDumpTool.class);
     NativeLibraryLoader.getInstance()
         .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-    LOG.info("Loaded");
   }
 
   private int bufferCapacity;

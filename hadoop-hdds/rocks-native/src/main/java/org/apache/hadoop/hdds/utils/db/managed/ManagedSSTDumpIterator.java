@@ -133,8 +133,8 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = new BufferedReader(new InputStreamReader(
         sstDumpToolTask.getPipedOutput(), StandardCharsets.UTF_8));
-    LOG.info("{}", processOutput.readLine());
-    LOG.info("{}", processOutput.readLine());
+    processOutput.readLine();
+    processOutput.readLine();
     charBuffer = new char[8192];
     open = new AtomicBoolean(true);
     currentKey = Optional.empty();

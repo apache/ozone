@@ -54,6 +54,7 @@ public class TestManagedSstFileReader {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestManagedSstFileReader.class);
+
   private String createRandomSSTFile(Map<String, Integer> records)
       throws IOException, RocksDBException {
     Map<String, Integer> keys = records instanceof TreeMap ?
@@ -100,32 +101,30 @@ public class TestManagedSstFileReader {
   }
 
 
-//  @ParameterizedTest
-//  @ValueSource(ints = {0, 1, 3})
-//  public void testGetKeyStream(int numberOfFiles)
-//      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-//    Pair<Map<String, Integer>, List<String>> data =
-//        createDummyData(numberOfFiles);
-//    List<String> files = data.getRight();
-//    Map<String, Integer> keys = data.getLeft();
-//    new ManagedSstFileReader(files).getKeyStream().forEach(
-//        key -> {
-//          Assertions.assertEquals(keys.get(key), 1);
-//          keys.remove(key);
-//        });
-//    keys.values().forEach(val -> Assertions.assertEquals(0, val));
-//  }
-
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 3})
-  public void testGetKeyStreamWithTombstone(int numberOfFiles)
+  @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-    LOG.info("Initializing SSTdumpTool {}", numberOfFiles);
     Pair<Map<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
     Map<String, Integer> keys = data.getLeft();
-    LOG.info("Initializing SSTdumpTools {}", numberOfFiles);
+    new ManagedSstFileReader(files).getKeyStream().forEach(
+        key -> {
+          Assertions.assertEquals(keys.get(key), 1);
+          keys.remove(key);
+        });
+    keys.values().forEach(val -> Assertions.assertEquals(0, val));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  public void testGetKeyStreamWithTombstone(int numberOfFiles)
+      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+    Pair<Map<String, Integer>, List<String>> data =
+        createDummyData(numberOfFiles);
+    List<String> files = data.getRight();
+    Map<String, Integer> keys = data.getLeft();
     ExecutorService executorService = new ThreadPoolExecutor(0,
         1, 60, TimeUnit.SECONDS,
         new SynchronousQueue<>(), new ThreadFactoryBuilder()
@@ -133,15 +132,9 @@ public class TestManagedSstFileReader {
         .build(), new ThreadPoolExecutor.DiscardPolicy());
     ManagedSSTDumpTool sstDumpTool =
         new ManagedSSTDumpTool(executorService, 256);
-    LOG.info("Initialized SSTdumpTool");
     new ManagedSstFileReader(files).getKeyStreamWithTombstone(sstDumpTool)
-        .forEach(key -> {
-          LOG.info("{} {}", numberOfFiles, key);
-          keys.remove(key);
-        });
-    LOG.info("Done {}", numberOfFiles);
+        .forEach(keys::remove);
     Assertions.assertEquals(0, keys.size());
-    LOG.info("Dones {}", numberOfFiles);
     executorService.shutdown();
     try {
       executorService.awaitTermination(5, TimeUnit.SECONDS);
@@ -149,6 +142,5 @@ public class TestManagedSstFileReader {
       LOG.error("Failed to shutdown Report Manager", e);
       Thread.currentThread().interrupt();
     }
-    LOG.info("Dones2 {}", numberOfFiles);
   }
 }
