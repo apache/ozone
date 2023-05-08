@@ -182,3 +182,6 @@ OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
 # change or let all OMs write to AccessController if this dev flag is set.
 #
 OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

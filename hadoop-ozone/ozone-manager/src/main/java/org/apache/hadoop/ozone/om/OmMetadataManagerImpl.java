@@ -1550,7 +1550,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Get the latest OmSnapshot for a snapshot path.
    */
   public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
-                                       OmSnapshotManager snapshotManager)
+                                      OmSnapshotManager snapshotManager)
       throws IOException {
 
     String latestPathSnapshot =

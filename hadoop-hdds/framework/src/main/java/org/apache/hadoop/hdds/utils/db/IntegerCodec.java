@@ -18,21 +18,38 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-
 import com.google.common.primitives.Ints;
+
+import javax.annotation.Nonnull;
+import java.util.function.IntFunction;
 
 /**
  * Codec to convert Integer to/from byte array.
  */
-public class IntegerCodec implements Codec<Integer> {
+public final class IntegerCodec implements Codec<Integer> {
   @Override
-  public byte[] toPersistedFormat(Integer object) throws IOException {
+  public boolean supportCodecBuffer() {
+    return true;
+  }
+
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull Integer object,
+      IntFunction<CodecBuffer> allocator) {
+    return allocator.apply(Integer.BYTES).putInt(object);
+  }
+
+  @Override
+  public Integer fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return buffer.asReadOnlyByteBuffer().getInt();
+  }
+
+  @Override
+  public byte[] toPersistedFormat(Integer object) {
     return Ints.toByteArray(object);
   }
 
   @Override
-  public Integer fromPersistedFormat(byte[] rawData) throws IOException {
+  public Integer fromPersistedFormat(byte[] rawData) {
     return Ints.fromByteArray(rawData);
   }
 

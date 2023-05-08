@@ -15,31 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.erasurecode.rawcoder;
 
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+package org.apache.hadoop.ozone.om.snapshot;
 
 /**
- * Test NativeXOR encoding and decoding.
+ * TestSnapshotFeatureEnabledAspect util class.
  */
-public class TestNativeXORRawCoder extends TestXORRawCoderBase {
+public class SnapshotFeatureEnabledUtil {
 
-  public TestNativeXORRawCoder() {
-    super(NativeXORRawErasureCoderFactory.class,
-        NativeXORRawErasureCoderFactory.class);
+  /**
+   * This is an example of an "API" that requires snapshot feature enabled.
+   */
+  @RequireSnapshotFeatureState(true)
+  public String snapshotMethod() {
+    return "yay";
   }
 
-  @BeforeEach
-  public void setup() {
-    Assumptions.assumeTrue(ErasureCodeNative.isNativeCodeLoaded());
-    setAllowDump(true);
+  /**
+   * Method needed for the Aspect to get current feature state. Emulates
+   * {@link org.apache.hadoop.ozone.om.OzoneManager#isFilesystemSnapshotEnabled}
+   * Note: Method has to be `public` for reflection invocation to work.
+   * @return false
+   */
+  public boolean isFilesystemSnapshotEnabled() {
+    return false;
   }
 
-  @Test
-  public void testAfterRelease63() throws Exception {
-    prepare(6, 3, null, null);
-    testAfterRelease();
-  }
 }
