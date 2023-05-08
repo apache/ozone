@@ -17,7 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test base for raw Reed-solomon coders.

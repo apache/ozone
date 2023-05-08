@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmTestManagers;
@@ -94,6 +95,8 @@ public class TestSnapshotDeletingService {
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         100000, TimeUnit.MILLISECONDS);
     conf.setQuietMode(false);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     omTestManagers = new OmTestManagers(conf);
     keyManager = omTestManagers.getKeyManager();
     omMetadataManager = omTestManagers.getMetadataManager();

@@ -79,10 +79,10 @@ public class TestTypedRDBTableStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
 
-    codecRegistry = new CodecRegistry();
+    codecRegistry = CodecRegistry.newBuilder().build();
 
   }
 
@@ -91,6 +91,7 @@ public class TestTypedRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test

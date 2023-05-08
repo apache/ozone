@@ -487,9 +487,10 @@ public final class OmUtils {
   /**
    * Verify volume name is a valid DNS name.
    */
-  public static void validateVolumeName(String volumeName) throws OMException {
+  public static void validateVolumeName(String volumeName, boolean isStrictS3)
+      throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName);
+      HddsClientUtils.verifyResourceName(volumeName, isStrictS3);
     } catch (IllegalArgumentException e) {
       throw new OMException("Invalid volume name: " + volumeName,
           OMException.ResultCodes.INVALID_VOLUME_NAME);

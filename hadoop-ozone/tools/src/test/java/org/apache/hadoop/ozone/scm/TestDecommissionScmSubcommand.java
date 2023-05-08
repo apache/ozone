@@ -88,7 +88,7 @@ public class TestDecommissionScmSubcommand {
     DecommissionScmResponseProto response =
         DecommissionScmResponseProto.newBuilder()
             .setSuccess(false)
-            .setErrorMsg("Removal of primordial node is not supported")
+            .setErrorMsg("Cannot remove current leader.")
             .build();
 
     Mockito.when(client.decommissionScm(any()))
@@ -99,7 +99,7 @@ public class TestDecommissionScmSubcommand {
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
       assertTrue(capture.getOutput().contains(
-          "Removal of primordial"));
+          "remove current leader"));
     }
   }
 
