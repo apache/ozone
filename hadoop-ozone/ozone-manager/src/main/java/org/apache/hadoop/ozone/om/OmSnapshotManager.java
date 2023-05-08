@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -440,11 +441,17 @@ public final class OmSnapshotManager implements AutoCloseable {
    * volume name and bucket name as a prefix in FSO deletedDirectoryTable.
    * Follows:
    * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * {@link OmSnapshotManager}. If this is used elsewhere, consider moving this
+   * to {@link OMMetadataManager}.
+   *
    * @param volumeName volume name
    * @param bucketName bucket name
    * @return /volumeId/bucketId/
    *    e.g. /-9223372036854772480/-9223372036854771968/
    */
+  @VisibleForTesting
   public static String getOzonePathKeyWithVolumeBucketNames(
       OMMetadataManager omMetadataManager,
       String volumeName,
