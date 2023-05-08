@@ -497,9 +497,6 @@ public class ContainerEndpoint {
     try {
       Map<Long, ContainerMetadata> omContainers =
           reconContainerMetadataManager.getContainers(-1, -1);
-      List<Long> scmAllContainers = containerManager.getContainers().stream()
-          .map(containerInfo -> containerInfo.getContainerID()).collect(
-              Collectors.toList());
       List<Long> scmNonDeletedContainers =
           containerManager.getContainers().stream()
               .filter(containerInfo -> !(containerInfo.getState() ==
@@ -510,7 +507,8 @@ public class ContainerEndpoint {
       // Filter list of container Ids which are present in OM but not in SCM.
       List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
           omContainers.entrySet().stream().filter(containerMetadataEntry ->
-                  !(scmAllContainers.contains(containerMetadataEntry.getKey())))
+                  !(scmNonDeletedContainers.contains(
+                      containerMetadataEntry.getKey())))
               .collect(
                   Collectors.toList());
 
