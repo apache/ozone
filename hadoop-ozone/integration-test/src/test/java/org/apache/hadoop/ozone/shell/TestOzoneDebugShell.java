@@ -22,35 +22,30 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -89,7 +84,7 @@ public class TestOzoneDebugShell {
   }
 
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
@@ -115,27 +110,21 @@ public class TestOzoneDebugShell {
     writeKey(volumeName, bucketName, keyName);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
-    Assert.assertEquals(0, exitCode);
+    Assertions.assertEquals(0, exitCode);
 
     closeContainerForKey(volumeName, bucketName, keyName);
 
     exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
-    Assert.assertEquals(0, exitCode);
+    Assertions.assertEquals(0, exitCode);
   }
 
   private static void writeKey(String volumeName, String bucketName,
       String keyName) throws IOException {
-    try (OzoneClient client = OzoneClientFactory.getRpcClient(
-        cluster.getConf())) {
-      ObjectStore objectStore = client.getObjectStore();
-      objectStore.createVolume(volumeName);
-      objectStore.getVolume(volumeName).createBucket(bucketName);
-      OzoneOutputStream key =
-          objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(keyName, 1024, ReplicationType.RATIS,
-                  ReplicationFactor.THREE, new HashMap<>());
-      key.write("test".getBytes(UTF_8));
-      key.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+      TestDataUtil.createKey(
+          client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
+          keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");
     }
   }
 
@@ -172,27 +161,17 @@ public class TestOzoneDebugShell {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    ContainerID containerId =
-        ContainerID.valueOf(omKeyLocationInfo.getContainerID());
-
     ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(containerId);
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-
-    cluster.getStorageContainerManager().getPipelineManager()
-        .closePipeline(pipeline, false);
-    GenericTestUtils.waitFor(
-        () -> container.getState() == HddsProtos.LifeCycleState.CLOSED, 200,
-        30000);
+        cluster.getStorageContainerManager().getContainerManager().getContainer(
+            ContainerID.valueOf(omKeyLocationInfo.getContainerID()));
+    OzoneTestUtils.closeContainer(cluster.getStorageContainerManager(),
+        container);
   }
 
   /**
    * shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {

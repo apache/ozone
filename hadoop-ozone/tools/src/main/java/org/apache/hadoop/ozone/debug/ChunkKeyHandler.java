@@ -67,7 +67,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 public class ChunkKeyHandler extends KeyHandler implements
     SubcommandWithParent {
 
-  private ContainerOperationClient containerOperationClient;
   private  XceiverClientManager xceiverClientManager;
   private XceiverClientSpi xceiverClient;
   private OzoneManagerProtocol ozoneManagerClient;
@@ -82,9 +81,8 @@ public class ChunkKeyHandler extends KeyHandler implements
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException {
-    try {
-      containerOperationClient = new ContainerOperationClient(
-          parent.getOzoneConf());
+    try (ContainerOperationClient containerOperationClient = new
+        ContainerOperationClient(parent.getOzoneConf())) {
       xceiverClientManager = containerOperationClient.getXceiverClientManager();
       ozoneManagerClient =
           client.getObjectStore().getClientProxy().getOzoneManagerClient();
@@ -191,10 +189,6 @@ public class ChunkKeyHandler extends KeyHandler implements
       Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
       String prettyJson = gson2.toJson(result);
       System.out.println(prettyJson);
-    } finally {
-      xceiverClientManager.close();
-      containerOperationClient.close();
-      ozoneManagerClient.close();
     }
   }
 
