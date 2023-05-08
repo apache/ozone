@@ -86,6 +86,7 @@ Test ozone shell
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
+                    Run Keyword         Test Delete key with and without Trash   ${protocol}       ${server}       ${volume}
 
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
