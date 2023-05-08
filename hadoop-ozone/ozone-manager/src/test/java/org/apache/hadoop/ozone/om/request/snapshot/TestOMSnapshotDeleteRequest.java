@@ -97,8 +97,6 @@ public class TestOMSnapshotDeleteRequest {
     when(ozoneManager.getBucketOwner(any(), any(),
         any(), any())).thenReturn("dummyBucketOwner");
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(5);
-    when(lvm.getFeature(any())).thenReturn(OMLayoutFeature.SNAPSHOT_SUPPORT);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     AuditLogger auditLogger = mock(AuditLogger.class);
