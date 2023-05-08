@@ -409,7 +409,9 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     objectStore.setAcl(volumeObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
-        "user:" + USER2 + ":r"));
+        "user:" + USER1 + ":l," +
+        "user:" + USER2 + ":r," +
+        "user:" + USER2 + ":l"));
 
     final OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder()
         .setResType(OzoneObj.ResourceType.BUCKET)
@@ -430,6 +432,7 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
     objectStore.setAcl(keyObj, OzoneAcl.parseAcls(
         "user:" + USER1 + ":r," +
+        "user:" + USER1 + ":l," +
         "user:" + USER1 + ":x"));
   }
 
@@ -445,6 +448,7 @@ public class TestOzoneManagerSnapshotAcl {
         "user:" + USER1 + ":r," +
             "user:" + USER1 + ":x," +
             "user:" + USER2 + ":r," +
+            "user:" + USER2 + ":l," +
             "user:" + USER2 + ":x"));
   }
 
