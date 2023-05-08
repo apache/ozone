@@ -216,6 +216,7 @@ share/ozone/lib/ozone-interface-storage.jar
 share/ozone/lib/ozone-manager.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-recon.jar
+share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
 share/ozone/lib/perfmark-api.jar
@@ -253,13 +254,13 @@ share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
 share/ozone/lib/spring-beans.jar
 share/ozone/lib/spring-core.jar
-share/ozone/lib/spring-jcl.jar
 share/ozone/lib/spring-jdbc.jar
 share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax-ex.jar
 share/ozone/lib/txw2.jar
+share/ozone/lib/vault-java-driver.jar
 share/ozone/lib/weld-servlet-shaded.Final.jar
 share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar

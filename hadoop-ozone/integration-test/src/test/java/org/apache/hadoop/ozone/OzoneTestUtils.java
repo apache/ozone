@@ -25,17 +25,20 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 
 import org.apache.ratis.util.IOUtils;
@@ -168,5 +171,19 @@ public final class OzoneTestUtils {
       throw new UncheckedIOException(e);
     }
     return sockets;
+  }
+
+  /**
+    * Close container & Wait till container state becomes CLOSED.
+   */
+  public static void closeContainer(StorageContainerManager scm,
+      ContainerInfo container)
+      throws IOException, TimeoutException, InterruptedException {
+    Pipeline pipeline = scm.getPipelineManager()
+        .getPipeline(container.getPipelineID());
+    scm.getPipelineManager().closePipeline(pipeline, false);
+    GenericTestUtils.waitFor(() ->
+            container.getState() == HddsProtos.LifeCycleState.CLOSED,
+        200, 30000);
   }
 }

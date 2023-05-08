@@ -23,18 +23,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 
@@ -71,24 +68,21 @@ import org.slf4j.LoggerFactory;
  * bootstrap.  The follower needs these copies to respond the users
  * snapshot requests when it becomes the leader.
  */
-public class OmRatisSnapshotProvider {
+public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmRatisSnapshotProvider.class);
 
-  private final File omSnapshotDir;
-  private Map<String, OMNodeDetails> peerNodesMap;
+  private final Map<String, OMNodeDetails> peerNodesMap;
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
-
+    super(omRatisSnapshotDir, OM_DB_NAME);
     LOG.info("Initializing OM Snapshot Provider");
-    this.omSnapshotDir = omRatisSnapshotDir;
-
-    this.peerNodesMap = new HashMap<>();
+    this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
@@ -115,68 +109,6 @@ public class OmRatisSnapshotProvider {
   }
 
   /**
-   * Download the latest checkpoint from OM Leader via HTTP.
-   * @param leaderOMNodeID leader OM Node ID.
-   * @return the DB checkpoint (including the ratis snapshot index)
-   */
-  public DBCheckpoint getOzoneManagerDBSnapshot(String leaderOMNodeID)
-      throws IOException {
-    String snapshotTime = Long.toString(System.currentTimeMillis());
-    String snapshotFileName = OM_DB_NAME + "-" + leaderOMNodeID
-        + "-" + snapshotTime;
-    String snapshotFilePath = Paths.get(omSnapshotDir.getAbsolutePath(),
-        snapshotFileName).toFile().getAbsolutePath();
-    File targetFile = new File(snapshotFilePath + ".tar");
-
-    String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
-        .getOMDBCheckpointEnpointUrl(httpPolicy.isHttpEnabled());
-
-    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
-        "URL: {}", leaderOMNodeID, omCheckpointUrl);
-    SecurityUtil.doAsCurrentUser(() -> {
-      HttpURLConnection httpURLConnection = (HttpURLConnection)
-          connectionFactory.openConnection(new URL(omCheckpointUrl),
-              spnegoEnabled);
-      httpURLConnection.connect();
-      int errorCode = httpURLConnection.getResponseCode();
-      if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
-        throw new IOException("Unexpected exception when trying to reach " +
-            "OM to download latest checkpoint. Checkpoint URL: " +
-            omCheckpointUrl + ". ErrorCode: " + errorCode);
-      }
-
-      try (InputStream inputStream = httpURLConnection.getInputStream()) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
-      } catch (IOException ex) {
-        LOG.error("OM snapshot {} cannot be downloaded.", targetFile, ex);
-        boolean deleted = FileUtils.deleteQuietly(targetFile);
-        if (!deleted) {
-          LOG.error("OM snapshot which failed to download {} cannot be deleted",
-              targetFile);
-        }
-      }
-      return null;
-    });
-
-    // Untar the checkpoint file.
-    Path untarredDbDir = Paths.get(snapshotFilePath);
-    FileUtil.unTar(targetFile, untarredDbDir.toFile());
-    FileUtils.deleteQuietly(targetFile);
-
-    LOG.info("Successfully downloaded latest checkpoint from leader OM: {}",
-        leaderOMNodeID);
-
-    RocksDBCheckpoint omCheckpoint = new RocksDBCheckpoint(untarredDbDir);
-    return omCheckpoint;
-  }
-
-  public void stop() {
-    if (connectionFactory != null) {
-      connectionFactory.destroy();
-    }
-  }
-
-  /**
    * When a new OM is bootstrapped, add it to the peerNode map.
    */
   public void addNewPeerNode(OMNodeDetails newOMNode) {
@@ -188,5 +120,49 @@ public class OmRatisSnapshotProvider {
    */
   public void removeDecommissionedPeerNode(String decommNodeId) {
     peerNodesMap.remove(decommNodeId);
+  }
+
+  @Override
+  public void downloadSnapshot(String leaderNodeID, File targetFile)
+      throws IOException {
+    OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
+    URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
+        httpPolicy.isHttpEnabled(), true,
+        HAUtils.getExistingSstFiles(getCandidateDir()));
+    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
+        "URL: {}", leaderNodeID, omCheckpointUrl);
+    SecurityUtil.doAsCurrentUser(() -> {
+      HttpURLConnection connection = (HttpURLConnection)
+          connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
+      connection.setRequestMethod("GET");
+      connection.connect();
+      int errorCode = connection.getResponseCode();
+      if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
+        throw new IOException("Unexpected exception when trying to reach " +
+            "OM to download latest checkpoint. Checkpoint URL: " +
+            omCheckpointUrl + ". ErrorCode: " + errorCode);
+      }
+
+      try (InputStream inputStream = connection.getInputStream()) {
+        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+      } catch (IOException ex) {
+        boolean deleted = FileUtils.deleteQuietly(targetFile);
+        if (!deleted) {
+          LOG.error("OM snapshot which failed to download {} cannot be deleted",
+              targetFile);
+        }
+        throw ex;
+      } finally {
+        connection.disconnect();
+      }
+      return null;
+    });
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (connectionFactory != null) {
+      connectionFactory.destroy();
+    }
   }
 }

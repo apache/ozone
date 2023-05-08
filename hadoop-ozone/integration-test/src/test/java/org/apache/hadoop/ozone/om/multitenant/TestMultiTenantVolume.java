@@ -51,6 +51,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -294,5 +295,22 @@ public class TestMultiTenantVolume {
     // Delete tenant and volume
     store.deleteTenant(TENANT_ID);
     store.deleteVolume(TENANT_ID);
+  }
+
+  @Test
+  public void testRejectNonS3CompliantTenantIdCreationWithDefaultStrictS3True()
+      throws Exception {
+    ObjectStore store = getStoreForAccessID(ACCESS_ID);
+    String[] nonS3CompliantTenantId =
+        {"tenantid_underscore", "_tenantid___multi_underscore_", "tenantid_"};
+
+    for (String tenantId : nonS3CompliantTenantId) {
+      OMException e = assertThrows(
+          OMException.class,
+          () -> store.createTenant(tenantId));
+
+      Assert.assertTrue(e.getMessage().contains("Invalid volume name: "
+          + tenantId));
+    }
   }
 }

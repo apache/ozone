@@ -57,6 +57,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -137,20 +138,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           TENANT_ALREADY_EXISTS);
     }
 
-    // getUserName returns:
-    // - Kerberos principal when Kerberos security is enabled
-    // - User's login name when security is not enabled
-    // - AWS_ACCESS_KEY_ID if the original request comes from S3 Gateway.
-    //    Not Applicable to TenantCreateRequest.
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    // getShortUserName here follows RpcClient#createVolume
-    // A caveat is that this assumes OM's auth_to_local is the same as
-    //  the client's. Maybe move this logic to the client and pass VolumeArgs?
-    final String owner = ugi.getShortUserName();
+    final String owner = getUserName();
     // Volume name defaults to tenant name if unspecified in the request
     final String volumeName = request.getVolumeName();
     // Validate volume name
-    OmUtils.validateVolumeName(volumeName);
+    OmUtils.validateVolumeName(volumeName, ozoneManager.isStrictS3());
 
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
@@ -360,5 +352,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       omMetrics.incNumTenantCreateFails();
     }
     return omClientResponse;
+  }
+
+  public String getUserName() throws IOException {
+    // getUserName returns:
+    // - Kerberos principal when Kerberos security is enabled
+    // - User's login name when security is not enabled
+    // - AWS_ACCESS_KEY_ID if the original request comes from S3 Gateway.
+    //    Not Applicable to TenantCreateRequest.
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    // getShortUserName here follows RpcClient#createVolume
+    // A caveat is that this assumes OM's auth_to_local is the same as
+    //  the client's. Maybe move this logic to the client and pass VolumeArgs?
+    if (ugi != null) {
+      return ugi.getShortUserName();
+    } else {
+      throw new OMException("User name is null.", USER_NOT_FOUND);
+    }
   }
 }

@@ -18,20 +18,60 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-import static org.junit.Assert.assertNotNull;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TemporaryFolder;
 
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,56 +85,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for container endpoint.
@@ -103,9 +108,9 @@ public class TestContainerEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
+  private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
@@ -182,6 +187,8 @@ public class TestContainerEndpoint {
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
+    containerStateManager = reconContainerManager
+        .getContainerStateManager();
   }
 
   @Before
@@ -992,7 +999,168 @@ public class TestContainerEndpoint {
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L);
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+  protected ContainerWithPipeline getTestContainer(
+      HddsProtos.LifeCycleState state, long containerId)
+      throws IOException, TimeoutException {
+    ContainerID localContainerID = ContainerID.valueOf(containerId);
+    Pipeline localPipeline = getRandomPipeline();
+    reconPipelineManager.addPipeline(localPipeline);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(localContainerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(localPipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(state)
+            .build();
+    return new ContainerWithPipeline(containerInfo, localPipeline);
+  }
+
+  @Test
+  public void testGetSCMDeletedContainers() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 102L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 103L));
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(102L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(102L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(102L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(103L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(103L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETING);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(103L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(2, 0);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(2, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(102, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+
+    deletedContainerInfo = deletedContainerInfoList.get(1);
+    Assertions.assertEquals(103, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersLimitParam() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 104L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 105L));
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(104L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(104L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(105L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(105L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(1, 0);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(104, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetSCMDeletedContainersPrevKeyParam() throws Exception {
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 106L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 107L));
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(106L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(106L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    Set<ContainerID> containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(1, containerIDs.size());
+
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(ContainerID.valueOf(107L),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.DELETE);
+    reconContainerManager
+        .updateContainerState(ContainerID.valueOf(107L),
+            HddsProtos.LifeCycleEvent.CLEANUP);
+    containerIDs = containerStateManager
+        .getContainerIDs(HddsProtos.LifeCycleState.DELETED);
+    Assertions.assertEquals(2, containerIDs.size());
+
+    Response scmDeletedContainers =
+        containerEndpoint.getSCMDeletedContainers(2, 106L);
+    List<DeletedContainerInfo> deletedContainerInfoList =
+        (List<DeletedContainerInfo>) scmDeletedContainers.getEntity();
+    Assertions.assertEquals(1, deletedContainerInfoList.size());
+
+    DeletedContainerInfo deletedContainerInfo = deletedContainerInfoList.get(0);
+    Assertions.assertEquals(107, deletedContainerInfo.getContainerID());
+    Assertions.assertEquals("DELETED",
+        deletedContainerInfo.getContainerState());
   }
 }

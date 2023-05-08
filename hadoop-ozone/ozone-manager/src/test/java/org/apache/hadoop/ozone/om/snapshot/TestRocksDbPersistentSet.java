@@ -100,7 +100,7 @@ public class TestRocksDbPersistentSet {
     ColumnFamilyHandle columnFamily = null;
 
     try {
-      CodecRegistry codecRegistry = new CodecRegistry();
+      final CodecRegistry codecRegistry = CodecRegistry.newBuilder().build();
       columnFamily = db.get().createColumnFamily(
           new ColumnFamilyDescriptor(
               codecRegistry.asRawData("testSet"), columnFamilyOptions));
