@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -464,6 +465,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       DefaultMetricsSystem.shutdown();
 
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
+      CodecBuffer.assertNoLeaks();
     } catch (IOException e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }

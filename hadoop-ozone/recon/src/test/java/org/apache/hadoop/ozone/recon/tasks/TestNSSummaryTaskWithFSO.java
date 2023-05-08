@@ -206,16 +206,18 @@ public final class TestNSSummaryTaskWithFSO {
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket1.length);
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket2.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket1.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket2.length);
 
       Assert.assertEquals(1, fileDistBucket1[0]);
-      for (int i = 1; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         Assert.assertEquals(0, fileDistBucket1[i]);
       }
       Assert.assertEquals(1, fileDistBucket2[1]);
       Assert.assertEquals(1, fileDistBucket2[2]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 1 || i == 2) {
           continue;
         }
@@ -255,9 +257,10 @@ public final class TestNSSummaryTaskWithFSO {
       Assert.assertEquals(KEY_THREE_SIZE, nsSummaryInDir2.getSizeOfFiles());
 
       int[] fileDistForDir2 = nsSummaryInDir2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistForDir2.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistForDir2.length);
       Assert.assertEquals(1, fileDistForDir2[fileDistForDir2.length - 1]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS - 1; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS - 1; ++i) {
         Assert.assertEquals(0, fileDistForDir2[i]);
       }
       Assert.assertEquals(0, nsSummaryInDir2.getChildDir().size());
@@ -282,6 +285,7 @@ public final class TestNSSummaryTaskWithFSO {
     private static OMDBUpdateEvent keyEvent5;
     private static OMDBUpdateEvent keyEvent6;
     private static OMDBUpdateEvent keyEvent7;
+
     @BeforeClass
     public static void setUp() throws IOException {
       nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
@@ -428,16 +432,17 @@ public final class TestNSSummaryTaskWithFSO {
       Assert.assertNotNull(nsSummaryForBucket2);
       Assert.assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
       // key 4 + key 5 + updated key 2
-      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_TWO_UPDATE_SIZE,
-          nsSummaryForBucket2.getSizeOfFiles());
+      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE
+          + KEY_TWO_UPDATE_SIZE, nsSummaryForBucket2.getSizeOfFiles());
 
       int[] fileSizeDist = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileSizeDist.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileSizeDist.length);
       // 1023L and 100L
       Assert.assertEquals(2, fileSizeDist[0]);
       // 2050L
       Assert.assertEquals(1, fileSizeDist[2]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 0 || i == 2) {
           continue;
         }

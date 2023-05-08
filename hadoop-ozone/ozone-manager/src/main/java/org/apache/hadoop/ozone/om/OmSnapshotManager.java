@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -160,7 +159,18 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
+  /**
+   * TODO: [SNAPSHOT] HDDS-8529: Refactor the constructor in a way that when
+   *  ozoneManager.isFilesystemSnapshotEnabled() returns false,
+   *  no snapshot-related background job or initialization would run,
+   *  except for applying previously committed Ratis transactions in e.g.:
+   *  1. {@link OMKeyPurgeRequest#validateAndUpdateCache}
+   *  2. {@link OMDirectoriesPurgeRequestWithFSO#validateAndUpdateCache}
+   */
   public OmSnapshotManager(OzoneManager ozoneManager) {
+    LOG.info("Ozone filesystem snapshot feature is {}.",
+        ozoneManager.isFilesystemSnapshotEnabled() ? "enabled" : "disabled");
+
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
@@ -261,17 +271,21 @@ public final class OmSnapshotManager implements AutoCloseable {
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
-        diffCleanupServiceInterval,
-        diffCleanupServiceTimeout,
-        ozoneManager,
-        snapshotDiffDb,
-        snapDiffJobCf,
-        snapDiffPurgedJobCf,
-        snapDiffReportCf,
-        codecRegistry
-    );
-    this.snapshotDiffCleanupService.start();
+    if (ozoneManager.isFilesystemSnapshotEnabled()) {
+      this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
+          diffCleanupServiceInterval,
+          diffCleanupServiceTimeout,
+          ozoneManager,
+          snapshotDiffDb,
+          snapDiffJobCf,
+          snapDiffPurgedJobCf,
+          snapDiffReportCf,
+          codecRegistry
+      );
+      this.snapshotDiffCleanupService.start();
+    } else {
+      this.snapshotDiffCleanupService = null;
+    }
   }
 
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
@@ -327,17 +341,13 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   private CodecRegistry createCodecRegistryForSnapDiff() {
-    CodecRegistry registry = new CodecRegistry();
-
-    // Integers are used for indexing persistent list.
-    registry.addCodec(Integer.class, new IntegerCodec());
+    final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         new OmDBDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
-
-    return registry;
+    return registry.build();
   }
 
   /**
@@ -565,7 +575,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public IOmMetadataReader checkForSnapshot(String volumeName,
                                             String bucketName, String keyname)
       throws IOException {
-    if (keyname == null) {
+    if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
 
@@ -629,40 +639,47 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     int pageSize,
                                                     boolean forceFullDiff)
       throws IOException {
-    // Validate fromSnapshot and toSnapshot
-    final SnapshotInfo fsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
-        volume, bucket, fromSnapshot);
-    final SnapshotInfo tsInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
-        volume, bucket, toSnapshot);
-    verifySnapshotInfoForSnapDiff(fsInfo, tsInfo);
+
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
     int index = getIndexFromToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }
 
-    final String fsKey = SnapshotInfo.getTableKey(volume, bucket, fromSnapshot);
-    final String tsKey = SnapshotInfo.getTableKey(volume, bucket, toSnapshot);
-    try {
-      final OmSnapshot fs = snapshotCache.get(fsKey);
-      final OmSnapshot ts = snapshotCache.get(tsKey);
-      return snapshotDiffManager.getSnapshotDiffReport(volume, bucket, fs, ts,
-          fsInfo, tsInfo, index, pageSize, forceFullDiff);
-    } catch (ExecutionException e) {
-      throw new IOException(e.getCause());
-    }
+    SnapshotDiffResponse snapshotDiffReport =
+        snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
+            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff);
+
+    // Check again to make sure that from and to snapshots are still active and
+    // were not deleted in between response generation.
+    // Ideally, snapshot diff and snapshot deletion should take an explicit lock
+    // to achieve the synchronization, but it would be complex and expensive.
+    // To avoid the complexity, we just check that snapshots are active
+    // before returning the response. It is like an optimistic lock to achieve
+    // similar behaviour and make sure client gets consistent response.
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+    return snapshotDiffReport;
   }
 
-  private void verifySnapshotInfoForSnapDiff(final SnapshotInfo fromSnapshot,
-                                             final SnapshotInfo toSnapshot)
+  private void validateSnapshotsExistAndActive(final String volumeName,
+                                               final String bucketName,
+                                               final String fromSnapshotName,
+                                               final String toSnapshotName)
       throws IOException {
+    SnapshotInfo fromSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, fromSnapshotName);
+    SnapshotInfo toSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, toSnapshotName);
+
     // Block SnapDiff if either of the snapshots is not active.
-    checkSnapshotActive(fromSnapshot);
-    checkSnapshotActive(toSnapshot);
+    checkSnapshotActive(fromSnapInfo);
+    checkSnapshotActive(toSnapInfo);
+
     // Check snapshot creation time
-    if (fromSnapshot.getCreationTime() > toSnapshot.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapshot.getName() +
-          " should be older than to toSnapshot:" + toSnapshot.getName());
+    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
+      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
+          " should be older than to toSnapshot:" + toSnapInfo.getName());
     }
   }
 

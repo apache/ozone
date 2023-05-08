@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 
@@ -37,6 +38,12 @@ public class OzoneDebug extends GenericCli {
 
   public OzoneDebug() {
     super(OzoneDebug.class);
+  }
+
+  @VisibleForTesting
+  public OzoneDebug(OzoneConfiguration configuration) {
+    super(OzoneDebug.class);
+    this.ozoneConf = configuration;
   }
 
   public OzoneConfiguration getOzoneConf() {

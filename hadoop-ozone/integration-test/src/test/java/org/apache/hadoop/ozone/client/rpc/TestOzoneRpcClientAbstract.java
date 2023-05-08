@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -154,6 +155,7 @@ import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -4072,14 +4074,15 @@ public abstract class TestOzoneRpcClientAbstract {
         omKeyInfo.getKeyLocationVersions().size());
 
     if (expectedCount == 1) {
-      RepeatedOmKeyInfo repeatedOmKeyInfo = cluster
-          .getOzoneManager().getMetadataManager()
-          .getDeletedTable().get(cluster.getOzoneManager().getMetadataManager()
+      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+          = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
+          .getRangeKVs(null, 100,
+              cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
-      Assert.assertNotNull(repeatedOmKeyInfo);
+      Assert.assertTrue(rangeKVs.size() > 0);
       Assert.assertEquals(expectedCount,
-          repeatedOmKeyInfo.getOmKeyInfoList().size());
+          rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {
       // If expectedCount is greater than 1 means versioning enabled,
       // so delete table should be empty.
@@ -4093,6 +4096,8 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  @Flaky("HDDS-8550")
+  @Disabled("HDDS-8557")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

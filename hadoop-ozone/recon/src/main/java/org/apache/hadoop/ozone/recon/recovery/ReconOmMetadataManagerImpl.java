@@ -92,8 +92,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           .setName(dbFile.getName())
           .setPath(dbFile.toPath().getParent());
       addOMTablesAndCodecs(dbStoreBuilder);
-      DBStore newStore = dbStoreBuilder.build();
-      setStore(newStore);
+      setStore(dbStoreBuilder.build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {

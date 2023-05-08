@@ -17,9 +17,9 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test NativeXOR encoding and decoding.
@@ -31,9 +31,9 @@ public class TestNativeXORRawCoder extends TestXORRawCoderBase {
         NativeXORRawErasureCoderFactory.class);
   }
 
-  @Before
+  @BeforeEach
   public void setup() {
-    Assume.assumeTrue(ErasureCodeNative.isNativeCodeLoaded());
+    Assumptions.assumeTrue(ErasureCodeNative.isNativeCodeLoaded());
     setAllowDump(true);
   }
 

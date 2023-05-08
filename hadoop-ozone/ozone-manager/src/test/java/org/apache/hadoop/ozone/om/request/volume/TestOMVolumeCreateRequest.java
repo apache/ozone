@@ -210,6 +210,78 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         omMetadataManager.getVolumeKey(volumeName)));
   }
 
+  @Test
+  public void 
+        testAcceptS3CompliantVolumeNameCreationRegardlessOfStrictS3Setting()
+        throws Exception {
+    String adminName = UUID.randomUUID().toString();
+    String ownerName = UUID.randomUUID().toString();
+    boolean[] omStrictS3Configs = {true, false};
+    for (boolean isStrictS3 : omStrictS3Configs) {
+      when(ozoneManager.isStrictS3()).thenReturn(isStrictS3);
+      String volumeName = UUID.randomUUID().toString();
+      acceptVolumeCreationHelper(volumeName, adminName, ownerName);
+    }
+  }
+
+  @Test
+  public void testRejectNonS3CompliantVolumeNameCreationWithStrictS3True()
+        throws Exception {
+    String adminName = UUID.randomUUID().toString();
+    String ownerName = UUID.randomUUID().toString();        
+    String[] nonS3CompliantVolumeName = 
+        {"volume_underscore", "_volume___multi_underscore_", "volume_"};
+    when(ozoneManager.isStrictS3()).thenReturn(true);
+    for (String volumeName : nonS3CompliantVolumeName) {
+      rejectVolumeCreationHelper(volumeName, adminName, ownerName);
+    }
+  }
+
+  @Test
+  public void testAcceptNonS3CompliantVolumeNameCreationWithStrictS3False()
+        throws Exception {
+    String adminName = UUID.randomUUID().toString();
+    String ownerName = UUID.randomUUID().toString();        
+    String[] nonS3CompliantVolumeName = 
+        {"volume_underscore", "_volume___multi_underscore_", "volume_"};
+    when(ozoneManager.isStrictS3()).thenReturn(false);
+    for (String volumeName : nonS3CompliantVolumeName) {
+      acceptVolumeCreationHelper(volumeName, adminName, ownerName);
+    }
+  }
+
+  private void acceptVolumeCreationHelper(String volumeName, String adminName,
+        String ownerName)
+        throws Exception {
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
+        ownerName);
+    OMVolumeCreateRequest omVolumeCreateRequest =
+            new OMVolumeCreateRequest(originalRequest);
+    OMRequest modifiedRequest = omVolumeCreateRequest.preExecute(ozoneManager);
+    omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
+    long txLogIndex = 1;
+    OMClientResponse omClientResponse =
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
+            ozoneManagerDoubleBufferHelper);
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        omClientResponse.getOMResponse();
+
+    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omResponse.getStatus());
+    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
+        omMetadataManager.getVolumeKey(volumeName)));
+  }
+
+  private void rejectVolumeCreationHelper(String volumeName, String adminName,
+        String ownerName)
+        throws Exception {
+    // Verify exception thrown on invalid volume name
+    LambdaTestUtils.intercept(OMException.class, "Invalid volume name: " 
+        + volumeName,
+        () -> doPreExecute(volumeName, adminName, ownerName));
+  }
+
   private void doPreExecute(String volumeName,
       String adminName, String ownerName) throws Exception {
 

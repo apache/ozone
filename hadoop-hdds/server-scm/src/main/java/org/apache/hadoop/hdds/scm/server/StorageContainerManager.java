@@ -2166,11 +2166,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot remove current leader.");
     }
 
-    // Currently we don't support removal of primordial node.
-    if (scmId.equals(primaryScmNodeId)) {
-      throw new IOException("Removal of primordial node is not supported.");
-    }
-
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()
         .getDivision().getGroup());
 
