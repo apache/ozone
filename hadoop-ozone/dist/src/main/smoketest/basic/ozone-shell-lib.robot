@@ -206,6 +206,7 @@ Test prefix Acls
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
 
 Test Delete key with and without Trash
+    [arguments]    ${protocol}         ${server}       ${volume}
                    Execute               ozone sh bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
                    Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key1 /opt/hadoop/NOTICE.txt
                    Execute               ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bso/key1
