@@ -57,8 +57,8 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 
 OZONE-SITE.XML_hdds.x509.default.duration=PT40s
 OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT30s
-OZONE-SITE.XML_hdds.block.token.expiry.time=15s
-OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=15s
+OZONE-SITE.XML_hdds.block.token.expiry.time=20s
+OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=20s
 
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
