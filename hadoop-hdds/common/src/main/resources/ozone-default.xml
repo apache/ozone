@@ -3381,6 +3381,12 @@
     <description>Wait duration before which close container
       is send to DN.</description>
   </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
+    <value>600s</value>
+    <tag>SCM, OZONE</tag>
+    <description>Wait duration for flush of buffered transaction.</description>
+  </property>
 
 
   <property>
