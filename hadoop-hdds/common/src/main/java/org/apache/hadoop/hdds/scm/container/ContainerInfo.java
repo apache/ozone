@@ -158,6 +158,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.state = state;
   }
 
+  public void setStateEnterTime(long epoch) {
+    this.stateEnterTime = Instant.ofEpochMilli(epoch);
+  }
+
   public Instant getStateEnterTime() {
     return stateEnterTime;
   }
@@ -436,7 +440,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
-    private long stateEnterTime;
+    private long stateEnterTime = Time.now();
     private String owner;
     private long containerID;
     private long deleteTransactionId;

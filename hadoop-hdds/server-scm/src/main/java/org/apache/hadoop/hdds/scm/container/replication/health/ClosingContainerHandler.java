@@ -19,14 +19,18 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
 
 /**
  * Class used in Replication Manager to close replicas of CLOSING containers.
@@ -59,10 +63,10 @@ public class ClosingContainerHandler extends AbstractCheck {
     LOG.debug("Checking container {} in ClosingContainerHandler",
         containerInfo);
 
-    boolean forceClose = request.getContainerInfo().getReplicationConfig()
-        .getReplicationType() != HddsProtos.ReplicationType.RATIS;
+    boolean forceClose = containerInfo.getReplicationConfig()
+        .getReplicationType() != ReplicationType.RATIS;
 
-    if (request.getContainerReplicas().size() == 0) {
+    if (request.getContainerReplicas().isEmpty()) {
       request.getReport().incrementAndSample(
           ReplicationManagerReport.HealthState.MISSING,
           containerInfo.containerID());
@@ -74,6 +78,35 @@ public class ClosingContainerHandler extends AbstractCheck {
             containerInfo, replica.getDatanodeDetails(), forceClose);
       }
     }
+
+    /*
+     * Empty containers in CLOSING state should be CLOSED.
+     *
+     * These are containers that are allocated in SCM but never got created
+     * on Datanodes. Since these containers don't have any replica associated
+     * with them, they are stuck in CLOSING state forever as there is no
+     * replicas to CLOSE.
+     *
+     * We should wait for sometime before moving the container to CLOSED state.
+     * This will give enough time for Datanodes to report the container,
+     * in cases where the container creation was successful on Datanodes.
+     *
+     * Should we have a separate configuration for this wait time?
+     * For now, we are using ReplicationManagerThread Interval * 5 as the wait
+     * time.
+     */
+
+    final long waitTime = replicationManager.getConfig().getInterval() * 5;
+    final long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
+    final Optional<ContainerInfo> emptyContainer = Optional.of(containerInfo)
+        .filter(c -> c.getReplicationType().equals(ReplicationType.RATIS))
+        .filter(c -> request.getContainerReplicas().isEmpty())
+        .filter(c -> c.getNumberOfKeys() == 0)
+        .filter(c -> (Time.now() - closingTime) > waitTime);
+
+    emptyContainer.ifPresent(c -> replicationManager.updateContainerState(
+        c.containerID(), HddsProtos.LifeCycleEvent.CLOSE));
+
     return true;
   }
 }

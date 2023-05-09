@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -262,8 +264,10 @@ public class ContainerStateMap {
     }
     // TODO: Simplify this logic.
     final ContainerInfo currentInfo = containerMap.get(containerID);
+    final Instant oldStateEnterTime = currentInfo.getStateEnterTime();
     try {
       currentInfo.setState(newState);
+      currentInfo.setStateEnterTime(Time.now());
 
       // We are updating two places before this update is done, these can
       // fail independently, since the code needs to handle it.
@@ -292,6 +296,7 @@ public class ContainerStateMap {
           newState);
 
       currentInfo.setState(currentState);
+      currentInfo.setStateEnterTime(oldStateEnterTime.toEpochMilli());
 
       // if this line throws, the state map can be in an inconsistent
       // state, since we will have modified the attribute by the

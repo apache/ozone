@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -384,6 +385,18 @@ public class LegacyReplicationManager {
               sendCloseCommand(
                   container, replica.getDatanodeDetails(), false);
             }
+          }
+
+          /*
+           * Empty containers in CLOSING state should be CLOSED.
+           *
+           * These are containers that are allocated in SCM but never got
+           * created on Datanodes. Since these containers don't have any
+           * replica associated with them, they are stuck in CLOSING state
+           * forever as there is no replicas to CLOSE.
+           */
+          if (replicas.isEmpty() && (container.getNumberOfKeys() == 0)) {
+            closeEmptyContainer(container);
           }
           return;
         }
@@ -2233,6 +2246,32 @@ public class LegacyReplicationManager {
     } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
           container.getContainerID(), ex);
+    }
+  }
+
+  private void closeEmptyContainer(ContainerInfo containerInfo) {
+    /*
+     * We should wait for sometime before moving the container to CLOSED state.
+     * This will give enough time for Datanodes to report the container,
+     * in cases where the container creation was successful on Datanodes.
+     *
+     * Should we have a separate configuration for this wait time?
+     * For now, we are using ReplicationManagerThread Interval * 5 as the wait
+     * time.
+     */
+
+    final long waitTime = rmConf.getInterval() * 5;
+    final long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
+
+    try {
+      if ((Time.now() - closingTime) > waitTime) {
+        containerManager.updateContainerState(containerInfo.containerID(),
+            HddsProtos.LifeCycleEvent.CLOSE);
+      }
+    } catch (IOException | InvalidStateTransitionException |
+             TimeoutException e) {
+      LOG.error("Failed to CLOSE the container {}",
+          containerInfo.containerID(), e);
     }
   }
 }
