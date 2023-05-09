@@ -171,6 +171,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return this.scmhaService.getServiceByIndex(index);
   }
 
+  public StorageContainerManager getScmLeader() {
+    return getStorageContainerManagers().stream()
+        .filter(StorageContainerManager::checkLeader)
+        .findFirst().orElse(null);
+  }
+
   private OzoneManager getOMLeader(boolean waitForLeaderElection)
       throws TimeoutException, InterruptedException {
     if (waitForLeaderElection) {
@@ -701,9 +707,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
             "127.0.0.1:" + blockPort);
 
-        if (i <= numOfActiveSCMs) {
-          scmPorts.release(scmNodeId);
-        }
+        scmPorts.release(scmNodeId);
         scmRpcPorts.release(scmNodeId);
       }
 

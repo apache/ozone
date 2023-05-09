@@ -289,7 +289,7 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
     for (Map.Entry<String, ProxyInfo<SCMSecurityProtocolPB>> proxy :
         scmProxies.entrySet()) {
       if (proxy.getValue() != null) {
-        RPC.stopProxy(proxy.getValue());
+        RPC.stopProxy(proxy.getValue().proxy);
       }
       scmProxies.remove(proxy.getKey());
     }
