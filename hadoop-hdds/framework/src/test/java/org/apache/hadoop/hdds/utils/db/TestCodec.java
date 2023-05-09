@@ -137,7 +137,7 @@ public final class TestCodec {
     final byte[] array = codec.toPersistedFormat(object);
     final Bytes fromArray = new Bytes(array);
 
-    try (final CodecBuffer buffer = codec.toCodecBuffer(object,
+    try (CodecBuffer buffer = codec.toCodecBuffer(object,
         CodecBuffer::allocateHeap)) {
       final Bytes fromBuffer = new Bytes(buffer);
 
