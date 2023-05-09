@@ -64,7 +64,9 @@ public class SolrHttpClient {
   private static CloseableHttpClient httpClient;
   private static HttpClientContext context;
 
-  public static CloseableHttpClient getCloseableHttpClient() {
+  public static CloseableHttpClient getCloseableHttpClient()
+      throws KeyManagementException, NoSuchAlgorithmException,
+      KeyStoreException {
     if (null != httpClient) {
       return httpClient;
     }
@@ -86,12 +88,16 @@ public class SolrHttpClient {
                 }
               }).build())
           .setDefaultAuthSchemeRegistry(authSchemeRegistry).build();
-    } catch (KeyManagementException e) {
-      LOG.error("KeyManagementException in creating http client instance", e);
-    } catch (NoSuchAlgorithmException e) {
-      LOG.error("NoSuchAlgorithmException in creating http client instance", e);
-    } catch (KeyStoreException e) {
-      LOG.error("KeyStoreException in creating http client instance", e);
+    } catch (KeyManagementException kme) {
+      LOG.error("KeyManagementException in creating http client instance", kme);
+      throw kme;
+    } catch (NoSuchAlgorithmException nsae) {
+      LOG.error("NoSuchAlgorithmException in creating http client instance",
+          nsae);
+      throw nsae;
+    } catch (KeyStoreException kse) {
+      LOG.error("KeyStoreException in creating http client instance", kse);
+      throw kse;
     }
     return httpClient;
   }
@@ -142,6 +148,12 @@ public class SolrHttpClient {
       if (statusCode == 200) {
         entityResponse = EntityUtils.toString(response.getEntity());
       }
+    } catch (NoSuchAlgorithmException nsae) {
+      throw new RuntimeException(nsae);
+    } catch (KeyStoreException kse) {
+      throw new RuntimeException(kse);
+    } catch (KeyManagementException kme) {
+      throw new RuntimeException(kme);
     }
     return entityResponse;
   }
