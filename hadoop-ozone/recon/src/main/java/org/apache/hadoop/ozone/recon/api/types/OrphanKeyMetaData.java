@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OrphanKeyMetaDataProto;
 
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,15 +31,10 @@ import java.util.stream.Collectors;
 public class OrphanKeyMetaData {
   private Set<Long> objectIds;
   private Long status;
-  private String volumeName;
-  private String bucketName;
 
-  public OrphanKeyMetaData(Set<Long> objectIds, Long status, String volumeName,
-                           String bucketName) {
+  public OrphanKeyMetaData(Set<Long> objectIds, Long status) {
     this.objectIds = objectIds;
     this.status = status;
-    this.volumeName = volumeName;
-    this.bucketName = bucketName;
   }
 
   public Set<Long> getObjectIds() {
@@ -59,33 +53,15 @@ public class OrphanKeyMetaData {
     this.status = status;
   }
 
-  public String getVolumeName() {
-    return volumeName;
-  }
-
-  public void setVolumeName(String volumeName) {
-    this.volumeName = volumeName;
-  }
-
-  public String getBucketName() {
-    return bucketName;
-  }
-
-  public void setBucketName(String bucketName) {
-    this.bucketName = bucketName;
-  }
-
   public static OrphanKeyMetaData fromProto(
       OrphanKeyMetaDataProto proto) {
     return new OrphanKeyMetaData(proto.getObjectIdList().stream().collect(
-        Collectors.toSet()), proto.getStatus(),
-        proto.getVolumeName(), proto.getBucketName());
+        Collectors.toSet()), proto.getStatus()
+    );
   }
 
   public OrphanKeyMetaDataProto toProto() {
     return OrphanKeyMetaDataProto.newBuilder().addAllObjectId(objectIds)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
         .setStatus(status).build();
   }
 
@@ -99,13 +75,11 @@ public class OrphanKeyMetaData {
     }
     OrphanKeyMetaData that = (OrphanKeyMetaData) o;
     return Objects.equals(objectIds, that.objectIds) &&
-        Objects.equals(status, that.status) &&
-        Objects.equals(volumeName, that.volumeName) &&
-        Objects.equals(bucketName, that.bucketName);
+        Objects.equals(status, that.status);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(objectIds, status, volumeName, bucketName);
+    return Objects.hash(objectIds, status);
   }
 }

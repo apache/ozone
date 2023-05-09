@@ -41,9 +41,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
@@ -230,6 +232,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         return false;
       }
 
+      Set<Long> bucketObjIdSet = new HashSet<>();
+      buildBucketObjIdSet(omMetadataManager, bucketObjIdSet);
+
       List<Long> orphanMetaDataKeyList = new ArrayList<>();
       LOG.info("Starting to verify orphan key candidates...");
       // If any deleted directory is present as parent key in
@@ -240,17 +245,15 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       if (removeDeletedDirEntries(omMetadataManager, orphanMetaDataKeyList)) {
         return false;
       }
-      if (!deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
+      if (!batchDeleteAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
         return false;
       }
       // Verify if child keys for left out parents are really orphans or
       // their parents are bucket objects.
-      List<Long> bucketObjectIds = new ArrayList<>();
-      if (verifyOrphanParentsForBucket(omMetadataManager, bucketObjectIds)) {
+      if (verifyOrphanParentsForBucket(bucketObjIdSet, orphanMetaDataKeyList)) {
         return false;
       }
-
-      if (!deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
+      if (!batchDeleteAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
         return false;
       }
       LOG.info("Completed verification of orphan key candidates.");
@@ -272,6 +275,22 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
+  private static void buildBucketObjIdSet(OMMetadataManager omMetadataManager,
+                                Set<Long> bucketObjIdSet) throws IOException {
+    Table<String, OmBucketInfo> bucketTable =
+        omMetadataManager.getBucketTable();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
+            bucketTableIter = bucketTable.iterator()) {
+      while (bucketTableIter.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> bucketInfoKeyValue
+            = bucketTableIter.next();
+        OmBucketInfo bucketInfo = bucketInfoKeyValue.getValue();
+        bucketObjIdSet.add(bucketInfo.getObjectID());
+      }
+    }
+  }
+
   private boolean removeDeletedDirEntries(OMMetadataManager omMetadataManager,
                             List<Long> orphanMetaDataKeyList)
       throws IOException {
@@ -284,7 +303,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         OmKeyInfo omKeyInfo = kv.getValue();
         orphanMetaDataKeyList.add(omKeyInfo.getObjectID());
-        if (!checkOrphanDataAndCallDeleteFlushToDB(orphanMetaDataKeyList)) {
+        if (!checkOrphanDataThresholdAndAddToDeleteBatch(
+            orphanMetaDataKeyList)) {
           return true;
         }
       }

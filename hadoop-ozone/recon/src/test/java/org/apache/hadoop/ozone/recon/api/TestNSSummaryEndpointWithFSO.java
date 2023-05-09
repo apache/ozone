@@ -732,6 +732,7 @@ public class TestNSSummaryEndpointWithFSO {
    * Write directories and keys info into OM DB.
    * @throws Exception
    */
+  @SuppressWarnings("methodlength")
   private void populateOMDB() throws Exception {
     // write all directories
     writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
@@ -1370,7 +1371,7 @@ public class TestNSSummaryEndpointWithFSO {
   public void testOrphanKeys() throws IOException {
     try (TableIterator<Long, ? extends Table.KeyValue<Long, OrphanKeyMetaData>>
         orphanTableIter = this.orphanKeysMetaDataTable.iterator()) {
-      while(orphanTableIter.hasNext()) {
+      while (orphanTableIter.hasNext()) {
         Table.KeyValue<Long, OrphanKeyMetaData> keyValue =
             orphanTableIter.next();
         Long key = keyValue.getKey();

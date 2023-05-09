@@ -354,7 +354,7 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
-  protected boolean deleteFlushAndCommitOrphanKeysMetaDataToDB(
+  protected boolean batchDeleteAndCommitOrphanKeysMetaDataToDB(
       List<Long> orphanKeysParentIdList) {
     try {
       deleteOrphanKeysMetaDataFromDB(orphanKeysParentIdList);
@@ -366,12 +366,12 @@ public class NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  protected boolean checkOrphanDataAndCallDeleteFlushToDB(
+  protected boolean checkOrphanDataThresholdAndAddToDeleteBatch(
       List<Long> orphanKeysParentIdList) {
     // if map contains more than entries, flush to DB and clear the map
     if (null != orphanKeysParentIdList && orphanKeysParentIdList.size() >=
         orphanKeysFlushToDBMaxThreshold) {
-      return deleteFlushAndCommitOrphanKeysMetaDataToDB(orphanKeysParentIdList);
+      return batchDeleteAndCommitOrphanKeysMetaDataToDB(orphanKeysParentIdList);
     }
     return true;
   }
@@ -401,19 +401,14 @@ public class NSSummaryTaskDbEventHandler {
       Set<Long> objectIds = new HashSet<>();
       objectIds.add(objectID);
       OrphanKeyMetaData orphanKeyMetaData =
-          new OrphanKeyMetaData(objectIds, status, "", "");
-      if (fileDirObjInfo instanceof OmKeyInfo) {
-        OmKeyInfo keyInfo = (OmKeyInfo) fileDirObjInfo;
-        orphanKeyMetaData =
-            new OrphanKeyMetaData(objectIds, status, keyInfo.getVolumeName(),
-                keyInfo.getBucketName());
-      }
+          new OrphanKeyMetaData(objectIds, status);
       orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
     }
   }
 
   protected boolean verifyOrphanParentsForBucket(
-      OMMetadataManager omMetadataManager, List<Long> bucketObjectIds)
+      Set<Long> bucketObjectIdsSet,
+      List<Long> toBeDeletedBucketObjectIdsFromOrphanMap)
       throws IOException {
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
         OrphanKeyMetaData>> orphanKeysMetaDataIter =
@@ -422,14 +417,10 @@ public class NSSummaryTaskDbEventHandler {
         Table.KeyValue<Long, OrphanKeyMetaData> keyValue =
             orphanKeysMetaDataIter.next();
         Long parentId = keyValue.getKey();
-        OrphanKeyMetaData value = keyValue.getValue();
-        String volumeName = value.getVolumeName();
-        String bucketName = value.getBucketName();
-        OmBucketInfo bucketInfo =
-            getBucketInfo(volumeName, bucketName, omMetadataManager);
-        if (null != bucketInfo && parentId == bucketInfo.getObjectID()) {
-          bucketObjectIds.add(parentId);
-          if (!checkOrphanDataAndCallDeleteFlushToDB(bucketObjectIds)) {
+        if (bucketObjectIdsSet.contains(parentId)) {
+          toBeDeletedBucketObjectIdsFromOrphanMap.add(parentId);
+          if (!checkOrphanDataThresholdAndAddToDeleteBatch(
+              toBeDeletedBucketObjectIdsFromOrphanMap)) {
             return true;
           }
         }
