@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -73,13 +74,16 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
@@ -118,6 +122,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -135,6 +140,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private MetricsProxyEndpoint metricsProxyEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
+  private ContainerSizeCountTask containerSizeCountTask;
   private TableCountTask tableCountTask;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
@@ -146,6 +152,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -230,27 +237,31 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
             .build();
 
+    reconScm = (ReconStorageContainerManagerFacade)
+        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     Configuration sqlConfiguration =
         reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
-        fileCountBySizeDao, utilizationSchemaDefinition);
+        fileCountBySizeDao,
+        containerCountBySizeDao,
+        utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
     tableCountTask = new TableCountTask(
         globalStatsDao, sqlConfiguration, reconOMMetadataManager);
-    reconScm = (ReconStorageContainerManagerFacade)
-        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, globalStatsDao,
             containerHealthSchemaManager);
+    containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
@@ -752,6 +763,53 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
+  }
+
+  @Test
+  public void testGetContainerCounts() throws Exception {
+    // Mock container info objects with different sizes
+    ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
+    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+
+    ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
+    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+
+    // Create a list of container info objects
+    List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo1);
+    containers.add(omContainerInfo2);
+
+    // Process the list of containers through the container size count task
+    containerSizeCountTask.process(containers);
+
+    // Test fetching all container counts
+    Response response = utilizationEndpoint.getContainerCounts(0L);
+    List<ContainerCountBySize> resultSet =
+        (List<ContainerCountBySize>) response.getEntity();
+
+    assertEquals(2, resultSet.size());
+    // The UpperBound Stored for 1.5GB in the table is 2147483648L
+    assertTrue(resultSet.stream().anyMatch(o -> o.getContainerSize() ==
+        2147483648L && o.getCount() == 1L));
+    // The UpperBound Stored for 2.5GB in the table is 4294967296L
+    assertTrue(resultSet.stream().anyMatch(o -> o.getContainerSize() ==
+        4294967296L && o.getCount() == 1L));
+
+    // Test fetching a specific container size (1.5GB)
+    response = utilizationEndpoint.getContainerCounts(1500000000L);
+    resultSet = (List<ContainerCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    // The UpperBound Stored for 1.5GB is 2147483648L (2GB)
+    assertEquals(2147483648L, resultSet.get(0).getContainerSize());
+    assertEquals(1, resultSet.get(0).getCount());
+
+    // Test fetching non-existent container size
+    response = utilizationEndpoint.getContainerCounts(8192L);
+    resultSet = (List<ContainerCountBySize>) response.getEntity();
+    assertTrue(resultSet.isEmpty());
+
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

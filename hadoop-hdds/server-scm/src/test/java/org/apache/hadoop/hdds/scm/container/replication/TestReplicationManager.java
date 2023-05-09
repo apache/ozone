@@ -186,6 +186,27 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testPendingOpsClearedWhenStarting() {
+    containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
+        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+    containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
+        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+    Assert.assertEquals(1, containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
+    Assert.assertEquals(1, containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE));
+
+    // Registers against serviceManager and notifies the status has changed.
+    enableProcessAll();
+
+    // Pending ops should be cleared.
+    Assert.assertEquals(0, containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
+    Assert.assertEquals(0, containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE));
+  }
+
+  @Test
   public void testOpenContainerSkipped() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.OPEN);

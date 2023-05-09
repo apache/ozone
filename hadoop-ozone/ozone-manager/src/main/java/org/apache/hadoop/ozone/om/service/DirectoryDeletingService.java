@@ -128,7 +128,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     @Override
-    public BackgroundTaskResult call() throws Exception {
+    public BackgroundTaskResult call() {
       if (shouldRun()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
@@ -141,6 +141,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
+
+        // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
         try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -179,6 +181,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
         }
+        // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
+        //  in finally block
       }
 
       // place holder by returning empty results of this call back.

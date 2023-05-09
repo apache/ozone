@@ -4072,6 +4072,10 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(expectedCount,
         omKeyInfo.getKeyLocationVersions().size());
 
+    // ensure flush double buffer for deleted Table
+    cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
+        .awaitDoubleBufferFlush();
+
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = cluster.getOzoneManager().getMetadataManager().getDeletedTable()

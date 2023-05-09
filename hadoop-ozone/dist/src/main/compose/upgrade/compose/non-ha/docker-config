@@ -40,3 +40,7 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+# Does not take effect on Ozone versions < 1.4.0
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

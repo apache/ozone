@@ -47,7 +47,6 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
 
-
 /**
  * This class tests OMSnapshotDeleteResponse.
  */
@@ -94,6 +93,8 @@ public class TestOMSnapshotDeleteResponse {
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Prepare the table, write an entry with SnapshotCreate
+    OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
+        omMetadataManager, volumeName, bucketName);
     OMSnapshotCreateResponse omSnapshotCreateResponse =
         new OMSnapshotCreateResponse(OMResponse.newBuilder()
             .setCmdType(Type.CreateSnapshot)
