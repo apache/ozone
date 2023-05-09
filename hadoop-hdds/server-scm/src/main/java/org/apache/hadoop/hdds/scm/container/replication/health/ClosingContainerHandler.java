@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -57,7 +58,7 @@ public class ClosingContainerHandler extends AbstractCheck {
   public boolean handle(ContainerCheckRequest request) {
     ContainerInfo containerInfo = request.getContainerInfo();
 
-    if (containerInfo.getState() != HddsProtos.LifeCycleState.CLOSING) {
+    if (containerInfo.getState() != LifeCycleState.CLOSING) {
       return false;
     }
     LOG.debug("Checking container {} in ClosingContainerHandler",
@@ -96,17 +97,19 @@ public class ClosingContainerHandler extends AbstractCheck {
      * time.
      */
 
-    final long waitTime = replicationManager.getConfig().getInterval() * 5;
-    final long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
+
     final Optional<ContainerInfo> emptyContainer = Optional.of(containerInfo)
         .filter(c -> c.getReplicationType().equals(ReplicationType.RATIS))
         .filter(c -> request.getContainerReplicas().isEmpty())
         .filter(c -> c.getNumberOfKeys() == 0)
-        .filter(c -> (Time.now() - closingTime) > waitTime);
+        .filter(c -> {
+          long waitTime = replicationManager.getConfig().getInterval() * 5;
+          long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
+          return (Time.now() - closingTime) > waitTime;
+        });
 
     emptyContainer.ifPresent(c -> replicationManager.updateContainerState(
-        c.containerID(), HddsProtos.LifeCycleEvent.CLOSE));
-
+        c.containerID(), LifeCycleEvent.CLOSE));
     return true;
   }
 }

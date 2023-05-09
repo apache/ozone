@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -38,6 +39,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -62,6 +64,9 @@ public class TestClosingContainerHandler {
   @BeforeEach
   public void setup() {
     replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig()).thenReturn(
+        new OzoneConfiguration().getObject(
+            ReplicationManager.ReplicationManagerConfiguration.class));
     closingContainerHandler = new ClosingContainerHandler(replicationManager);
   }
 
@@ -208,6 +213,31 @@ public class TestClosingContainerHandler {
         Assertions.assertEquals(0L, v);
       }
     });
+  }
+
+  @Test
+  public void testEmptyContainerInClosingState() throws InterruptedException {
+    /*
+     * Empty Container in CLOSING state should be CLOSED after
+     * a timeout (ReplicationManager Interval * 5)
+     */
+    replicationManager.getConfig().setInterval(Duration.ofSeconds(1));
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    ReplicationManagerReport report = new ReplicationManagerReport();
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    Thread.sleep(Duration.ofSeconds(5).toMillis());
+    assertAndVerify(request, true, 0);
+    Mockito.verify(replicationManager, Mockito.times(1))
+        .updateContainerState(containerInfo.containerID(),
+            HddsProtos.LifeCycleEvent.CLOSE);
   }
 
   /**
