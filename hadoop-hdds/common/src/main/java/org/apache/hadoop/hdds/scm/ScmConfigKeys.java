@@ -36,6 +36,10 @@ public final class ScmConfigKeys {
   // performance.
   public static final String OZONE_SCM_DB_DIRS = "ozone.scm.db.dirs";
 
+  // SCM DB directory permission
+  public static final String OZONE_SCM_DB_DIRS_PERMISSIONS =
+      "ozone.scm.db.dirs.permissions";
+
   public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
       = "dfs.container.ratis.enabled";
   public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
@@ -212,6 +216,8 @@ public final class ScmConfigKeys {
       "hdds.rest.http-address";
   public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
+  public static final String HDDS_DATANODE_DIR_PERMISSION =
+      "hdds.datanode.dir.perm";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =

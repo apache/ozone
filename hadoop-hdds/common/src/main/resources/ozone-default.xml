@@ -683,6 +683,14 @@
       dfs.container.ratis.datanode.storage.dir be configured separately.
     </description>
   </property>
+  <property>
+    <name>ozone.om.db.dirs.permissions</name>
+    <value>700</value>
+    <description>
+      Permissions for the metadata directories for Ozone Manager The
+      permissions can either be octal or symbolic.
+    </description>
+  </property>
 
   <property>
     <name>ozone.metastore.rocksdb.statistics</name>
@@ -718,6 +726,14 @@
       If undefined, then the SCM will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.db.dirs.permissions</name>
+    <value>700</value>
+    <description>
+      Permissions for the metadata directories for Storage Container Manager The
+      permissions can either be octal or symbolic.
     </description>
   </property>
   <property>
@@ -2765,6 +2781,14 @@
       If undefined, then the Recon will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.db.dir.perm</name>
+    <value>700</value>
+    <description>
+      Permissions for the metadata directories for Recon The
+      permissions can either be octal or symbolic.
     </description>
   </property>
   <property>

@@ -31,6 +31,8 @@ public final class ReconConfigKeys {
   }
 
   public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
+  // Recon DB directory permission
+  public static final String RECON_DB_DIR = "ozone.recon.db.dir.perm";
 
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
