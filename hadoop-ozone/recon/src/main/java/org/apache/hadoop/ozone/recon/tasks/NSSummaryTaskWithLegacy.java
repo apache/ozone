@@ -124,23 +124,27 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
           switch (action) {
           case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
+                new HashMap<>(), 1L);
             break;
 
           case DELETE:
-            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, new HashMap<>(),
+                1L);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               setKeyParentID(oldKeyInfo);
-              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, new HashMap<>(),
+                  1L);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                   updatedKey);
             }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
+                new HashMap<>(), 1L);
             break;
 
           default:
@@ -168,22 +172,25 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           switch (action) {
           case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null, 1L);
             break;
 
           case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap,
+                new HashMap<>(), 1L);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap,
+                  new HashMap<>(), 1L);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                   updatedKey);
             }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
+                new HashMap<>(), 1L);
             break;
 
           default:
@@ -249,9 +256,10 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                     .setObjectID(keyInfo.getObjectID())
                     .setParentObjectID(keyInfo.getParentObjectID())
                     .build();
-            handlePutDirEvent(directoryInfo, nsSummaryMap);
+            handlePutDirEvent(directoryInfo, nsSummaryMap, null, 0L);
           } else {
-            handlePutKeyEvent(keyInfo, nsSummaryMap);
+            handlePutKeyEvent(keyInfo, nsSummaryMap, null,
+                0L);
           }
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;

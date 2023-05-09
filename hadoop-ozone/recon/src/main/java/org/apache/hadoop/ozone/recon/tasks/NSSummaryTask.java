@@ -113,7 +113,7 @@ public class NSSummaryTask implements ReconOmTask {
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
-      reconNamespaceSummaryManager.clearOrphanKeysMetaDataTable();
+      reconNamespaceSummaryManager.clearOrphanKeyMetaDataTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ",
           ioEx);

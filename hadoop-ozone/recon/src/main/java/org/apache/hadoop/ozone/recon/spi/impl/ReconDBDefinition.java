@@ -26,10 +26,10 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
-import org.apache.hadoop.ozone.recon.codec.OrphanKeyMetaDataSetCodec;
+import org.apache.hadoop.ozone.recon.codec.OrphanKeyMetaDataCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 
 /**
@@ -98,13 +98,13 @@ public class ReconDBDefinition implements DBDefinition {
           new ContainerReplicaHistoryListCodec());
 
   public static final DBColumnFamilyDefinition
-      <Long, OrphanKeysMetaDataSet> ORPHAN_KEYS_METADATA =
-      new DBColumnFamilyDefinition<Long, OrphanKeysMetaDataSet>(
+      <Long, OrphanKeyMetaData> ORPHAN_KEYS_METADATA =
+      new DBColumnFamilyDefinition<Long, OrphanKeyMetaData>(
           "orphan_keys_metadata",
           Long.class,
           new LongCodec(),
-          OrphanKeysMetaDataSet.class,
-          new OrphanKeyMetaDataSetCodec());
+          OrphanKeyMetaData.class,
+          new OrphanKeyMetaDataCodec());
 
   @Override
   public String getName() {

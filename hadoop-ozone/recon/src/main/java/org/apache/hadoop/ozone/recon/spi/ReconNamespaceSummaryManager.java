@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 
 import java.io.IOException;
 
@@ -47,17 +47,17 @@ public interface ReconNamespaceSummaryManager {
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException;
 
-  void batchStoreOrphanKeysMetaData(BatchOperation batch, long objectId,
-                                    OrphanKeysMetaDataSet orphanKeysMetaDataSet)
+  void batchStoreOrphanKeyMetaData(BatchOperation batch, long objectId,
+                                   OrphanKeyMetaData orphanKeyMetaData)
       throws IOException;
 
-  OrphanKeysMetaDataSet getOrphanKeysMetaDataSet(long objectId)
+  OrphanKeyMetaData getOrphanKeyMetaData(long objectId)
       throws IOException;
 
-  void deleteOrphanKeysMetaDataSet(long objectId) throws IOException;
+  void deleteOrphanKeyMetaDataSet(long objectId) throws IOException;
 
-  void clearOrphanKeysMetaDataTable() throws IOException;
+  void clearOrphanKeyMetaDataTable() throws IOException;
 
-  void batchDeleteOrphanKeysMetaData(BatchOperation batch, long objectId)
+  void batchDeleteOrphanKeyMetaData(BatchOperation batch, long objectId)
       throws IOException;
 }

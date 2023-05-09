@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
@@ -62,7 +61,7 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private DBStore reconDbStore;
-  private final Table<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataTable;
+  private final Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
@@ -114,19 +113,17 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void writeOrphanKeysMetaDataToDB(
-      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap, long status)
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      orphanKeysMetaDataSetMap.keySet().forEach((Long key) -> {
+      orphanKeyMetaDataMap.keySet().forEach((Long key) -> {
         try {
-          OrphanKeysMetaDataSet orphanKeysMetaDataSet =
-              orphanKeysMetaDataSetMap.get(key);
-          orphanKeysMetaDataSet.getSet().forEach(orphanKeyMetaData -> {
-            orphanKeyMetaData.setStatus(status);
-          });
-          reconNamespaceSummaryManager.batchStoreOrphanKeysMetaData(
+          OrphanKeyMetaData orphanKeyMetaData =
+              orphanKeyMetaDataMap.get(key);
+          orphanKeyMetaData.setStatus(status);
+          reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
               rdbBatchOperation,
-              key, orphanKeysMetaDataSet);
+              key, orphanKeyMetaData);
         } catch (IOException e) {
           LOG.error("Unable to write orphan keys meta data in Recon DB.",
               e);
@@ -136,8 +133,10 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
-  protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap) throws IOException {
+  protected void handlePutKeyEvent(
+      OmKeyInfo keyInfo, Map<Long, NSSummary> nsSummaryMap,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
@@ -145,10 +144,18 @@ public class NSSummaryTaskDbEventHandler {
       // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
+    removeFromOrphanIfExists(keyInfo, orphanKeyMetaDataMap);
     if (nsSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
       nsSummary = new NSSummary();
+      // file might probably be present in bucket or directory,
+      // however add as probable orphan.
+      addOrphanCandidate(keyInfo, orphanKeyMetaDataMap,
+          status, false);
+    } else {
+      addOrphanCandidate(keyInfo, orphanKeyMetaDataMap,
+          status, true);
     }
     int numOfFile = nsSummary.getNumOfFiles();
     long sizeOfFile = nsSummary.getSizeOfFiles();
@@ -163,13 +170,16 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
-  protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
-                                   Map<Long, NSSummary> nsSummaryMap)
+  protected void handlePutDirEvent(OmDirectoryInfo omDirectoryInfo,
+                                   Map<Long, NSSummary> nsSummaryMap,
+                                   Map<Long, OrphanKeyMetaData>
+                                       orphanKeyMetaDataMap,
+                                   long status)
       throws IOException {
-    long parentObjectId = directoryInfo.getParentObjectID();
-    long objectId = directoryInfo.getObjectID();
+    long parentObjectId = omDirectoryInfo.getParentObjectID();
+    long objectId = omDirectoryInfo.getObjectID();
     // write the dir name to the current directory
-    String dirName = directoryInfo.getName();
+    String dirName = omDirectoryInfo.getName();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary curNSSummary = nsSummaryMap.get(objectId);
     if (curNSSummary == null) {
@@ -183,25 +193,40 @@ public class NSSummaryTaskDbEventHandler {
     }
     curNSSummary.setDirName(dirName);
     nsSummaryMap.put(objectId, curNSSummary);
-
+    removeFromOrphanIfExists(omDirectoryInfo, orphanKeyMetaDataMap);
     // Write the child dir list to the parent directory
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
-    }
-    if (nsSummary == null) {
-      // If we don't have it locally and in the DB we create a new instance
-      // as this is a new ID
-      nsSummary = new NSSummary();
+      if (nsSummary == null) {
+        // If we don't have it locally and in the DB we create a new instance
+        // as this is a new ID
+        nsSummary = new NSSummary();
+        addOrphanCandidate(omDirectoryInfo, orphanKeyMetaDataMap,
+            status, false);
+      } else {
+        addOrphanCandidate(omDirectoryInfo, orphanKeyMetaDataMap,
+            status, true);
+      }
     }
     nsSummary.addChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
   }
 
-  protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
-                                      Map<Long, NSSummary> nsSummaryMap)
+  private <T extends WithParentObjectId> void removeFromOrphanIfExists(
+      T fileDirInfo,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
+    long objectID = fileDirInfo.getObjectID();
+    orphanKeyMetaDataMap.remove(objectID);
+    reconNamespaceSummaryManager.deleteOrphanKeyMetaDataSet(objectID);
+  }
+
+  protected void handleDeleteKeyEvent(
+      OmKeyInfo keyInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
       throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
@@ -231,10 +256,14 @@ public class NSSummaryTaskDbEventHandler {
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+    addOrphanCandidate(keyInfo, orphanKeyMetaDataMap, status, true);
   }
 
-  protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
-                                      Map<Long, NSSummary> nsSummaryMap)
+  protected void handleDeleteDirEvent(
+      OmDirectoryInfo directoryInfo,
+      Map<Long, NSSummary> nsSummaryMap,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status)
       throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
@@ -253,6 +282,7 @@ public class NSSummaryTaskDbEventHandler {
 
     nsSummary.removeChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
+    addOrphanCandidate(directoryInfo, orphanKeyMetaDataMap, status, true);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
@@ -277,10 +307,10 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected boolean writeFlushAndCommitOrphanKeysMetaDataToDB(
-      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap, long status) {
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status) {
     try {
-      writeOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap, status);
-      orphanKeysMetaDataSetMap.clear();
+      writeOrphanKeysMetaDataToDB(orphanKeyMetaDataMap, status);
+      orphanKeyMetaDataMap.clear();
     } catch (IOException e) {
       LOG.error("Unable to write orphan keys meta data in Recon DB.", e);
       return false;
@@ -289,12 +319,12 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected boolean checkOrphanDataAndCallWriteFlushToDB(
-      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap, long status) {
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status) {
     // if map contains more than entries, flush to DB and clear the map
-    if (null != orphanKeysMetaDataSetMap && orphanKeysMetaDataSetMap.size() >=
+    if (null != orphanKeyMetaDataMap && orphanKeyMetaDataMap.size() >=
         orphanKeysFlushToDBMaxThreshold) {
       return writeFlushAndCommitOrphanKeysMetaDataToDB(
-          orphanKeysMetaDataSetMap, status);
+          orphanKeyMetaDataMap, status);
     }
     return true;
   }
@@ -304,7 +334,7 @@ public class NSSummaryTaskDbEventHandler {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       orphanKeysParentIdList.forEach(parentId -> {
         try {
-          reconNamespaceSummaryManager.batchDeleteOrphanKeysMetaData(
+          reconNamespaceSummaryManager.batchDeleteOrphanKeyMetaData(
               rdbBatchOperation, parentId);
         } catch (IOException e) {
           LOG.error(
@@ -346,65 +376,55 @@ public class NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  protected <T extends WithParentObjectId> void buildOrphanCandidateSet(
+  private <T extends WithParentObjectId> void addOrphanCandidate(
       T fileDirObjInfo,
-      Map<Long, NSSummary> nsSummaryMap,
-      Map<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataSetMap, long status)
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status,
+      boolean parentExist)
       throws IOException {
     long objectID = fileDirObjInfo.getObjectID();
     long parentObjectID = fileDirObjInfo.getParentObjectID();
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectID);
-    if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectID);
-    }
-    if (null == nsSummary) {
-      OrphanKeysMetaDataSet orphanKeysMetaDataSet =
-          orphanKeysMetaDataSetMap.get(parentObjectID);
-      if (null == orphanKeysMetaDataSet) {
-        orphanKeysMetaDataSet =
-            reconNamespaceSummaryManager.getOrphanKeysMetaDataSet(
+    if (parentExist) {
+      OrphanKeyMetaData orphanKeyMetaData =
+          orphanKeyMetaDataMap.get(parentObjectID);
+      if (null == orphanKeyMetaData) {
+        orphanKeyMetaData =
+            reconNamespaceSummaryManager.getOrphanKeyMetaData(
                 parentObjectID);
       }
-      Set<OrphanKeyMetaData> orphanKeyMetaDataSet;
-      if (null == orphanKeysMetaDataSet) {
-        orphanKeyMetaDataSet = new HashSet<>();
-        orphanKeysMetaDataSet = new OrphanKeysMetaDataSet(orphanKeyMetaDataSet);
+      if (null != orphanKeyMetaData) {
+        Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
+        objectIds.add(objectID);
+        orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
       }
-      orphanKeyMetaDataSet = orphanKeysMetaDataSet.getSet();
+    } else {
+      Set<Long> objectIds = new HashSet<>();
+      objectIds.add(objectID);
       OrphanKeyMetaData orphanKeyMetaData =
-          new OrphanKeyMetaData(objectID, status, "", "");
+          new OrphanKeyMetaData(objectIds, status, "", "");
       if (fileDirObjInfo instanceof OmKeyInfo) {
         OmKeyInfo keyInfo = (OmKeyInfo) fileDirObjInfo;
         orphanKeyMetaData =
-            new OrphanKeyMetaData(objectID, status, keyInfo.getVolumeName(),
+            new OrphanKeyMetaData(objectIds, status, keyInfo.getVolumeName(),
                 keyInfo.getBucketName());
       }
-      orphanKeyMetaDataSet.add(orphanKeyMetaData);
-      orphanKeysMetaDataSetMap.put(parentObjectID, orphanKeysMetaDataSet);
-    } else {
-      orphanKeysMetaDataSetMap.remove(parentObjectID);
+      orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
     }
-    checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap, status);
   }
 
   protected boolean verifyOrphanParentsForBucket(
       OMMetadataManager omMetadataManager, List<Long> bucketObjectIds)
       throws IOException {
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
-        OrphanKeysMetaDataSet>> orphanKeysMetaDataIter =
+        OrphanKeyMetaData>> orphanKeysMetaDataIter =
              orphanKeysMetaDataTable.iterator()) {
       while (orphanKeysMetaDataIter.hasNext()) {
-        Table.KeyValue<Long, OrphanKeysMetaDataSet> keyValue =
+        Table.KeyValue<Long, OrphanKeyMetaData> keyValue =
             orphanKeysMetaDataIter.next();
         Long parentId = keyValue.getKey();
-        OrphanKeysMetaDataSet value = keyValue.getValue();
-        Set<OrphanKeyMetaData> orphanKeyMetaDataSet = value.getSet();
-        OrphanKeyMetaData orphanKeyMetaData = orphanKeyMetaDataSet.stream()
-            .filter(orphanKey -> !(orphanKey.getVolumeName().isEmpty()))
-            .findFirst().get();
-        String volumeName = orphanKeyMetaData.getVolumeName();
-        String bucketName = orphanKeyMetaData.getBucketName();
+        OrphanKeyMetaData value = keyValue.getValue();
+        String volumeName = value.getVolumeName();
+        String bucketName = value.getBucketName();
         OmBucketInfo bucketInfo =
             getBucketInfo(volumeName, bucketName, omMetadataManager);
         if (null != bucketInfo && parentId == bucketInfo.getObjectID()) {

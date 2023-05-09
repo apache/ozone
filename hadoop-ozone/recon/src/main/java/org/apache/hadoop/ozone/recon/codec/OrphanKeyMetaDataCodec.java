@@ -19,33 +19,33 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OrphanKeysMetaDataSetProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 
 import java.io.IOException;
 
 /**
  * Codec for OrphanKeyMetaDataSet.
  */
-public class OrphanKeyMetaDataSetCodec
-    implements Codec<OrphanKeysMetaDataSet> {
+public class OrphanKeyMetaDataCodec
+    implements Codec<OrphanKeyMetaData> {
 
   @Override
-  public byte[] toPersistedFormat(OrphanKeysMetaDataSet obj) {
+  public byte[] toPersistedFormat(OrphanKeyMetaData obj) {
     return obj.toProto().toByteArray();
   }
 
   @Override
-  public OrphanKeysMetaDataSet fromPersistedFormat(byte[] rawData)
+  public OrphanKeyMetaData fromPersistedFormat(byte[] rawData)
       throws IOException {
-    return OrphanKeysMetaDataSet.fromProto(
-        OrphanKeysMetaDataSetProto.parseFrom(rawData));
+    return OrphanKeyMetaData.fromProto(
+        HddsProtos.OrphanKeyMetaDataProto.parseFrom(rawData));
   }
 
   @Override
-  public OrphanKeysMetaDataSet copyObject(
-      OrphanKeysMetaDataSet obj) {
+  public OrphanKeyMetaData copyObject(
+      OrphanKeyMetaData obj) {
     return obj;
   }
 }

@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.slf4j.Logger;
@@ -50,7 +50,7 @@ public class OrphanKeyDetectionTask implements ReconOmTask {
       LoggerFactory.getLogger(OrphanKeyDetectionTask.class);
   private DBStore reconDbStore;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private final Table<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataTable;
+  private final Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 
   @Inject
   public OrphanKeyDetectionTask(
@@ -126,9 +126,9 @@ public class OrphanKeyDetectionTask implements ReconOmTask {
   private void handlePutDeleteDirEvent(OmKeyInfo updatedKeyInfo) {
     long objectID = updatedKeyInfo.getObjectID();
     try {
-      OrphanKeysMetaDataSet orphanKeysMetaDataSet =
+      OrphanKeyMetaData orphanKeyMetaData =
           orphanKeysMetaDataTable.get(objectID);
-      if (null != orphanKeysMetaDataSet) {
+      if (null != orphanKeyMetaData) {
         orphanKeysMetaDataTable.delete(objectID);
       }
     } catch (IOException e) {

@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
@@ -80,6 +83,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.ORPHAN_KEYS_METADATA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -115,6 +120,7 @@ public class TestNSSummaryEndpointWithFSO {
   private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
   private ReconDBProvider reconDBProvider;
+  private Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -126,10 +132,12 @@ public class TestNSSummaryEndpointWithFSO {
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
   private static final String VOL_TWO = "vol2";
+  private static final String VOL_THREE = "vol3";
   private static final String BUCKET_ONE = "bucket1";
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -141,6 +149,10 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String KEY_NINE = "dir5/file9";
   private static final String KEY_TEN = "dir5/file10";
   private static final String KEY_ELEVEN = "file11";
+  private static final String KEY_TWELVE = "dir6/dir7/file12";
+  private static final String KEY_THIRTEEN = "dir6/dir7/file13";
+  private static final String KEY_FOURTEEN = "dir6/dir7/dir8/file14";
+  private static final String KEY_FIFTEEN = "dir6/dir7/dir8/file15";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
 
@@ -155,12 +167,19 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
   private static final String FILE_ELEVEN = "file11";
+  private static final String FILE_TWELVE = "file12";
+  private static final String FILE_THIRTEEN = "file13";
+  private static final String FILE_FOURTEEN = "file14";
+  private static final String FILE_FIFTEEN = "file15";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
+  private static final String DIR_SIX = "dir6";
+  private static final String DIR_SEVEN = "dir7";
+  private static final String DIR_EIGHT = "dir8";
   // objects IDs
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
@@ -185,6 +204,15 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long DIR_SIX_OBJECT_ID = 22L;
+  private static final long DIR_SEVEN_OBJECT_ID = 23L;
+  private static final long DIR_EIGHT_OBJECT_ID = 24L;
+  private static final long VOL_THREE_OBJECT_ID = 25L;
+  private static final long KEY_TWELVE_OBJECT_ID = 26L;
+  private static final long KEY_THIRTEEN_OBJECT_ID = 27L;
+  private static final long KEY_FOURTEEN_OBJECT_ID = 28L;
+  private static final long KEY_FIFTEEN_OBJECT_ID = 29L;
+  private static final long BUCKET_FIVE_OBJECT_ID = 30L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -222,6 +250,10 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_TWELVE_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_THIRTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
+  private static final long KEY_FOURTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_FIFTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
@@ -309,10 +341,12 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long ROOT_QUOTA = 2 * (2 * OzoneConsts.MB);
   private static final long VOL_QUOTA = 2 * OzoneConsts.MB;
   private static final long VOL_TWO_QUOTA = 2 * OzoneConsts.MB;
+  private static final long VOL_THREE_QUOTA = 2 * OzoneConsts.MB;
   private static final long BUCKET_ONE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -353,6 +387,9 @@ public class TestNSSummaryEndpointWithFSO {
     ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
+    ozoneConfiguration.setLong(
+        OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD,
+        10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.newFolder());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -384,6 +421,8 @@ public class TestNSSummaryEndpointWithFSO {
             reconOMMetadataManager, ozoneConfiguration, reconDBProvider);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     commonUtils = new CommonUtils();
+    this.orphanKeysMetaDataTable =
+        ORPHAN_KEYS_METADATA.getTable(reconDBProvider.getDbStore());
   }
 
   @Test
@@ -711,6 +750,18 @@ public class TestNSSummaryEndpointWithFSO {
             BUCKET_THREE_OBJECT_ID, BUCKET_THREE_OBJECT_ID,
             VOL_TWO_OBJECT_ID, DIR_FIVE);
 
+    /*writeDirToOm(reconOMMetadataManager, DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID, DIR_SIX);*/
+
+    writeDirToOm(reconOMMetadataManager, DIR_SEVEN_OBJECT_ID,
+        DIR_SIX_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID, DIR_SEVEN);
+
+    writeDirToOm(reconOMMetadataManager, DIR_EIGHT_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID, DIR_EIGHT);
+
     // write all keys
     writeKeyToOm(reconOMMetadataManager,
           KEY_ONE,
@@ -822,11 +873,55 @@ public class TestNSSummaryEndpointWithFSO {
           VOL_TWO_OBJECT_ID,
           KEY_ELEVEN_SIZE,
           getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWELVE,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_TWELVE,
+        KEY_TWELVE_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THIRTEEN,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_THIRTEEN,
+        KEY_THIRTEEN_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_THIRTEEN_SIZE,
+        getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FOURTEEN,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_FOURTEEN,
+        KEY_FOURTEEN_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_FOURTEEN_SIZE,
+        getBucketLayout());
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FIFTEEN,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_FIFTEEN,
+        KEY_FIFTEEN_OBJECT_ID,
+        DIR_EIGHT_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_FIFTEEN_SIZE,
+        getBucketLayout());
   }
 
   /**
-   * Create a new OM Metadata manager instance with one user, one vol, and two
-   * buckets.
+   * Create a new OM Metadata manager instance with one user, three vol,
+   * and five buckets.
    * @throws IOException ioEx
    */
   private static OMMetadataManager initializeNewOmMetadataManager(
@@ -858,8 +953,19 @@ public class TestNSSummaryEndpointWithFSO {
             .setQuotaInBytes(VOL_TWO_QUOTA)
             .build();
 
+    String volume3Key = omMetadataManager.getVolumeKey(VOL_THREE);
+    OmVolumeArgs args3 =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOL_THREE_OBJECT_ID)
+            .setVolume(VOL_THREE)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .setQuotaInBytes(VOL_THREE_QUOTA)
+            .build();
+
     omMetadataManager.getVolumeTable().put(volumeKey, args);
     omMetadataManager.getVolumeTable().put(volume2Key, args2);
+    omMetadataManager.getVolumeTable().put(volume3Key, args3);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(VOL)
@@ -893,6 +999,14 @@ public class TestNSSummaryEndpointWithFSO {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_THREE)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
             bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -901,11 +1015,14 @@ public class TestNSSummaryEndpointWithFSO {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }
@@ -1247,5 +1364,19 @@ public class TestNSSummaryEndpointWithFSO {
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
         ROOT_QUOTA - ROOT_DATA_SIZE);
+  }
+
+  @Test
+  public void testOrphanKeys() throws IOException {
+    try (TableIterator<Long, ? extends Table.KeyValue<Long, OrphanKeyMetaData>>
+        orphanTableIter = this.orphanKeysMetaDataTable.iterator()) {
+      while(orphanTableIter.hasNext()) {
+        Table.KeyValue<Long, OrphanKeyMetaData> keyValue =
+            orphanTableIter.next();
+        Long key = keyValue.getKey();
+        OrphanKeyMetaData value = keyValue.getValue();
+        Set<Long> objectIds = value.getObjectIds();
+      }
+    }
   }
 }

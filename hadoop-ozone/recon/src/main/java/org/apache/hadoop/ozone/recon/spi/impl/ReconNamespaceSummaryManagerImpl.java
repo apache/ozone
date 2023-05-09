@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.api.types.OrphanKeysMetaDataSet;
+import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 import javax.inject.Inject;
@@ -40,7 +40,7 @@ public class ReconNamespaceSummaryManagerImpl
         implements ReconNamespaceSummaryManager {
 
   private Table<Long, NSSummary> nsSummaryTable;
-  private Table<Long, OrphanKeysMetaDataSet> orphanKeysMetaDataTable;
+  private Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
   private DBStore namespaceDbStore;
 
   @Inject
@@ -87,32 +87,32 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
-  public void batchStoreOrphanKeysMetaData(
+  public void batchStoreOrphanKeyMetaData(
       BatchOperation batch, long objectId,
-      OrphanKeysMetaDataSet orphanKeysMetaDataSet)
+      OrphanKeyMetaData orphanKeyMetaData)
       throws IOException {
     orphanKeysMetaDataTable.putWithBatch(batch, objectId,
-        orphanKeysMetaDataSet);
+        orphanKeyMetaData);
   }
 
   @Override
-  public OrphanKeysMetaDataSet getOrphanKeysMetaDataSet(long objectId)
+  public OrphanKeyMetaData getOrphanKeyMetaData(long objectId)
       throws IOException {
     return orphanKeysMetaDataTable.get(objectId);
   }
 
   @Override
-  public void deleteOrphanKeysMetaDataSet(long objectId) throws IOException {
+  public void deleteOrphanKeyMetaDataSet(long objectId) throws IOException {
     orphanKeysMetaDataTable.delete(objectId);
   }
 
   @Override
-  public void clearOrphanKeysMetaDataTable() throws IOException {
+  public void clearOrphanKeyMetaDataTable() throws IOException {
     truncateTable(orphanKeysMetaDataTable);
   }
 
   @Override
-  public void batchDeleteOrphanKeysMetaData(BatchOperation batch, long objectId)
+  public void batchDeleteOrphanKeyMetaData(BatchOperation batch, long objectId)
       throws IOException {
     orphanKeysMetaDataTable.deleteWithBatch(batch, objectId);
   }
