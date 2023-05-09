@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
@@ -30,14 +29,6 @@ public class ContainerDiscrepancyInfo {
 
   @JsonProperty("containerId")
   private long containerID;
-
-  @JsonProperty("omContainerState")
-  @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  private long omContainerState;
-
-  @JsonProperty("scmContainerState")
-  @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  private long scmContainerState;
 
   @JsonProperty("numberOfKeys")
   private long numberOfKeys;
@@ -66,22 +57,6 @@ public class ContainerDiscrepancyInfo {
 
   public void setNumberOfKeys(long numberOfKeys) {
     this.numberOfKeys = numberOfKeys;
-  }
-
-  public long getOmContainerState() {
-    return omContainerState;
-  }
-
-  public void setOmContainerState(long omContainerState) {
-    this.omContainerState = omContainerState;
-  }
-
-  public long getScmContainerState() {
-    return scmContainerState;
-  }
-
-  public void setScmContainerState(long scmContainerState) {
-    this.scmContainerState = scmContainerState;
   }
 
   public List<Pipeline> getPipelines() {
