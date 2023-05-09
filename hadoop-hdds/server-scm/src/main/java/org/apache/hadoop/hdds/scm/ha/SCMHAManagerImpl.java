@@ -112,9 +112,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
             .setServiceName("SCMHATransactionMonitor")
             .setIntervalInMillis(interval)
             .setWaitTimeInMillis(interval)
-            .setPeriodicalTask(() -> {
-              monitorTask.run();
-            }).build();
+            .setPeriodicalTask(monitorTask).build();
     scm.getSCMServiceManager().register(trxBufferMonitorService);
     trxBufferMonitorService.start();
   }

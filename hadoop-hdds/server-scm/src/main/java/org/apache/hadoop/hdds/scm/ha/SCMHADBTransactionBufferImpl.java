@@ -159,6 +159,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       }
       latestSnapshot = latestTrxInfo.toSnapshotInfo();
     } finally {
+      txFlushPending = 0;
+      lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
   }

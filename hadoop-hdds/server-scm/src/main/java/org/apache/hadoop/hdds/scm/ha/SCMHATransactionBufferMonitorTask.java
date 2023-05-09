@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
+import org.apache.ratis.statemachine.SnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,11 +51,18 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
       LOG.debug("Running TransactionFlushTask");
       // set latest snapshot to null for force snapshot
       // the value will be reset again when snapshot is taken
+      SnapshotInfo lastSnapshot = transactionBuffer.getLatestSnapshot();
       transactionBuffer.setLatestSnapshot(null);
       try {
         server.doSnapshotRequest();
       } catch (IOException e) {
         LOG.error("Snapshot request is failed", e);
+      } finally {
+        // under failure case, if unable to take snapshot, its value
+        // is reset to previous known value
+        if (null == transactionBuffer.getLatestSnapshot()) {
+          transactionBuffer.setLatestSnapshot(lastSnapshot);
+        }
       }
     }
   }
