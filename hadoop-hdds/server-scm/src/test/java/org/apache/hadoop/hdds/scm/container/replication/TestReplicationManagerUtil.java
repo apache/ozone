@@ -80,8 +80,8 @@ public class TestReplicationManagerUtil {
 
     // Take one of the replicas and set it to be removed. It should be on the
     // excluded list rather than the used list.
-    Set<DatanodeDetails> toBeRemoved = new HashSet<>();
-    toBeRemoved.add(remove.getDatanodeDetails());
+    Set<ContainerReplica> toBeRemoved = new HashSet<>();
+    toBeRemoved.add(remove);
 
     // Finally, add a pending add and delete. The add should go onto the used
     // list and the delete added to the excluded nodes.

@@ -110,7 +110,7 @@ public final class ReplicationManagerUtil {
    */
   public static ExcludedAndUsedNodes getExcludedAndUsedNodes(
       List<ContainerReplica> replicas,
-      Set<DatanodeDetails> toBeRemoved,
+      Set<ContainerReplica> toBeRemoved,
       List<ContainerReplicaOp> pendingReplicaOps,
       ReplicationManager replicationManager) {
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
@@ -123,7 +123,7 @@ public final class ReplicationManagerUtil {
         excludedNodes.add(r.getDatanodeDetails());
         continue;
       }
-      if (toBeRemoved.contains(r.getDatanodeDetails())) {
+      if (toBeRemoved.contains(r)) {
         // This node is currently present, but we plan to remove it so it is not
         // considered used, but must be excluded
         excludedNodes.add(r.getDatanodeDetails());
