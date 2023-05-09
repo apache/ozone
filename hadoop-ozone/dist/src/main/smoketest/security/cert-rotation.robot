@@ -26,15 +26,6 @@ ${port}        9859
 Setup Test
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-Test datanode functions before and after certificate rotation
-    Basic key generation and validation
-    ${sleepTime} =    Find wait time
-    ${certId1} =      Get datanode cert serial
-    Sleep	       ${sleepTime}
-    Basic key generation and validation
-    ${certId2} =        Get datanode cert serial
-    Should Not Be Equal     ${certId1}      ${certId2}
-
 Basic key generation and validation
     ${random} =   Generate Random String    10
     Freon OCKG    prefix=${random}
@@ -50,6 +41,11 @@ Get datanode cert serial
     [return]            ${certSerial}
 
 *** Test Cases ***
-Certificate rotation test
-    Test datanode functions before and after certificate rotation
-
+Test datanode functions before and after certificate rotation
+    Basic key generation and validation
+    ${sleepTime} =    Find wait time
+    ${certId1} =      Get datanode cert serial
+    Sleep	       ${sleepTime}
+    Basic key generation and validation
+    ${certId2} =        Get datanode cert serial
+    Should Not Be Equal     ${certId1}      ${certId2}
