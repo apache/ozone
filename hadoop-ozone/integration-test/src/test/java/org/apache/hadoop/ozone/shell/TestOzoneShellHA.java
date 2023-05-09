@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -69,6 +71,7 @@ import com.google.gson.internal.LinkedTreeMap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -1132,7 +1135,7 @@ public class TestOzoneShellHA {
 
   @Test
   public void testKeyDeleteOrSkipTrashWhenTrashEnableFSO()
-          throws UnsupportedEncodingException {
+      throws IOException {
     // Create 100 keys
     generateKeys("/volumefso1", "/bucket1",
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
@@ -1185,6 +1188,46 @@ public class TestOzoneShellHA {
     // Total number of keys now will be 99 as
     // 1 key deleted without trash
     Assert.assertEquals(99, getNumOfKeys());
+
+    final String username =
+        UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path current = new Path("Current");
+    Path userTrashCurrent = new Path(userTrash, current);
+
+    // Try to delete from trash path
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
+          + "/key4"};
+
+    out.reset();
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Total number of keys still remain 99 as
+    // delete from trash not allowed without --skipTrash
+    Assert.assertEquals(99, getNumOfKeys());
+
+    // Now try to delete from trash path with --skipTrash option
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
+          + "/key4", "--skipTrash"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Total number of keys now will be 98 as
+    // 1 key deleted without trash and 1 from the trash path
+    Assert.assertEquals(98, getNumOfKeys());
   }
 
   @Test
