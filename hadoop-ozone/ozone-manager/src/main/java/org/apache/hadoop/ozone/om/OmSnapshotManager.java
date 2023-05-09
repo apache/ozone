@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -372,15 +374,19 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Acquire deletedTable write lock
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
+    // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
     try {
       // Create DB checkpoint for snapshot
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
       // Clean up active DB's deletedTable right after checkpoint is taken,
       // with table write lock held
-      deleteKeysInSnapshotScopeFromDTableInternal(omMetadataManager,
+      deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-      // TODO: [SNAPSHOT] HDDS-8064. Clean up deletedDirTable as well
+      // Clean up deletedDirectoryTable as well
+      deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
     } finally {
+      // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
           .writeLock().unlock();
@@ -413,73 +419,153 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method to delete keys in the snapshot scope from active DB's
-   * deletedTable.
-   *
+   * Helper method to delete DB keys in the snapshot scope (bucket)
+   * from active DB's deletedDirectoryTable.
    * @param omMetadataManager OMMetadataManager instance
    * @param volumeName volume name
    * @param bucketName bucket name
    */
-  private static void deleteKeysInSnapshotScopeFromDTableInternal(
+  private static void deleteKeysFromDelDirTableInSnapshotScope(
       OMMetadataManager omMetadataManager,
       String volumeName,
       String bucketName) throws IOException {
 
     // Range delete start key (inclusive)
-    String beginKey =
-        omMetadataManager.getOzoneKey(volumeName, bucketName, "");
-
-    // Range delete end key (exclusive) to be found
+    final String beginKey = getOzonePathKeyWithVolumeBucketNames(
+        omMetadataManager, volumeName, bucketName);
+    // Range delete end key (exclusive). To be calculated
     String endKey;
 
-    // Start performance tracking timer
-    long startTime = System.nanoTime();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+         iter = omMetadataManager.getDeletedDirTable().iterator()) {
+      endKey = findEndKeyGivenPrefix(iter, beginKey);
+    }
+
+    // Clean up deletedDirectoryTable
+    deleteRangeInclusive(omMetadataManager.getDeletedDirTable(),
+        beginKey, endKey);
+  }
+
+  /**
+   * Helper method to generate /volumeId/bucketId/ DB key prefix from given
+   * volume name and bucket name as a prefix in FSO deletedDirectoryTable.
+   * Follows:
+   * {@link OmMetadataManagerImpl#getOzonePathKey(long, long, long, String)}.
+   * <p>
+   * Note: Currently, this is only intended to be a special use case in
+   * {@link OmSnapshotManager}. If this is used elsewhere, consider moving this
+   * to {@link OMMetadataManager}.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
+   */
+  @VisibleForTesting
+  public static String getOzonePathKeyWithVolumeBucketNames(
+      OMMetadataManager omMetadataManager,
+      String volumeName,
+      String bucketName) throws IOException {
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
+
+  /**
+   * Helper method to locate the end key with the given prefix and iterator.
+   * @param keyIter TableIterator
+   * @param keyPrefix DB key prefix String
+   * @return endKey String, or null if no keys with such prefix is found
+   */
+  private static String findEndKeyGivenPrefix(
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
+      String keyPrefix) throws IOException {
+
+    String endKey;
+    keyIter.seek(keyPrefix);
+    // Continue only when there are entries of snapshot (bucket) scope
+    // in deletedTable in the first place
+    if (!keyIter.hasNext()) {
+      // No key matching keyPrefix. No need to do delete or deleteRange at all.
+      endKey = null;
+    } else {
+      // Remember the last key with a matching prefix
+      endKey = keyIter.next().getKey();
+
+      // Loop until prefix mismatches.
+      // TODO: [SNAPSHOT] Try to seek to next predicted bucket name instead of
+      //  the while-loop for a potential speed up?
+      // Start performance tracking timer
+      long startTime = System.nanoTime();
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, ?> entry = keyIter.next();
+        String dbKey = entry.getKey();
+        if (dbKey.startsWith(keyPrefix)) {
+          endKey = dbKey;
+        }
+      }
+      // Time took for the iterator to finish (in ns)
+      long timeElapsed = System.nanoTime() - startTime;
+      if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
+        // Print time elapsed
+        LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
+            new Throwable().fillInStackTrace().getStackTrace()[1]
+                .getMethodName());
+      }
+    }
+    return endKey;
+  }
+
+  /**
+   * Helper method to do deleteRange on a table, including endKey.
+   * TODO: Move this into {@link Table} ?
+   * @param table Table
+   * @param beginKey begin key
+   * @param endKey end key
+   */
+  private static void deleteRangeInclusive(
+      Table<String, ?> table, String beginKey, String endKey)
+      throws IOException {
+
+    if (endKey != null) {
+      table.deleteRange(beginKey, endKey);
+      // Remove range end key itself
+      table.delete(endKey);
+    }
+  }
+
+  /**
+   * Helper method to delete DB keys in the snapshot scope (bucket)
+   * from active DB's deletedTable.
+   * @param omMetadataManager OMMetadataManager instance
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   */
+  private static void deleteKeysFromDelKeyTableInSnapshotScope(
+      OMMetadataManager omMetadataManager,
+      String volumeName,
+      String bucketName) throws IOException {
+
+    // Range delete start key (inclusive)
+    final String beginKey =
+        omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+    // Range delete end key (exclusive). To be found
+    String endKey;
 
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             keyIter = omMetadataManager.getDeletedTable().iterator()) {
-
-      keyIter.seek(beginKey);
-      // Continue only when there are entries of snapshot (bucket) scope
-      // in deletedTable in the first place
-      if (!keyIter.hasNext()) {
-        // Use null as a marker. No need to do deleteRange() at all.
-        endKey = null;
-      } else {
-        // Remember the last key with a matching prefix
-        endKey = keyIter.next().getKey();
-
-        // Loop until prefix mismatches.
-        // TODO: [SNAPSHOT] Try to seek next predicted bucket name (speed up?)
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
-          String dbKey = entry.getKey();
-          if (dbKey.startsWith(beginKey)) {
-            endKey = dbKey;
-          }
-        }
-      }
+             iter = omMetadataManager.getDeletedTable().iterator()) {
+      endKey = findEndKeyGivenPrefix(iter, beginKey);
     }
 
-    // Time took for the iterator to finish (in ns)
-    long timeElapsed = System.nanoTime() - startTime;
-    if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
-      // Print time elapsed
-      LOG.warn("Took {} ns to clean up deletedTable", timeElapsed);
-    }
+    // Clean up deletedTable
+    deleteRangeInclusive(omMetadataManager.getDeletedTable(), beginKey, endKey);
 
-    if (endKey != null) {
-      // Clean up deletedTable
-      omMetadataManager.getDeletedTable().deleteRange(beginKey, endKey);
-
-      // Remove range end key itself
-      omMetadataManager.getDeletedTable().delete(endKey);
-    }
-
-    // Note: We do not need to invalidate deletedTable cache since entries
-    // are not added to its table cache in the first place.
+    // No need to invalidate deletedTable (or deletedDirectoryTable) table
+    // cache since entries are not added to its table cache in the first place.
     // See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
-
+    //
     // This makes the table clean up efficient as we only need one
     // deleteRange() operation. No need to invalidate cache entries
     // one by one.
