@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SingleSCMSecurityProtocolProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -446,6 +447,16 @@ public final class HddsServerUtil {
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
+  }
+
+  /**
+   * Create a scm security client to interact with a specific SCM node.
+   */
+  public static SCMSecurityProtocolClientSideTranslatorPB
+      getScmSecurityClientSingleNode(ConfigurationSource conf, String scmNodeId,
+      UserGroupInformation ugi) throws IOException {
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        new SingleSCMSecurityProtocolProxyProvider(conf, ugi, scmNodeId));
   }
 
   public static SCMSecurityProtocolClientSideTranslatorPB

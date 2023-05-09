@@ -106,6 +106,10 @@ public final class SecretKeyStateImpl implements SecretKeyState {
    */
   @Override
   public void updateKeys(List<ManagedSecretKey> newKeys) {
+    updateKeysInternal(newKeys);
+  }
+
+  private void updateKeysInternal(List<ManagedSecretKey> newKeys) {
     LOG.info("Updating keys with {}", newKeys);
     lock.writeLock().lock();
     try {
@@ -126,5 +130,10 @@ public final class SecretKeyStateImpl implements SecretKeyState {
     } finally {
       lock.writeLock().unlock();
     }
+  }
+
+  @Override
+  public void reinitialize(List<ManagedSecretKey> secretKeys) {
+    updateKeysInternal(secretKeys);
   }
 }

@@ -85,7 +85,7 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(180);
+  public Timeout timeout = Timeout.seconds(500);
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;

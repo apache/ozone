@@ -21,12 +21,16 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -37,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.hdds.ExitManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -45,6 +50,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientSingleNode;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
@@ -64,6 +72,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
+  private final SecurityConfig securityConfig;
   private final DBTransactionBuffer transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
@@ -77,8 +86,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf,
+      final SecurityConfig securityConfig,
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
+    this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
@@ -186,6 +197,21 @@ public class SCMHAManagerImpl implements SCMHAManager {
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
         leaderId, dBCheckpoint.getCheckpointLocation());
     return dBCheckpoint;
+  }
+
+  @Override
+  public List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID)
+      throws IOException {
+    if (!SecretKeyManagerService.isSecretKeyEnable(securityConfig)) {
+      return null;
+    }
+
+    LOG.info("Getting secret keys from leader {}.", leaderID);
+    try (SCMSecurityProtocolClientSideTranslatorPB securityProtocol =
+             getScmSecurityClientSingleNode(conf, leaderID,
+                 UserGroupInformation.getLoginUser())) {
+      return securityProtocol.getAllSecretKeys();
+    }
   }
 
   @Override

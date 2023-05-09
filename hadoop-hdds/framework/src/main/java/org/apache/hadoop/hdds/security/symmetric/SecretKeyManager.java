@@ -143,6 +143,10 @@ public class SecretKeyManager implements SecretKeyClient {
     return state.getSortedKeys();
   }
 
+  public void reinitialize(List<ManagedSecretKey> secretKeys) {
+    state.reinitialize(secretKeys);
+  }
+
   private boolean shouldRotate(ManagedSecretKey currentKey) {
     Duration established = between(currentKey.getCreationTime(), Instant.now());
     return established.compareTo(rotationDuration) >= 0;

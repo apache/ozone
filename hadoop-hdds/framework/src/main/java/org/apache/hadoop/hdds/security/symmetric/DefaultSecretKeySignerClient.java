@@ -72,14 +72,16 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
 
   @Override
   public void stop() {
-    executorService.shutdown();
-    try {
-      if (executorService.awaitTermination(1, TimeUnit.MINUTES)) {
-        executorService.shutdownNow();
+    if (executorService != null) {
+      executorService.shutdown();
+      try {
+        if (executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while shutting down executor service.", e);
+        Thread.currentThread().interrupt();
       }
-    } catch (InterruptedException e) {
-      LOG.error("Interrupted while shutting down executor service.", e);
-      Thread.currentThread().interrupt();
     }
   }
 
