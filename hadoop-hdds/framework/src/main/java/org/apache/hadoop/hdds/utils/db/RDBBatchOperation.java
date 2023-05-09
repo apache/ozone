@@ -117,7 +117,7 @@ public class RDBBatchOperation implements BatchOperation {
 
     @Override
     public String toString() {
-      return array != null? bytes2String(array)
+      return array != null ? bytes2String(array)
           : bytes2String(asReadOnlyByteBuffer());
     }
   }
