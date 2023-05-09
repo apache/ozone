@@ -158,7 +158,7 @@ public class SstFilteringService extends BackgroundService
                       dbName, true, Optional.of(Boolean.TRUE), false)) {
             RocksDatabase db = rdbStore.getDb();
             try (BootstrapStateHandler.Lock lock =
-                getBoostrapStateLock().lock()) {
+                getBootstrapStateLock().lock()) {
               db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
             }
           }
@@ -224,7 +224,7 @@ public class SstFilteringService extends BackgroundService
   }
 
   @Override
-  public BootstrapStateHandler.Lock getBoostrapStateLock() {
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }
 }

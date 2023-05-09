@@ -22,7 +22,7 @@ import java.util.concurrent.Semaphore;
 
 /** Bootstrap state handler interface. */
 public interface BootstrapStateHandler {
-  Lock getBoostrapStateLock();
+  Lock getBootstrapStateLock();
 
   /** Bootstrap state handler lock implementation. */
   class Lock implements AutoCloseable {

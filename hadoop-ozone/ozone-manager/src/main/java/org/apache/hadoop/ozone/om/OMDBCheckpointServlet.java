@@ -134,7 +134,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (BootstrapStateHandler.Lock lock = getBoostrapStateLock().lock();
+    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock();
          TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(destination)) {
       archiveOutputStream
@@ -297,7 +297,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
   }
 
   @Override
-  public BootstrapStateHandler.Lock getBoostrapStateLock() {
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }
 
@@ -321,10 +321,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     public BootstrapStateHandler.Lock lock()
         throws InterruptedException {
       // First lock all the handlers.
-      keyDeletingService.getBoostrapStateLock().lock();
-      sstFilteringService.getBoostrapStateLock().lock();
-      rocksDbCheckpointDiffer.getBoostrapStateLock().lock();
-      snapshotDeletingService.getBoostrapStateLock().lock();
+      keyDeletingService.getBootstrapStateLock().lock();
+      sstFilteringService.getBootstrapStateLock().lock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
+      snapshotDeletingService.getBootstrapStateLock().lock();
 
       // Then wait for the double buffer to be flushed.
       om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
@@ -333,10 +333,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
 
     @Override
     public void unlock() {
-      snapshotDeletingService.getBoostrapStateLock().unlock();
-      rocksDbCheckpointDiffer.getBoostrapStateLock().unlock();
-      sstFilteringService.getBoostrapStateLock().unlock();
-      keyDeletingService.getBoostrapStateLock().unlock();
+      snapshotDeletingService.getBootstrapStateLock().unlock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
+      sstFilteringService.getBootstrapStateLock().unlock();
+      keyDeletingService.getBootstrapStateLock().unlock();
     }
   }
 }

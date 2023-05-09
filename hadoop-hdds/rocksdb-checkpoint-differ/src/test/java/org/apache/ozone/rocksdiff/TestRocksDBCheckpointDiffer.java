@@ -1134,7 +1134,7 @@ public class TestRocksDBCheckpointDiffer {
     Future<Boolean> future;
     // Take the lock and start the consumer.
     try (BootstrapStateHandler.Lock lock =
-        differ.getBoostrapStateLock().lock()) {
+        differ.getBootstrapStateLock().lock()) {
       future = executorService.submit(
           () -> {
             c.accept(differ);

@@ -517,7 +517,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
   }
 
-  public BootstrapStateHandler.Lock getBoostrapStateLock() {
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
   }
 }

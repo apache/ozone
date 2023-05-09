@@ -205,7 +205,7 @@ public class TestOMDbCheckpointServlet {
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
 
-    when(omDbCheckpointServletMock.getBoostrapStateLock())
+    when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
   }
 
@@ -641,7 +641,7 @@ public class TestOMDbCheckpointServlet {
     // Confirm the other handlers are locked out when the bootstrap
     //  servlet takes the lock.
     try (BootstrapStateHandler.Lock lock =
-        spyServlet.getBoostrapStateLock().lock()) {
+        spyServlet.getBootstrapStateLock().lock()) {
       confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
       confirmServletLocksOutOtherHandler(snapshotDeletingService,
           executorService);
@@ -683,7 +683,7 @@ public class TestOMDbCheckpointServlet {
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
     try (BootstrapStateHandler.Lock lock =
-        handler.getBoostrapStateLock().lock()) {
+        handler.getBootstrapStateLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
       Assert.assertThrows(TimeoutException.class,
@@ -696,8 +696,8 @@ public class TestOMDbCheckpointServlet {
       ExecutorService executorService) {
     return executorService.submit(() -> {
       try {
-        handler.getBoostrapStateLock().lock();
-        handler.getBoostrapStateLock().unlock();
+        handler.getBootstrapStateLock().lock();
+        handler.getBootstrapStateLock().unlock();
         return true;
       } catch (InterruptedException e) {
       }
