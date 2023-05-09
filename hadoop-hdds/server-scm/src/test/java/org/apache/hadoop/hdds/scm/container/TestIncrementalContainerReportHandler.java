@@ -323,7 +323,8 @@ public class TestIncrementalContainerReportHandler {
       throws IOException, TimeoutException, NodeNotFoundException {
     Assertions.assertEquals(HddsProtos.ReplicationType.EC,
         container.getReplicationType());
-    final int numDatanodes = container.getReplicationConfig().getRequiredNodes();
+    final int numDatanodes =
+        container.getReplicationConfig().getRequiredNodes();
     // Register required number of datanodes with NodeManager
     List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
     for (int i = 0; i < numDatanodes; i++) {
