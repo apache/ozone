@@ -452,8 +452,16 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
+  /**
+   * Scenario: CLOSED container with 2 CLOSED, 1 CLOSING and 3 UNHEALTHY
+   * replicas.
+   * Expectation: This container is over replicated because there's an excess
+   * of UNHEALTHY replicas. The handler should return true but this container
+   * should not be queued for over replication because there's a mis matched
+   * replica.
+   */
   @Test
-  public void testHandlerReturnsFalseForExcessUnhealthyReplicas() {
+  public void testHandlerReturnsTrueForExcessUnhealthyReplicas() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0);
@@ -469,13 +477,60 @@ public class TestRatisReplicationCheckHandler {
     ContainerHealthResult result =
         healthCheck.checkHealth(requestBuilder.build());
 
-    // this handler does not deal with an excess of unhealthy replicas when
-    // the container is otherwise sufficiently replicated
-    Assert.assertEquals(HealthState.UNHEALTHY, result.getHealthState());
+    // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
+    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    OverReplicatedHealthResult overRepResult =
+        (OverReplicatedHealthResult) result;
+    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
+    Assert.assertTrue(overRepResult.hasMismatchedReplicas());
+    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
     Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    // it should not be queued for over replication because there's a mis
+    // matched replica
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * Scenario: CLOSED container with 3 CLOSED and 3 UNHEALTHY replicas.
+   * Expectation: This container should be queued for over replication
+   * because there's an excess of UNHEALTHY replicas and there are no mis
+   * matched replicas.
+   */
+  @Test
+  public void testHandlerAddsToQueueWhenExcessUnhealthyReplicas() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0, 0);
+    replicas.addAll(unhealthyReplicas);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+
+    // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
+    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    OverReplicatedHealthResult overRepResult =
+        (OverReplicatedHealthResult) result;
+    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
+    Assert.assertFalse(overRepResult.hasMismatchedReplicas());
+    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
   }
 
   @Test
@@ -551,6 +606,48 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     Assert.assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * Scenario: Container is both over replicated and mis replicated.
+   * Expectation: It should be queued for over replication.
+   */
+  @Test
+  public void testOverReplicatedWithMisReplication() {
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation ->
+        new ContainerPlacementStatusDefault(1, 2, 3));
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
+    Set<ContainerReplica> unhealthyReplicas =
+        createReplicas(container.containerID(), State.UNHEALTHY, 0, 0, 0);
+    replicas.addAll(unhealthyReplicas);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+
+    // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
+    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    OverReplicatedHealthResult overRepResult =
+        (OverReplicatedHealthResult) result;
+    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
+    Assert.assertFalse(overRepResult.hasMismatchedReplicas());
+    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
+
+    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
   @Test

@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -94,6 +96,7 @@ import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
@@ -111,6 +114,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
 import org.apache.ratis.util.ExitUtils;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,6 +123,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Recon's 'lite' version of SCM.
  */
+@Singleton
 public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
@@ -148,15 +154,20 @@ public class ReconStorageContainerManagerFacade
   private HDDSLayoutVersionManager scmLayoutVersionManager;
   private ReconSafeModeManager safeModeManager;
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
-
+  private ContainerSizeCountTask containerSizeCountTask;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
 
+  // To Do :- Refactor the constructor in a separate JIRA
   @Inject
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
+      ContainerCountBySizeDao containerCountBySizeDao,
+      UtilizationSchemaDefinition utilizationSchemaDefinition,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,
@@ -191,8 +202,7 @@ public class ReconStorageContainerManagerFacade
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
-        conf,
-        nodeManager,
+        conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
         eventQueue,
         scmhaManager,
@@ -207,7 +217,7 @@ public class ReconStorageContainerManagerFacade
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
-
+    this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
 
@@ -227,28 +237,34 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao,
         reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
+        containerManager, scmServiceProvider,
+        reconTaskStatusDao, containerHealthSchemaManager,
+        containerPlacementPolicy, reconTaskConfig);
+
+    this.containerSizeCountTask = new ContainerSizeCountTask(
         containerManager,
         scmServiceProvider,
-        reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy,
-        reconTaskConfig);
+        reconTaskStatusDao,
+        reconTaskConfig,
+        containerCountBySizeDao,
+        utilizationSchemaDefinition);
 
     StaleNodeHandler staleNodeHandler =
-        new ReconStaleNodeHandler(nodeManager, pipelineManager,
-            conf, pipelineSyncTask);
+        new ReconStaleNodeHandler(nodeManager, pipelineManager, conf,
+            pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
-        pipelineManager, containerManager,
-        scmServiceProvider, containerHealthTask, pipelineSyncTask);
+        pipelineManager, containerManager, scmServiceProvider,
+        containerHealthTask, pipelineSyncTask, containerSizeCountTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
-
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmContext);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(
-            pipelineManager, containerManager, scmContext);
+            pipelineManager, containerManager, scmContext,
+            null, 0);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
     // Use the same executor for both ICR and FCR.
@@ -306,6 +322,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
+    reconScmTasks.add(containerSizeCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
@@ -673,11 +690,24 @@ public class ReconStorageContainerManagerFacade
     return reconNodeDetails;
   }
 
+  public DBStore getScmDBStore() {
+    return dbStore;
+  }
+
   public EventQueue getEventQueue() {
     return eventQueue;
   }
 
   public StorageContainerServiceProvider getScmServiceProvider() {
     return scmServiceProvider;
+  }
+
+  @VisibleForTesting
+  public ContainerSizeCountTask getContainerSizeCountTask() {
+    return containerSizeCountTask;
+  }
+  @VisibleForTesting
+  public ContainerCountBySizeDao getContainerCountBySizeDao() {
+    return containerCountBySizeDao;
   }
 }

@@ -266,7 +266,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
                   .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress.getHostAddress()))));
+                  .concat(":".concat(peerInetAddress == null ? "" :
+                      peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

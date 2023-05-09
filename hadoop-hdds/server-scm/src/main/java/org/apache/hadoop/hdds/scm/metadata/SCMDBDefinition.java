@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -174,7 +175,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           ByteString.class,
-          new ByteStringCodec());
+          ByteStringCodec.getInstance());
 
   @Override
   public String getName() {

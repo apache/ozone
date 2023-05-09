@@ -96,6 +96,10 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
   @Override
   protected void verifyKeyName(OmKeyInfo omKeyInfo) {
     // prefix layout format - stores fileName in the keyName DB field.

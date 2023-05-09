@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
@@ -107,7 +106,7 @@ public class TestOzoneManagerSnapshotAcl {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     final String omServiceId = "om-service-test-1"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.randomNumeric(32);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
@@ -135,11 +134,6 @@ public class TestOzoneManagerSnapshotAcl {
     // stop the deletion services so that keys can still be read
     keyManager.stop();
     OMStorage.getOmDbDir(ozoneManagerConf);
-  }
-
-  @AfterEach
-  public void cleanup() throws IOException {
-    setDefaultAcls();
   }
 
   @AfterAll
@@ -456,7 +450,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createKey(OzoneBucket bucket)
       throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(5);
+    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
     byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
     fileKey.write(data);
@@ -467,7 +461,7 @@ public class TestOzoneManagerSnapshotAcl {
       throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(5);
+        snapshotPrefix + RandomStringUtils.randomNumeric(32);
     objectStore.createSnapshot(volumeName, bucketName, snapshotName);
     snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
@@ -525,7 +519,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
     final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(5);
+    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(ADMIN)
         .setBucketLayout(bucketLayout).build();
@@ -534,7 +528,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(5);
+    volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
     final VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)

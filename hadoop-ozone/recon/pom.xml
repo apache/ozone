@@ -170,6 +170,9 @@
                   <filtering>true</filtering>
                 </resource>
               </resources>
+              <nonFilteredFileExtensions>
+                <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
+              </nonFilteredFileExtensions>
             </configuration>
           </execution>
         </executions>
@@ -340,6 +343,12 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-jdbc</artifactId>
       <version>${spring.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>spring-jcl</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>javax.activation</groupId>

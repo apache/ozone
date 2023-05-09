@@ -82,12 +82,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isDecommission;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
@@ -172,8 +176,8 @@ public class ReplicationManager implements SCMService {
   private final ECReplicationCheckHandler ecReplicationCheckHandler;
   private final RatisReplicationCheckHandler ratisReplicationCheckHandler;
   private final EventPublisher eventPublisher;
-  private final ReentrantLock lock = new ReentrantLock();
-  private ReplicationQueue replicationQueue;
+  private final AtomicReference<ReplicationQueue> replicationQueue
+      = new AtomicReference<>(new ReplicationQueue());
   private final ECUnderReplicationHandler ecUnderReplicationHandler;
   private final ECOverReplicationHandler ecOverReplicationHandler;
   private final ECMisReplicationHandler ecMisReplicationHandler;
@@ -190,6 +194,7 @@ public class ReplicationManager implements SCMService {
   private final int datanodeReplicationLimit;
   private final int reconstructionCommandWeight;
   private final int datanodeDeleteLimit;
+  private final double inflightReplicationFactor;
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -237,25 +242,25 @@ public class ReplicationManager implements SCMService {
     this.ratisReplicationCheckHandler =
         new RatisReplicationCheckHandler(ratisContainerPlacement);
     this.nodeManager = nodeManager;
-    this.replicationQueue = new ReplicationQueue();
     this.maintenanceRedundancy = rmConf.maintenanceRemainingRedundancy;
     this.ratisMaintenanceMinReplicas = rmConf.getMaintenanceReplicaMinimum();
     this.datanodeReplicationLimit = rmConf.getDatanodeReplicationLimit();
     this.reconstructionCommandWeight = rmConf.getReconstructionCommandWeight();
     this.datanodeDeleteLimit = rmConf.getDatanodeDeleteLimit();
+    this.inflightReplicationFactor = rmConf.getInflightReplicationLimitFactor();
 
     ecUnderReplicationHandler = new ECUnderReplicationHandler(
         ecContainerPlacement, conf, this);
     ecOverReplicationHandler =
         new ECOverReplicationHandler(ecContainerPlacement, this);
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
-        conf, this, rmConf.isPush());
+        conf, this);
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
         ratisContainerPlacement, conf, this);
     ratisOverReplicationHandler =
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
-        ratisContainerPlacement, conf, this, rmConf.isPush());
+        ratisContainerPlacement, conf, this);
     underReplicatedProcessor =
         new UnderReplicatedProcessor(this,
             rmConf.getUnderReplicatedInterval());
@@ -386,52 +391,44 @@ public class ReplicationManager implements SCMService {
       }
     }
     report.setComplete();
-    lock.lock();
-    try {
-      replicationQueue = newRepQueue;
-    } finally {
-      lock.unlock();
-    }
+    replicationQueue.set(newRepQueue);
     this.containerReport = report;
     LOG.info("Replication Monitor Thread took {} milliseconds for" +
             " processing {} containers.", clock.millis() - start,
         containers.size());
   }
 
-  /**
-   * Retrieve the new highest priority container to be replicated from the
-   * under replicated queue.
-   * @return The new underReplicated container to be processed, or null if the
-   *         queue is empty.
-   */
-  public ContainerHealthResult.UnderReplicatedHealthResult
-      dequeueUnderReplicatedContainer() {
-    lock.lock();
-    try {
-      return replicationQueue.dequeueUnderReplicatedContainer();
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
-   * Retrieve the new highest priority container to be replicated from the
-   * under replicated queue.
-   * @return The next over-replicated container to be processed, or null if the
-   *         queue is empty.
-   */
-  public ContainerHealthResult.OverReplicatedHealthResult
-      dequeueOverReplicatedContainer() {
-    lock.lock();
-    try {
-      return replicationQueue.dequeueOverReplicatedContainer();
-    } finally {
-      lock.unlock();
-    }
-  }
-
   public void sendCloseContainerEvent(ContainerID containerID) {
     eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+  }
+
+  /**
+   * Returns the maximum number of inflight replications allowed across the
+   * cluster at any given time. If zero is returned, there is no limit.
+   * @return zero if not limit defined, otherwise the maximum number of
+   *         inflight replications allowed across the cluster at any given time.
+   */
+  public long getReplicationInFlightLimit() {
+    if (inflightReplicationFactor <= 0) {
+      return 0;
+    }
+    // Any healthy node in the cluster can participate in replication by being
+    // as source. Eg, even decommissioned hosts can be a source if they are
+    // still online. If the host is offline, then it will be quickly stale or
+    // dead. Therefore we simply count the number of healthy nodes and include
+    // those which are not in service.
+    int healthyNodes = nodeManager.getNodeCount(null, HEALTHY);
+    return (long) Math.ceil(
+        healthyNodes * datanodeReplicationLimit * inflightReplicationFactor);
+  }
+
+  /**
+   * Returns the number of inflight replications currently in progress across
+   * the cluster.
+   */
+  public long getInflightReplicationCount() {
+    return containerReplicaPendingOps
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
   }
 
   /**
@@ -570,7 +567,7 @@ public class ReplicationManager implements SCMService {
     datanodes.sort(Comparator.comparingInt(Pair::getLeft));
     DatanodeDetails datanode = datanodes.get(0).getRight();
     int currentCount = datanodes.get(0).getLeft();
-    if (currentCount + additionalCmdCount >= datanodeReplicationLimit) {
+    if (currentCount + additionalCmdCount >= getReplicationLimit(datanode)) {
       addExcludedNode(datanode);
     }
     return datanode;
@@ -592,11 +589,13 @@ public class ReplicationManager implements SCMService {
         = new ArrayList<>();
     for (DatanodeDetails dn : datanodes) {
       try {
-        int totalCount = getDatanodeQueuedReplicationCount(dn);
-        if (totalCount >= datanodeReplicationLimit) {
-          LOG.debug("Datanode {} has reached the maximum number of queued " +
-              "commands, replication + reconstruction * {}: {})",
-              dn, reconstructionCommandWeight, totalCount);
+        int totalCount = getQueuedReplicationCount(dn);
+        int replicationLimit = getReplicationLimit(dn);
+        if (totalCount >= replicationLimit) {
+          LOG.debug("Datanode {} has reached the maximum of {} queued " +
+              "commands for state {}, replication + reconstruction * {}: {}",
+              dn, replicationLimit, dn.getPersistedOpState(),
+              reconstructionCommandWeight, totalCount);
           addExcludedNode(dn);
           continue;
         }
@@ -609,7 +608,7 @@ public class ReplicationManager implements SCMService {
     return datanodeWithCommandCount;
   }
 
-  private int getDatanodeQueuedReplicationCount(DatanodeDetails datanode)
+  private int getQueuedReplicationCount(DatanodeDetails datanode)
       throws NodeNotFoundException {
     Map<Type, Integer> counts = nodeManager.getTotalDatanodeCommandCounts(
         datanode, Type.replicateContainerCommand,
@@ -757,42 +756,6 @@ public class ReplicationManager implements SCMService {
     }
   }
 
-
-  /**
-   * Add an under replicated container back to the queue if it was unable to
-   * be processed. Its retry count will be incremented before it is re-queued,
-   * reducing its priority.
-   * Note that the queue could have been rebuilt and replaced after this
-   * message was removed but before it is added back. This will result in a
-   * duplicate entry on the queue. However, when it is processed again, the
-   * result of the processing will end up with pending replicas scheduled. If
-   * instance 1 is processed and creates the pending replicas, when instance 2
-   * is processed, it will find the pending containers and know it has no work
-   * to do, and be discarded. Additionally, the queue will be refreshed
-   * periodically removing any duplicates.
-   * @param underReplicatedHealthResult
-   */
-  public void requeueUnderReplicatedContainer(ContainerHealthResult
-      .UnderReplicatedHealthResult underReplicatedHealthResult) {
-    underReplicatedHealthResult.incrementRequeueCount();
-    lock.lock();
-    try {
-      replicationQueue.enqueue(underReplicatedHealthResult);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  public void requeueOverReplicatedContainer(ContainerHealthResult
-      .OverReplicatedHealthResult overReplicatedHealthResult) {
-    lock.lock();
-    try {
-      replicationQueue.enqueue(overReplicatedHealthResult);
-    } finally {
-      lock.unlock();
-    }
-  }
-
   int processUnderReplicatedContainer(
       final ContainerHealthResult result) throws IOException {
     ContainerID containerID = result.getContainerInfo().containerID();
@@ -857,10 +820,9 @@ public class ReplicationManager implements SCMService {
     LOG.debug("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
     // If there is an existing mapping, we may need to remove it
-    excludedNodes.computeIfPresent(datanode, (k, v) -> {
+    excludedNodes.computeIfPresent(datanode, (dn, v) -> {
       try {
-        if (getDatanodeQueuedReplicationCount(datanode)
-            < datanodeReplicationLimit) {
+        if (getQueuedReplicationCount(dn) < getReplicationLimit(dn)) {
           // Returning null removes the entry from the map
           return null;
         } else {
@@ -1086,6 +1048,10 @@ public class ReplicationManager implements SCMService {
     }
   }
 
+  ReplicationQueue getQueue() {
+    return replicationQueue.get();
+  }
+
   /**
    * Configuration used by the Replication Manager.
    */
@@ -1096,16 +1062,14 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "enable.legacy",
         type = ConfigType.BOOLEAN,
-        defaultValue = "true",
+        defaultValue = "false",
         tags = {SCM, OZONE},
-        description = "This configuration decides if " +
-            "LegacyReplicationManager should be used to handle RATIS " +
-            "containers. Default is true, which means " +
-            "LegacyReplicationManager will handle RATIS containers while " +
-            "ReplicationManager will handle EC containers. If false, " +
+        description =
+            "If true, LegacyReplicationManager will handle RATIS containers " +
+            "while ReplicationManager will handle EC containers. If false, " +
             "ReplicationManager will handle both RATIS and EC."
     )
-    private boolean enableLegacy = true;
+    private boolean enableLegacy;
 
     public boolean isLegacyEnabled() {
       return enableLegacy;
@@ -1297,6 +1261,31 @@ public class ReplicationManager implements SCMService {
       return datanodeDeleteLimit;
     }
 
+    @Config(key = "inflight.limit.factor",
+        type = ConfigType.DOUBLE,
+        defaultValue = "0.75",
+        tags = { SCM },
+        description = "The overall replication task limit on a cluster is the" +
+            " number healthy nodes, times the datanode.replication.limit." +
+            " This factor, which should be between zero and 1, scales that" +
+            " limit down to reduce the overall number of replicas pending" +
+            " creation on the cluster. A setting of zero disables global" +
+            " limit checking. A setting of 1 effectively disables it, by" +
+            " making the limit equal to the above equation. However if there" +
+            " are many decommissioning nodes on the cluster, the decommission" +
+            " nodes will have a higher than normal limit, so the setting of 1" +
+            " may still provide some limit in extreme circumstances."
+    )
+    private double inflightReplicationLimitFactor = 0.75;
+
+    public double getInflightReplicationLimitFactor() {
+      return inflightReplicationLimitFactor;
+    }
+
+    public void setInflightReplicationLimitFactor(double factor) {
+      this.inflightReplicationLimitFactor = factor;
+    }
+
     public void setDatanodeReplicationLimit(int limit) {
       this.datanodeReplicationLimit = limit;
     }
@@ -1356,6 +1345,16 @@ public class ReplicationManager implements SCMService {
         throw new IllegalArgumentException("reconstructionCommandWeight is"
             + " set to " + reconstructionCommandWeight + " and must be > 0");
       }
+      if (inflightReplicationLimitFactor < 0) {
+        throw new IllegalArgumentException(
+            "inflight.limit.factor is set to " + inflightReplicationLimitFactor
+                + " and must be >= 0");
+      }
+      if (inflightReplicationLimitFactor > 1) {
+        throw new IllegalArgumentException(
+            "inflight.limit.factor is set to " + inflightReplicationLimitFactor
+                + " and must be <= 1");
+      }
     }
   }
 
@@ -1370,6 +1369,13 @@ public class ReplicationManager implements SCMService {
         if (serviceStatus != ServiceStatus.RUNNING) {
           LOG.info("Service {} transitions to RUNNING.", getServiceName());
           lastTimeToBeReadyInMillis = clock.millis();
+          // It this SCM was previously a leader and transitioned to a follower
+          // and then back to a leader in a short time, there may be old pending
+          // Ops in the ContainerReplicaPendingOps table. They are no longer
+          // needed as the DN will discard any commands when the term changes.
+          // Therefore we should clear the table so RM starts from a clean
+          // state.
+          containerReplicaPendingOps.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
         if (rmConf.isLegacyEnabled()) {
@@ -1478,6 +1484,15 @@ public class ReplicationManager implements SCMService {
   
   public ContainerReplicaPendingOps getContainerReplicaPendingOps() {
     return containerReplicaPendingOps;
+  }
+
+  private int getReplicationLimit(DatanodeDetails datanode) {
+    HddsProtos.NodeOperationalState state = datanode.getPersistedOpState();
+    int limit = datanodeReplicationLimit;
+    if (isMaintenance(state) || isDecommission(state)) {
+      limit *= 2;
+    }
+    return limit;
   }
 
   /**

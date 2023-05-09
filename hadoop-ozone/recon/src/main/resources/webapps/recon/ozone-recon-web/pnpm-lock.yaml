@@ -3,6 +3,7 @@ lockfileVersion: 5.4
 specifiers:
   '@ant-design/icons': ^5.0.1
   '@babel/core': ^7.0.0
+  '@fontsource/roboto': ^4.5.8
   '@types/classnames': ^2.2.10
   '@types/jest': 24.0.12
   '@types/node': 11.13.9
@@ -50,14 +51,15 @@ specifiers:
 dependencies:
   '@ant-design/icons': 5.0.1_5owmthsvj5ictknaj3ev736ofq
   '@babel/core': 7.10.2
+  '@fontsource/roboto': 4.5.8
   '@types/classnames': 2.2.10
   '@types/jest': 24.0.12
   '@types/node': 11.13.9
   '@types/react': 16.8.15
   '@types/react-dom': 16.8.4
   '@types/react-router-dom': 4.3.5
-  ag-charts-community: 7.2.0
-  ag-charts-react: 7.2.0_goh33fhhg3s5wnhfkk5zwf6yvu
+  ag-charts-community: 7.3.0
+  ag-charts-react: 7.3.0_f63rgqzwzldix4i5qrfnzwypk4
   antd: 3.26.17_5owmthsvj5ictknaj3ev736ofq
   axios: 0.21.4
   babel-jest: 24.9.0_@babel+core@7.10.2
@@ -163,9 +165,9 @@ packages:
     dependencies:
       '@ant-design/colors': 7.0.0
       '@ant-design/icons-svg': 4.2.1
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       classnames: 2.2.6
-      rc-util: 5.29.3_5owmthsvj5ictknaj3ev736ofq
+      rc-util: 5.30.0_5owmthsvj5ictknaj3ev736ofq
       react: 16.13.1
       react-dom: 16.13.1_react@16.13.1
     dev: false
@@ -1999,8 +2001,8 @@ packages:
       regenerator-runtime: 0.13.5
     dev: false
 
-  /@babel/runtime/7.21.0:
-    resolution: {integrity: sha512-xwII0//EObnq89Ji5AKYQaRYiW/nZ3llSv29d49IuxPhKbtJoLP+9QUUZ4nVragQVtaVGeZrpB+ZtG/Pdy/POw==}
+  /@babel/runtime/7.21.5:
+    resolution: {integrity: sha512-8jI69toZqqcsnqGGqwGS4Qb1VwLOEp4hz+CXPywcvjs60u3B4Pom/U/7rm4W8tMOYEB+E9wgD0mW1l3r8qlI9Q==}
     engines: {node: '>=6.9.0'}
     dependencies:
       regenerator-runtime: 0.13.11
@@ -2088,7 +2090,7 @@ packages:
     peerDependencies:
       react: '>=16.3.0'
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       '@emotion/cache': 10.0.29
       '@emotion/css': 10.0.27
       '@emotion/serialize': 0.11.16
@@ -2141,6 +2143,10 @@ packages:
 
   /@emotion/weak-memoize/0.2.5:
     resolution: {integrity: sha512-6U71C2Wp7r5XtFtQzYrW5iKFT67OixrSxjI4MptCHzdSVlgabczzqLe0ZSgnub/5Kp4hSbpDB1tMytZY9pwxxA==}
+    dev: false
+
+  /@fontsource/roboto/4.5.8:
+    resolution: {integrity: sha512-CnD7zLItIzt86q4Sj3kZUiLcBk1dSk81qcqgMGaZe7SQ1P8hFNxhMl5AZthK1zrDM5m74VVhaOpuMGIL4gagaA==}
     dev: false
 
   /@hapi/address/2.1.4:
@@ -3100,18 +3106,18 @@ packages:
       robust-orientation: 1.1.3
     dev: false
 
-  /ag-charts-community/7.2.0:
-    resolution: {integrity: sha512-KOmp+PlYqqjmfRAHnXck/cYH5sEQTlPsP3cVim6RR+rVdJCjXzJkr8sH3voUmNIj899bHdKreuewiRda+JX9zA==}
+  /ag-charts-community/7.3.0:
+    resolution: {integrity: sha512-118U6YsCMia6iZHaN06zT19rr2SYa92WB73pMVCKQlp2H3c19uKQ6Y6DfKG/nIfNUzFXZLHBwKIdZXsMWJdZww==}
     dev: false
 
-  /ag-charts-react/7.2.0_goh33fhhg3s5wnhfkk5zwf6yvu:
-    resolution: {integrity: sha512-Q6EsruDnEsLpgGygp/ed2ZeOgudrZYH+b0s+bOs5jLphzzeezugPuMLTpp2WTzfl5bWlFQUOqfm+0J1xX9McJA==}
+  /ag-charts-react/7.3.0_f63rgqzwzldix4i5qrfnzwypk4:
+    resolution: {integrity: sha512-DR8l8IQbRJeutTslqJ8muwsMPdFyJAn/rq17NhQYZ9F4wx0suIAgaUG/We8KEO94qASLX/nhKuvbI/d7M4kJRw==}
     peerDependencies:
-      ag-charts-community: ~7.2.0
+      ag-charts-community: ~7.3.0
       react: ^16.3.0 || ^17.0.0 || ^18.0.0
       react-dom: ^16.3.0 || ^17.0.0 || ^18.0.0
     dependencies:
-      ag-charts-community: 7.2.0
+      ag-charts-community: 7.3.0
       prop-types: 15.7.2
       react: 16.13.1
       react-dom: 16.13.1_react@16.13.1
@@ -3700,7 +3706,7 @@ packages:
   /babel-plugin-macros/2.8.0:
     resolution: {integrity: sha512-SEP5kJpfGYqYKpBrj5XU3ahw5p5GOHJ0U5ssOSQ/WBVdwkD2Dzlce95exQTs3jOVWPPKLBN2rlEWkCK7dSmLvg==}
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       cosmiconfig: 6.0.0
       resolve: 1.17.0
     dev: false
@@ -5815,7 +5821,7 @@ packages:
   /dom-helpers/5.1.4:
     resolution: {integrity: sha512-TjMyeVUvNEnOnhzs6uAn9Ya47GmMo3qq7m+Lr/3ON0Rs5kHvb8I+SQYjLUSYn7qhEm0QjW0yrBkvz9yOrwwz1A==}
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       csstype: 2.6.10
     dev: false
 
@@ -6554,7 +6560,7 @@ packages:
     peerDependencies:
       eslint: ^3 || ^4 || ^5 || ^6
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       aria-query: 3.0.0
       array-includes: 3.1.1
       ast-types-flow: 0.0.7
@@ -7543,7 +7549,7 @@ packages:
     resolution: {integrity: sha512-oWb1Z6mkHIskLzEJ/XWX0srkpkTQ7vaopMQkyaEIoq0fmtFVxOthb8cCxeT+p3ynTdkk/RZwbgG4brR5BeWECw==}
     engines: {node: '>= 4.0'}
     os: [darwin]
-    deprecated: fsevents 1 will break on node v14+ and could be using insecure binaries. Upgrade to fsevents 2.
+    deprecated: The v1 package contains DANGEROUS / INSECURE binaries. Upgrade to safe fsevents v2
     requiresBuild: true
     dependencies:
       bindings: 1.5.0
@@ -8396,7 +8402,7 @@ packages:
   /history/4.10.1:
     resolution: {integrity: sha512-36nwAD620w12kuzPAsyINPWJqlNbij+hpK1k9XRloDtym8mxzGYl2c17LnV6IAGB2Dmg4tEa7G7DlawS0+qjew==}
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       loose-envify: 1.4.0
       resolve-pathname: 3.0.0
       tiny-invariant: 1.1.0
@@ -9811,7 +9817,7 @@ packages:
     dev: true
 
   /js-tokens/3.0.2:
-    resolution: {integrity: sha512-RjTcuD4xjtthQkaWH7dFlH85L+QaVtSoOyGdZ3g6HFhS9dFNDfLyqgm2NFe2X6cQpeFmt0452FJjFG5UameExg==}
+    resolution: {integrity: sha1-mGbfOVECEw449/mWvOtlRDIJwls=}
     dev: false
 
   /js-tokens/4.0.0:
@@ -10722,7 +10728,7 @@ packages:
       prop-types: ^15.0.0
       react: ^0.14.0 || ^15.0.0 || ^16.0.0
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       prop-types: 15.7.2
       react: 16.13.1
       tiny-warning: 1.0.3
@@ -13051,7 +13057,7 @@ packages:
       '@ant-design/css-animation': 1.7.2
       classnames: 2.2.6
       raf: 3.4.1
-      rc-util: 5.29.3_5owmthsvj5ictknaj3ev736ofq
+      rc-util: 5.30.0_5owmthsvj5ictknaj3ev736ofq
       react: 16.13.1
       react-dom: 16.13.1_react@16.13.1
     dev: false
@@ -13506,13 +13512,13 @@ packages:
       shallowequal: 1.1.0
     dev: false
 
-  /rc-util/5.29.3_5owmthsvj5ictknaj3ev736ofq:
-    resolution: {integrity: sha512-wX6ZwQTzY2v7phJBquN4mSEIFR0E0qumlENx0zjENtDvoVSq2s7cR95UidKRO1hOHfDsecsfM9D1gO4Kebs7fA==}
+  /rc-util/5.30.0_5owmthsvj5ictknaj3ev736ofq:
+    resolution: {integrity: sha512-uaWpF/CZGyXuhQG71MWxkU+0bWkPEgqZUxEv251Cu7p3kpHDNm5+Ygu/U8ux0a/zbfGW8PsKcJL0XVBOMrlIZg==}
     peerDependencies:
       react: '>=16.9.0'
       react-dom: '>=16.9.0'
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       react: 16.13.1
       react-dom: 16.13.1_react@16.13.1
       react-is: 16.13.1
@@ -13536,7 +13542,7 @@ packages:
       object-assign: 4.1.1
       promise: 8.1.0
       raf: 3.4.1
-      regenerator-runtime: 0.13.11
+      regenerator-runtime: 0.13.5
       whatwg-fetch: 3.0.0
     dev: false
 
@@ -13804,7 +13810,7 @@ packages:
       react: '>=16.6.0'
       react-dom: '>=16.6.0'
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       dom-helpers: 5.1.4
       loose-envify: 1.4.0
       prop-types: 15.7.2
@@ -14001,7 +14007,7 @@ packages:
   /regenerator-transform/0.14.4:
     resolution: {integrity: sha512-EaJaKPBI9GvKpvUz2mz4fhx7WPgvwRLY9v3hlNHWmAuJHI13T4nwKnNvm5RWJzEdnI5g5UwtOww+S8IdoUC2bw==}
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       private: 0.1.8
     dev: false
 
@@ -16723,7 +16729,7 @@ packages:
     resolution: {integrity: sha512-UHdwrN3FrDvicM3AqJS/J07X0KXj67R8Cg0waq1MKEOqzo89ap6zh6LmaLnRAjpB+bDIz+7OlPye9iii9KBnxw==}
     engines: {node: '>=4.0.0'}
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       '@hapi/joi': 15.1.1
       common-tags: 1.8.0
       fs-extra: 4.0.3
@@ -16819,7 +16825,7 @@ packages:
     peerDependencies:
       webpack: ^2.0.0 || ^3.0.0 || ^4.0.0
     dependencies:
-      '@babel/runtime': 7.21.0
+      '@babel/runtime': 7.21.5
       json-stable-stringify: 1.0.1
       webpack: 4.42.0
       workbox-build: 4.3.1

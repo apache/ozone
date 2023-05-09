@@ -74,7 +74,8 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     // Verify resource name
-    OmUtils.validateVolumeName(volumeInfo.getVolume());
+    OmUtils.validateVolumeName(volumeInfo.getVolume(),
+        ozoneManager.isStrictS3());
 
     // Set creation time & set modification time
     long initialTime = Time.now();

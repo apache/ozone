@@ -112,6 +112,17 @@ Create bucket with name
     ${result} =          Execute AWSS3APICli  create-bucket --bucket ${bucket}
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
+Create legacy bucket
+    ${postfix} =         Generate Ozone String
+    ${legacy_bucket} =   Set Variable               legacy-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
+    [Return]             ${legacy_bucket}
+
+Create obs bucket
+    ${postfix} =         Generate Ozone String
+    ${bucket} =   Set Variable               obs-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l OBJECT_STORE s3v/${bucket}   0
+    [Return]             ${bucket}
 
 Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}

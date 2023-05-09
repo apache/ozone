@@ -335,16 +335,29 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     // Then choose nodes close to anchor based on network topology
     int nodesToFind = nodesRequired - results.size();
+    boolean bCheckNodeInAnchorRack = true;
     for (int x = 0; x < nodesToFind; x++) {
       // Pick remaining nodes based on the existence of rack awareness.
       DatanodeDetails pick = null;
-      if (rackAwareness) {
+      if (rackAwareness && bCheckNodeInAnchorRack) {
         pick = chooseNodeBasedOnSameRack(
             healthyNodes, exclude,
             nodeManager.getClusterNetworkTopologyMap(), anchor);
+        if (pick == null) {
+          // No available node to pick from first anchor node
+          // Make nextNode as anchor node and pick remaining node
+          anchor = nextNode;
+          pick = chooseNodeBasedOnSameRack(
+              healthyNodes, exclude,
+              nodeManager.getClusterNetworkTopologyMap(), anchor);
+        }
       }
       // fall back protection
       if (pick == null) {
+        // Make bNodeFoundInAnchorRack to false so that from next node search
+        // it will just search in fallback nodes and avoid searching in
+        // anchor node rack.
+        bCheckNodeInAnchorRack = false;
         pick = fallBackPickNodes(healthyNodes, exclude);
         if (rackAwareness) {
           LOG.debug("Failed to choose node based on topology. Fallback " +

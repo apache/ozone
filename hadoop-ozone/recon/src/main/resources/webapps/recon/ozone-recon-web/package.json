@@ -5,6 +5,7 @@
   "dependencies": {
     "@ant-design/icons": "^5.0.1",
     "@babel/core": "^7.0.0",
+    "@fontsource/roboto": "^4.5.8",
     "@types/classnames": "^2.2.10",
     "@types/jest": "24.0.12",
     "@types/node": "11.13.9",
