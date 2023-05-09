@@ -340,13 +340,9 @@ public class OzoneListStatusHelper {
             String prefixKey, String startKey) throws IOException {
       this.iterType = iterType;
       this.table = table;
-      this.tableIterator = table.iterator();
+      this.tableIterator = table.iterator(prefixKey);
       this.prefixKey = prefixKey;
       this.currentKey = null;
-
-      if (!StringUtils.isBlank(prefixKey)) {
-        tableIterator.seek(prefixKey);
-      }
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
