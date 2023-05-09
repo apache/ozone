@@ -63,6 +63,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     rwLock.readLock().lock();
     try {
+      txFlushPending++;
       table.putWithBatch(getCurrentBatchOperation(), key, value);
     } finally {
       rwLock.readLock().unlock();
@@ -74,6 +75,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       throws IOException {
     rwLock.readLock().lock();
     try {
+      txFlushPending++;
       table.deleteWithBatch(getCurrentBatchOperation(), key);
     } finally {
       rwLock.readLock().unlock();
@@ -116,8 +118,6 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           TRANSACTION_INFO_KEY, latestTrxInfo);
 
       metadataStore.getStore().commitBatchOperation(currentBatchOperation);
-      txFlushPending = 0;
-      lastSnapshotTimeMs = scm.getSystemClock().millis();
       currentBatchOperation.close();
       this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
       // reset batch operation
@@ -129,6 +129,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           deletedBlockLog instanceof DeletedBlockLogImpl);
       ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
     } finally {
+      txFlushPending = 0;
+      lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
   }
@@ -163,8 +165,13 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   
   @Override
   public boolean shouldFlush(long snapshotWaitTime) {
-    long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
-    return txFlushPending > 0 && timeDiff > snapshotWaitTime;
+    rwLock.readLock().lock();
+    try {
+      long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
+      return txFlushPending > 0 && timeDiff > snapshotWaitTime;
+    } finally {
+      rwLock.readLock().unlock();
+    }
   }
 
   @Override

@@ -231,7 +231,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public SCMRatisResponse submitSnapshotRequest() throws IOException {
+  public boolean doSnapshotRequest() throws IOException {
     final long requestTimeout = ozoneConf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
@@ -243,10 +243,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         clientId, getDivision().getId(), getDivision().getGroup().getGroupId(),
         nextCallId(), requestTimeout);
     final RaftClientReply raftClientReply = server.snapshotManagement(req);
-    if (LOG.isDebugEnabled()) {
-      LOG.info("Snapshot request with Reply {}", raftClientReply);
+    if (!raftClientReply.isSuccess()) {
+      LOG.info("Snapshot request failed", raftClientReply.getException());
     }
-    return SCMRatisResponse.decode(raftClientReply);
+    return raftClientReply.isSuccess();
   }
 
   private long nextCallId() {
