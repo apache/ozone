@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ./commonawslib.robot
 
+
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
 

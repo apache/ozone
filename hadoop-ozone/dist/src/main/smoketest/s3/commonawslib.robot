@@ -67,15 +67,15 @@ Setup v2 headers
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
 
 Setup v4 headers
-    Log To Console      in-v4 ${SECURITY_ENABLED}
+    Log To Console      v4 ${SECURITY_ENABLED}
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Setup secure v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
 
 Setup secure v4 headers
-    Log To Console      in-secure-v4
+    Log To Console      enter-secure-v4
     ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
-    Log To Console      in-secure-v4-result ${result}
+    Log To Console      secure-v4 ${result}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -89,12 +89,12 @@ Setup secure v4 headers
     Log To Console      exit-secure-v4
 
 Setup dummy credentials for S3
-    Log To Console      in-dummy-v4
+    Log To Console      enter-dummy-v4
                         Execute                    aws configure set default.s3.signature_version s3v4
                         Execute                    aws configure set aws_access_key_id dlfknslnfslf
                         Execute                    aws configure set aws_secret_access_key dlfknslnfslf
                         Execute                    aws configure set region us-west-1
-    Log To Console      exit-secure-v4
+    Log To Console      exit-dummy-v4
 
 Save AWS access key
     ${OZONE_AWS_ACCESS_KEY_ID} =      Execute     aws configure get aws_access_key_id
