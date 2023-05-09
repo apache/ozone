@@ -72,14 +72,6 @@ public final class CodecBuffer implements AutoCloseable {
     assertRefCnt(1);
   }
 
-  public CompletableFuture<Void> getReleased() {
-    return released;
-  }
-
-  int readableBytes() {
-    return buf.readableBytes();
-  }
-
   private void assertRefCnt(int expected) {
     Preconditions.assertSame(expected, buf.refCnt(), "refCnt");
   }
@@ -115,6 +107,16 @@ public final class CodecBuffer implements AutoCloseable {
       // A zero capacity buffer, possibly singleton, may not be able released.
       Preconditions.assertSame(0, buf.capacity(), "capacity");
     }
+  }
+
+  /** @return the future of {@link #release()}. */
+  public CompletableFuture<Void> getReleaseFuture() {
+    return released;
+  }
+
+  /** @return the number of bytes can be read. */
+  public int readableBytes() {
+    return buf.readableBytes();
   }
 
   /** @return a readonly {@link ByteBuffer} view of this buffer. */

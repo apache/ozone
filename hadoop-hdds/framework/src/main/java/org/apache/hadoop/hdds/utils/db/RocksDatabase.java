@@ -303,6 +303,11 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut array key {}", bytes2String(key));
+        LOG.debug("batchPut array value {}", bytes2String(value));
+      }
+
       assertClosed();
       try {
         counter.incrementAndGet();
@@ -316,12 +321,18 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, ByteBuffer key,
         ByteBuffer value) throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
+        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+      }
+
       assertClosed();
       try {
         counter.incrementAndGet();
         writeBatch.put(getHandle(), key.duplicate(), value);
       } catch (RocksDBException e) {
-        throw toIOException(this, "batchPut ByteBuffer key " + bytes2String(key), e);
+        throw toIOException(this, "batchPut ByteBuffer key "
+            + bytes2String(key), e);
       } finally {
         counter.decrementAndGet();
       }
