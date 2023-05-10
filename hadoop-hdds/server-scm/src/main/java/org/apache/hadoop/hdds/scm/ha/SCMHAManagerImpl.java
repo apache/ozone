@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
@@ -51,7 +51,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientSingleNode;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -182,10 +182,10 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
 
     LOG.info("Getting secret keys from leader {}.", leaderID);
-    try (SCMSecurityProtocolClientSideTranslatorPB securityProtocol =
-             getScmSecurityClientSingleNode(conf, leaderID,
+    try (SecretKeyProtocolClientSideTranslatorPB secretKeyProtocol =
+             getSecretKeyClientForScm(conf, leaderID,
                  UserGroupInformation.getLoginUser())) {
-      return securityProtocol.getAllSecretKeys();
+      return secretKeyProtocol.getAllSecretKeys();
     }
   }
 

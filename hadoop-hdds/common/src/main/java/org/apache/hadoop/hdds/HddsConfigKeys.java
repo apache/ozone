@@ -292,6 +292,10 @@ public final class HddsConfigKeys {
       "hdds.security.client.scm.secretkey.om.protocol.acl";
 
   public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.scm.protocol.acl";
+
+  public static final String
       HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
       "hdds.security.client.scm.secretkey.datanode.protocol.acl";
 

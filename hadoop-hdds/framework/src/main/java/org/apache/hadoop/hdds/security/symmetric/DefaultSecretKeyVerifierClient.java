@@ -21,7 +21,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.slf4j.Logger;
@@ -47,7 +47,7 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
 
   private final LoadingCache<UUID, Optional<ManagedSecretKey>> cache;
 
-  DefaultSecretKeyVerifierClient(SCMSecretKeyProtocol scmSecretKeyProtocol,
+  DefaultSecretKeyVerifierClient(SecretKeyProtocol secretKeyProtocol,
                                  ConfigurationSource conf) {
     Duration expiryDuration = parseExpiryDuration(conf);
     Duration rotateDuration = parseRotateDuration(conf);
@@ -68,7 +68,7 @@ public class DefaultSecretKeyVerifierClient implements SecretKeyVerifierClient {
         new CacheLoader<UUID, Optional<ManagedSecretKey>>() {
           @Override
           public Optional<ManagedSecretKey> load(UUID id) throws Exception {
-            ManagedSecretKey secretKey = scmSecretKeyProtocol.getSecretKey(id);
+            ManagedSecretKey secretKey = secretKeyProtocol.getSecretKey(id);
             LOG.info("Secret key fetched from SCM: {}", secretKey);
             return Optional.ofNullable(secretKey);
           }

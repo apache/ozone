@@ -47,14 +47,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Failover proxy provider for SCMSecurityProtocol server.
+ * Failover proxy provider for SCMSecretKeyProtocolService server.
  */
-public class SCMSecretKeyProtocolFailoverProxyProvider
+public class SecretKeyProtocolFailoverProxyProvider
     <T extends SCMSecretKeyProtocolService.BlockingInterface> implements
     FailoverProxyProvider<T>, Closeable {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(SCMSecretKeyProtocolFailoverProxyProvider.class);
+      LoggerFactory.getLogger(SecretKeyProtocolFailoverProxyProvider.class);
 
   // scmNodeId -> ProxyInfo<rpcProxy>
   private final Map<String, ProxyInfo<T>> scmProxies;
@@ -94,7 +94,7 @@ public class SCMSecretKeyProtocolFailoverProxyProvider
    * @param conf
    * @param userGroupInformation
    */
-  public SCMSecretKeyProtocolFailoverProxyProvider(ConfigurationSource conf,
+  public SecretKeyProtocolFailoverProxyProvider(ConfigurationSource conf,
       UserGroupInformation userGroupInformation, Class<T> proxyClazz) {
     Preconditions.checkNotNull(userGroupInformation);
     this.ugi = userGroupInformation;
@@ -282,12 +282,10 @@ public class SCMSecretKeyProtocolFailoverProxyProvider
 
   @Override
   public synchronized void close() throws IOException {
-    for (Map.Entry<String, ProxyInfo<T>> proxy :
-        scmProxies.entrySet()) {
-      if (proxy.getValue() != null) {
-        RPC.stopProxy(proxy.getValue());
+    for (ProxyInfo<T> proxyInfo : scmProxies.values()) {
+      if (proxyInfo.proxy != null) {
+        RPC.stopProxy(proxyInfo.proxy);
       }
-      scmProxies.remove(proxy.getKey());
     }
   }
 

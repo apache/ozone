@@ -31,7 +31,7 @@ import java.util.UUID;
 @KerberosInfo(
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
-public interface SCMSecretKeyProtocol {
+public interface SecretKeyProtocol {
 
   /**
    * Get the current SecretKey that is used for signing tokens.

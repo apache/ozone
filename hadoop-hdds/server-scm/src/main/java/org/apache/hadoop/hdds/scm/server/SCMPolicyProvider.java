@@ -22,9 +22,10 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocolDatanode;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocolOm;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolDatanode;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolOm;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
@@ -39,6 +40,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CER
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CONTAINER_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL;
 
 /**
  * {@link PolicyProvider} for SCM protocols.
@@ -78,10 +80,13 @@ public final class SCMPolicyProvider extends PolicyProvider {
               SCMSecurityProtocol.class),
           new Service(
               HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL,
-              SCMSecretKeyProtocolOm.class),
+              SecretKeyProtocolOm.class),
+          new Service(
+              HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL,
+              SecretKeyProtocolScm.class),
           new Service(
               HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL,
-              SCMSecretKeyProtocolDatanode.class)
+              SecretKeyProtocolDatanode.class)
       };
 
   @SuppressFBWarnings("EI_EXPOSE_REP")

@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 
 import java.io.IOException;
@@ -61,7 +61,7 @@ public class DefaultSecretKeyClient implements SecretKeyClient {
   }
 
   public static SecretKeyClient create(ConfigurationSource conf,
-      SCMSecretKeyProtocol secretKeyProtocol)
+      SecretKeyProtocol secretKeyProtocol)
       throws IOException {
     SecretKeySignerClient singerClient =
         new DefaultSecretKeySignerClient(secretKeyProtocol);

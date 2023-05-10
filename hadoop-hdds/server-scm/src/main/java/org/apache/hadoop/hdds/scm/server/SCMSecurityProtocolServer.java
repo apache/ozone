@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -46,11 +46,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolDatanodePB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolOmPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.protocol.SCMSecretKeyProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocol.SecretKeyProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
@@ -94,7 +95,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
-    SCMSecretKeyProtocol {
+    SecretKeyProtocol {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
@@ -145,7 +146,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     BlockingService secretKeyService =
         SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService
             .newReflectiveBlockingService(
-                new SCMSecretKeyProtocolServerSideTranslatorPB(
+                new SecretKeyProtocolServerSideTranslatorPB(
                     this, scm, secretKeyMetrics)
         );
     this.rpcServer =
@@ -155,9 +156,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
             SCMSecurityProtocolPB.class,
             secureProtoPbService,
             handlerCount);
-    HddsServerUtil.addPBProtocol(conf, SCMSecretKeyProtocolDatanodePB.class,
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolDatanodePB.class,
         secretKeyService, rpcServer);
-    HddsServerUtil.addPBProtocol(conf, SCMSecretKeyProtocolOmPB.class,
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolOmPB.class,
+        secretKeyService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolScmPB.class,
         secretKeyService, rpcServer);
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {

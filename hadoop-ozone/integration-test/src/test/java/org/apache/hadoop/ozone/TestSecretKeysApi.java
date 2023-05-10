@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
@@ -63,7 +63,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecretKeyClientForDatanode;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForDatanode;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
@@ -195,7 +195,7 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "3000ms");
 
     startCluster(3);
-    SCMSecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
+    SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
 
     // start the test when keys are full.
     GenericTestUtils.waitFor(() -> {
@@ -248,7 +248,7 @@ public final class TestSecretKeysApi {
   @Test
   public void testSecretKeyApiNotEnabled() throws Exception {
     startCluster(1);
-    SCMSecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
+    SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
 
     SCMSecretKeyException ex = assertThrows(SCMSecretKeyException.class,
             secretKeyProtocol::getCurrentSecretKey);
@@ -276,7 +276,7 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "7d");
 
     startCluster(3);
-    SCMSecretKeyProtocol securityProtocol = getSecretKeyProtocol();
+    SecretKeyProtocol securityProtocol = getSecretKeyProtocol();
     List<ManagedSecretKey> keysInitial = securityProtocol.getAllSecretKeys();
     LOG.info("Keys before fail over: {}.", keysInitial);
 
@@ -304,7 +304,7 @@ public final class TestSecretKeysApi {
     // When HADOOP_SECURITY_AUTHORIZATION is enabled, SecretKey protocol
     // is only available for Datanode and OM, any other authenticated user
     // can't access the protocol.
-    SCMSecretKeyProtocol secretKeyProtocol =
+    SecretKeyProtocol secretKeyProtocol =
         getSecretKeyProtocol(testUserPrincipal, testUserKeytab);
     RemoteException ex =
         assertThrows(RemoteException.class,
@@ -323,7 +323,7 @@ public final class TestSecretKeysApi {
 
     // When HADOOP_SECURITY_AUTHORIZATION is not enabled, any other
     // authenticated user can access the protocol.
-    SCMSecretKeyProtocol secretKeyProtocol =
+    SecretKeyProtocol secretKeyProtocol =
         getSecretKeyProtocol(testUserPrincipal, testUserKeytab);
     assertNotNull(secretKeyProtocol.getCurrentSecretKey());
   }
@@ -344,18 +344,18 @@ public final class TestSecretKeysApi {
   }
 
   @NotNull
-  private SCMSecretKeyProtocol getSecretKeyProtocol() throws IOException {
+  private SecretKeyProtocol getSecretKeyProtocol() throws IOException {
     return getSecretKeyProtocol(ozonePrincipal, ozoneKeytab);
   }
 
   @NotNull
-  private SCMSecretKeyProtocol getSecretKeyProtocol(
+  private SecretKeyProtocol getSecretKeyProtocol(
       String user, File keyTab) throws IOException {
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
             user, keyTab.getCanonicalPath());
     ugi.setAuthenticationMethod(KERBEROS);
-    return getScmSecretKeyClientForDatanode(conf, ugi);
+    return getSecretKeyClientForDatanode(conf, ugi);
   }
 
   private void enableBlockToken() {

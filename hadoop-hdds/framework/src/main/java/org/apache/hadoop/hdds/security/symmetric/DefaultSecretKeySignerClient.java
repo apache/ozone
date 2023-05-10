@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,14 +44,14 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeySignerClient.class);
 
-  private final SCMSecretKeyProtocol scmSecretKeyProtocol;
+  private final SecretKeyProtocol secretKeyProtocol;
   private final AtomicReference<ManagedSecretKey> cache =
       new AtomicReference<>();
   private ScheduledExecutorService executorService;
 
   public DefaultSecretKeySignerClient(
-      SCMSecretKeyProtocol scmSecretKeyProtocol) {
-    this.scmSecretKeyProtocol = scmSecretKeyProtocol;
+      SecretKeyProtocol secretKeyProtocol) {
+    this.secretKeyProtocol = secretKeyProtocol;
   }
 
   @Override
@@ -63,7 +63,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   @Override
   public void start(ConfigurationSource conf) throws IOException {
     final ManagedSecretKey initialKey =
-        scmSecretKeyProtocol.getCurrentSecretKey();
+        secretKeyProtocol.getCurrentSecretKey();
     LOG.info("Initial secret key fetched from SCM: {}.", initialKey);
     cache.set(initialKey);
     scheduleSecretKeyPoller(conf, initialKey.getCreationTime());
@@ -110,7 +110,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     // from SCM.
     if (nextRotate.isBefore(Instant.now())) {
       try {
-        ManagedSecretKey newKey = scmSecretKeyProtocol.getCurrentSecretKey();
+        ManagedSecretKey newKey = secretKeyProtocol.getCurrentSecretKey();
         if (!newKey.equals(current)) {
           cache.set(newKey);
           LOG.info("New secret key fetched from SCM: {}.", newKey);

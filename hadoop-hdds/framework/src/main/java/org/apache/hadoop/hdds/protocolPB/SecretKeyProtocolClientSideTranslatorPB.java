@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.protocolPB;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecre
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.Type;
-import org.apache.hadoop.hdds.scm.proxy.SCMSecretKeyProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -47,20 +47,20 @@ import java.util.stream.Collectors;
 
 /**
  * This class is the client-side translator that forwards requests for
- * {@link SCMSecretKeyProtocol} to the server proxy.
+ * {@link SecretKeyProtocol} to the server proxy.
  */
-public class SCMSecretKeyProtocolClientSideTranslatorPB implements
-    SCMSecretKeyProtocol, ProtocolTranslator, Closeable {
+public class SecretKeyProtocolClientSideTranslatorPB implements
+    SecretKeyProtocol, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final BlockingInterface rpcProxy;
-  private SCMSecretKeyProtocolFailoverProxyProvider failoverProxyProvider;
+  private SecretKeyProtocolFailoverProxyProvider failoverProxyProvider;
 
-  public SCMSecretKeyProtocolClientSideTranslatorPB(
-      SCMSecretKeyProtocolFailoverProxyProvider<? extends BlockingInterface>
+  public SecretKeyProtocolClientSideTranslatorPB(
+      SecretKeyProtocolFailoverProxyProvider<? extends BlockingInterface>
           proxyProvider, Class<? extends BlockingInterface> proxyClazz) {
     Preconditions.checkState(proxyProvider != null);
     this.failoverProxyProvider = proxyProvider;

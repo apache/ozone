@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyResponse;
@@ -27,8 +27,8 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecre
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeysListResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.Status;
-import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolDatanodePB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecretKeyProtocolOmPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
@@ -44,21 +44,21 @@ import java.util.UUID;
 
 /**
  * This class is the server-side translator that forwards requests received on
- * {@link SCMSecretKeyProtocolDatanodePB} to the server implementation.
+ * {@link SecretKeyProtocolDatanodePB} to the server implementation.
  */
-public class SCMSecretKeyProtocolServerSideTranslatorPB
-    implements SCMSecretKeyProtocolDatanodePB, SCMSecretKeyProtocolOmPB {
+public class SecretKeyProtocolServerSideTranslatorPB
+    implements SecretKeyProtocolDatanodePB, SecretKeyProtocolOmPB {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMSecretKeyProtocolServerSideTranslatorPB.class);
+      LoggerFactory.getLogger(SecretKeyProtocolServerSideTranslatorPB.class);
 
-  private final SCMSecretKeyProtocol impl;
+  private final SecretKeyProtocol impl;
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
       SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
 
-  public SCMSecretKeyProtocolServerSideTranslatorPB(SCMSecretKeyProtocol impl,
+  public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocol impl,
       StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
