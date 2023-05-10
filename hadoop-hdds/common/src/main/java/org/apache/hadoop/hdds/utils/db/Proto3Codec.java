@@ -24,7 +24,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Parser;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.IntFunction;
