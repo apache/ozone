@@ -232,7 +232,8 @@ public class TestOMDbCheckpointServlet {
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl +
         crNl +
         sstFileName + crNl +
-        "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl).getBytes();
+        "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl)
+        .getBytes(StandardCharsets.UTF_8);
     InputStream input = new ByteArrayInputStream(data);
     ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
     when(requestMock.getInputStream()).thenReturn(inputStream);
