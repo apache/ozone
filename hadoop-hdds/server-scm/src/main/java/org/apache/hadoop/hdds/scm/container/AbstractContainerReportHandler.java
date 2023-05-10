@@ -361,13 +361,33 @@ public class AbstractContainerReportHandler {
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
-        .setEmpty(replicaProto.getIsEmpty())
+        .setEmpty(fillEmpty(replicaProto))
         .build();
 
     if (replica.getState().equals(State.DELETED)) {
       containerManager.removeContainerReplica(containerId, replica);
     } else {
       containerManager.updateContainerReplica(containerId, replica);
+    }
+  }
+
+  /**
+   * Determines whether container replica is empty or not.
+   *
+   * @param replicaProto container replica details.
+   * @return true if container replica is empty else false
+   */
+  private boolean fillEmpty(final ContainerReplicaProto replicaProto) {
+    if (replicaProto.hasIsEmpty()) {
+      return replicaProto.getIsEmpty();
+    } else {
+      // Handled when DN version is old then there will not be isEmpty field.
+      // In this case judge container empty based on keyCount
+      // and bytesUsed field.
+      if (replicaProto.getKeyCount() == 0 && replicaProto.getUsed() == 0) {
+        return true;
+      }
+      return false;
     }
   }
 
