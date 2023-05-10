@@ -805,7 +805,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
       @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete, null,
+    return OmUtils.prepareKeyForDelete(keyToDelete,
           trxnLogIndex, isRatisEnabled);
   }
 

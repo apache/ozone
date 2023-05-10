@@ -98,7 +98,7 @@ public class S3MultipartUploadAbortResponse extends OmKeyResponse {
           OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          currentKeyPartInfo, null, omMultipartKeyInfo.getUpdateID(),
+          currentKeyPartInfo, omMultipartKeyInfo.getUpdateID(),
           isRatisEnabled);
       // multi-part key format is volumeName/bucketName/keyName/uploadId
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
