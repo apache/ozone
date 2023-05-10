@@ -577,6 +577,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 
   @Test
