@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
+import java.util.List;
 
 /**
  * Metadata object that represents a Container.
@@ -32,6 +36,9 @@ public class ContainerMetadata {
 
   @XmlElement(name = "NumberOfKeys")
   private long numberOfKeys;
+
+  @JsonProperty("pipelines")
+  private List<Pipeline> pipelines;
 
   public ContainerMetadata(long containerID) {
     this.containerID = containerID;
@@ -53,4 +60,12 @@ public class ContainerMetadata {
     this.numberOfKeys = numberOfKeys;
   }
 
+  public List<Pipeline> getPipelines() {
+    return pipelines;
+  }
+
+  public void setPipelines(
+      List<Pipeline> pipelines) {
+    this.pipelines = pipelines;
+  }
 }

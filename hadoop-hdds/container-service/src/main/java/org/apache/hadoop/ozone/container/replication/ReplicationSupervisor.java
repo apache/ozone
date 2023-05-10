@@ -288,8 +288,9 @@ public final class ReplicationSupervisor {
       int newMaxQueueSize = datanodeConfig.getCommandQueueLimit();
 
       if (isMaintenance(newState) || isDecommission(newState)) {
-        threadCount *= 2;
-        newMaxQueueSize *= 2;
+        threadCount = replicationConfig.scaleOutOfServiceLimit(threadCount);
+        newMaxQueueSize =
+            replicationConfig.scaleOutOfServiceLimit(newMaxQueueSize);
       }
 
       LOG.info("Node state updated to {}, scaling executor pool size to {}",

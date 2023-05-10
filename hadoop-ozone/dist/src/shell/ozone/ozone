@@ -81,6 +81,19 @@ function ozonecmd_case
   # exception as mentioned in HDDS-3812
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled ${RATIS_OPTS}"
+  # Add JVM parameter for Java 17
+  OZONE_MODULE_ACCESS_ARGS=""
+
+  # Get the version string
+  JAVA_VERSION_STRING=$(java -version 2>&1 | head -n 1)
+
+  # Extract the major version number
+  JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
+
+  # populate JVM args based on java version
+  if [[ "${JAVA_MAJOR_VERSION}" == "17" ]]; then
+      OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
+  fi
 
   case ${subcmd} in
     auditparser)
@@ -108,7 +121,7 @@ function ozonecmd_case
       ozone_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
       OZONE_DATANODE_OPTS="${RATIS_OPTS} ${OZONE_DATANODE_OPTS}"
       OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
-      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="ozone-datanode"
     ;;
@@ -126,7 +139,7 @@ function ozonecmd_case
     ;;
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
-      OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
+      OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     getconf)
@@ -139,7 +152,7 @@ function ozonecmd_case
       ozone_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
-      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
+      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
     sh | shell)
@@ -157,18 +170,18 @@ function ozonecmd_case
       ozone_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
       OZONE_SCM_OPTS="${RATIS_OPTS} ${OZONE_SCM_OPTS}"
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
-      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
+      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="hdds-server-scm"
     ;;
     s3g)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.s3.Gateway'
-      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties"
+      OZONE_S3G_OPTS="${OZONE_S3G_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/s3g-audit-log4j2.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-s3gateway"
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp"
+      OZONE_OPTS="${OZONE_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -184,6 +197,7 @@ function ozonecmd_case
     recon)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       OZONE_CLASSNAME='org.apache.hadoop.ozone.recon.ReconServer'
+      OZONE_RECON_OPTS="${OZONE_RECON_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-recon"
     ;;
     fs)

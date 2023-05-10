@@ -60,6 +60,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -191,7 +192,8 @@ public class TestValidateBCSIDOnRestart {
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     stateMachine.takeSnapshot();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    final Path parentPath = StatemachineImplTestUtil.findLatestSnapshot(storage)
+        .getFile().getPath();
     stateMachine.buildMissingContainerSet(parentPath.toFile());
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots

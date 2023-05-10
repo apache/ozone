@@ -286,12 +286,11 @@ public class SCMSecurityProtocolFailoverProxyProvider implements
 
   @Override
   public synchronized void close() throws IOException {
-    for (Map.Entry<String, ProxyInfo<SCMSecurityProtocolPB>> proxy :
-        scmProxies.entrySet()) {
-      if (proxy.getValue() != null) {
-        RPC.stopProxy(proxy.getValue());
+    for (ProxyInfo<SCMSecurityProtocolPB> proxyInfo : scmProxies.values()) {
+      SCMSecurityProtocolPB proxy = proxyInfo.proxy;
+      if (proxy != null) {
+        RPC.stopProxy(proxy);
       }
-      scmProxies.remove(proxy.getKey());
     }
   }
 
