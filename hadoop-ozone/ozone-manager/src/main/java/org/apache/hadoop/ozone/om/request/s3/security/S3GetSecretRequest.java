@@ -162,8 +162,7 @@ public class S3GetSecretRequest extends OMClientRequest {
                     new S3SecretValue(accessId, awsSecret.get());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
-                    assignS3SecretValue,
-                    transactionLogIndex);
+                    assignS3SecretValue);
               } else {
                 assignS3SecretValue = null;
               }

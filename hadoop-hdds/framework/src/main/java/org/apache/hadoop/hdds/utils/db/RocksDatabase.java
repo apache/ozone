@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -302,6 +303,11 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut array key {}", bytes2String(key));
+        LOG.debug("batchPut array value {}", bytes2String(value));
+      }
+
       assertClosed();
       try {
         counter.incrementAndGet();
@@ -312,7 +318,26 @@ public final class RocksDatabase {
         counter.decrementAndGet();
       }
     }
-    
+
+    public void batchPut(ManagedWriteBatch writeBatch, ByteBuffer key,
+        ByteBuffer value) throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
+        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+      }
+
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.put(getHandle(), key.duplicate(), value);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchPut ByteBuffer key "
+            + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
     public void markClosed() {
       isClosed.set(true);
     }
@@ -432,6 +457,20 @@ public final class RocksDatabase {
   }
 
   public void put(ColumnFamily family, byte[] key, byte[] value)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().put(family.getHandle(), writeOptions, key, value);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "put " + bytes2String(key), e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void put(ColumnFamily family, ByteBuffer key, ByteBuffer value)
       throws IOException {
     assertClose();
     try {

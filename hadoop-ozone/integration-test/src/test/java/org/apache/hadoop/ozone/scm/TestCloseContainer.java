@@ -21,13 +21,12 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -115,12 +114,7 @@ public class TestCloseContainer {
     // Pick any container on the cluster, get its pipeline, close it and then
     // wait for the container to close
     ContainerInfo container = scm.getContainerManager().getContainers().get(0);
-    Pipeline pipeline = scm.getPipelineManager()
-        .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().closePipeline(pipeline, false);
-    GenericTestUtils.waitFor(() ->
-            container.getState() == HddsProtos.LifeCycleState.CLOSED,
-        200, 30000);
+    OzoneTestUtils.closeContainer(scm, container);
 
     long originalSeq = container.getSequenceId();
 

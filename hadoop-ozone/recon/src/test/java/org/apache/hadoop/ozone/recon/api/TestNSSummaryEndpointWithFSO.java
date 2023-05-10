@@ -683,7 +683,7 @@ public class TestNSSummaryEndpointWithFSO {
     Assert.assertEquals(bin1, fileSizeDist[1]);
     Assert.assertEquals(bin2, fileSizeDist[2]);
     Assert.assertEquals(bin3, fileSizeDist[3]);
-    for (int i = 4; i < ReconConstants.NUM_OF_BINS; ++i) {
+    for (int i = 4; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
       Assert.assertEquals(0, fileSizeDist[i]);
     }
   }

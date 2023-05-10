@@ -123,14 +123,14 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore, S3SecretCache {
+    S3SecretStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
   /**
    * OM RocksDB Structure .
    * <p>
-   * OM DB stores metadata as KV pairs in different column families.
+   * OM DB stores metadata as KV pairs iThis n different column families.
    * <p>
    * OM DB Schema:
    *
@@ -187,7 +187,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |----------------------------------------------------------------------|
    * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
    * |----------------------------------------------------------------------|
-   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName -> KeyInfo    |
+   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
+   * |                  |                                      KeyInfo      |
    * |----------------------------------------------------------------------|
    *
    * Snapshot Tables:
@@ -196,7 +197,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
-   * |snapshotRenamedKeyTable| /volumeName/bucketName/objectID -> /v/b/origKey |
+   * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
+   * |                       |  1. /volumeId/bucketId/parentId/dirName         |
+   * |                       |  2. /volumeId/bucketId/parentId/fileName        |
+   * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
    */
 
@@ -224,8 +228,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       "principalToAccessIdsTable";
   public static final String TENANT_STATE_TABLE = "tenantStateTable";
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
-  public static final String SNAPSHOT_RENAMED_KEY_TABLE =
-      "snapshotRenamedKeyTable";
+  public static final String SNAPSHOT_RENAMED_TABLE =
+      "snapshotRenamedTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -248,7 +252,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_KEY_TABLE
+      SNAPSHOT_RENAMED_TABLE
   };
 
   private DBStore store;
@@ -277,7 +281,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table tenantStateTable;
 
   private Table snapshotInfoTable;
-  private Table snapshotRenamedKeyTable;
+  private Table snapshotRenamedTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -576,7 +580,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(PRINCIPAL_TO_ACCESS_IDS_TABLE)
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
-        .addTable(SNAPSHOT_RENAMED_KEY_TABLE)
+        .addTable(SNAPSHOT_RENAMED_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
         .addCodec(RepeatedOmKeyInfo.class,
@@ -697,12 +701,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, SnapshotInfo.class);
     checkTableStatus(snapshotInfoTable, SNAPSHOT_INFO_TABLE, addCacheMetrics);
 
-    // volumeName/bucketName/objectID -> renamedKey (renamed key for key table)
-    snapshotRenamedKeyTable = this.store.getTable(SNAPSHOT_RENAMED_KEY_TABLE,
+    // volumeName/bucketName/objectID -> renamedKey or renamedDir
+    snapshotRenamedTable = this.store.getTable(SNAPSHOT_RENAMED_TABLE,
         String.class, String.class);
-    checkTableStatus(snapshotRenamedKeyTable, SNAPSHOT_RENAMED_KEY_TABLE,
+    checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
-    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedKeyTable.
+    // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
   }
 
   /**
@@ -942,7 +946,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         bucketLayout.isFileSystemOptimized() ?
                 OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
                         bucketId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX :
-                bucketKey;
+            OzoneFSUtils.addTrailingSlashIfNeeded(bucketKey);
 
     // Check key/file Table
     Table<String, OmKeyInfo> table = getKeyTable(bucketLayout);
@@ -1546,7 +1550,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Get the latest OmSnapshot for a snapshot path.
    */
   public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
-                                       OmSnapshotManager snapshotManager)
+                                      OmSnapshotManager snapshotManager)
       throws IOException {
 
     String latestPathSnapshot =
@@ -1721,18 +1725,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public void put(String kerberosId, S3SecretValue secretValue, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
-        CacheValue.get(txId, secretValue));
-  }
-
-  @Override
-  public void invalidate(String id, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(id),
-        CacheValue.get(txId));
-  }
-
-  @Override
   public S3Batcher batcher() {
     return new S3Batcher() {
       @Override
@@ -1786,8 +1778,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, String> getSnapshotRenamedKeyTable() {
-    return snapshotRenamedKeyTable;
+  public Table<String, String> getSnapshotRenamedTable() {
+    return snapshotRenamedTable;
   }
 
   /**

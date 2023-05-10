@@ -30,8 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import java.util.concurrent.TimeUnit;
-
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
@@ -44,6 +43,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -79,25 +79,14 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
 
-  @VisibleForTesting
-  public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families, long maxDbUpdatesSizeThreshold)
-      throws IOException {
-    this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
-        maxDbUpdatesSizeThreshold, true);
-  }
-
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanNameName, boolean enableCompactionLog,
-                  long maxTimeAllowedForSnapshotInDag,
-                  long compactionDagDaemonInterval,
                   long maxDbUpdatesSizeThreshold,
-                  boolean createCheckpointDirs)
+                  boolean createCheckpointDirs,
+                  ConfigurationSource configuration)
 
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
@@ -111,11 +100,10 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
+        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(),
-            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
+            dbLocation.toString(), configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -267,7 +255,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public Table<byte[], byte[]> getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws IOException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
