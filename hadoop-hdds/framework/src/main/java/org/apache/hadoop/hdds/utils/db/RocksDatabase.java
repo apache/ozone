@@ -49,6 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -901,5 +902,19 @@ public final class RocksDatabase implements Closeable {
     return dbNameToCfHandleMap;
   }
 
-
+  @Override
+  protected void finalize() throws Throwable {
+    if (!isClosed()) {
+      String warning = "RocksDatabase is not closed properly.";
+      if (LOG.isDebugEnabled()) {
+        String stackTrace =
+            Arrays.toString(Thread.currentThread().getStackTrace());
+        String debugMessage = String
+            .format("%n StackTrace for unclosed instance: %s", stackTrace);
+        warning = warning.concat(debugMessage);
+      }
+      LOG.warn(warning);
+    }
+    super.finalize();
+  }
 }

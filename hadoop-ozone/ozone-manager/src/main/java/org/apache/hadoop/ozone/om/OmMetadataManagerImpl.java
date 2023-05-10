@@ -390,9 +390,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       setStore(loadDB(conf, metaDir, dbName, false,
           java.util.Optional.of(Boolean.TRUE), false));
       initializeOmTables(false);
-    } catch (Exception e) {
+    } catch (IOException e) {
       stop();
-      throw new IOException(e.getCause());
+      throw e;
     }
   }
 

@@ -338,13 +338,13 @@ public final class OmSnapshotManager implements AutoCloseable {
               snapshotInfo.getVolumeName(),
               snapshotInfo.getBucketName(),
               snapshotInfo.getName());
-        } catch (Exception e) {
+        } catch (IOException e) {
           // Close RocksDB if snapshotMetadataManager got initialized.
           if (snapshotMetadataManager != null &&
               !snapshotMetadataManager.getStore().isClosed()) {
             snapshotMetadataManager.getStore().close();
           }
-          throw new IOException(e.getCause());
+          throw e;
         }
       }
     };
