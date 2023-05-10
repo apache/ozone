@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
+Documentation       Smoketest ozone cluster snapshot feature
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
@@ -25,7 +25,7 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Create snapshot
-    [Tags]     snapshot-support
+    [Tags]     snapshot-enabled
     ${output} =         Execute                ozone sh volume create vol
                         Should not contain     ${output}       Failed
     ${output} =         Execute                ozone sh bucket create /vol/bucket2
@@ -36,42 +36,42 @@ Create snapshot
                         Execute                ozone sh key put /vol/bucket2/key1 /tmp/sourcekey
                         Execute                ozone sh snapshot create /vol/bucket2 snapshot2
 
-Create snapshot in non-supported ozone version
-    [Tags]     snapshot-non-support
+Attempt to create snapshot when snapshot feature is disabled
+    [Tags]     snapshot-disabled
     ${output} =         Execute and checkrc    ozone sh volume create vol     0
     ${output} =         Execute and checkrc    ozone sh bucket create /vol/bucket2     0
     ${output} =         Execute and checkrc    ozone sh snapshot create /vol/bucket2 snapshot1     255
 
 List snapshot
-    [Tags]     snapshot-support
+    [Tags]     snapshot-enabled
     ${output} =         Execute           ozone sh snapshot ls /vol/bucket2
                         Should contain    ${output}       snapshot1
                         Should contain    ${output}       snapshot2
                         Should contain    ${output}       SNAPSHOT_ACTIVE
 
-List snapshot in non-supported ozone version
-    [Tags]     snapshot-non-support
+Attempt to list snapshot when snapshot feature is disabled
+    [Tags]     snapshot-disabled
     ${output} =         Execute and checkrc       ozone sh snapshot ls /vol/bucket2    255
 
 Snapshot Diff
-    [Tags]     snapshot-support
+    [Tags]     snapshot-enabled
     ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
                         Should contain    ${output}       Snapshot diff job is IN_PROGRESS
     ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
                         Should contain    ${output}       +    key1
 
-Snapshot Diff in non-supported ozone version
-    [Tags]     snapshot-non-support
+Attempt to snapshotDiff when snapshot feature is disabled
+    [Tags]     snapshot-disabled
     ${output} =         Execute and checkrc          ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2     255
 
 Delete snapshot
-    [Tags]     snapshot-support
+    [Tags]     snapshot-enabled
     ${output} =         Execute           ozone sh snapshot delete /vol/bucket2 snapshot1
                         Should not contain      ${output}       Failed
     ${output} =         Execute           ozone sh snapshot ls /vol/bucket2
                         Should contain          ${output}       SNAPSHOT_DELETED
 
-Delete snapshot in non-supported ozone version
-    [Tags]     snapshot-non-support
+Attempt to delete when snapshot feature is disabled
+    [Tags]     snapshot-disabled
     ${output} =         Execute and checkrc          ozone sh snapshot delete /vol/bucket2 snapshot1     255
 
