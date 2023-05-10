@@ -703,7 +703,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Bucket or Volume name has an unsupported character : #",
+        "Bucket or Volume name has an unsupported character : #", 
         () -> volume.createBucket(bucketName));
   }
 
