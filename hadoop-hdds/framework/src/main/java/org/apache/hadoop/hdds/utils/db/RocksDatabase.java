@@ -82,6 +82,7 @@ public final class RocksDatabase implements Closeable {
   private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
       new HashMap<>();
 
+  private final StackTraceElement[] stackTrace;
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
@@ -353,6 +354,7 @@ public final class RocksDatabase implements Closeable {
     this.descriptors = descriptors;
     this.columnFamilies = columnFamilies;
     this.counter = counter;
+    this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
   @Override
@@ -907,10 +909,8 @@ public final class RocksDatabase implements Closeable {
     if (!isClosed()) {
       String warning = "RocksDatabase is not closed properly.";
       if (LOG.isDebugEnabled()) {
-        String stackTrace =
-            Arrays.toString(Thread.currentThread().getStackTrace());
-        String debugMessage = String
-            .format("%n StackTrace for unclosed instance: %s", stackTrace);
+        String debugMessage = String.format("%n StackTrace for unclosed " +
+            "RocksDatabase instance: %s", Arrays.toString(stackTrace));
         warning = warning.concat(debugMessage);
       }
       LOG.warn(warning);
