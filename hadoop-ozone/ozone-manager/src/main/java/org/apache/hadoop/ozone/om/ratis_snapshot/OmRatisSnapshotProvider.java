@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -80,7 +81,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final Map<String, OMNodeDetails> peerNodesMap;
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
-  private final URLConnectionFactory connectionFactory;
+  private URLConnectionFactory connectionFactory;
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
@@ -186,7 +187,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    * @throws IOException if an exception occured during writing to output
    * stream.
    */
-  private static void writeFormData(HttpURLConnection connection,
+  public static void writeFormData(HttpURLConnection connection,
       List<String> sstFiles) throws IOException {
     try (DataOutputStream out =
              new DataOutputStream(connection.getOutputStream())) {
@@ -216,5 +217,11 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     if (connectionFactory != null) {
       connectionFactory.destroy();
     }
+  }
+
+  @VisibleForTesting
+  public void setConnectionFactory(
+      URLConnectionFactory connectionFactory) {
+    this.connectionFactory = connectionFactory;
   }
 }

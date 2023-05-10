@@ -19,14 +19,19 @@ package org.apache.hadoop.hdds.scm;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.compress.compressors.CompressorException;
@@ -50,7 +55,10 @@ import org.junit.jupiter.api.Timeout;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -138,6 +146,26 @@ public class TestSCMDbCheckpointServlet {
           .thenReturn(cluster.getStorageContainerManager());
       when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
           .thenReturn("true");
+
+      String crNl = "\r\n";
+      String sstFileName = "sstFile.sst";
+      byte[] data = ("--" +  MULTIPART_FORM_DATA_BOUNDARY + crNl +
+          "Content-Disposition: form-data; name=\"" +
+          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl +
+          crNl +
+          sstFileName + crNl +
+          "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl).getBytes();
+      InputStream input = new ByteArrayInputStream(data);
+      ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+      when(requestMock.getInputStream()).thenReturn(inputStream);
+      when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
+          .thenAnswer(invocation -> {
+            byte[] buffer = invocation.getArgument(0);
+            int offset = invocation.getArgument(1);
+            int length = invocation.getArgument(2);
+            return input.read(buffer, offset, length);
+          });
+
       doNothing().when(responseMock).setContentType("application/x-tgz");
       doNothing().when(responseMock).setHeader(Matchers.anyString(),
           Matchers.anyString());
@@ -181,6 +209,11 @@ public class TestSCMDbCheckpointServlet {
               getLastCheckpointStreamingTimeTaken() > 0);
       Assertions.assertTrue(scmMetrics.getDBCheckpointMetrics().
           getNumCheckpoints() > initialCheckpointCount);
+
+      List<String> toExcludeList = new ArrayList<>();
+      toExcludeList.add(sstFileName);
+      Mockito.verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
+          any(), any(), eq(toExcludeList), any());
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }

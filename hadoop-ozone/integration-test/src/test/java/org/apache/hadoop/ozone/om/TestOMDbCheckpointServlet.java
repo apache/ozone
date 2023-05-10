@@ -19,13 +19,16 @@
 package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletContext;
+import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -72,6 +75,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 
@@ -91,6 +95,8 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -219,6 +225,25 @@ public class TestOMDbCheckpointServlet {
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
+    String crNl = "\r\n";
+    String sstFileName = "sstFile.sst";
+    byte[] data = ("--" +  MULTIPART_FORM_DATA_BOUNDARY + crNl +
+        "Content-Disposition: form-data; name=\"" +
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl +
+        crNl +
+        sstFileName + crNl +
+        "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl).getBytes();
+    InputStream input = new ByteArrayInputStream(data);
+    ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+    when(requestMock.getInputStream()).thenReturn(inputStream);
+    when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
+        .thenAnswer(invocation -> {
+          byte[] buffer = invocation.getArgument(0);
+          int offset = invocation.getArgument(1);
+          int length = invocation.getArgument(2);
+          return input.read(buffer, offset, length);
+        });
+
     doNothing().when(responseMock).setContentType("application/x-tar");
     doNothing().when(responseMock).setHeader(Matchers.anyString(),
         Matchers.anyString());
@@ -240,6 +265,11 @@ public class TestOMDbCheckpointServlet {
             getLastCheckpointStreamingTimeTaken() > 0);
     Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
         getNumCheckpoints() > initialCheckpointCount);
+
+    List<String> toExcludeList = new ArrayList<>();
+    toExcludeList.add(sstFileName);
+    Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
+        any(), any(), eq(toExcludeList), any());
   }
 
   @Test
