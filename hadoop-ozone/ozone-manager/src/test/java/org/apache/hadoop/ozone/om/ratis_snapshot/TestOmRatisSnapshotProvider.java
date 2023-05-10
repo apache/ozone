@@ -22,9 +22,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -104,17 +104,18 @@ public class TestOmRatisSnapshotProvider {
     when(connectionFactory.openConnection(any(URL.class), anyBoolean()))
         .thenReturn(connection);
 
-    OutputStream outputStream = new ByteArrayOutputStream();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     when(connection.getOutputStream()).thenReturn(outputStream);
     when(connection.getResponseCode()).thenReturn(HTTP_OK);
     InputStream inputStream =
-        new ByteArrayInputStream("somehting".getBytes());
+        new ByteArrayInputStream(outputStream.toByteArray());
     when(connection.getInputStream()).thenReturn(inputStream);
 
     omRatisSnapshotProvider.downloadSnapshot(leaderNodeId, targetFile);
 
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(), outputStream.toString());
+    Assertions.assertEquals(sb.toString(),
+        new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 
   @Test
@@ -123,7 +124,7 @@ public class TestOmRatisSnapshotProvider {
     List<String> sstFiles = new ArrayList<>();
     String fileName = "file1.sst";
     sstFiles.add(fileName);
-    OutputStream outputStream = new ByteArrayOutputStream();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     when(connection.getOutputStream()).thenReturn(outputStream);
 
 
@@ -131,19 +132,21 @@ public class TestOmRatisSnapshotProvider {
 
     sb.append(fileName).append(CR_NL);
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(), outputStream.toString());
+    Assertions.assertEquals(sb.toString(),
+        new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 
   @Test
   public void testWriteFormDataWithoutSstFile() throws IOException {
     HttpURLConnection connection = mock(HttpURLConnection.class);
-    OutputStream outputStream = new ByteArrayOutputStream();
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     when(connection.getOutputStream()).thenReturn(outputStream);
 
     OmRatisSnapshotProvider.writeFormData(connection, new ArrayList<>());
 
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(), outputStream.toString());
+    Assertions.assertEquals(sb.toString(),
+        new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 
 }
