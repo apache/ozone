@@ -135,6 +135,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value)
       throws IOException {
+    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
+    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
+    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+      // The buffers will be released after commit.
+      rawTable.putWithBatch(batch,
+          keyCodec.toDirectCodecBuffer(key),
+          valueCodec.toDirectCodecBuffer(value));
+    }
+
     byte[] keyData = codecRegistry.asRawData(key);
     byte[] valueData = codecRegistry.asRawData(value);
     rawTable.putWithBatch(batch, keyData, valueData);
