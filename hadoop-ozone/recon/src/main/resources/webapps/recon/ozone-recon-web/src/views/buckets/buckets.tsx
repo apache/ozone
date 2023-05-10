@@ -70,7 +70,17 @@ interface IBucketsState {
   volumeOptions: IOption[];
   currentRow?: IBucket;
   showPanel: boolean;
+  selectedLimit: IOption;
 }
+
+const LIMIT_OPTIONS: IOption[] = [
+  {label: "1000", value: "1000"},
+  {label: "5000", value: "5000"},
+  {label: "10000", value: "10000"},
+  {label: "20000", value: "20000"}
+]
+
+const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
 
 const renderIsVersionEnabled = (isVersionEnabled: boolean) => {
   return isVersionEnabled ?
@@ -252,7 +262,8 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       selectedVolumes: [],
       volumeOptions: [],
       showPanel: false,
-      currentRow: {}
+      currentRow: {},
+      selectedLimit: INITIAL_LIMIT_OPTION
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -304,6 +315,14 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
     });
   };
 
+  _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
+    const limit = (selected as IOption)
+    this.setState({
+      selectedLimit: limit
+    })
+    this._loadData()
+  }
+
   _handleVolumeChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
     const {volumeBucketMap} = this.state;
     const selectedVolumes = (selected as IOption[]);
@@ -351,7 +370,11 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
       showPanel: false
     }));
-    axios.get('/api/v1/om/buckets').then(response => {
+    axios.get('/api/v1/om/buckets', {
+      params: {
+        limit: this.state.selectedLimit.value
+      },
+    }).then(response => {
       const bucketsResponse: IBucketsResponse = response.data;
       const totalCount = bucketsResponse.totalCount;
       const buckets: IBucketResponse[] = bucketsResponse.buckets;
@@ -447,7 +470,8 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
 
   render() {
     const {loading, totalCount, lastUpdated, selectedColumns,
-      columnOptions, volumeOptions, selectedVolumes, selectedBuckets, showPanel, currentRow} = this.state;
+      columnOptions, volumeOptions, selectedVolumes,
+      selectedBuckets, showPanel, currentRow, selectedLimit} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} buckets`,
       showSizeChanger: true,
@@ -484,6 +508,19 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
               allOption={allColumnsOption}
               onChange={this._handleColumnChange}
             /> Columns
+          </div>
+          <div className='limit-block'>
+            <MultiSelect
+                allowSelectAll={false}
+                isMulti={false}
+                maxShowValues={LIMIT_OPTIONS.length}
+                className='multi-select-container'
+                options={LIMIT_OPTIONS}
+                closeMenuOnSelect={true}
+                hideSelectedOptions={false}
+                value={selectedLimit}
+                onChange={this._handleLimitChange}
+            /> Limit
           </div>
           <AutoReloadPanel
             isLoading={loading}

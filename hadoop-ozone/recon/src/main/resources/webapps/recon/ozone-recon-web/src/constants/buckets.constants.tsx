@@ -16,32 +16,4 @@
  * limitations under the License.
  */
 
-.buckets-container {
-  .content-div {
-    .pipeline-container {
-      margin-bottom: 5px;
-    }
-  }
-
-  .filter-block { 
-    font-size: 14px;
-    font-weight: normal;
-    display: inline-block;
-    margin-left: 20px;
-  }
-  
-  .multi-select-container {
-    padding-left: 5px;
-    margin-right: 5px;
-    display: inline-block;
-    min-width: 200px;
-    z-index: 99;
-  }
-
-  .limit-block {
-    font-size: 14px;
-    font-weight: normal;
-    display: inline-block;
-    margin-left: 20px;
-  }
-}
+export const BUCKET_INITIAL_LIMIT = 1000;

@@ -25,6 +25,8 @@
   "/task/status": "/taskStatus",
   "/containers/unhealthy": "/unhealthyContainers",
   "/om/volumes": "/volumes",
+  "/om/volumes?limit=*": "/volumes",
   "/om/buckets": "/buckets",
-  "/om/buckets?volume=": "/buckets"
+  "/om/buckets?volume=": "/buckets",
+  "/om/buckets?limit=*": "/buckets"
 }

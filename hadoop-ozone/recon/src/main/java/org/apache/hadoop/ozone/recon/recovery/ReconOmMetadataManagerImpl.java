@@ -290,7 +290,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (Strings.isNullOrEmpty(volumeName)) {
       // startBucket requires the knowledge of the volume, for example
       // there might be buckets with the same names under different
-      // volumes. Hence, startBucket and bucketPrefix will be ignored if
+      // volumes. Hence, startBucket will be ignored if
       // volumeName is not specified
       return listAllBuckets(maxNumOfBuckets);
     }

@@ -33,6 +33,7 @@ import {AclPanel} from '../../components/aclDrawer/aclDrawer';
 import {ColumnProps} from 'antd/es/table';
 import QuotaBar from '../../components/quotaBar/quotaBar';
 import {Link} from 'react-router-dom';
+import CreatableSelect from 'react-select/creatable';
 
 interface IVolumeResponse {
   volume: string;
@@ -62,6 +63,7 @@ interface IVolumesState {
   columnOptions: IOption[];
   currentRow?: IVolume;
   showPanel: boolean;
+  selectedLimit: IOption;
 }
 
 const COLUMNS: VolumnTableColumn[] = [
@@ -161,6 +163,15 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+const LIMIT_OPTIONS: IOption[] = [
+  {label: "1000", value: "1000"},
+  {label: "5000", value: "5000"},
+  {label: "10000", value: "10000"},
+  {label: "20000", value: "20000"}
+]
+
+const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
+
 export class Volumes extends React.Component<Record<string, object>, IVolumesState> {
   autoReload: AutoReloadHelper;
 
@@ -175,7 +186,8 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       selectedColumns: [],
       columnOptions: defaultColumns,
       showPanel: false,
-      currentRow: {}
+      currentRow: {},
+      selectedLimit: INITIAL_LIMIT_OPTION
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -225,6 +237,30 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
     });
   };
 
+  _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
+    const limit = (selected as IOption)
+    this.setState({
+      selectedLimit: limit
+    });
+    this._loadData()
+  }
+
+  _onCreateOption = (created: string) => {
+    // Check that it's a numeric and non-negative
+    if (parseInt(created)) {
+      const createdOption: IOption = {
+        label: created,
+        value: created
+      }
+      this.setState({
+        selectedLimit: createdOption
+      });
+      this._loadData()
+    } else {
+      console.log('Not a valid option')
+    }
+  }
+
   _getSelectedColumns = (selected: IOption[]) => {
     const selectedColumns = selected.length > 0 ? selected : COLUMNS.filter(column => column.isVisible).map(column => ({
       label: column.key,
@@ -246,7 +282,11 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
       showPanel: false
     }));
-    axios.get('/api/v1/om/volumes').then(response => {
+    axios.get('/api/v1/om/volumes', {
+      params: {
+        limit: this.state.selectedLimit.value
+      },
+    }).then(response => {
       const volumesResponse: IVolumesResponse = response.data;
       const totalCount = volumesResponse.totalCount;
       const volumes: IVolumeResponse[] = volumesResponse.volumes;
@@ -295,7 +335,8 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   };
 
   render() {
-    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions, showPanel, currentRow} = this.state;
+    const {dataSource, loading, totalCount, lastUpdated, selectedColumns,
+      columnOptions, showPanel, currentRow, selectedLimit} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} volumes`,
       showSizeChanger: true,
@@ -318,6 +359,35 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
               allOption={allColumnsOption}
               onChange={this._handleColumnChange}
             /> Columns
+          </div>
+          <div className='limit-block'>
+            <CreatableSelect
+                className={'limit-block'}
+                isClearable={false}
+                isDisabled={loading}
+                isLoading={loading}
+                onChange={this._handleLimitChange}
+                onCreateOption={this._onCreateOption}
+                isValidNewOption={(input, value, _option) => {
+                  return parseInt(input)
+                }}
+                options={LIMIT_OPTIONS}
+                value={selectedLimit}
+                formatCreateLabel={(input) => {
+                  return `New limit... ${input}`
+                }}
+            /> Limit
+            {/*<MultiSelect*/}
+            {/*    allowSelectAll={false}*/}
+            {/*    isMulti={false}*/}
+            {/*    maxShowValues={LIMIT_OPTIONS.length}*/}
+            {/*    className='multi-select-container'*/}
+            {/*    options={LIMIT_OPTIONS}*/}
+            {/*    closeMenuOnSelect={true}*/}
+            {/*    hideSelectedOptions={false}*/}
+            {/*    value={selectedLimit}*/}
+            {/*    onChange={this._handleLimitChange}*/}
+            {/*/> Limit*/}
           </div>
           <AutoReloadPanel
             isLoading={loading}
