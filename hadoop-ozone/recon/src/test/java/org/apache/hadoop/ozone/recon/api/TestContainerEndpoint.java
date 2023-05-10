@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -41,6 +42,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
+import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
@@ -69,6 +72,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -108,6 +113,10 @@ public class TestContainerEndpoint {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestContainerEndpoint.class);
+
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
@@ -1162,5 +1171,54 @@ public class TestContainerEndpoint {
     Assertions.assertEquals(107, deletedContainerInfo.getContainerID());
     Assertions.assertEquals("DELETED",
         deletedContainerInfo.getContainerState());
+  }
+
+  @Test
+  public void testGetContainerInsightsNonSCMContainers()
+      throws IOException, TimeoutException {
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    putContainerInfos(2);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    assertEquals(omContainers.size(), scmContainers.size());
+    // delete container Id 1 from SCM
+    reconContainerManager.deleteContainer(ContainerID.valueOf(1));
+    Response containerInsights =
+        containerEndpoint.getContainerMisMatchInsights();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+    ContainerDiscrepancyInfo containerDiscrepancyInfo =
+        containerDiscrepancyInfoList.get(0);
+    assertEquals(1, containerDiscrepancyInfo.getContainerID());
+    assertEquals(1, containerDiscrepancyInfoList.size());
+    assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
+  }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainers()
+      throws IOException, TimeoutException {
+    putContainerInfos(2);
+    List<ContainerKeyPrefix> deletedContainerKeyList =
+        reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
+            .stream().map(entry -> entry.getKey()).collect(
+                Collectors.toList());
+    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
+      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+        reconContainerMetadataManager
+            .batchDeleteContainerMapping(rdbBatchOperation, key);
+        reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+      } catch (IOException e) {
+        LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
+      }
+    });
+    Response containerInsights =
+        containerEndpoint.getContainerMisMatchInsights();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+    ContainerDiscrepancyInfo containerDiscrepancyInfo =
+        containerDiscrepancyInfoList.get(0);
+    assertEquals(2, containerDiscrepancyInfo.getContainerID());
+    assertEquals(1, containerDiscrepancyInfoList.size());
+    assertEquals("SCM", containerDiscrepancyInfo.getExistsAt());
   }
 }
