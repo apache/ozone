@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
  * Protocol for secret key related operations, to be used by SCM service role.
  */
 @ProtocolInfo(protocolName =
-    "org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocolOm",
+    "org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm",
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = HDDS_SCM_KERBEROS_PRINCIPAL_KEY,

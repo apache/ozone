@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIP
  * service role.
  */
 @ProtocolInfo(protocolName =
-    "org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocolDatanode",
+    "org.apache.hadoop.hdds.protocol.SecretKeyProtocolDatanode",
     protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
