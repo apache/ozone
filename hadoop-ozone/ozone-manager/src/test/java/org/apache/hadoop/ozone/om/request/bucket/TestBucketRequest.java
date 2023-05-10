@@ -91,7 +91,7 @@ public class TestBucketRequest {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
-    when(ozoneManager.resolveBucketLinkWithoutAcl(any(Pair.class)))
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenAnswer(invocation -> new ResolvedBucket(
             invocation.getArgument(0), invocation.getArgument(0)));
   }

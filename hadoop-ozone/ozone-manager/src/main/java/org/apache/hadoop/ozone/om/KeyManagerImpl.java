@@ -869,7 +869,7 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
-    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLinkWithoutAcl(
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
         Pair.of(obj.getVolumeName(), obj.getBucketName()));
     String volume = resolvedBucket.realVolume();
     String bucket = resolvedBucket.realBucket();
@@ -916,7 +916,7 @@ public class KeyManagerImpl implements KeyManager {
 
     ResolvedBucket resolvedBucket;
     try {
-      resolvedBucket = ozoneManager.resolveBucketLinkWithoutAcl(
+      resolvedBucket = ozoneManager.resolveBucketLink(
           Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
     } catch (IOException e) {
       throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);

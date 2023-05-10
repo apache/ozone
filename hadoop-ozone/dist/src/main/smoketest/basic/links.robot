@@ -39,11 +39,13 @@ Setup ACL tests
     Execute             ozone sh bucket create ${source}/readable-bucket
     Execute             ozone sh key put ${source}/readable-bucket/key-in-readable-bucket /etc/passwd
     Execute             ozone sh bucket create ${source}/unreadable-bucket
+
+    Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
+    Execute             ozone sh volume addacl --acl user:testuser2:r[DEFAULT] ${target}
+
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link2
-    Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
 
-    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
     Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
     Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
 
