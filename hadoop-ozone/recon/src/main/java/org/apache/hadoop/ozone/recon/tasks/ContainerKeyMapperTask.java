@@ -76,13 +76,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     long omKeyCount = 0;
-    // Maps the (container, key) -> count
-    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
-    // Maps the key -> containerId
-    Map<Long, Long> containerKeyCountMap = new HashMap<>();
-    // List of the deleted (container, key) pair's
-    List<ContainerKeyPrefix> deletedKeyCountList = new ArrayList<>();
-
     try {
       LOG.info("Starting a 'reprocess' run of ContainerKeyMapperTask.");
       Instant start = Instant.now();
@@ -102,8 +95,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           while (keyIter.hasNext()) {
             Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
             OmKeyInfo omKeyInfo = kv.getValue();
-            handlePutOMKeyEvent(kv.getKey(), omKeyInfo, containerKeyMap,
-                containerKeyCountMap, deletedKeyCountList);
+            writeOMKeyToContainerDB(kv.getKey(), omKeyInfo);
             omKeyCount++;
           }
         }
@@ -117,12 +109,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key Prefix data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
-    }
-    try {
-      writeToTheDB(containerKeyMap, containerKeyCountMap, deletedKeyCountList);
-    } catch (IOException e) {
-      LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
     return new ImmutablePair<>(getTaskName(), true);
@@ -373,6 +359,57 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           // keyCount will be 0 if containerID is not found. So, there is no
           // need to initialize keyCount for the first time.
           containerKeyCountMap.put(containerId, ++keyCount);
+        }
+      }
+    }
+
+    if (containerCountToIncrement > 0) {
+      reconContainerMetadataManager
+          .incrementContainerCountBy(containerCountToIncrement);
+    }
+  }
+
+  /**
+   * Write an OM key to container DB and update containerID -> no. of keys
+   * count.
+   *
+   * @param key key String
+   * @param omKeyInfo omKeyInfo value
+   * @throws IOException if unable to write to recon DB.
+   */
+  private void writeOMKeyToContainerDB(String key, OmKeyInfo omKeyInfo)
+      throws IOException {
+    long containerCountToIncrement = 0;
+    for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : omKeyInfo
+        .getKeyLocationVersions()) {
+      long keyVersion = omKeyLocationInfoGroup.getVersion();
+      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup
+          .getLocationList()) {
+        long containerId = omKeyLocationInfo.getContainerID();
+        ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
+            containerId, key, keyVersion);
+        if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
+            containerKeyPrefix) == 0) {
+          // Save on writes. No need to save same container-key prefix
+          // mapping again.
+          reconContainerMetadataManager.storeContainerKeyMapping(
+              containerKeyPrefix, 1);
+
+          // check if container already exists and
+          // increment the count of containers if it does not exist
+          if (!reconContainerMetadataManager.doesContainerExists(containerId)) {
+            containerCountToIncrement++;
+          }
+
+          // update the count of keys for the given containerID
+          long keyCount = reconContainerMetadataManager
+              .getKeyCountForContainer(containerId);
+
+          // increment the count and update containerKeyCount.
+          // keyCount will be 0 if containerID is not found. So, there is no
+          // need to initialize keyCount for the first time.
+          reconContainerMetadataManager.storeContainerKeyCount(containerId,
+              ++keyCount);
         }
       }
     }
