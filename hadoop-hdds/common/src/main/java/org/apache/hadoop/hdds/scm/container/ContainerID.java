@@ -24,6 +24,9 @@ import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
@@ -32,6 +35,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * normal integers in code.
  */
 public final class ContainerID implements Comparable<ContainerID> {
+  private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
+      LongCodec.get(), ContainerID::valueOf, c -> c.id, true);
+
+  public static Codec<ContainerID> getCodec() {
+    return CODEC;
+  }
 
   private final long id;
 
