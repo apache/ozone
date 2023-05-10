@@ -2284,7 +2284,7 @@ public class TestRootedOzoneFileSystem {
     String bucketNameLocal = RandomStringUtils.randomNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     ofs.mkdirs(volume);
-    LambdaTestUtils.intercept(FileNotFoundException.class,
+    LambdaTestUtils.intercept(OMException.class,
         () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
     ofs.delete(volume, true);
