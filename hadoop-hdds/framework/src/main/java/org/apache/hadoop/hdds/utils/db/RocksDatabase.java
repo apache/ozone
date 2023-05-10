@@ -73,7 +73,7 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
  * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase {
+public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
@@ -354,6 +354,7 @@ public final class RocksDatabase {
     this.counter = counter;
   }
 
+  @Override
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
       // Wait for all background work to be cancelled first. e.g. RDB compaction

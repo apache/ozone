@@ -295,47 +295,57 @@ public final class OmSnapshotManager implements AutoCloseable {
       // load the snapshot into the cache if not already there
       @Nonnull
       public OmSnapshot load(@Nonnull String snapshotTableKey)
-          throws IOException {
-        // see if the snapshot exists
-        SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
-
-        // Block snapshot from loading when it is no longer active e.g. DELETED,
-        // unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo);
-
-        CacheValue<SnapshotInfo> cacheValue =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .getCacheValue(new CacheKey<>(snapshotTableKey));
-        boolean isSnapshotInCache = cacheValue != null && Optional.ofNullable(
-            cacheValue.getCacheValue()).isPresent();
-
-        // read in the snapshot
-        OzoneConfiguration conf = ozoneManager.getConfiguration();
-        OMMetadataManager snapshotMetadataManager;
-
-        // Create the snapshot metadata manager by finding the corresponding
-        // RocksDB instance, creating an OmMetadataManagerImpl instance based on
-        // that
+          throws Exception {
+        OMMetadataManager snapshotMetadataManager = null;
         try {
-          snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
-        } catch (IOException e) {
-          LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
-          throw e;
+          // see if the snapshot exists
+          SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
+
+          // Block snapshot from loading when it is no longer active
+          // e.g. DELETED, unless this is called from SnapshotDeletingService.
+          checkSnapshotActive(snapshotInfo);
+
+          CacheValue<SnapshotInfo> cacheValue =
+              ozoneManager.getMetadataManager().getSnapshotInfoTable()
+                  .getCacheValue(new CacheKey<>(snapshotTableKey));
+          boolean isSnapshotInCache = cacheValue != null && Optional.ofNullable(
+              cacheValue.getCacheValue()).isPresent();
+
+          // read in the snapshot
+          OzoneConfiguration conf = ozoneManager.getConfiguration();
+
+          // Create the snapshot metadata manager by finding the corresponding
+          // RocksDB instance, creating an OmMetadataManagerImpl instance based
+          // on that.
+          try {
+            snapshotMetadataManager = new OmMetadataManagerImpl(conf,
+                snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
+          } catch (IOException e) {
+            LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
+            throw e;
+          }
+
+          // create the other manager instances based on snapshot
+          // metadataManager
+          PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
+              false);
+          KeyManagerImpl km = new KeyManagerImpl(null,
+              ozoneManager.getScmClient(), snapshotMetadataManager, conf,
+              ozoneManager.getBlockTokenSecretManager(),
+              ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
+
+          return new OmSnapshot(km, pm, ozoneManager,
+              snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(),
+              snapshotInfo.getName());
+        } catch (Exception e) {
+          // Close RocksDB if snapshotMetadataManager got initialized.
+          if (snapshotMetadataManager != null &&
+              !snapshotMetadataManager.getStore().isClosed()) {
+            snapshotMetadataManager.getStore().close();
+          }
+          throw new IOException(e.getCause());
         }
-
-        // create the other manager instances based on snapshot metadataManager
-        PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
-            false);
-        KeyManagerImpl km = new KeyManagerImpl(null,
-            ozoneManager.getScmClient(), snapshotMetadataManager, conf,
-            ozoneManager.getBlockTokenSecretManager(),
-            ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
-
-        return new OmSnapshot(km, pm, ozoneManager,
-            snapshotInfo.getVolumeName(),
-            snapshotInfo.getBucketName(),
-            snapshotInfo.getName());
       }
     };
   }
