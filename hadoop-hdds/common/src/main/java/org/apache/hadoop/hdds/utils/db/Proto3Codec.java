@@ -24,8 +24,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Parser;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.IntFunction;
@@ -39,7 +38,9 @@ public final class Proto3Codec<M extends MessageLite>
                                      Codec<? extends MessageLite>> CODECS
       = new ConcurrentHashMap<>();
 
-  /** @return the {@link Codec} for the given class. */
+  /**
+   * @return the {@link Codec} for the given class.
+   */
   public static <T extends MessageLite> Codec<T> get(Class<T> clazz) {
     final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto3Codec::new);
     return (Codec<T>) codec;
@@ -68,20 +69,23 @@ public final class Proto3Codec<M extends MessageLite>
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) throws IOException {
-    final CodecBuffer buffer = allocator.apply(message.getSerializedSize());
-    try (OutputStream out = buffer.getOutputStream()) {
-      message.writeTo(CodedOutputStream.newInstance(out));
-    }
-    return buffer;
+      IntFunction<CodecBuffer> allocator) {
+    final int size = message.getSerializedSize();
+    return allocator.apply(size).put(buffer -> {
+      try {
+        message.writeTo(CodedOutputStream.newInstance(buffer));
+      } catch (IOException e) {
+        throw new IllegalStateException(
+            "Failed to writeTo: message=" + message, e);
+      }
+      return size;
+    });
   }
 
   @Override
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
-    try (InputStream in = buffer.getInputStream()) {
-      return parser.parseFrom(in);
-    }
+      throws InvalidProtocolBufferException {
+    return parser.parseFrom(buffer.asReadOnlyByteBuffer());
   }
 
   @Override
@@ -96,7 +100,7 @@ public final class Proto3Codec<M extends MessageLite>
   }
 
   @Override
-  public final M copyObject(M message) {
+  public M copyObject(M message) {
     // proto messages are immutable
     return message;
   }

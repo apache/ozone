@@ -28,6 +28,8 @@ import java.util.List;
 /**
  * Helper class to convert between protobuf lists and Java lists of
  * {@link ContainerProtos.ChunkInfo} objects.
+ * <p>
+ * This class is immutable.
  */
 public class ChunkInfoList {
   private static final Codec<ChunkInfoList> CODEC = new DelegatedCodec<>(

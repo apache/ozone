@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
  * <p>
  * We are creating a specific type for this to avoid mixing this with
  * normal integers in code.
+ * <p>
+ * This class is immutable.
  */
 public final class ContainerID implements Comparable<ContainerID> {
   private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(

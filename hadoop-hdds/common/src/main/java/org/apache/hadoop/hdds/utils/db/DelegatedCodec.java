@@ -62,7 +62,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
 
   @Override
   public final boolean supportCodecBuffer() {
-    return true;
+    return delegate.supportCodecBuffer();
   }
 
   @Override

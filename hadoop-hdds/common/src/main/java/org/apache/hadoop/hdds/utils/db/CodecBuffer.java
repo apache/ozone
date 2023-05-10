@@ -19,19 +19,16 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
-import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.ToIntFunction;
 
 /**
  * A buffer used by {@link Codec}
@@ -120,16 +117,6 @@ public final class CodecBuffer implements AutoCloseable {
     return buf.nioBuffer().asReadOnlyBuffer();
   }
 
-  /** @return an {@link InputStream} reading from this buffer. */
-  public InputStream getInputStream() {
-    return new ByteBufInputStream(buf.duplicate());
-  }
-
-  /** @return an {@link OutputStream} writing to this buffer. */
-  public OutputStream getOutputStream() {
-    return new ByteBufOutputStream(buf);
-  }
-
   /**
    * Similar to {@link ByteBuffer#putInt(int)}.
    *
@@ -171,6 +158,21 @@ public final class CodecBuffer implements AutoCloseable {
   public CodecBuffer put(ByteBuffer buffer) {
     assertRefCnt(1);
     buf.writeBytes(buffer);
+    return this;
+  }
+
+  /**
+   * Put bytes from the given source to this buffer.
+   *
+   * @param source put bytes to a {@link ByteBuffer} and return the size.
+   * @return this object.
+   */
+  public CodecBuffer put(ToIntFunction<ByteBuffer> source) {
+    assertRefCnt(1);
+    final int w = buf.writerIndex();
+    final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
+    final int size = source.applyAsInt(buffer);
+    buf.setIndex(buf.readerIndex(), w + size);
     return this;
   }
 }
