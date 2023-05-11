@@ -22,6 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
+
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ThreadLocalRandom;
@@ -126,5 +129,21 @@ public final class TestCodec {
     final T fromWrappedArray = codec.fromCodecBuffer(wrapped);
     wrapped.release();
     Assertions.assertEquals(original, fromWrappedArray);
+
+    runTestBytes(original, codec);
+  }
+
+  static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
+    final byte[] array = codec.toPersistedFormat(object);
+    final Bytes fromArray = new Bytes(array);
+
+    try (CodecBuffer buffer = codec.toCodecBuffer(object,
+        CodecBuffer::allocateHeap)) {
+      final Bytes fromBuffer = new Bytes(buffer);
+
+      Assertions.assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
+      Assertions.assertEquals(fromArray, fromBuffer);
+      Assertions.assertEquals(fromBuffer, fromArray);
+    }
   }
 }
