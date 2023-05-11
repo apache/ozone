@@ -562,7 +562,7 @@ public final class ScmConfigKeys {
           1000L;
 
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "raft.server.snapshot.creation.gap";
+      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
       1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =

@@ -3382,6 +3382,12 @@
       is send to DN.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
+    <value>1024</value>
+    <tag>SCM, OZONE</tag>
+    <description>Raft snapshot gap index after which snapshot can be taken.</description>
+  </property>
+  <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
     <value>600s</value>
     <tag>SCM, OZONE</tag>
