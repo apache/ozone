@@ -30,6 +30,10 @@ import java.util.List;
  */
 public class KeyInsightInfoResponse {
 
+  /** last key sent. */
+  @JsonProperty("lastKey")
+  private String lastKey;
+
   /** Amount of data mapped to all keys and files in
    * a cluster across all DNs. */
   @JsonProperty("replicatedTotal")
@@ -64,12 +68,21 @@ public class KeyInsightInfoResponse {
 
   public KeyInsightInfoResponse() {
     responseCode = ResponseStatus.OK;
+    lastKey = "";
     replicatedTotal = 0L;
     unreplicatedTotal = 0L;
     nonFSOKeyInfoList = new ArrayList<>();
     fsoKeyInfoList = new ArrayList<>();
     repeatedOmKeyInfoList = new ArrayList<>();
     deletedDirInfoList = new ArrayList<>();
+  }
+
+  public String getLastKey() {
+    return lastKey;
+  }
+
+  public void setLastKey(String lastKey) {
+    this.lastKey = lastKey;
   }
 
   public long getReplicatedTotal() {

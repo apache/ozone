@@ -135,13 +135,14 @@ public class OMDBInsightEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKeyPrefix) {
+      String prevKey) {
     KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
+    String lastKey = "";
     List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
     for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
         BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
@@ -152,8 +153,8 @@ public class OMDBInsightEndpoint {
           TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyIter = openKeyTable.iterator()) {
         boolean skipPrevKey = false;
-        String seekKey = prevKeyPrefix;
-        if (!skipPrevKeyDone && StringUtils.isNotBlank(prevKeyPrefix)) {
+        String seekKey = prevKey;
+        if (!skipPrevKeyDone && StringUtils.isNotBlank(prevKey)) {
           skipPrevKey = true;
           Table.KeyValue<String, OmKeyInfo> seekKeyValue =
               keyIter.seek(seekKey);
@@ -161,17 +162,18 @@ public class OMDBInsightEndpoint {
           // if not, then return empty result
           // In case of an empty prevKeyPrefix, all the keys are returned
           if (seekKeyValue == null ||
-              (StringUtils.isNotBlank(prevKeyPrefix) &&
-                  !seekKeyValue.getKey().equals(prevKeyPrefix))) {
-            return Response.ok(openKeyInsightInfo).build();
+              (StringUtils.isNotBlank(prevKey) &&
+                  !seekKeyValue.getKey().equals(prevKey))) {
+            continue;
           }
         }
         while (keyIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
           String key = kv.getKey();
+          lastKey = key;
           OmKeyInfo omKeyInfo = kv.getValue();
           // skip the prev key if prev key is present
-          if (skipPrevKey && key.equals(prevKeyPrefix)) {
+          if (skipPrevKey && key.equals(prevKey)) {
             skipPrevKeyDone = true;
             continue;
           }
@@ -209,6 +211,7 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
+    openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
   }
 
@@ -263,12 +266,12 @@ public class OMDBInsightEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKeyPrefix) {
+      String prevKey) {
     KeyInsightInfoResponse
         deletedKeyAndDirInsightInfo = new KeyInsightInfoResponse();
-    getPendingForDeletionKeyInfo(limit, prevKeyPrefix,
+    getPendingForDeletionKeyInfo(limit, prevKey,
         deletedKeyAndDirInsightInfo);
-    getPendingForDeletionDirInfo(limit, prevKeyPrefix,
+    getPendingForDeletionDirInfo(limit, prevKey,
         deletedKeyAndDirInsightInfo);
     return Response.ok(deletedKeyAndDirInsightInfo).build();
   }
@@ -287,6 +290,7 @@ public class OMDBInsightEndpoint {
             keyIter = deletedDirTable.iterator()) {
       boolean skipPrevKey = false;
       String seekKey = prevKeyPrefix;
+      String lastKey = "";
       if (StringUtils.isNotBlank(prevKeyPrefix)) {
         skipPrevKey = true;
         Table.KeyValue<String, OmKeyInfo> seekKeyValue =
@@ -303,6 +307,7 @@ public class OMDBInsightEndpoint {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         String key = kv.getKey();
+        lastKey = key;
         OmKeyInfo omKeyInfo = kv.getValue();
         // skip the prev key if prev key is present
         if (skipPrevKey && key.equals(prevKeyPrefix)) {
@@ -326,6 +331,7 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
+      pendingForDeletionKeyInfo.setLastKey(lastKey);
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -339,7 +345,7 @@ public class OMDBInsightEndpoint {
 
   private void getPendingForDeletionKeyInfo(
       int limit,
-      String prevKeyPrefix,
+      String prevKey,
       KeyInsightInfoResponse deletedKeyAndDirInsightInfo) {
     List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
         deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
@@ -350,8 +356,9 @@ public class OMDBInsightEndpoint {
             RepeatedOmKeyInfo>>
             keyIter = deletedTable.iterator()) {
       boolean skipPrevKey = false;
-      String seekKey = prevKeyPrefix;
-      if (StringUtils.isNotBlank(prevKeyPrefix)) {
+      String seekKey = prevKey;
+      String lastKey = "";
+      if (StringUtils.isNotBlank(prevKey)) {
         skipPrevKey = true;
         Table.KeyValue<String, RepeatedOmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
@@ -359,17 +366,18 @@ public class OMDBInsightEndpoint {
         // if not, then return empty result
         // In case of an empty prevKeyPrefix, all the keys are returned
         if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(prevKeyPrefix) &&
-                !seekKeyValue.getKey().equals(prevKeyPrefix))) {
+            (StringUtils.isNotBlank(prevKey) &&
+                !seekKeyValue.getKey().equals(prevKey))) {
           return;
         }
       }
       while (keyIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         String key = kv.getKey();
+        lastKey = key;
         RepeatedOmKeyInfo repeatedOmKeyInfo = kv.getValue();
         // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKeyPrefix)) {
+        if (skipPrevKey && key.equals(prevKey)) {
           continue;
         }
         updateReplicatedAndUnReplicatedTotal(deletedKeyAndDirInsightInfo,
@@ -379,6 +387,7 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
+      deletedKeyAndDirInsightInfo.setLastKey(lastKey);
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
