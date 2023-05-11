@@ -19,12 +19,16 @@ package org.apache.hadoop.ozone.lease;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
+
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +49,8 @@ public class LeaseManager<T> {
 
   private final String name;
   private final long defaultTimeout;
-  private final Object monitor = new Object();
   private Map<T, Lease<T>> activeLeases;
+  private BlockingQueue<T> leaseKeyBlockingQueue;
   private LeaseMonitor leaseMonitor;
   private Thread leaseMonitorThread;
   private boolean isRunning;
@@ -62,6 +66,7 @@ public class LeaseManager<T> {
   public LeaseManager(String name, long defaultTimeout) {
     this.name = name;
     this.defaultTimeout = defaultTimeout;
+    leaseKeyBlockingQueue = new LinkedBlockingQueue<>();
   }
 
   /**
@@ -120,9 +125,7 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    leaseKeyBlockingQueue.add(resource);
     return lease;
   }
 
@@ -151,9 +154,7 @@ public class LeaseManager<T> {
     Lease<T> lease = new Lease<>(resource, timeout);
     lease.registerCallBack(callback);
     activeLeases.put(resource, lease);
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    leaseKeyBlockingQueue.add(resource);
     return lease;
   }
 
@@ -204,9 +205,8 @@ public class LeaseManager<T> {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    leaseMonitorThread.interrupt();
+    leaseKeyBlockingQueue.clear();
     for (T resource : activeLeases.keySet()) {
       try {
         release(resource);
@@ -265,11 +265,11 @@ public class LeaseManager<T> {
         }
 
         try {
-          synchronized (monitor) {
-            monitor.wait(sleepTime);
-          }
+          // block for event and clear all events as will be 
+          // handled by activeLeases before going for next wait
+          leaseKeyBlockingQueue.poll(sleepTime, TimeUnit.MILLISECONDS);
+          leaseKeyBlockingQueue.clear();
         } catch (InterruptedException e) {
-          // This means a new lease is added to activeLeases.
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
         }
