@@ -34,6 +34,8 @@ import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -122,8 +124,7 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool) throws IOException, RocksDBException,
-      NativeLibraryNotLoadedException {
+      ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
@@ -140,8 +141,9 @@ public class ManagedSstFileReader {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
               @Override
-              protected String getTransformedValue(KeyValue value) {
-                return value.getKey();
+              protected String getTransformedValue(Optional<KeyValue> value) {
+                return value.map(v -> new String(v.getKey(), UTF_8))
+                    .orElse(null);
               }
             };
           }
@@ -198,12 +200,9 @@ public class ManagedSstFileReader {
     private String currentFile;
     private ClosableIterator<T> currentFileIterator;
 
-    private MultipleSstFileIterator(Collection<String> files)
-        throws IOException, RocksDBException,
-        NativeLibraryNotLoadedException {
+    private MultipleSstFileIterator(Collection<String> files) {
       this.fileNameIterator = files.iterator();
       init();
-      moveToNextFile();
     }
 
     protected abstract void init();
@@ -216,7 +215,8 @@ public class ManagedSstFileReader {
     public boolean hasNext() {
       try {
         do {
-          if (currentFileIterator.hasNext()) {
+          if (!Objects.isNull(currentFileIterator) &&
+              currentFileIterator.hasNext()) {
             return true;
           }
         } while (moveToNextFile());
