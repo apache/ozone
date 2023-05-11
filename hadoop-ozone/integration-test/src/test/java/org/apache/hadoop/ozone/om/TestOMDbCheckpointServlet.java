@@ -225,16 +225,27 @@ public class TestOMDbCheckpointServlet {
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
+    List<String> toExcludeList = new ArrayList<>();
+    toExcludeList.add("sstFile1.sst");
+    toExcludeList.add("sstFile2.sst");
+
+    // Generate form data
     String crNl = "\r\n";
-    String sstFileName = "sstFile.sst";
-    byte[] data = ("--" +  MULTIPART_FORM_DATA_BOUNDARY + crNl +
-        "Content-Disposition: form-data; name=\"" +
-        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl +
-        crNl +
-        sstFileName + crNl +
-        "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl)
-        .getBytes(StandardCharsets.UTF_8);
-    InputStream input = new ByteArrayInputStream(data);
+    String contentDisposition = "Content-Disposition: form-data; name=\"" +
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl + crNl;
+    String boundary = "--" + MULTIPART_FORM_DATA_BOUNDARY;
+    String endBoundary = boundary + "--" + crNl;
+    StringBuilder sb = new StringBuilder();
+    toExcludeList.forEach(sfn -> {
+      sb.append(boundary).append(crNl);
+      sb.append(contentDisposition);
+      sb.append(sfn).append(crNl);
+    });
+    sb.append(endBoundary);
+
+    // Use generated form data as input stream to the HTTP request
+    InputStream input = new ByteArrayInputStream(
+        sb.toString().getBytes(StandardCharsets.UTF_8));
     ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
     when(requestMock.getInputStream()).thenReturn(inputStream);
     when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
@@ -267,8 +278,6 @@ public class TestOMDbCheckpointServlet {
     Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
         getNumCheckpoints() > initialCheckpointCount);
 
-    List<String> toExcludeList = new ArrayList<>();
-    toExcludeList.add(sstFileName);
     Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any());
   }

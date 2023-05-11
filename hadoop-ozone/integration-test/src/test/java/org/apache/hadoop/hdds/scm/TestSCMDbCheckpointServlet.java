@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMDBCheckpointServlet;
@@ -114,8 +113,7 @@ public class TestSCMDbCheckpointServlet {
 
   @Test
   public void testDoPost()
-      throws ServletException, IOException, CompressorException,
-      InterruptedException {
+      throws ServletException, IOException, InterruptedException {
 
     File tempFile = null;
     try {
@@ -148,16 +146,27 @@ public class TestSCMDbCheckpointServlet {
       when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
           .thenReturn("true");
 
+      List<String> toExcludeList = new ArrayList<>();
+      toExcludeList.add("sstFile1.sst");
+      toExcludeList.add("sstFile2.sst");
+
+      // Generate form data
       String crNl = "\r\n";
-      String sstFileName = "sstFile.sst";
-      byte[] data = ("--" +  MULTIPART_FORM_DATA_BOUNDARY + crNl +
-          "Content-Disposition: form-data; name=\"" +
-          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl +
-          crNl +
-          sstFileName + crNl +
-          "--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + crNl).getBytes(
-          StandardCharsets.UTF_8);
-      InputStream input = new ByteArrayInputStream(data);
+      String contentDisposition = "Content-Disposition: form-data; name=\"" +
+          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl + crNl;
+      String boundary = "--" + MULTIPART_FORM_DATA_BOUNDARY;
+      String endBoundary = boundary + "--" + crNl;
+      StringBuilder sb = new StringBuilder();
+      toExcludeList.forEach(sfn -> {
+        sb.append(boundary).append(crNl);
+        sb.append(contentDisposition);
+        sb.append(sfn).append(crNl);
+      });
+      sb.append(endBoundary);
+
+      // Use generated form data as input stream to the HTTP request
+      InputStream input = new ByteArrayInputStream(
+          sb.toString().getBytes(StandardCharsets.UTF_8));
       ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
       when(requestMock.getInputStream()).thenReturn(inputStream);
       when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
@@ -212,8 +221,6 @@ public class TestSCMDbCheckpointServlet {
       Assertions.assertTrue(scmMetrics.getDBCheckpointMetrics().
           getNumCheckpoints() > initialCheckpointCount);
 
-      List<String> toExcludeList = new ArrayList<>();
-      toExcludeList.add(sstFileName);
       Mockito.verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
           any(), any(), eq(toExcludeList), any());
     } finally {
