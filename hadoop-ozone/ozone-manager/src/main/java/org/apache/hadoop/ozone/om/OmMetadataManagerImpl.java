@@ -123,14 +123,14 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore, S3SecretCache {
+    S3SecretStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
   /**
    * OM RocksDB Structure .
    * <p>
-   * OM DB stores metadata as KV pairs in different column families.
+   * OM DB stores metadata as KV pairs iThis n different column families.
    * <p>
    * OM DB Schema:
    *
@@ -372,22 +372,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {
-    lock = new OmReadOnlyLock();
-    omEpoch = 0;
-    String snapshotDir = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
-    File metaDir = new File(snapshotDir);
-    String dbName = OM_DB_NAME + snapshotDirName;
-    // The check is only to prevent every snapshot read to perform a disk IO
-    // and check if a checkpoint dir exists. If entry is present in cache,
-    // it is most likely DB entries will get flushed in this wait time.
-    if (isSnapshotInCache) {
-      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
-      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
+    try {
+      lock = new OmReadOnlyLock();
+      omEpoch = 0;
+      String snapshotDir = OMStorage.getOmDbDir(conf) +
+          OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
+      File metaDir = new File(snapshotDir);
+      String dbName = OM_DB_NAME + snapshotDirName;
+      // The check is only to prevent every snapshot read to perform a disk IO
+      // and check if a checkpoint dir exists. If entry is present in cache,
+      // it is most likely DB entries will get flushed in this wait time.
+      if (isSnapshotInCache) {
+        File checkpoint =
+            Paths.get(metaDir.toPath().toString(), dbName).toFile();
+        RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
+      }
+      setStore(loadDB(conf, metaDir, dbName, false,
+          java.util.Optional.of(Boolean.TRUE), false));
+      initializeOmTables(false);
+    } catch (IOException e) {
+      stop();
+      throw e;
     }
-    setStore(loadDB(conf, metaDir, dbName, false,
-            java.util.Optional.of(Boolean.TRUE), false));
-    initializeOmTables(false);
   }
 
   @Override
@@ -1550,7 +1556,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Get the latest OmSnapshot for a snapshot path.
    */
   public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
-                                       OmSnapshotManager snapshotManager)
+                                      OmSnapshotManager snapshotManager)
       throws IOException {
 
     String latestPathSnapshot =
@@ -1722,18 +1728,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     s3SecretTable.delete(kerberosId);
-  }
-
-  @Override
-  public void put(String kerberosId, S3SecretValue secretValue, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(kerberosId),
-        CacheValue.get(txId, secretValue));
-  }
-
-  @Override
-  public void invalidate(String id, long txId) {
-    s3SecretTable.addCacheEntry(new CacheKey<>(id),
-        CacheValue.get(txId));
   }
 
   @Override

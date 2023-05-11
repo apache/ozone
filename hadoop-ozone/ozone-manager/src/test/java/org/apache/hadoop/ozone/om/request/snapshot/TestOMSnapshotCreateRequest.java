@@ -97,6 +97,7 @@ public class TestOMSnapshotCreateRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any())).thenReturn(false);
     when(ozoneManager.isOwner(any(), any())).thenReturn(false);
     when(ozoneManager.getBucketOwner(any(), any(),

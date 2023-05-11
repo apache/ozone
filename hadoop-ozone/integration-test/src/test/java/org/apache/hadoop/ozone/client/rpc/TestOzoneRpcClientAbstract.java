@@ -577,6 +577,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 
   @Test
@@ -703,7 +704,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Invalid bucket name: invalid#bucket",
+        "Bucket or Volume name has an unsupported character : #",
         () -> volume.createBucket(bucketName));
   }
 
@@ -4071,6 +4072,10 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertNotNull(omKeyInfo);
     Assert.assertEquals(expectedCount,
         omKeyInfo.getKeyLocationVersions().size());
+
+    // ensure flush double buffer for deleted Table
+    cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
+        .awaitDoubleBufferFlush();
 
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs

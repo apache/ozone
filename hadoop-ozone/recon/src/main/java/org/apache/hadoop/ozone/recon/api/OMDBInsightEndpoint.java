@@ -277,7 +277,7 @@ public class OMDBInsightEndpoint {
   }
 
   private void getPendingForDeletionDirInfo(
-      int limit, String prevKeyPrefix,
+      int limit, String prevKey,
       KeyInsightInfoResponse pendingForDeletionKeyInfo) {
 
     List<KeyEntityInfo> deletedDirInfoList =
@@ -289,9 +289,9 @@ public class OMDBInsightEndpoint {
         TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             keyIter = deletedDirTable.iterator()) {
       boolean skipPrevKey = false;
-      String seekKey = prevKeyPrefix;
+      String seekKey = prevKey;
       String lastKey = "";
-      if (StringUtils.isNotBlank(prevKeyPrefix)) {
+      if (StringUtils.isNotBlank(prevKey)) {
         skipPrevKey = true;
         Table.KeyValue<String, OmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
@@ -299,8 +299,8 @@ public class OMDBInsightEndpoint {
         // if not, then return empty result
         // In case of an empty prevKeyPrefix, all the keys are returned
         if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(prevKeyPrefix) &&
-                !seekKeyValue.getKey().equals(prevKeyPrefix))) {
+            (StringUtils.isNotBlank(prevKey) &&
+                !seekKeyValue.getKey().equals(prevKey))) {
           return;
         }
       }
@@ -310,7 +310,7 @@ public class OMDBInsightEndpoint {
         lastKey = key;
         OmKeyInfo omKeyInfo = kv.getValue();
         // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKeyPrefix)) {
+        if (skipPrevKey && key.equals(prevKey)) {
           continue;
         }
         KeyEntityInfo keyEntityInfo = new KeyEntityInfo();

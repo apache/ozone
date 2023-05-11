@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -72,6 +73,23 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         bucketName, txnLogId, omMetadataManager);
     dbToKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
         toKeyParentInfo.getObjectID(), "toKey");
+  }
+
+  @Test
+  public void testRenameOpenFile() throws Exception {
+    fromKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+        String.valueOf(1234));
+    addKeyToTable(fromKeyInfo);
+    OMRequest modifiedOmRequest =
+        doPreExecute(createRenameKeyRequest(
+            volumeName, bucketName, fromKeyName, toKeyName));
+    OMKeyRenameRequest omKeyRenameRequest =
+        getOMKeyRenameRequest(modifiedOmRequest);
+    OMClientResponse response =
+            omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
+        response.getOMResponse().getStatus());
   }
 
   @Override

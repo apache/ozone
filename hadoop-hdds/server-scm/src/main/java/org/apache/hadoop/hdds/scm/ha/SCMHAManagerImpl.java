@@ -371,8 +371,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public boolean removeSCM(RemoveSCMRequest request) throws IOException {
-    // Currently we don't support decommission of Primordial SCM
-    // The caller should make sure that the requested node is not Primordial SCM
 
     String clusterId = scm.getClusterId();
     if (!request.getClusterId().equals(scm.getClusterId())) {

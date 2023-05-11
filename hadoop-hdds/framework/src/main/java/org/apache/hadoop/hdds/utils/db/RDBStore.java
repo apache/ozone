@@ -79,16 +79,6 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
 
-  @VisibleForTesting
-  public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families,
-                  long maxDbUpdatesSizeThreshold)
-      throws IOException {
-    this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, true, null);
-  }
-
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
@@ -134,19 +124,16 @@ public class RDBStore implements DBStore {
             "db path :{}", dbJmxBeanName);
       }
 
-      //create checkpoints directory if not exists.
+      // Create checkpoints and snapshot directories if not exists.
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
+        snapshotsParentDir = null;
       } else {
         Path checkpointsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
         checkpointsParentDir = checkpointsParentDirPath.toString();
         Files.createDirectories(checkpointsParentDirPath);
-      }
-      //create snapshot checkpoint directory if does not exist.
-      if (!createCheckpointDirs) {
-        snapshotsParentDir = null;
-      } else {
+
         Path snapshotsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
@@ -172,7 +159,9 @@ public class RDBStore implements DBStore {
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
-    } catch (IOException | RocksDBException e) {
+    } catch (Exception e) {
+      // Close DB and other things if got initialized.
+      close();
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
           + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
@@ -214,9 +203,9 @@ public class RDBStore implements DBStore {
     }
 
     RDBMetrics.unRegister();
-    checkPointManager.close();
+    IOUtils.closeQuietly(checkPointManager);
     IOUtils.closeQuietly(rocksDBCheckpointDiffer);
-    db.close();
+    IOUtils.closeQuietly(db);
   }
 
   @Override
@@ -265,7 +254,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public Table<byte[], byte[]> getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws IOException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);

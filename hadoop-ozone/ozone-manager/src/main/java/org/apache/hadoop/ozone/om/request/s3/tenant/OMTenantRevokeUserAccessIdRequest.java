@@ -211,7 +211,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           CacheValue.get(transactionLogIndex));
 
       S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
-      s3SecretManager.invalidateCacheEntry(accessId, transactionLogIndex);
+      s3SecretManager.invalidateCacheEntry(accessId);
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
 

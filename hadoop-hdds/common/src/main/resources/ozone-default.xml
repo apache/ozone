@@ -1634,7 +1634,15 @@
       or be directly or indirectly in a group defined in this property.
     </description>
   </property>
-
+  <property>
+    <name>ozone.s3g.default.bucket.layout</name>
+    <value>OBJECT_STORE</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bucket layout that will be used when buckets are created through
+      the S3 API.
+    </description>
+  </property>
   <property>
     <name>ozone.readonly.administrators</name>
     <value/>
@@ -3197,6 +3205,16 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.filesystem.snapshot.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enables Ozone filesystem snapshot feature if set to true on the OM side.
+      Disables it otherwise.
     </description>
   </property>
 

@@ -453,6 +453,7 @@ Apache License 2.0
 MIT
 =====================
 
+   com.bettercloud:vault-java-driver
    com.kstruct:gethostname4j
    org.bouncycastle:bcpkix-jdk15on
    org.bouncycastle:bcprov-jdk15on
