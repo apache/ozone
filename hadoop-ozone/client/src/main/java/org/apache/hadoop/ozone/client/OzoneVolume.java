@@ -370,7 +370,7 @@ public class OzoneVolume extends WithMetadata {
 
   /**
    * Returns Iterator to iterate over all buckets after prevBucket in the
-   * volum's snapshotted buckets.
+   * volume's snapshotted buckets.
    * volume.
    * If prevBucket is null it iterates from the first bucket in the volume.
    * The result can be restricted using bucket prefix, will return all

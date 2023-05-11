@@ -2247,11 +2247,11 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volA = store.getVolume(volumeA);
     OzoneVolume volB = store.getVolume(volumeB);
 
-    String bucketName;
+
     //Create 10 buckets in  vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameA = "bucket-a-";
     for (int i = 0; i < 10; i++) {
-      bucketName = bucketBaseNameA +
+      String bucketName = bucketBaseNameA +
           i + "-" + RandomStringUtils.randomNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
@@ -2263,87 +2263,24 @@ public abstract class TestOzoneRpcClientAbstract {
     //Create 10 buckets in vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameB = "bucket-b-";
     for (int i = 0; i < 10; i++) {
-      bucketName = bucketBaseNameB +
+      String bucketName = bucketBaseNameB +
           i + "-" + RandomStringUtils.randomNumeric(5);
       volA.createBucket(bucketName);
       store.createSnapshot(volumeA, bucketName, null);
       volB.createBucket(
           bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
-    Iterator<? extends OzoneBucket> volABucketIter =
-        volA.listBuckets("bucket-");
-    int volABucketCount = 0;
-    while (volABucketIter.hasNext()) {
-      volABucketIter.next();
-      volABucketCount++;
-    }
-    Assert.assertEquals(20, volABucketCount);
-
-    Iterator<? extends OzoneBucket> volABucketHasSnapshotIter =
-        volA.listBuckets("bucket-", null, true);
-    int volABucketHasSnapshotCount = 0;
-    while (volABucketHasSnapshotIter.hasNext()) {
-      volABucketHasSnapshotIter.next();
-      volABucketHasSnapshotCount++;
-    }
-    Assert.assertEquals(20, volABucketHasSnapshotCount);
-
-    Iterator<? extends OzoneBucket> volBBucketIter =
-        volA.listBuckets("bucket-");
-    int volBBucketCount = 0;
-    while (volBBucketIter.hasNext()) {
-      volBBucketIter.next();
-      volBBucketCount++;
-    }
-    Assert.assertEquals(20, volBBucketCount);
-
-    Iterator<? extends OzoneBucket> volBBucketHasSnapshotIter =
-        volB.listBuckets("bucket-", null, true);
-    int volBBucketHasSnapshotCount = 0;
-    while (volBBucketHasSnapshotIter.hasNext()) {
-      volBBucketHasSnapshotIter.next();
-      volBBucketHasSnapshotCount++;
-    }
-    Assert.assertEquals(10, volBBucketHasSnapshotCount);
-
-    Iterator<? extends OzoneBucket> volABucketAIter =
-        volA.listBuckets("bucket-a-");
-    int volABucketACount = 0;
-    while (volABucketAIter.hasNext()) {
-      volABucketAIter.next();
-      volABucketACount++;
-    }
-    Assert.assertEquals(10, volABucketACount);
-
-    Iterator<? extends OzoneBucket> volABucketAHasSnapshotIter =
-        volA.listBuckets("bucket-a-", null, true);
-    int volABucketAHasSnapshotCount = 0;
-    while (volABucketAHasSnapshotIter.hasNext()) {
-      volABucketAHasSnapshotIter.next();
-      volABucketAHasSnapshotCount++;
-    }
-    Assert.assertEquals(10, volABucketAHasSnapshotCount);
-
-    Iterator<? extends OzoneBucket> volBBucketBIter =
-        volB.listBuckets("bucket-b-");
-    int volBBucketBCount = 0;
-    while (volBBucketBIter.hasNext()) {
-      volBBucketBIter.next();
-      volBBucketBCount++;
-    }
-    Assert.assertEquals(10, volBBucketBCount);
-
-    Iterator<? extends OzoneBucket> volBBucketBHasSnapshotIter =
-        volB.listBuckets("bucket-b-", null, true);
-    int volBBucketBHasSnapshotCount = 0;
-    while (volBBucketBHasSnapshotIter.hasNext()) {
-      volBBucketBHasSnapshotIter.next();
-      volBBucketBHasSnapshotCount++;
-    }
-    Assert.assertEquals(0, volBBucketBHasSnapshotCount);
+    assertBucketCount(volA, "bucket-", 20);
+    assertBucketHasSnapshotCount(volA, "bucket-", null, true, 20);
+    assertBucketCount(volB, "bucket-", 20);
+    assertBucketHasSnapshotCount(volB, "bucket-", null, true, 10);
+    assertBucketCount(volA, bucketBaseNameA, 10);
+    assertBucketHasSnapshotCount(volA, bucketBaseNameA, null, true, 10);
+    assertBucketCount(volB, bucketBaseNameB, 10);
+    assertBucketHasSnapshotCount(volB, bucketBaseNameB, null, true, 0);
 
     Iterator<? extends OzoneBucket> volABucketBIter = volA.listBuckets(
-        "bucket-b-");
+        bucketBaseNameB);
     for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volABucketBIter.next().getName()
           .startsWith(bucketBaseNameB + i + "-"));
@@ -2351,16 +2288,15 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertFalse(volABucketBIter.hasNext());
 
     Iterator<? extends OzoneBucket> volABucketBHasSnapshotIter =
-        volA.listBuckets("bucket-b-", null, true);
-    int volABucketBHasSnapshotCount = 0;
-    while (volABucketBHasSnapshotIter.hasNext()) {
-      volABucketBHasSnapshotIter.next();
-      volABucketBHasSnapshotCount++;
+        volA.listBuckets(bucketBaseNameB, null, true);
+    for (int i = 0; i < 10; i++) {
+      Assert.assertTrue(volABucketBHasSnapshotIter.next().getName()
+          .startsWith(bucketBaseNameB + i + "-"));
     }
-    Assert.assertEquals(10, volABucketBHasSnapshotCount);
+    Assert.assertFalse(volABucketBIter.hasNext());
 
     Iterator<? extends OzoneBucket> volBBucketAIter = volB.listBuckets(
-        "bucket-a-");
+        bucketBaseNameA);
     for (int i = 0; i < 10; i++) {
       Assert.assertTrue(volBBucketAIter.next().getName()
           .startsWith(bucketBaseNameA + i + "-"));
@@ -2368,13 +2304,12 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertFalse(volBBucketAIter.hasNext());
 
     Iterator<? extends OzoneBucket> volBBucketAHasSnapshotIter =
-        volB.listBuckets("bucket-a-", null, true);
-    int volBBucketAHasSnapshotCount = 0;
-    while (volBBucketAHasSnapshotIter.hasNext()) {
-      volBBucketAHasSnapshotIter.next();
-      volBBucketAHasSnapshotCount++;
+        volB.listBuckets(bucketBaseNameA, null, true);
+    for (int i = 0; i < 10; i++) {
+      Assert.assertTrue(volBBucketAHasSnapshotIter.next().getName()
+          .startsWith(bucketBaseNameA + i + "-"));
     }
-    Assert.assertEquals(10, volBBucketAHasSnapshotCount);
+    Assert.assertFalse(volBBucketAIter.hasNext());
 
   }
 
@@ -4188,5 +4123,35 @@ public abstract class TestOzoneRpcClientAbstract {
 
   private static ReplicationConfig anyReplication() {
     return RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+  }
+
+  private void assertBucketHasSnapshotCount(OzoneVolume volume,
+                                 String bucketPrefix,
+                                 String preBucket,
+                                 boolean hasSnapshot,
+                                 int expectedBucketCount) {
+    Iterator<? extends OzoneBucket> bucketIterator =
+        volume.listBuckets(bucketPrefix, preBucket, hasSnapshot);
+    int bucketCount = 0;
+    while (bucketIterator.hasNext()) {
+      Assert.assertTrue(
+          bucketIterator.next().getName().startsWith(bucketPrefix));
+      bucketCount++;
+    }
+    Assert.assertEquals(expectedBucketCount, bucketCount);
+  }
+
+  private void assertBucketCount(OzoneVolume volume,
+                                 String bucketPrefix,
+                                 int expectedBucketCount) {
+    Iterator<? extends OzoneBucket> bucketIterator =
+        volume.listBuckets(bucketPrefix);
+    int bucketCount = 0;
+    while (bucketIterator.hasNext()) {
+      Assert.assertTrue(
+          bucketIterator.next().getName().startsWith(bucketPrefix));
+      bucketCount++;
+    }
+    Assert.assertEquals(expectedBucketCount, bucketCount);
   }
 }

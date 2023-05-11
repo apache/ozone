@@ -25,6 +25,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -238,7 +239,7 @@ public class TestOmMetrics {
     // inject exception to test for Failure Metrics on the read path
     Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
     Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
-        any(), anyInt(), anyBoolean());
+        any(), anyInt(), eq(false));
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
