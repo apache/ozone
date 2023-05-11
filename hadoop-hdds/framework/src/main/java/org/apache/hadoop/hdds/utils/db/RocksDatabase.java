@@ -49,6 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -73,7 +74,7 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
  * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase {
+public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
@@ -81,6 +82,7 @@ public final class RocksDatabase {
   private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
       new HashMap<>();
 
+  private final StackTraceElement[] stackTrace;
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
@@ -376,8 +378,10 @@ public final class RocksDatabase {
     this.descriptors = descriptors;
     this.columnFamilies = columnFamilies;
     this.counter = counter;
+    this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
+  @Override
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
       // Wait for all background work to be cancelled first. e.g. RDB compaction
@@ -924,5 +928,17 @@ public final class RocksDatabase {
     return dbNameToCfHandleMap;
   }
 
-
+  @Override
+  protected void finalize() throws Throwable {
+    if (!isClosed()) {
+      String warning = "RocksDatabase is not closed properly.";
+      if (LOG.isDebugEnabled()) {
+        String debugMessage = String.format("%n StackTrace for unclosed " +
+            "RocksDatabase instance: %s", Arrays.toString(stackTrace));
+        warning = warning.concat(debugMessage);
+      }
+      LOG.warn(warning);
+    }
+    super.finalize();
+  }
 }
