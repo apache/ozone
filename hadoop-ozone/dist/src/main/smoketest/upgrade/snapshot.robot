@@ -26,52 +26,52 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Create snapshot
     [Tags]     snapshot-enabled
-    ${output} =         Execute                ozone sh volume create vol
+    ${output} =         Execute                ozone sh volume create snapvolume-1
                         Should not contain     ${output}       Failed
-    ${output} =         Execute                ozone sh bucket create /vol/bucket2
+    ${output} =         Execute                ozone sh bucket create /snapvolume-1/snapbucket-1
                         Should not contain     ${output}       Failed
-    ${output} =         Execute                ozone sh snapshot create /vol/bucket2 snapshot1
+    ${output} =         Execute                ozone sh snapshot create /snapvolume-1/snapbucket-1 snapshot1
                         Should not contain     ${output}       Failed
                         Execute and checkrc    echo "key created using Ozone Shell" > /tmp/sourcekey    0
-                        Execute                ozone sh key put /vol/bucket2/key1 /tmp/sourcekey
-                        Execute                ozone sh snapshot create /vol/bucket2 snapshot2
+                        Execute                ozone sh key put /snapvolume-1/snapbucket-1/key1 /tmp/sourcekey
+                        Execute                ozone sh snapshot create /snapvolume-1/snapbucket-1 snapshot2
 
 Attempt to create snapshot when snapshot feature is disabled
     [Tags]     snapshot-disabled
-    ${output} =         Execute and checkrc    ozone sh volume create vol     0
-    ${output} =         Execute and checkrc    ozone sh bucket create /vol/bucket2     0
-    ${output} =         Execute and checkrc    ozone sh snapshot create /vol/bucket2 snapshot1     255
+    ${output} =         Execute and checkrc    ozone sh volume create snapvolume-2     0
+    ${output} =         Execute and checkrc    ozone sh bucket create /snapvolume-2/snapbucket-1     0
+    ${output} =         Execute and checkrc    ozone sh snapshot create /snapvolume-2/snapbucket-1 snapshot1     255
 
 List snapshot
     [Tags]     snapshot-enabled
-    ${output} =         Execute           ozone sh snapshot ls /vol/bucket2
+    ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
                         Should contain    ${output}       snapshot1
                         Should contain    ${output}       snapshot2
                         Should contain    ${output}       SNAPSHOT_ACTIVE
 
 Attempt to list snapshot when snapshot feature is disabled
     [Tags]     snapshot-disabled
-    ${output} =         Execute and checkrc       ozone sh snapshot ls /vol/bucket2    255
+    ${output} =         Execute and checkrc       ozone sh snapshot ls /snapvolume-2/snapbucket-1    255
 
 Snapshot Diff
     [Tags]     snapshot-enabled
-    ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
+    ${output} =         Execute           ozone sh snapshot snapshotDiff /snapvolume-1/snapbucket-1 snapshot1 snapshot2
                         Should contain    ${output}       Snapshot diff job is IN_PROGRESS
-    ${output} =         Execute           ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2
+    ${output} =         Execute           ozone sh snapshot snapshotDiff /snapvolume-1/snapbucket-1 snapshot1 snapshot2
                         Should contain    ${output}       +    key1
 
 Attempt to snapshotDiff when snapshot feature is disabled
     [Tags]     snapshot-disabled
-    ${output} =         Execute and checkrc          ozone sh snapshot snapshotDiff /vol/bucket2 snapshot1 snapshot2     255
+    ${output} =         Execute and checkrc          ozone sh snapshot snapshotDiff /snapvolume-2/snapbucket-1 snapshot1 snapshot2     255
 
 Delete snapshot
     [Tags]     snapshot-enabled
-    ${output} =         Execute           ozone sh snapshot delete /vol/bucket2 snapshot1
+    ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
                         Should not contain      ${output}       Failed
-    ${output} =         Execute           ozone sh snapshot ls /vol/bucket2
+    ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
                         Should contain          ${output}       SNAPSHOT_DELETED
 
 Attempt to delete when snapshot feature is disabled
     [Tags]     snapshot-disabled
-    ${output} =         Execute and checkrc          ozone sh snapshot delete /vol/bucket2 snapshot1     255
+    ${output} =         Execute and checkrc          ozone sh snapshot delete /snapvolume-2/snapbucket-1 snapshot1     255
 

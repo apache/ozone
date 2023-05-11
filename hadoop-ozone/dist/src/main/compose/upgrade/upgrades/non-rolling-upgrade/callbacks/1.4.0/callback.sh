@@ -27,7 +27,7 @@ validate_snapshot_support() {
   else
     TEST_TAG="snapshot-disabled"
   fi
-  execute_robot_test "$SCM" --include "${TEST_TAG}" -v upgrade/snapshot.robot
+  execute_robot_test "$SCM" --include "${TEST_TAG}" upgrade/snapshot.robot
 }
 
 ### CALLBACKS ###
