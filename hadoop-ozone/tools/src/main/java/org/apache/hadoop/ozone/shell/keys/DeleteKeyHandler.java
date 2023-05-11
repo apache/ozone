@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -65,24 +66,16 @@ public class DeleteKeyHandler extends KeyHandler {
 
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       // Handle FSO delete key which supports trash also
-      deleteFSOKey(client, address);
+      deleteFSOKey(bucket, keyName);
     } else {
       bucket.deleteKey(keyName);
     }
   }
 
-  private void deleteFSOKey(OzoneClient client, OzoneAddress address)
+  private void deleteFSOKey(OzoneBucket bucket, String keyName)
       throws IOException {
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
-
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-
     float hadoopTrashInterval = getConf().getFloat(
         FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
-
     long trashInterval =
         (long) (getConf().getFloat(
             OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
@@ -92,27 +85,21 @@ public class DeleteKeyHandler extends KeyHandler {
     // In this case during delete operation move key to trash
     if (trashInterval > 0 && !skipTrash &&
         !keyName.contains(TRASH_PREFIX)) {
-
       keyName = OzoneFSUtils.removeTrailingSlashIfNeeded(keyName);
-      try {
         // Check if key exists in Ozone
-        OzoneKeyDetails key = bucket.getKey(keyName);
-        if (key == null) {
-          out().printf("Key not found %s %n", keyName);
-          return;
-        }
-
-        if (bucket.getFileStatus(keyName).isDirectory()) {
-          List<OzoneFileStatus> ozoneFileStatusList =
-              bucket.listStatus(keyName, false, "", 1);
-          if (ozoneFileStatusList != null && !ozoneFileStatusList.isEmpty()) {
-            out().printf("Directory is not empty %n");
-            return;
-          }
-        }
-      } catch (Exception e) {
+      boolean bKeyExist = isKeyExist(bucket, keyName);
+      if (!bKeyExist) {
         out().printf("Key not found %s %n", keyName);
         return;
+      }
+
+      if (bucket.getFileStatus(keyName).isDirectory()) {
+        List<OzoneFileStatus> ozoneFileStatusList =
+            bucket.listStatus(keyName, false, "", 1);
+        if (ozoneFileStatusList != null && !ozoneFileStatusList.isEmpty()) {
+          out().printf("Directory is not empty %n");
+          return;
+        }
       }
 
       final String username =
@@ -127,21 +114,28 @@ public class DeleteKeyHandler extends KeyHandler {
           : userTrashCurrent).toUri().getPath();
 
       String toKeyName = new Path(userTrashCurrent, keyName).toUri().getPath();
-      OzoneKeyDetails toKeyDetails = null;
-      try {
-        // check whether key already exist in trash
-        toKeyDetails = bucket.getKey(toKeyName);
-      } catch (IOException e) {
-        // Key doesn't exist inside trash.
+      bKeyExist = isKeyExist(bucket, toKeyName);
+
+      if (bKeyExist) {
+        if (bucket.getFileStatus(toKeyName).isDirectory()) {
+          // if directory already exist in trash, just delete the directory
+          bucket.deleteKey(keyName);
+          return;
+        }
+        // Key already exists in trash, Append timestamp with keyName
+        // And move into trash
+        // Same behaviour as filesystem trash
+        toKeyName += Time.now();
       }
 
-      if (toKeyDetails != null) {
-        // if key(directory) already exist in trash, just delete the key
-        bucket.deleteKey(keyName);
-        return;
+      // Check whether trash directory already exist inside bucket
+      bKeyExist = isKeyExist(bucket, trashDirectory);
+      if (!bKeyExist) {
+        // Trash directory doesn't exist
+        // Create directory inside trash
+        bucket.createDirectory(trashDirectory);
       }
-      // Create directory inside trash
-      bucket.createDirectory(trashDirectory);
+
       // Rename key to move inside trash folder
       bucket.renameKey(keyName, toKeyName);
       out().printf("Key moved inside Trash: %s %n", toKeyName);
@@ -152,5 +146,19 @@ public class DeleteKeyHandler extends KeyHandler {
     } else {
       bucket.deleteKey(keyName);
     }
+  }
+
+  private boolean isKeyExist(OzoneBucket bucket, String keyName) {
+    OzoneKeyDetails keyDetails;
+    try {
+      // check whether key exist
+      keyDetails = bucket.getKey(keyName);
+    } catch (IOException e) {
+      return false;
+    }
+    if (keyDetails == null) {
+      return false;
+    }
+    return true;
   }
 }
