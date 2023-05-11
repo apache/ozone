@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -65,7 +65,7 @@ public final class CodecBuffer implements AutoCloseable {
   }
 
   private final ByteBuf buf;
-  private final AtomicBoolean released = new AtomicBoolean();
+  private final CompletableFuture<Void> released = new CompletableFuture<>();
 
   private CodecBuffer(ByteBuf buf) {
     this.buf = buf;
@@ -80,7 +80,7 @@ public final class CodecBuffer implements AutoCloseable {
   protected void finalize() throws Throwable {
     // leak detection
     final int capacity = buf.capacity();
-    if (!released.get() && capacity > 0) {
+    if (!released.isDone() && capacity > 0) {
       final int refCnt = buf.refCnt();
       if (refCnt > 0) {
         final int leak = LEAK_COUNT.incrementAndGet();
@@ -99,7 +99,7 @@ public final class CodecBuffer implements AutoCloseable {
 
   /** Release this buffer and return it back to the pool. */
   public void release() {
-    final boolean set = released.compareAndSet(false, true);
+    final boolean set = released.complete(null);
     Preconditions.assertTrue(set, () -> "Already released: " + this);
     if (buf.release()) {
       assertRefCnt(0);
@@ -107,6 +107,16 @@ public final class CodecBuffer implements AutoCloseable {
       // A zero capacity buffer, possibly singleton, may not be able released.
       Preconditions.assertSame(0, buf.capacity(), "capacity");
     }
+  }
+
+  /** @return the future of {@link #release()}. */
+  public CompletableFuture<Void> getReleaseFuture() {
+    return released;
+  }
+
+  /** @return the number of bytes can be read. */
+  public int readableBytes() {
+    return buf.readableBytes();
   }
 
   /** @return a readonly {@link ByteBuffer} view of this buffer. */
