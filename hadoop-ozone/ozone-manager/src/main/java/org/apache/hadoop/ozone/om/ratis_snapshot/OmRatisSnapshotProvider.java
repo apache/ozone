@@ -81,7 +81,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final Map<String, OMNodeDetails> peerNodesMap;
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
-  private URLConnectionFactory connectionFactory;
+  private final URLConnectionFactory connectionFactory;
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
@@ -137,7 +137,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         "URL: {}", leaderNodeID, omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
-          connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
+          getConnectionFactory().openConnection(omCheckpointUrl, spnegoEnabled);
 
       connection.setRequestMethod("POST");
       String contentTypeValue = "multipart/form-data; boundary=" +
@@ -220,8 +220,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   }
 
   @VisibleForTesting
-  public void setConnectionFactory(
-      URLConnectionFactory connectionFactory) {
-    this.connectionFactory = connectionFactory;
+  public URLConnectionFactory getConnectionFactory() {
+    return connectionFactory;
   }
 }
