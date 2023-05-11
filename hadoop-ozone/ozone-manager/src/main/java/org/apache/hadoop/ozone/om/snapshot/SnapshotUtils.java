@@ -63,7 +63,7 @@ public final class SnapshotUtils {
           .getSnapshotInfoTable()
           .get(snapshotKey);
     } catch (IOException e) {
-      LOG.error("Snapshot {}: not found.", snapshotKey, e);
+      LOG.error("Snapshot '{}' is not found.", snapshotKey, e);
       throw e;
     }
     if (snapshotInfo == null) {

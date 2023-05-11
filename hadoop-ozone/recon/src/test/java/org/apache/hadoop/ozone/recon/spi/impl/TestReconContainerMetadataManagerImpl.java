@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -31,6 +33,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.Assert;
 import org.junit.Before;
@@ -47,6 +50,7 @@ public class TestReconContainerMetadataManagerImpl {
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconContainerMetadataManager reconContainerMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -54,10 +58,14 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeClass
   public static void setupOnce() throws Exception {
+    reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(TEMP_FOLDER.newFolder()),
+        TEMP_FOLDER.newFolder());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(TEMP_FOLDER)
             .withReconSqlDb()
             .withContainerDB()
+            .withReconOm(reconOMMetadataManager)
             .build();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
