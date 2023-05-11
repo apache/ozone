@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -290,32 +290,32 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
     return new CacheLoader<String, OmSnapshot>() {
-      @Override
 
-      // load the snapshot into the cache if not already there
       @Nonnull
+      @Override
       public OmSnapshot load(@Nonnull String snapshotTableKey)
           throws IOException {
         // see if the snapshot exists
         SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        // Block snapshot from loading when it is no longer active e.g. DELETED,
-        // unless this is called from SnapshotDeletingService.
+        // Block snapshot from loading when it is no longer active
+        // e.g. DELETED, unless this is called from SnapshotDeletingService.
         checkSnapshotActive(snapshotInfo);
 
-        CacheValue<SnapshotInfo> cacheValue =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .getCacheValue(new CacheKey<>(snapshotTableKey));
-        boolean isSnapshotInCache = cacheValue != null && Optional.ofNullable(
-            cacheValue.getCacheValue()).isPresent();
+        CacheValue<SnapshotInfo> cacheValue = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable()
+            .getCacheValue(new CacheKey<>(snapshotTableKey));
+
+        boolean isSnapshotInCache = Objects.nonNull(cacheValue) &&
+            Objects.nonNull(cacheValue.getCacheValue());
 
         // read in the snapshot
         OzoneConfiguration conf = ozoneManager.getConfiguration();
-        OMMetadataManager snapshotMetadataManager;
 
         // Create the snapshot metadata manager by finding the corresponding
-        // RocksDB instance, creating an OmMetadataManagerImpl instance based on
-        // that
+        // RocksDB instance, creating an OmMetadataManagerImpl instance based
+        // on that.
+        OMMetadataManager snapshotMetadataManager;
         try {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
               snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
@@ -324,18 +324,27 @@ public final class OmSnapshotManager implements AutoCloseable {
           throw e;
         }
 
-        // create the other manager instances based on snapshot metadataManager
-        PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
-            false);
-        KeyManagerImpl km = new KeyManagerImpl(null,
-            ozoneManager.getScmClient(), snapshotMetadataManager, conf,
-            ozoneManager.getBlockTokenSecretManager(),
-            ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
+        try {
+          // create the other manager instances based on snapshot
+          // metadataManager
+          PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
+              false);
+          KeyManagerImpl km = new KeyManagerImpl(null,
+              ozoneManager.getScmClient(), snapshotMetadataManager, conf,
+              ozoneManager.getBlockTokenSecretManager(),
+              ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
 
-        return new OmSnapshot(km, pm, ozoneManager,
-            snapshotInfo.getVolumeName(),
-            snapshotInfo.getBucketName(),
-            snapshotInfo.getName());
+          return new OmSnapshot(km, pm, ozoneManager,
+              snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(),
+              snapshotInfo.getName());
+        } catch (Exception e) {
+          // Close RocksDB if there is any failure.
+          if (!snapshotMetadataManager.getStore().isClosed()) {
+            snapshotMetadataManager.getStore().close();
+          }
+          throw new IOException(e);
+        }
       }
     };
   }

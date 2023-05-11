@@ -124,19 +124,16 @@ public class RDBStore implements DBStore {
             "db path :{}", dbJmxBeanName);
       }
 
-      //create checkpoints directory if not exists.
+      // Create checkpoints and snapshot directories if not exists.
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
+        snapshotsParentDir = null;
       } else {
         Path checkpointsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
         checkpointsParentDir = checkpointsParentDirPath.toString();
         Files.createDirectories(checkpointsParentDirPath);
-      }
-      //create snapshot checkpoint directory if does not exist.
-      if (!createCheckpointDirs) {
-        snapshotsParentDir = null;
-      } else {
+
         Path snapshotsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
@@ -162,7 +159,9 @@ public class RDBStore implements DBStore {
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
-    } catch (IOException | RocksDBException e) {
+    } catch (Exception e) {
+      // Close DB and other things if got initialized.
+      close();
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
           + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
@@ -204,9 +203,9 @@ public class RDBStore implements DBStore {
     }
 
     RDBMetrics.unRegister();
-    checkPointManager.close();
+    IOUtils.closeQuietly(checkPointManager);
     IOUtils.closeQuietly(rocksDBCheckpointDiffer);
-    db.close();
+    IOUtils.closeQuietly(db);
   }
 
   @Override
