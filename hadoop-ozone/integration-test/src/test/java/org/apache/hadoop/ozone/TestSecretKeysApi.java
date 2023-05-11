@@ -30,6 +30,7 @@ import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.jetbrains.annotations.NotNull;
@@ -106,6 +107,7 @@ public final class TestSecretKeysApi {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
+    ExitUtil.disableSystemExit();
 
     workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
     clusterId = UUID.randomUUID().toString();
