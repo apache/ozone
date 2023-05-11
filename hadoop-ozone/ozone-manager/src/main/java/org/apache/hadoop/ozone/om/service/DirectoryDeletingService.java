@@ -122,7 +122,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
 
-        // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
+        // Acquire active DB deletedDirectoryTable write lock
+        getOzoneManager().getMetadataManager().getTableLock(
+            OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().lock();
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
         try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -154,15 +156,29 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             subFileNum += request.getDeletedSubFilesCount();
           }
 
-          optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
-              subFileNum, allSubDirList, purgePathRequestList, null, startTime);
+          // Acquire deletedTable write lock this late to allow KeyDeletingTask
+          // to interleave up until this point
+          getOzoneManager().getMetadataManager().getTableLock(
+              OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
+
+          try {
+            optimizeDirDeletesAndSubmitRequest(
+                remainNum, dirNum, subDirNum, subFileNum,
+                allSubDirList, purgePathRequestList, null, startTime);
+          } finally {
+            // Release deletedTable write lock
+            getOzoneManager().getMetadataManager().getTableLock(
+                OmMetadataManagerImpl.DELETED_TABLE).writeLock().unlock();
+          }
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
+        } finally {
+          // Release deletedDirectoryTable write lock
+          getOzoneManager().getMetadataManager().getTableLock(
+              OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().unlock();
         }
-        // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
-        //  in finally block
       }
 
       // place holder by returning empty results of this call back.
