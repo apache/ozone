@@ -38,6 +38,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -748,11 +749,12 @@ public class TestSolrUtil {
         solrAuditResp);
     String startDate = String.valueOf(Instant.now().toEpochMilli() + 100000);
     // Run the test
-    solrUtilUnderTest.queryLogs("/", "key", startDate,
-        solrHttpClient);
+    AtomicReference<EntityReadAccessHeatMapResponse> atomicReference =
+        solrUtilUnderTest.queryLogs("/", "key", startDate,
+            solrHttpClient);
 
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        solrUtilUnderTest.getEntityReadAccessHeatMapResponse();
+        atomicReference.get();
     Assertions.assertTrue(
         entityReadAccessHeatMapResponse.getChildren().size() > 0);
     Assertions.assertEquals(12,

@@ -80,8 +80,6 @@ public class SolrUtil {
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
-  private AtomicReference<EntityReadAccessHeatMapResponse>
-      entityReadAccessHeatMapRespRef;
   private SimpleDateFormat dateFormat = new SimpleDateFormat(
       "yyyy-MM-dd'T'HH:mm:ss'Z'");
   private final String timeZone;
@@ -95,8 +93,6 @@ public class SolrUtil {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
-    this.entityReadAccessHeatMapRespRef = new AtomicReference<>(
-        new EntityReadAccessHeatMapResponse());
     this.ozoneConfiguration = ozoneConfiguration;
     this.timeZone = this.ozoneConfiguration.get(OZONE_RECON_SOLR_TIMEZONE_KEY,
         DEFAULT_TIMEZONE_VALUE);
@@ -111,6 +107,7 @@ public class SolrUtil {
   }
 
   private void addBucketData(
+      EntityReadAccessHeatMapResponse rootEntity,
       EntityReadAccessHeatMapResponse volumeEntity, String[] split,
       int readAccessCount, long keySize) {
     List<EntityReadAccessHeatMapResponse> children =
@@ -123,9 +120,11 @@ public class SolrUtil {
       bucketEntity = bucketList.get(0);
     }
     if (children.contains(bucketEntity)) {
-      addPrefixPathInfoToBucket(split, bucketEntity, readAccessCount, keySize);
+      addPrefixPathInfoToBucket(rootEntity, split, bucketEntity,
+          readAccessCount, keySize);
     } else {
-      addBucketAndPrefixPath(split, volumeEntity, readAccessCount, keySize);
+      addBucketAndPrefixPath(split, rootEntity, volumeEntity, readAccessCount,
+          keySize);
     }
   }
 
@@ -138,7 +137,8 @@ public class SolrUtil {
         new EntityReadAccessHeatMapResponse();
     volumeInfo.setLabel(split[0]);
     children.add(volumeInfo);
-    addBucketAndPrefixPath(split, volumeInfo, readAccessCount, keySize);
+    addBucketAndPrefixPath(split, rootEntity, volumeInfo, readAccessCount,
+        keySize);
   }
 
   private void updateVolumeSize(
@@ -188,7 +188,8 @@ public class SolrUtil {
   }
 
   private void addBucketAndPrefixPath(
-      String[] split, EntityReadAccessHeatMapResponse volumeEntity,
+      String[] split, EntityReadAccessHeatMapResponse rootEntity,
+      EntityReadAccessHeatMapResponse volumeEntity,
       long readAccessCount, long keySize) {
     List<EntityReadAccessHeatMapResponse> bucketEntities =
         volumeEntity.getChildren();
@@ -197,11 +198,13 @@ public class SolrUtil {
     bucket.setLabel(split[1]);
     bucketEntities.add(bucket);
     bucket.setMinAccessCount(readAccessCount);
-    addPrefixPathInfoToBucket(split, bucket, readAccessCount, keySize);
+    addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
+        keySize);
   }
 
   private void addPrefixPathInfoToBucket(
-      String[] split, EntityReadAccessHeatMapResponse bucket,
+      EntityReadAccessHeatMapResponse rootEntity, String[] split,
+      EntityReadAccessHeatMapResponse bucket,
       long readAccessCount, long keySize) {
     List<EntityReadAccessHeatMapResponse> prefixes = bucket.getChildren();
     updateBucketSize(bucket, keySize);
@@ -215,7 +218,7 @@ public class SolrUtil {
     prefixes.add(prefixPathInfo);
     // This is done for specific ask by UI treemap to render and provide
     // varying color shades based on varying ranges of access count.
-    updateRootLevelMinMaxAccessCount(readAccessCount);
+    updateRootLevelMinMaxAccessCount(readAccessCount, rootEntity);
   }
 
   private void updateBucketLevelMinMaxAccessCount(
@@ -236,9 +239,9 @@ public class SolrUtil {
     });
   }
 
-  private void updateRootLevelMinMaxAccessCount(long readAccessCount) {
-    EntityReadAccessHeatMapResponse rootEntity =
-        this.entityReadAccessHeatMapRespRef.get();
+  private void updateRootLevelMinMaxAccessCount(
+      long readAccessCount,
+      EntityReadAccessHeatMapResponse rootEntity) {
     rootEntity.setMinAccessCount(
         readAccessCount < rootEntity.getMinAccessCount() ? readAccessCount :
             rootEntity.getMinAccessCount());
@@ -252,52 +255,62 @@ public class SolrUtil {
     bucket.setSize(bucket.getSize() + keySize);
   }
 
-  public void queryLogs(String path, String entityType, String startDate,
-                        SolrHttpClient solrHttpClient) {
+  public AtomicReference<EntityReadAccessHeatMapResponse>
+      queryLogs(String path, String entityType, String startDate,
+            SolrHttpClient solrHttpClient) {
+    AtomicReference<EntityReadAccessHeatMapResponse>
+        entityReadAccessHeatMapResponseAtomicRef =
+        new AtomicReference<>();
     try {
-      SecurityUtil.doAsCurrentUser((PrivilegedExceptionAction<Void>) () -> {
-        InetSocketAddress solrAddress =
-            HddsUtils.getSolrAddress(ozoneConfiguration);
-        if (null == solrAddress) {
-          throw new ConfigurationException(String.format("For heatmap " +
-                  "feature Solr host and port configuration must be provided " +
-                  "for config key %s. Example format -> <Host>:<Port>",
-              OZONE_SOLR_ADDRESS_KEY));
-        }
-        List<NameValuePair> urlParameters = new ArrayList<>();
-        validateAndAddSolrReqParam(escapeQueryParamVal(path),
-            "resource", urlParameters);
-        validateAndAddSolrReqParam(entityType, "resType", urlParameters);
-        validateStartDate(startDate, urlParameters);
-        final String solrAuditResp =
-            solrHttpClient.sendRequest(
-                prepareHttpRequest(urlParameters, solrAddress,
-                    "/solr/ranger_audits/query"));
-        LOG.info("Solr Response: {}", solrAuditResp);
-        JsonElement jsonElement = JsonParser.parseString(solrAuditResp);
-        JsonObject jsonObject = jsonElement.getAsJsonObject();
-        JsonElement facets = jsonObject.get("facets");
-        JsonElement resources = facets.getAsJsonObject().get("resources");
-        JsonObject facetsBucketsObject = new JsonObject();
-        if (null != resources) {
-          facetsBucketsObject = resources.getAsJsonObject();
-        }
-        ObjectMapper objectMapper = new ObjectMapper();
+      SecurityUtil.doAsCurrentUser(
+          (PrivilegedExceptionAction<AtomicReference<
+              EntityReadAccessHeatMapResponse>>) () -> {
+            InetSocketAddress solrAddress =
+                HddsUtils.getSolrAddress(ozoneConfiguration);
+            if (null == solrAddress) {
+              throw new ConfigurationException(String.format("For heatmap " +
+                      "feature Solr host and port configuration must be " +
+                      "provided for config key %s. Example format -> " +
+                      "<Host>:<Port>",
+                  OZONE_SOLR_ADDRESS_KEY));
+            }
+            List<NameValuePair> urlParameters = new ArrayList<>();
+            validateAndAddSolrReqParam(escapeQueryParamVal(path),
+                "resource", urlParameters);
+            validateAndAddSolrReqParam(entityType, "resType", urlParameters);
+            validateStartDate(startDate, urlParameters);
+            final String solrAuditResp =
+                solrHttpClient.sendRequest(
+                    prepareHttpRequest(urlParameters, solrAddress,
+                        "/solr/ranger_audits/query"));
+            LOG.info("Solr Response: {}", solrAuditResp);
+            JsonElement jsonElement = JsonParser.parseString(solrAuditResp);
+            JsonObject jsonObject = jsonElement.getAsJsonObject();
+            JsonElement facets = jsonObject.get("facets");
+            JsonElement resources = facets.getAsJsonObject().get("resources");
+            JsonObject facetsBucketsObject = new JsonObject();
+            if (null != resources) {
+              facetsBucketsObject = resources.getAsJsonObject();
+            }
+            ObjectMapper objectMapper = new ObjectMapper();
 
-        AuditLogFacetsResources auditLogFacetsResources =
-            objectMapper.readValue(
-                facetsBucketsObject.toString(), AuditLogFacetsResources.class);
-        EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
-        if (null != entities && !(ArrayUtils.isEmpty(entities))) {
-          generateHeatMap(entities);
-        }
-        return null;
-      });
+            AuditLogFacetsResources auditLogFacetsResources =
+                objectMapper.readValue(
+                    facetsBucketsObject.toString(),
+                    AuditLogFacetsResources.class);
+            EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
+            if (null != entities && !(ArrayUtils.isEmpty(entities))) {
+              entityReadAccessHeatMapResponseAtomicRef.set(
+                  generateHeatMap(entities));
+            }
+            return entityReadAccessHeatMapResponseAtomicRef;
+          });
     } catch (JsonProcessingException e) {
       LOG.error("Solr Query Output Processing Error: {} ", e);
     } catch (IOException e) {
       LOG.error("Error while generating the access heatmap: {} ", e);
     }
+    return entityReadAccessHeatMapResponseAtomicRef;
   }
 
   private String escapeQueryParamVal(String path) {
@@ -314,7 +327,9 @@ public class SolrUtil {
                                  List<NameValuePair> urlParameters) {
     if (!StringUtils.isEmpty(startDate)) {
       ZonedDateTime lastXUnitsOfZonedDateTime = null;
-      startDate = validateStartDate(startDate);
+      if (null == LastXUnit.getType(startDate)) {
+        startDate = validateStartDate(startDate);
+      }
       if (null != LastXUnit.getType(startDate)) {
         lastXUnitsOfZonedDateTime =
             lastXUnitsOfTime(LastXUnit.getType(startDate));
@@ -372,9 +387,10 @@ public class SolrUtil {
     return requestWrapper;
   }
 
-  private void generateHeatMap(EntityMetaData[] entities) {
+  private EntityReadAccessHeatMapResponse generateHeatMap(
+      EntityMetaData[] entities) {
     EntityReadAccessHeatMapResponse rootEntity =
-        entityReadAccessHeatMapRespRef.get();
+        new EntityReadAccessHeatMapResponse();
     rootEntity.setMinAccessCount(entities[0].getReadAccessCount());
     rootEntity.setLabel("root");
     List<EntityReadAccessHeatMapResponse> children =
@@ -400,14 +416,15 @@ public class SolrUtil {
         volumeEntity = volumeList.get(0);
       }
       if (null != volumeEntity) {
-        addBucketData(volumeEntity, split, entityMetaData.getReadAccessCount(),
-            keySize);
+        addBucketData(rootEntity, volumeEntity, split,
+            entityMetaData.getReadAccessCount(), keySize);
       } else {
         addVolumeData(rootEntity, split,
             entityMetaData.getReadAccessCount(), keySize);
       }
     });
     updateRootEntitySize(rootEntity);
+    return rootEntity;
   }
 
   private long getEntitySize(String path) throws IOException {
@@ -426,10 +443,6 @@ public class SolrUtil {
     return 256L;
   }
 
-  public EntityReadAccessHeatMapResponse getEntityReadAccessHeatMapResponse() {
-    return entityReadAccessHeatMapRespRef.get();
-  }
-
   public String setDateRange(String fieldName, Date fromDate, Date toDate) {
     String fromStr = "*";
     String toStr = "NOW";
@@ -443,9 +456,6 @@ public class SolrUtil {
   }
 
   private String validateStartDate(String startDate) {
-    if (null != LastXUnit.getType(startDate)) {
-      return startDate;
-    }
     long epochMilliSeconds = 0L;
     try {
       epochMilliSeconds = Long.parseLong(startDate);

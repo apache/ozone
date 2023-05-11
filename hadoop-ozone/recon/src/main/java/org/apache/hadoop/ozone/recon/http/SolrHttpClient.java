@@ -60,11 +60,10 @@ import java.util.List;
 public class SolrHttpClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(SolrHttpClient.class);
+  private CloseableHttpClient httpClient;
+  private HttpClientContext context;
 
-  private static CloseableHttpClient httpClient;
-  private static HttpClientContext context;
-
-  public static CloseableHttpClient getCloseableHttpClient()
+  public synchronized CloseableHttpClient getCloseableHttpClient()
       throws KeyManagementException, NoSuchAlgorithmException,
       KeyStoreException {
     if (null != httpClient) {
@@ -102,7 +101,7 @@ public class SolrHttpClient {
     return httpClient;
   }
 
-  private static HttpClientContext getHttpClientContext() {
+  private synchronized HttpClientContext getHttpClientContext() {
     if (null != context) {
       return context;
     }
@@ -135,9 +134,10 @@ public class SolrHttpClient {
     LOG.info("Making Http Query to Solr: {} ", solrHostBaseQuery);
     post.setEntity(new UrlEncodedFormEntity(urlParameters));
     Instant start = Instant.now();
-    try (CloseableHttpClient httpClient = getCloseableHttpClient();
-         CloseableHttpResponse response = httpClient.execute(post,
-             getHttpClientContext())) {
+    try {
+      CloseableHttpClient closeableHttpClient = getCloseableHttpClient();
+      CloseableHttpResponse response = closeableHttpClient.execute(post,
+          getHttpClientContext());
       Instant end = Instant.now();
       int statusCode = response.getStatusLine().getStatusCode();
       long duration = Duration.between(start, end).toMillis();
