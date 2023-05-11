@@ -65,11 +65,13 @@ public class PipeInputStream extends InputStream {
       this.close();
       return -1;
     }
-    if (numberOfBytesLeftToRead == 0) {
+    while (numberOfBytesLeftToRead == 0) {
       numberOfBytesLeftToRead = readInternal(byteBuffer, capacity,
               nativeHandle);
       index = 0;
-      return read();
+      if (numberOfBytesLeftToRead != 0) {
+        return read();
+      }
     }
     numberOfBytesLeftToRead--;
     int ret = byteBuffer[index] & 0xFF;

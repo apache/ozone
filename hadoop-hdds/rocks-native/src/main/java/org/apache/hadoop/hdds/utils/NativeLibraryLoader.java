@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +99,7 @@ public class NativeLibraryLoader {
     if (isLibraryLoaded(libraryName)) {
       return true;
     }
+    LOG.info("Loading Library: {}", libraryName);
     boolean loaded = false;
     try {
       loaded = false;
@@ -132,7 +134,8 @@ public class NativeLibraryLoader {
       }
 
       // create a temporary file to copy the library to
-      final File temp = File.createTempFile(libraryName, getLibOsSuffix());
+      final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
+          new File(""));
       if (!temp.exists()) {
         return Optional.empty();
       } else {
@@ -140,7 +143,8 @@ public class NativeLibraryLoader {
       }
 
       Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      return Optional.ofNullable(temp);
+      ShutdownHookManager.get().addShutdownHook(temp::delete, 1);
+      return Optional.of(temp);
     } finally {
       if (is != null) {
         is.close();
