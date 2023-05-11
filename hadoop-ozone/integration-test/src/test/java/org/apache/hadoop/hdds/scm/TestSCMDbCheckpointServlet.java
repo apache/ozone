@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -52,10 +53,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Matchers;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -76,6 +80,11 @@ public class TestSCMDbCheckpointServlet {
   private String clusterId;
   private String scmId;
   private String omId;
+  private HttpServletRequest requestMock;
+  private HttpServletResponse responseMock;
+  private String method;
+  private SCMDBCheckpointServlet scmDbCheckpointServletMock;
+  private ServletContext servletContextMock;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -99,6 +108,34 @@ public class TestSCMDbCheckpointServlet {
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
     scmMetrics = StorageContainerManager.getMetrics();
+
+    requestMock = mock(HttpServletRequest.class);
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
+        .thenReturn("true");
+
+    responseMock = mock(HttpServletResponse.class);
+
+    scmDbCheckpointServletMock = mock(SCMDBCheckpointServlet.class);
+    doCallRealMethod().when(scmDbCheckpointServletMock).init();
+    doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
+        scm.getScmMetadataStore().getStore(),
+        scmMetrics.getDBCheckpointMetrics(),
+        false,
+        Collections.emptyList(),
+        Collections.emptyList(),
+        false);
+    doCallRealMethod().when(scmDbCheckpointServletMock)
+        .writeDbDataToStream(any(), any(), any(), any(), any());
+    doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
+        responseMock);
+    doCallRealMethod().when(scmDbCheckpointServletMock).doGet(requestMock,
+        responseMock);
+
+    servletContextMock = mock(ServletContext.class);
+    when(scmDbCheckpointServletMock.getServletContext())
+        .thenReturn(servletContextMock);
+    when(servletContextMock.getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getStorageContainerManager());
   }
 
   /**
@@ -111,77 +148,25 @@ public class TestSCMDbCheckpointServlet {
     }
   }
 
-  @Test
-  public void testDoPost()
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  public void testEndpoint(String httpMethod)
       throws ServletException, IOException, InterruptedException {
+    this.method = httpMethod;
 
     File tempFile = null;
     try {
-      SCMDBCheckpointServlet scmDbCheckpointServletMock =
-          mock(SCMDBCheckpointServlet.class);
-
-      doCallRealMethod().when(scmDbCheckpointServletMock).init();
-      doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
-          scm.getScmMetadataStore().getStore(),
-          scmMetrics.getDBCheckpointMetrics(),
-          false,
-          Collections.emptyList(),
-          Collections.emptyList(),
-          false);
-      doCallRealMethod().when(scmDbCheckpointServletMock)
-         .writeDbDataToStream(any(), any(), any(), any(), any());
-
-      HttpServletRequest requestMock = mock(HttpServletRequest.class);
-      HttpServletResponse responseMock = mock(HttpServletResponse.class);
-
-      ServletContext servletContextMock = mock(ServletContext.class);
-      when(scmDbCheckpointServletMock.getServletContext())
-          .thenReturn(servletContextMock);
-
-      when(requestMock.getMethod()).thenReturn("POST");
-      when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
-          "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
-      when(servletContextMock.getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE))
-          .thenReturn(cluster.getStorageContainerManager());
-      when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
-          .thenReturn("true");
-
       List<String> toExcludeList = new ArrayList<>();
       toExcludeList.add("sstFile1.sst");
       toExcludeList.add("sstFile2.sst");
 
-      // Generate form data
-      String crNl = "\r\n";
-      String contentDisposition = "Content-Disposition: form-data; name=\"" +
-          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl + crNl;
-      String boundary = "--" + MULTIPART_FORM_DATA_BOUNDARY;
-      String endBoundary = boundary + "--" + crNl;
-      StringBuilder sb = new StringBuilder();
-      toExcludeList.forEach(sfn -> {
-        sb.append(boundary).append(crNl);
-        sb.append(contentDisposition);
-        sb.append(sfn).append(crNl);
-      });
-      sb.append(endBoundary);
-
-      // Use generated form data as input stream to the HTTP request
-      InputStream input = new ByteArrayInputStream(
-          sb.toString().getBytes(StandardCharsets.UTF_8));
-      ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
-      when(requestMock.getInputStream()).thenReturn(inputStream);
-      when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
-          .thenAnswer(invocation -> {
-            byte[] buffer = invocation.getArgument(0);
-            int offset = invocation.getArgument(1);
-            int length = invocation.getArgument(2);
-            return input.read(buffer, offset, length);
-          });
+      setupHttpMethod(toExcludeList);
 
       doNothing().when(responseMock).setContentType("application/x-tgz");
-      doNothing().when(responseMock).setHeader(Matchers.anyString(),
-          Matchers.anyString());
+      doNothing().when(responseMock).setHeader(Mockito.anyString(),
+          Mockito.anyString());
 
-      tempFile = File.createTempFile("testDoPost_" + System
+      tempFile = File.createTempFile("testEndpoint_" + System
           .currentTimeMillis(), ".tar");
 
       FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -202,14 +187,11 @@ public class TestSCMDbCheckpointServlet {
             }
           });
 
-      doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
-          responseMock);
-
       scmDbCheckpointServletMock.init();
       long initialCheckpointCount =
           scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-      scmDbCheckpointServletMock.doPost(requestMock, responseMock);
+      doEndpoint();
 
       Assertions.assertTrue(tempFile.length() > 0);
       Assertions.assertTrue(
@@ -230,34 +212,8 @@ public class TestSCMDbCheckpointServlet {
   }
 
   @Test
-  public void testDoPostWithInvalidContentType()
-      throws ServletException, IOException, InterruptedException {
-
-    SCMDBCheckpointServlet scmDbCheckpointServletMock =
-        mock(SCMDBCheckpointServlet.class);
-
-    doCallRealMethod().when(scmDbCheckpointServletMock).init();
-    doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
-        scm.getScmMetadataStore().getStore(),
-        scmMetrics.getDBCheckpointMetrics(),
-        false,
-        Collections.emptyList(),
-        Collections.emptyList(),
-        false);
-    doCallRealMethod().when(scmDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any());
-
-    HttpServletRequest requestMock = mock(HttpServletRequest.class);
-    HttpServletResponse responseMock = mock(HttpServletResponse.class);
-
-    ServletContext servletContextMock = mock(ServletContext.class);
-    when(scmDbCheckpointServletMock.getServletContext())
-        .thenReturn(servletContextMock);
-
+  public void testDoPostWithInvalidContentType() throws ServletException {
     when(requestMock.getContentType()).thenReturn("application/json");
-
-    doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
-        responseMock);
 
     scmDbCheckpointServletMock.init();
 
@@ -265,4 +221,87 @@ public class TestSCMDbCheckpointServlet {
 
     Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
+
+  /**
+   * Calls endpoint in regards to parametrized HTTP method.
+   */
+  private void doEndpoint() {
+    if (method.equals("POST")) {
+      scmDbCheckpointServletMock.doPost(requestMock, responseMock);
+    } else {
+      scmDbCheckpointServletMock.doGet(requestMock, responseMock);
+    }
+  }
+
+  /**
+   * Parametrizes test with HTTP method.
+   * @return HTTP method.
+   */
+  private static Stream<Arguments> getHttpMethods() {
+    return Stream.of(arguments("POST"), arguments("GET"));
+  }
+
+  /**
+   * Setups HTTP method details depending on parametrized HTTP method.
+   * @param toExcludeList SST file names to be excluded.
+   * @throws IOException
+   */
+  private void setupHttpMethod(List<String> toExcludeList) throws IOException {
+    if (method.equals("POST")) {
+      setupPostMethod(toExcludeList);
+    } else {
+      setupGetMethod(toExcludeList);
+    }
+  }
+
+  /**
+   * Setups details for HTTP POST request.
+   * @param toExcludeList SST file names to be excluded.
+   * @throws IOException
+   */
+  private void setupPostMethod(List<String> toExcludeList)
+      throws IOException {
+    when(requestMock.getMethod()).thenReturn("POST");
+    when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
+        "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
+
+    // Generate form data
+    String crNl = "\r\n";
+    String contentDisposition = "Content-Disposition: form-data; name=\"" +
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]\"" + crNl + crNl;
+    String boundary = "--" + MULTIPART_FORM_DATA_BOUNDARY;
+    String endBoundary = boundary + "--" + crNl;
+    StringBuilder sb = new StringBuilder();
+    toExcludeList.forEach(sfn -> {
+      sb.append(boundary).append(crNl);
+      sb.append(contentDisposition);
+      sb.append(sfn).append(crNl);
+    });
+    sb.append(endBoundary);
+
+    // Use generated form data as input stream to the HTTP request
+    InputStream input = new ByteArrayInputStream(
+        sb.toString().getBytes(StandardCharsets.UTF_8));
+    ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+    when(requestMock.getInputStream()).thenReturn(inputStream);
+    when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
+        .thenAnswer(invocation -> {
+          byte[] buffer = invocation.getArgument(0);
+          int offset = invocation.getArgument(1);
+          int length = invocation.getArgument(2);
+          return input.read(buffer, offset, length);
+        });
+  }
+
+  /**
+   * Setups details for HTTP GET request.
+   * @param toExcludeList SST file names to be excluded.
+   */
+  private void setupGetMethod(List<String> toExcludeList) {
+    when(requestMock.getMethod()).thenReturn("GET");
+    when(requestMock
+        .getParameterValues(OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST))
+        .thenReturn(toExcludeList.toArray(new String[0]));
+  }
+
 }

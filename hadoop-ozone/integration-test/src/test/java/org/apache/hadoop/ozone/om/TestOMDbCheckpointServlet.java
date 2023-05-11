@@ -80,22 +80,25 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
-import org.mockito.Matchers;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -107,6 +110,7 @@ import static org.mockito.Mockito.when;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
+@Timeout(240)
 public class TestOMDbCheckpointServlet {
   private OzoneConfiguration conf;
   private File tempFile;
@@ -121,12 +125,9 @@ public class TestOMDbCheckpointServlet {
   private String snapshotDirName2;
   private Path compactionDirPath;
   private DBCheckpoint dbCheckpoint;
+  private String method;
+  private File folder;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(240);
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -134,11 +135,12 @@ public class TestOMDbCheckpointServlet {
    *
    * @throws Exception
    */
-  @Before
-  public void init() throws Exception {
+  @BeforeEach
+  public void init(@TempDir File tempDir) throws Exception {
+    folder = tempDir;
     conf = new OzoneConfiguration();
 
-    tempFile = File.createTempFile("testDoPost_" + System
+    tempFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
     FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
@@ -163,7 +165,7 @@ public class TestOMDbCheckpointServlet {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() throws InterruptedException {
     if (cluster != null) {
       cluster.shutdown();
@@ -197,10 +199,9 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(cluster.getOzoneManager());
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
         .thenReturn("true");
-    when(requestMock.getMethod()).thenReturn("POST");
-    when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
-        "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
 
+    doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
+        responseMock);
     doCallRealMethod().when(omDbCheckpointServletMock).doPost(requestMock,
         responseMock);
 
@@ -208,8 +209,58 @@ public class TestOMDbCheckpointServlet {
         .writeDbDataToStream(any(), any(), any(), any(), any());
   }
 
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  public void testEndpoint(String httpMethod) throws Exception {
+    this.method = httpMethod;
+
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+
+    setupCluster();
+
+    final OzoneManager om = cluster.getOzoneManager();
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        om.getOmAdminUsernames(),
+        om.getOmAdminGroups(),
+        om.isSpnegoEnabled());
+
+    doNothing().when(responseMock).setContentType("application/x-tar");
+    doNothing().when(responseMock).setHeader(anyString(), anyString());
+
+    List<String> toExcludeList = new ArrayList<>();
+    toExcludeList.add("sstFile1.sst");
+    toExcludeList.add("sstFile2.sst");
+
+    setupHttpMethod(toExcludeList);
+
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+
+    omDbCheckpointServletMock.init();
+    long initialCheckpointCount =
+        omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
+
+    doEndpoint();
+
+    Assertions.assertTrue(tempFile.length() > 0);
+    Assertions.assertTrue(
+        omMetrics.getDBCheckpointMetrics().
+            getLastCheckpointCreationTimeTaken() > 0);
+    Assertions.assertTrue(
+        omMetrics.getDBCheckpointMetrics().
+            getLastCheckpointStreamingTimeTaken() > 0);
+    Assertions.assertTrue(omMetrics.getDBCheckpointMetrics().
+        getNumCheckpoints() > initialCheckpointCount);
+
+    Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
+        any(), any(), eq(toExcludeList), any());
+  }
+
   @Test
-  public void testDoPost() throws Exception {
+  public void testDoPostWithInvalidContentType() throws Exception {
     conf.setBoolean(OZONE_ACL_ENABLED, false);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
 
@@ -225,9 +276,273 @@ public class TestOMDbCheckpointServlet {
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
 
+    when(requestMock.getContentType()).thenReturn("application/json");
+    doNothing().when(responseMock).setContentType("application/x-tar");
+    doNothing().when(responseMock).setHeader(anyString(),
+        anyString());
+
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+
+    omDbCheckpointServletMock.init();
+    omDbCheckpointServletMock.doPost(requestMock, responseMock);
+
+    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+  }
+
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  public void testSpnegoEnabled(String httpMethod) throws Exception {
+    this.method = httpMethod;
+
+    conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.set(OZONE_ADMINISTRATORS, "");
+    conf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");
+    conf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, "recon/host1@REALM");
+
+    setupCluster();
+
+    final OzoneManager om = cluster.getOzoneManager();
+    Collection<String> allowedUsers =
+            new LinkedHashSet<>(om.getOmAdminUsernames());
+    allowedUsers.add("recon");
+
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics(),
+        om.getAclsEnabled(),
+        allowedUsers,
+        Collections.emptySet(),
+        om.isSpnegoEnabled());
+
+    omDbCheckpointServletMock.init();
+
+    setupHttpMethod(new ArrayList<>());
+
+    doEndpoint();
+
+    // Response status should be set to 403 Forbidden since there was no user
+    // principal set in the request
+    verify(responseMock, times(1)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    // Set the principal to DN in request
+    // This should also get denied since only OM and recon
+    // users should be granted access to the servlet
+    Principal userPrincipalMock = mock(Principal.class);
+    when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
+    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
+
+    doEndpoint();
+
+    // Verify that the Response status is set to 403 again for DN user.
+    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    // Now, set the principal to recon in request
+    when(userPrincipalMock.getName()).thenReturn("recon/localhost@REALM");
+
+    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+
+    doEndpoint();
+
+    // Recon user should be able to access the servlet and download the
+    // snapshot
+    Assertions.assertTrue(tempFile.length() > 0);
+  }
+
+  @Test
+  public void testWriteDbDataToStream() throws Exception {
+    prepSnapshotData();
+    // Set http param to include snapshot data.
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn("true");
+
+    // Get the tarball.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
+    }
+
+    // Untar the file into a temp folder to be examined.
+    String testDirName = folder.getAbsolutePath();
+    int testDirLength = testDirName.length() + 1;
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    int newDbDirLength = newDbDirName.length() + 1;
+    File newDbDir = new File(newDbDirName);
+    newDbDir.mkdirs();
+    FileUtil.unTar(tempFile, newDbDir);
+
+    // Move snapshot dir to correct location.
+    Assertions.assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR)
+        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR)));
+
+    // Confirm the checkpoint directories match, (after remove extras).
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(newDbDirName);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        newDbDirLength);
+
+    Assertions.assertTrue(finalCheckpointSet.contains(OM_HARDLINK_FILE),
+        "hardlink file exists in checkpoint dir");
+    finalCheckpointSet.remove(OM_HARDLINK_FILE);
+    Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
+
+    int metaDirLength = metaDir.toString().length() + 1;
+    String shortSnapshotLocation =
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName));
+    String shortSnapshotLocation2 =
+        truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
+    String shortCompactionDirLocation =
+        truncateFileName(metaDirLength, compactionDirPath);
+
+    Set<String> finalFullSet =
+        getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
+
+    // Check each line in the hard link file.
+    List<String> fabricatedLinkLines = new ArrayList<>();
+    try (Stream<String> lines = Files.lines(Paths.get(newDbDirName,
+        OM_HARDLINK_FILE))) {
+
+      for (String line : lines.collect(Collectors.toList())) {
+        Assertions.assertFalse(line.contains("CURRENT"),
+            "CURRENT file is not a hard link");
+        if (line.contains("fabricatedFile")) {
+          fabricatedLinkLines.add(line);
+        } else {
+          checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
+          // add links to the final set
+          finalFullSet.add(line.split("\t")[0]);
+        }
+      }
+    }
+    Set<String> directories = Sets.newHashSet(
+        shortSnapshotLocation, shortSnapshotLocation2,
+        shortCompactionDirLocation);
+    checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
+
+    Set<String> initialFullSet =
+        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
+    Assertions.assertEquals(initialFullSet, finalFullSet,
+        "expected snapshot files not found");
+  }
+
+  @Test
+  public void testWriteDbDataWithoutOmSnapshot()
+      throws Exception {
+    prepSnapshotData();
+
+    // Set http param to exclude snapshot data.
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn(null);
+
+    // Get the tarball.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
+    }
+
+    // Untar the file into a temp folder to be examined.
+    String testDirName = folder.getAbsolutePath();
+    int testDirLength = testDirName.length() + 1;
+    FileUtil.unTar(tempFile, new File(testDirName));
+
+    // Confirm the checkpoint directories match.
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(testDirName);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        testDirLength);
+
+    Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
+  }
+
+  @Test
+  public void testWriteDbDataWithToExcludeFileList()
+      throws Exception {
+    prepSnapshotData();
+
+    File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
+        "dummy.sst");
+    try (OutputStreamWriter writer = new OutputStreamWriter(
+        new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
+      writer.write("Dummy data.");
+    }
+    Assertions.assertTrue(dummyFile.exists());
     List<String> toExcludeList = new ArrayList<>();
-    toExcludeList.add("sstFile1.sst");
-    toExcludeList.add("sstFile2.sst");
+    List<String> excludedList = new ArrayList<>();
+    toExcludeList.add(dummyFile.getName());
+
+    // Set http param to exclude snapshot data.
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn(null);
+
+    // Get the tarball.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream, toExcludeList, excludedList);
+    }
+
+    // Untar the file into a temp folder to be examined.
+    String testDirName = folder.getAbsolutePath();
+    int testDirLength = testDirName.length() + 1;
+    FileUtil.unTar(tempFile, new File(testDirName));
+
+    // Confirm the checkpoint directories match.
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(testDirName);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        testDirLength);
+
+    initialCheckpointSet.removeAll(finalCheckpointSet);
+    Assertions.assertTrue(initialCheckpointSet.contains(dummyFile.getName()));
+  }
+
+  /**
+   * Calls endpoint in regards to parametrized HTTP method.
+   */
+  private void doEndpoint() {
+    if (method.equals("POST")) {
+      omDbCheckpointServletMock.doPost(requestMock, responseMock);
+    } else {
+      omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    }
+  }
+
+  /**
+   * Parametrizes test with HTTP method.
+   * @return HTTP method.
+   */
+  private static Stream<Arguments> getHttpMethods() {
+    return Stream.of(arguments("POST"), arguments("GET"));
+  }
+
+  /**
+   * Setups HTTP method details depending on parametrized HTTP method.
+   * @param toExcludeList SST file names to be excluded.
+   * @throws IOException
+   */
+  private void setupHttpMethod(List<String> toExcludeList) throws IOException {
+    if (method.equals("POST")) {
+      setupPostMethod(toExcludeList);
+    } else {
+      setupGetMethod(toExcludeList);
+    }
+  }
+
+  /**
+   * Setups details for HTTP POST request.
+   * @param toExcludeList SST file names to be excluded.
+   * @throws IOException
+   */
+  private void setupPostMethod(List<String> toExcludeList)
+      throws IOException {
+    when(requestMock.getMethod()).thenReturn("POST");
+    when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
+        "boundary=" + MULTIPART_FORM_DATA_BOUNDARY);
 
     // Generate form data
     String crNl = "\r\n";
@@ -255,267 +570,17 @@ public class TestOMDbCheckpointServlet {
           int length = invocation.getArgument(2);
           return input.read(buffer, offset, length);
         });
-
-    doNothing().when(responseMock).setContentType("application/x-tar");
-    doNothing().when(responseMock).setHeader(Matchers.anyString(),
-        Matchers.anyString());
-
-    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-
-    omDbCheckpointServletMock.init();
-    long initialCheckpointCount =
-        omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
-
-    omDbCheckpointServletMock.doPost(requestMock, responseMock);
-
-    Assert.assertTrue(tempFile.length() > 0);
-    Assert.assertTrue(
-        omMetrics.getDBCheckpointMetrics().
-            getLastCheckpointCreationTimeTaken() > 0);
-    Assert.assertTrue(
-        omMetrics.getDBCheckpointMetrics().
-            getLastCheckpointStreamingTimeTaken() > 0);
-    Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
-        getNumCheckpoints() > initialCheckpointCount);
-
-    Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
-        any(), any(), eq(toExcludeList), any());
   }
 
-  @Test
-  public void testDoPostWithInvalidContentType() throws Exception {
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-
-    setupCluster();
-
-    final OzoneManager om = cluster.getOzoneManager();
-
-    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-        om.getMetadataManager().getStore(),
-        om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
-        om.getOmAdminUsernames(),
-        om.getOmAdminGroups(),
-        om.isSpnegoEnabled());
-
-    when(requestMock.getContentType()).thenReturn("application/json");
-    doNothing().when(responseMock).setContentType("application/x-tar");
-    doNothing().when(responseMock).setHeader(Matchers.anyString(),
-        Matchers.anyString());
-
-    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-
-    omDbCheckpointServletMock.init();
-    omDbCheckpointServletMock.doPost(requestMock, responseMock);
-
-    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
-  }
-
-  @Test
-  public void testSpnegoEnabled() throws Exception {
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.set(OZONE_ADMINISTRATORS, "");
-    conf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");
-    conf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, "recon/host1@REALM");
-
-    setupCluster();
-
-    final OzoneManager om = cluster.getOzoneManager();
-    Collection<String> allowedUsers =
-            new LinkedHashSet<>(om.getOmAdminUsernames());
-    allowedUsers.add("recon");
-
-    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-        om.getMetadataManager().getStore(),
-        om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
-        allowedUsers,
-        Collections.emptySet(),
-        om.isSpnegoEnabled());
-
-    omDbCheckpointServletMock.init();
-    omDbCheckpointServletMock.doPost(requestMock, responseMock);
-
-    // Response status should be set to 403 Forbidden since there was no user
-    // principal set in the request
-    verify(responseMock, times(1)).setStatus(HttpServletResponse.SC_FORBIDDEN);
-
-    // Set the principal to DN in request
-    // This should also get denied since only OM and recon
-    // users should be granted access to the servlet
-    Principal userPrincipalMock = mock(Principal.class);
-    when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
-    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
-
-    omDbCheckpointServletMock.doPost(requestMock, responseMock);
-
-    // Verify that the Response status is set to 403 again for DN user.
-    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
-
-    // Now, set the principal to recon in request
-    when(userPrincipalMock.getName()).thenReturn("recon/localhost@REALM");
-
-    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
-    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-
-    omDbCheckpointServletMock.doPost(requestMock, responseMock);
-
-    // Recon user should be able to access the servlet and download the
-    // snapshot
-    Assert.assertTrue(tempFile.length() > 0);
-  }
-
-  @Test
-  public void testWriteDbDataToStream() throws Exception {
-    prepSnapshotData();
-    // Set http param to include snapshot data.
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
-        .thenReturn("true");
-
-    // Get the tarball.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>());
-    }
-
-    // Untar the file into a temp folder to be examined.
-    String testDirName = folder.newFolder().getAbsolutePath();
-    int testDirLength = testDirName.length() + 1;
-    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
-    int newDbDirLength = newDbDirName.length() + 1;
-    File newDbDir = new File(newDbDirName);
-    newDbDir.mkdirs();
-    FileUtil.unTar(tempFile, newDbDir);
-
-    // Move snapshot dir to correct location.
-    Assert.assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR)
-        .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR)));
-
-    // Confirm the checkpoint directories match, (after remove extras).
-    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
-        checkpointLocation.toString().length() + 1);
-    Path finalCheckpointLocation = Paths.get(newDbDirName);
-    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
-        newDbDirLength);
-
-    Assert.assertTrue("hardlink file exists in checkpoint dir",
-        finalCheckpointSet.contains(OM_HARDLINK_FILE));
-    finalCheckpointSet.remove(OM_HARDLINK_FILE);
-    Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
-
-    int metaDirLength = metaDir.toString().length() + 1;
-    String shortSnapshotLocation =
-        truncateFileName(metaDirLength, Paths.get(snapshotDirName));
-    String shortSnapshotLocation2 =
-        truncateFileName(metaDirLength, Paths.get(snapshotDirName2));
-    String shortCompactionDirLocation =
-        truncateFileName(metaDirLength, compactionDirPath);
-
-    Set<String> finalFullSet =
-        getFiles(Paths.get(testDirName, OM_SNAPSHOT_DIR), testDirLength);
-
-    // Check each line in the hard link file.
-    List<String> fabricatedLinkLines = new ArrayList<>();
-    try (Stream<String> lines = Files.lines(Paths.get(newDbDirName,
-        OM_HARDLINK_FILE))) {
-
-      for (String line : lines.collect(Collectors.toList())) {
-        Assert.assertFalse("CURRENT file is not a hard link",
-            line.contains("CURRENT"));
-        if (line.contains("fabricatedFile")) {
-          fabricatedLinkLines.add(line);
-        } else {
-          checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
-          // add links to the final set
-          finalFullSet.add(line.split("\t")[0]);
-        }
-      }
-    }
-    Set<String> directories = Sets.newHashSet(
-        shortSnapshotLocation, shortSnapshotLocation2,
-        shortCompactionDirLocation);
-    checkFabricatedLines(directories, fabricatedLinkLines, testDirName);
-
-    Set<String> initialFullSet =
-        getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
-    Assert.assertEquals("expected snapshot files not found",
-        initialFullSet, finalFullSet);
-  }
-
-  @Test
-  public void testWriteDbDataWithoutOmSnapshot()
-      throws Exception {
-    prepSnapshotData();
-
-    // Set http param to exclude snapshot data.
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
-        .thenReturn(null);
-
-    // Get the tarball.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>());
-    }
-
-    // Untar the file into a temp folder to be examined.
-    String testDirName = folder.newFolder().getAbsolutePath();
-    int testDirLength = testDirName.length() + 1;
-    FileUtil.unTar(tempFile, new File(testDirName));
-
-    // Confirm the checkpoint directories match.
-    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
-        checkpointLocation.toString().length() + 1);
-    Path finalCheckpointLocation = Paths.get(testDirName);
-    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
-        testDirLength);
-
-    Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
-  }
-
-  @Test
-  public void testWriteDbDataWithToExcludeFileList()
-      throws Exception {
-    prepSnapshotData();
-
-    File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
-        "dummy.sst");
-    try (OutputStreamWriter writer = new OutputStreamWriter(
-        new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
-      writer.write("Dummy data.");
-    }
-    Assert.assertTrue(dummyFile.exists());
-    List<String> toExcludeList = new ArrayList<>();
-    List<String> excludedList = new ArrayList<>();
-    toExcludeList.add(dummyFile.getName());
-
-    // Set http param to exclude snapshot data.
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
-        .thenReturn(null);
-
-    // Get the tarball.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList, excludedList);
-    }
-
-    // Untar the file into a temp folder to be examined.
-    String testDirName = folder.newFolder().getAbsolutePath();
-    int testDirLength = testDirName.length() + 1;
-    FileUtil.unTar(tempFile, new File(testDirName));
-
-    // Confirm the checkpoint directories match.
-    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
-    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
-        checkpointLocation.toString().length() + 1);
-    Path finalCheckpointLocation = Paths.get(testDirName);
-    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
-        testDirLength);
-
-    initialCheckpointSet.removeAll(finalCheckpointSet);
-    Assert.assertTrue(initialCheckpointSet.contains(dummyFile.getName()));
+  /**
+   * Setups details for HTTP GET request.
+   * @param toExcludeList SST file names to be excluded.
+   */
+  private void setupGetMethod(List<String> toExcludeList) {
+    when(requestMock.getMethod()).thenReturn("GET");
+    when(requestMock
+        .getParameterValues(OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST))
+        .thenReturn(toExcludeList.toArray(new String[0]));
   }
 
   private void prepSnapshotData() throws Exception {
@@ -541,8 +606,8 @@ public class TestOMDbCheckpointServlet {
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
     fabricatedSnapshot.toFile().mkdirs();
-    Assert.assertTrue(Paths.get(fabricatedSnapshot.toString(), "fabricatedFile")
-        .toFile().createNewFile());
+    Assertions.assertTrue(Paths.get(fabricatedSnapshot.toString(),
+            "fabricatedFile").toFile().createNewFile());
 
     // Create fabricated links to snapshot dirs
     // to confirm that links are recognized even if
@@ -629,31 +694,32 @@ public class TestOMDbCheckpointServlet {
     String realDir = null;
     for (String dir: directories) {
       if (Paths.get(testDirName, dir, "fabricatedFile").toFile().exists()) {
-        Assert.assertNull(
-            "Exactly one copy of the fabricated file exists in the tarball",
-            realDir);
+        Assertions.assertNull(realDir,
+            "Exactly one copy of the fabricated file exists in the tarball");
         realDir = dir;
       }
     }
 
-    Assert.assertNotNull("real directory found", realDir);
+    Assertions.assertNotNull(realDir, "real directory found");
     directories.remove(realDir);
     Iterator<String> directoryIterator = directories.iterator();
     String dir0 = directoryIterator.next();
     String dir1 = directoryIterator.next();
-    Assert.assertNotEquals("link directories are different", dir0, dir1);
+    Assertions.assertNotEquals("link directories are different", dir0, dir1);
 
     for (String line : lines) {
       String[] files = line.split("\t");
-      Assert.assertTrue("fabricated entry contains valid first directory",
-          files[0].startsWith(dir0) || files[0].startsWith(dir1));
-      Assert.assertTrue("fabricated entry contains correct real directory",
-          files[1].startsWith(realDir));
+      Assertions.assertTrue(
+          files[0].startsWith(dir0) || files[0].startsWith(dir1),
+          "fabricated entry contains valid first directory");
+      Assertions.assertTrue(files[1].startsWith(realDir),
+          "fabricated entry contains correct real directory");
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
-      Assert.assertTrue("fabricated entries contains correct file name",
+      Assertions.assertTrue(
           path0.getFileName().toString().equals("fabricatedFile") &&
-              path1.getFileName().toString().equals("fabricatedFile"));
+              path1.getFileName().toString().equals("fabricatedFile"),
+          "fabricated entries contains correct file name");
     }
   }
 
@@ -663,12 +729,12 @@ public class TestOMDbCheckpointServlet {
                             String shortSnapshotLocation2,
                             String line) {
     String[] files = line.split("\t");
-    Assert.assertTrue("hl entry starts with valid snapshot dir",
-        files[0].startsWith(shortSnapshotLocation) ||
-        files[0].startsWith(shortSnapshotLocation2));
+    Assertions.assertTrue(files[0].startsWith(shortSnapshotLocation) ||
+        files[0].startsWith(shortSnapshotLocation2),
+        "hl entry starts with valid snapshot dir");
 
     String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
     String file1 = files[1];
-    Assert.assertEquals("hl filenames are the same", file0, file1);
+    Assertions.assertEquals(file0, file1, "hl filenames are the same");
   }
 }
