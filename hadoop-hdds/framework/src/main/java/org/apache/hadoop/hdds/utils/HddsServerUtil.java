@@ -511,6 +511,10 @@ public final class HddsServerUtil {
         SCMSecurityProtocol.class, conf);
   }
 
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * datanode service, should be use only if user is the Datanode identity.
+   */
   public static SecretKeyProtocolClientSideTranslatorPB
       getSecretKeyClientForDatanode(ConfigurationSource conf)
       throws IOException {
@@ -521,6 +525,10 @@ public final class HddsServerUtil {
         SecretKeyProtocolDatanodePB.class);
   }
 
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * OM service, should be use only if user is the OM identity.
+   */
   public static SecretKeyProtocolClientSideTranslatorPB
       getSecretKeyClientForOm(ConfigurationSource conf) throws IOException {
     return new SecretKeyProtocolClientSideTranslatorPB(
@@ -540,8 +548,11 @@ public final class HddsServerUtil {
   }
 
   /**
-   * Create a scm secret key client to interact with a specific SCM node.
-   * @param scmNodeId the destination SCM node ID.
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * SCM service, should be use only if user is the Datanode identity.
+   *
+   * The protocol returned by this method only target a single destination
+   * SCM node.
    */
   public static SecretKeyProtocolClientSideTranslatorPB
       getSecretKeyClientForScm(ConfigurationSource conf,
