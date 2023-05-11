@@ -113,7 +113,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
                     ManagedOptions options)
       throws NativeLibraryNotLoadedException {
     String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan",
-    "--silent"};
+        "--silent"};
     this.sstDumpToolTask = sstDumpTool.run(args, options);
     processOutput = sstDumpToolTask.getPipedOutput();
     intBuffer = new byte[4];
