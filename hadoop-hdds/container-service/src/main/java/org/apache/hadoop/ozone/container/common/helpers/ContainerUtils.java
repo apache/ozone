@@ -79,8 +79,8 @@ public final class ContainerUtils {
   public static ContainerCommandResponseProto logAndReturnError(
       Logger log, StorageContainerException ex,
       ContainerCommandRequestProto request) {
-    String logInfo = "Operation: {} , Trace ID: {} , " +
-        "Message: {} ,Result: {} , StorageContainerException Occurred.";
+    String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
+        "Result: {} , StorageContainerException Occurred.";
     if (ex.getResult() == CLOSED_CONTAINER_IO ||
         ex.getResult() == CONTAINER_NOT_OPEN) {
       if (log.isDebugEnabled()) {
