@@ -81,11 +81,6 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Disk Usage</span>
             <Link to='/DiskUsage'/>
           </Menu.Item>
-          {/* <Menu.Item key='/HeatMap'>
-            <Icon type='bar-chart'/>
-            <span>HeatMap</span>
-            <Link to='/HeatMap'/>
-          </Menu.Item> */}
         </Menu>
       </Sider>
     );
