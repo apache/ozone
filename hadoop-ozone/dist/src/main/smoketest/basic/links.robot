@@ -73,8 +73,9 @@ Cannot follow link without read access
 ACL verified on source and target bucket
     Execute             kdestroy
     Run Keyword         Kinit test user             testuser2         testuser2.keytab
-    ${result} =         Execute And Ignore Error    ozone sh bucket info ${target}/link-to-unreadable-bucket
-                        Should Contain              ${result}         PERMISSION_DENIED
+    ${result} =         Execute                     ozone sh bucket info ${target}/link-to-unreadable-bucket
+                        Should Contain              ${result}         link-to-unreadable-bucket
+                        Should Not Contain          ${result}         PERMISSION_DENIED
     ${result} =         Execute And Ignore Error    ozone sh bucket info ${source}/unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
