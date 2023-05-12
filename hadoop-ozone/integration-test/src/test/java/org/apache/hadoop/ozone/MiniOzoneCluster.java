@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -310,8 +311,6 @@ public interface MiniOzoneCluster {
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
     
-    protected Boolean randomContainerPort = true;
-    protected Boolean randomContainerStreamPort = true;
     protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
@@ -420,18 +419,6 @@ public interface MiniOzoneCluster {
      */
     public Builder setOmId(String id) {
       omId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * If set to true container service will be started in a random port.
-     *
-     * @param randomPort enable random port
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setRandomContainerPort(boolean randomPort) {
-      randomContainerPort = randomPort;
       return this;
     }
 
@@ -649,5 +636,36 @@ public interface MiniOzoneCluster {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
+  }
+
+  /**
+   * Helper class to get free port avoiding randomness.
+   */
+  class PortAllocator {
+
+    private static final int MIN_PORT = 15000;
+    private static final int MAX_PORT = 32000;
+    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    private PortAllocator() {
+      // no instances
+    }
+
+    static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    static String localhostWithFreePort() {
+      return "127.0.0.1:" + getFreePort();
+    }
+
+    static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
+    }
   }
 }
