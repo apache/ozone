@@ -37,12 +37,14 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -63,11 +65,19 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       LoggerFactory.getLogger(ContainerKeyMapperTask.class);
 
   private ReconContainerMetadataManager reconContainerMetadataManager;
+  private final long containerKeyFlushToDBMaxThreshold;
 
   @Inject
   public ContainerKeyMapperTask(ReconContainerMetadataManager
-                                        reconContainerMetadataManager) {
+                                        reconContainerMetadataManager,
+                                OzoneConfiguration configuration) {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
+    this.containerKeyFlushToDBMaxThreshold = configuration.getLong(
+        ReconServerConfigKeys.
+            OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD,
+        ReconServerConfigKeys.
+            OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT
+    );
   }
 
   /**
@@ -79,10 +89,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     long omKeyCount = 0;
 
     // In-memory maps for fast look up and batch write
-    // (HDDS-8580) Since "reprocess" iterate over the whole key table,
-    // only (containerId -> key count) map is used to prevent large memory
-    // overhead.
-
+    // key -> containerId
+    Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
     // containerId -> key count
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
     try {
@@ -96,6 +104,11 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       // loop over both key table and file table
       for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
           BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        // (HDDS-8580) Since "reprocess" iterate over the whole key table,
+        // containerKeyMap needs to be incrementally flushed to DB based on
+        // configured batch threshold.
+        // containerKeyCountMap can be flushed at the end since the number
+        // of containers in a cluster will not have significant memory overhead.
         Table<String, OmKeyInfo> omKeyInfoTable =
             omMetadataManager.getKeyTable(layout);
         try (
@@ -104,10 +117,20 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           while (keyIter.hasNext()) {
             Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
             OmKeyInfo omKeyInfo = kv.getValue();
-            handleKeyReprocess(kv.getKey(), omKeyInfo,
+            handleKeyReprocess(kv.getKey(), omKeyInfo, containerKeyMap,
                 containerKeyCountMap);
+            if (!checkAndCallFlushToDB(containerKeyMap)) {
+              LOG.error("Unable to flush containerKey information to the DB");
+              return new ImmutablePair<>(getTaskName(), false);
+            }
             omKeyCount++;
           }
+        }
+        // flush and commit left out keys at end
+        if (!flushAndCommitContainerKeyMapToDB(containerKeyMap)) {
+          LOG.error("Unable to flush " +
+              "remaining containerKey information to the DB");
+          return new ImmutablePair<>(getTaskName(), false);
         }
       }
 
@@ -123,7 +146,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     }
     try {
       // only batch write containerKeyCountMap to the containerKeyCountTable
-      // (key -> containerId) mapping has been written in (key -> containerId)
+      // containerKeyMap has been written to the DB
       // deleted container list is not needed since "reprocess" only has
       // put operations
       writeToTheDB(Collections.emptyMap(), containerKeyCountMap,
@@ -133,6 +156,29 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       return new ImmutablePair<>(getTaskName(), false);
     }
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private boolean flushAndCommitContainerKeyMapToDB(
+      Map<ContainerKeyPrefix, Integer> containerKeyMap) {
+    try {
+      writeToTheDB(containerKeyMap, Collections.emptyMap(),
+          Collections.emptyList());
+      containerKeyMap.clear();
+    } catch (IOException e) {
+      LOG.error("Unable to write Container Key data in Recon DB.", e);
+      return false;
+    }
+    return true;
+  }
+
+  private boolean checkAndCallFlushToDB(
+      Map<ContainerKeyPrefix, Integer> containerKeyMap) {
+    // if containerKeyMap more than entries, flush to DB and clear the map
+    if (null != containerKeyMap && containerKeyMap.size() >=
+          containerKeyFlushToDBMaxThreshold) {
+      return flushAndCommitContainerKeyMapToDB(containerKeyMap);
+    }
+    return true;
   }
 
   @Override
@@ -154,8 +200,9 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     // In-memory maps for fast look up and batch write
-    // (HDDS-8580) containerKeyMap map is allowed to be used in "process" since
-    // the maximum number of keys is bounded by delta limit configurations
+    // (HDDS-8580) containerKeyMap map is allowed to be used
+    // in "process" without batching since the maximum number of keys
+    // is bounded by delta limit configurations
 
     // key -> containerId
     Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
@@ -404,6 +451,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    *
    * @param key key String
    * @param omKeyInfo omKeyInfo value
+   * @param containerKeyMap we keep the added containerKeys in this map
+   *                        to allow incremental batching to containerKeyTable
    * @param containerKeyCountMap we keep the containerKey counts in this map 
    *                             to allow batching to containerKeyCountTable
    *                             after reprocessing is done
@@ -411,6 +460,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
    */
   private void handleKeyReprocess(String key,
                                   OmKeyInfo omKeyInfo,
+                                  Map<ContainerKeyPrefix, Integer>
+                                      containerKeyMap,
                                   Map<Long, Long> containerKeyCountMap)
       throws IOException {
     long containerCountToIncrement = 0;
@@ -426,8 +477,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
             containerKeyPrefix) == 0) {
           // Save on writes. No need to save same container-key prefix
           // mapping again.
-          reconContainerMetadataManager.storeContainerKeyMapping(
-              containerKeyPrefix, 1);
+          containerKeyMap.put(containerKeyPrefix, 1);
 
           // check if container already exists and
           // if it exists, update the count of keys for the given containerID
