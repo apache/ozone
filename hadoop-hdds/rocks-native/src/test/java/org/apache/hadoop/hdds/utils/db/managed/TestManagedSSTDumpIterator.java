@@ -18,20 +18,28 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Matchers;
+import org.mockito.Mockito;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -69,9 +77,10 @@ public class TestManagedSSTDumpIterator {
               new ArrayBlockingQueue<>(1),
               new ThreadPoolExecutor.CallerRunsPolicy());
       ManagedSSTDumpTool tool = new ManagedSSTDumpTool(executorService, 8192);
-      try (ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue> iterator =
-              new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(
-              tool, file.getAbsolutePath(), new ManagedOptions()) {
+      try (ManagedOptions options = new ManagedOptions();
+           ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue> iterator =
+              new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
+                  file.getAbsolutePath(), options) {
 
             @Override
             protected KeyValue getTransformedValue(Optional<KeyValue> value) {
@@ -132,6 +141,62 @@ public class TestManagedSSTDumpIterator {
     );
   }
 
+  private static byte[] getBytes(Integer val) {
+    byte[] b = new byte[4];
+    for (int i = 3; i >= 0; i--) {
+      b[i] = val.byteValue();
+      val = val >> 8;
+    }
+    return b;
+  }
+
+  private static byte[] getBytes(Long val) {
+    byte[] b = new byte[8];
+    for (int i = 7; i >= 0; i--) {
+      b[i] = (byte)(val & 0xff);
+      val = val >> 8;
+    }
+    return b;
+  }
+
+  private static byte[] getBytes(String val) {
+    byte[] b = new byte[val.length()];
+    for (int i = 0; i < val.length(); i++) {
+      b[i] = (byte) val.charAt(i);
+    }
+    return b;
+  }
+
+  private static Stream<? extends Arguments> invalidPipeInputStreamBytes() {
+    return Stream.of(
+        Arguments.of(Named.of("Invalid 3 byte integer",
+            new byte[] {0, 0, 0})),
+        Arguments.of(Named.of("Invalid 2 byte integer",
+            new byte[] {0, 0})),
+        Arguments.of(Named.of("Invalid 1 byte integer",
+            new byte[] {0, 0})),
+        Arguments.of(Named.of("Invalid key name length",
+            Bytes.concat(getBytes(4), getBytes("key")))),
+        Arguments.of(Named.of("Invalid Unsigned Long length",
+            Bytes.concat(getBytes(4), getBytes("key1"),
+                new byte[]{0, 0}))),
+        Arguments.of(Named.of("Invalid Sequence number",
+            Bytes.concat(getBytes(4), getBytes("key1")))),
+        Arguments.of(Named.of("Invalid Type",
+            Bytes.concat(getBytes(4), getBytes("key1"),
+                getBytes(4L)))),
+        Arguments.of(Named.of("Invalid Value",
+                Bytes.concat(getBytes(4), getBytes("key"),
+                    getBytes(4L), getBytes(0)))),
+        Arguments.of(Named.of("Invalid Value length",
+            Bytes.concat(getBytes(4), getBytes("key"),
+                getBytes(4L), getBytes(1), getBytes(6),
+                getBytes("val"))))
+    );
+  }
+
+
+
   @Native("Managed Rocks Tools")
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
@@ -145,5 +210,34 @@ public class TestManagedSSTDumpIterator {
                 (v1, v2) -> v2,
                 TreeMap::new));
     testSSTDumpIteratorWithKeys(keys);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidPipeInputStreamBytes")
+  public void testInvalidSSTDumpIteratorWithKeyFormat(byte[] inputBytes)
+      throws NativeLibraryNotLoadedException, ExecutionException,
+      InterruptedException, IOException {
+    ByteArrayInputStream byteArrayInputStream =
+        new ByteArrayInputStream(inputBytes);
+    ManagedSSTDumpTool tool = Mockito.mock(ManagedSSTDumpTool.class);
+    File file = File.createTempFile("tmp", ".sst");
+    Future future = Mockito.mock(Future.class);
+    Mockito.when(future.isDone()).thenReturn(false);
+    Mockito.when(future.get()).thenReturn(0);
+    Mockito.when(tool.run(Matchers.any(String[].class),
+        Matchers.any(ManagedOptions.class)))
+        .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
+            byteArrayInputStream));
+    try (ManagedOptions options = new ManagedOptions()) {
+      Assertions.assertThrows(IllegalStateException.class,
+          () -> new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(
+              tool, file.getAbsolutePath(), options) {
+            @Override
+            protected KeyValue getTransformedValue(
+                Optional<KeyValue> value) {
+              return value.orElse(null);
+            }
+          });
+    }
   }
 }

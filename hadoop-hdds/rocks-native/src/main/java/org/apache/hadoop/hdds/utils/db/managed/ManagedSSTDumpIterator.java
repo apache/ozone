@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -48,7 +49,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   // The second tells the sequence number of the key.
   // The third token gives the type of key in the sst file.
   // The fourth token
-  private PipeInputStream processOutput;
+  private InputStream processOutput;
   private Optional<KeyValue> currentKey;
   private byte[] intBuffer;
   private Optional<KeyValue> nextKey;
@@ -83,6 +84,9 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     int n = processOutput.read(intBuffer, 0, 4);
     if (n == 4) {
       return Optional.of(ByteBuffer.wrap(intBuffer).getInt());
+    } else if (n >= 0) {
+      throw new IllegalStateException(String.format("Integer expects " +
+          "4 bytes to be read from the stream, but read only %d bytes", n));
     }
     return Optional.empty();
   }
@@ -92,18 +96,26 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     if (size.isPresent()) {
       byte[] b = new byte[size.get()];
       int n = processOutput.read(b);
-      return n != size.get() ? Optional.empty() : Optional.of(b);
+      if (n >= 0 && n != size.get()) {
+        throw new IllegalStateException(String.format("Integer expects " +
+            "4 bytes to be read from the stream, but read only %d bytes", n));
+      }
+      return Optional.of(b);
     }
     return Optional.empty();
   }
 
-  private Optional<UnsignedLong> getNextUnsignedLong() {
+  private Optional<UnsignedLong> getNextUnsignedLong() throws IOException {
     long val = 0;
     for (int i = 0; i < 8; i++) {
       val = val << 8;
       int nextByte = processOutput.read();
       if (nextByte < 0) {
-        return Optional.empty();
+        if (i == 0) {
+          return Optional.empty();
+        }
+        throw new IllegalStateException(String.format("Long expects " +
+            "8 bytes to be read from the stream, but read only %d bytes", i));
       }
       val += nextByte;
     }
@@ -176,17 +188,24 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       if (!key.isPresent()) {
         return getTransformedValue(currentKey);
       }
-      Optional<UnsignedLong> sequenceNumber = getNextUnsignedLong();
-      if (!sequenceNumber.isPresent()) {
-        return getTransformedValue(currentKey);
-      }
-      Optional<Integer> type = getNextNumberInStream();
-      if (!type.isPresent()) {
-        return getTransformedValue(currentKey);
-      }
-      Optional<byte[]> value = getNextByteArray();
-      nextKey = value.map(val -> new KeyValue(key.get(),
-          sequenceNumber.get(), type.get(), val));
+      UnsignedLong sequenceNumber = getNextUnsignedLong()
+          .orElseThrow(() -> new IllegalStateException(
+              String.format("Error while trying to read sequence number" +
+                      " for key %s", StringUtils.bytes2String(key.get()))));
+
+      Integer type = getNextNumberInStream()
+          .orElseThrow(() -> new IllegalStateException(
+              String.format("Error while trying to read sequence number for " +
+                      "key %s with sequence number %s",
+                  StringUtils.bytes2String(key.get()),
+                  sequenceNumber.toString())));
+      byte[] val = getNextByteArray().orElseThrow(() ->
+          new IllegalStateException(
+              String.format("Error while trying to read sequence number for " +
+                      "key %s with sequence number %s of type %d",
+                  StringUtils.bytes2String(key.get()),
+                  sequenceNumber.toString(), type)));
+      nextKey = Optional.of(new KeyValue(key.get(), sequenceNumber, type, val));
     } catch (IOException e) {
       throw new RuntimeIOException(e);
     }
@@ -199,7 +218,11 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       if (!this.sstDumpToolTask.getFuture().isDone()) {
         this.sstDumpToolTask.getFuture().cancel(true);
       }
-      this.processOutput.close();
+      try {
+        this.processOutput.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
     open.compareAndSet(true, false);
   }
