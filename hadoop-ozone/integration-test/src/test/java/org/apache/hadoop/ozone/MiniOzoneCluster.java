@@ -644,7 +644,7 @@ public interface MiniOzoneCluster {
   class PortAllocator {
 
     private static final int MIN_PORT = 15000;
-    private static final int MAX_PORT = 64000;
+    private static final int MAX_PORT = 32000;
     private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
 
     private PortAllocator() {
