@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.UnsignedLong;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.eclipse.jetty.io.RuntimeIOException;
@@ -172,20 +173,20 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     nextKey = Optional.empty();
     try {
       Optional<byte[]> key = getNextByteArray();
-      if (key.isPresent()) {
-        Optional<UnsignedLong> sequenceNumber = getNextUnsignedLong();
-        if (sequenceNumber.isPresent()) {
-          Optional<Integer> type = getNextNumberInStream();
-          if (type.isPresent()) {
-            Optional<byte[]> value = getNextByteArray();
-            if (value.isPresent()) {
-              nextKey = Optional.of(
-                  new KeyValue(key.get(), sequenceNumber.get(), type.get(),
-                      value.get()));
-            }
-          }
-        }
+      if (!key.isPresent()) {
+        return getTransformedValue(currentKey);
       }
+      Optional<UnsignedLong> sequenceNumber = getNextUnsignedLong();
+      if (!sequenceNumber.isPresent()) {
+        return getTransformedValue(currentKey);
+      }
+      Optional<Integer> type = getNextNumberInStream();
+      if (!type.isPresent()) {
+        return getTransformedValue(currentKey);
+      }
+      Optional<byte[]> value = getNextByteArray();
+      nextKey = value.map(val -> new KeyValue(key.get(),
+          sequenceNumber.get(), type.get(), val));
     } catch (IOException e) {
       throw new RuntimeIOException(e);
     }
@@ -221,13 +222,14 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
    * Class containing Parsed KeyValue Record from Sst Dumptool output.
    */
   public static final class KeyValue {
-    private byte[] key;
-    private UnsignedLong sequence;
-    private Integer type;
-    private byte[] value;
+
+    private final byte[] key;
+    private final UnsignedLong sequence;
+    private final Integer type;
+    private final byte[] value;
 
     private KeyValue(byte[] key, UnsignedLong sequence, Integer type,
-                     byte[] value) {
+             byte[] value) {
       this.key = key;
       this.sequence = sequence;
       this.type = type;
@@ -255,10 +257,10 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     @Override
     public String toString() {
       return "KeyValue{" +
-          "key=" + Arrays.toString(key) +
+          "key=" + StringUtils.bytes2String(key) +
           ", sequence=" + sequence +
           ", type=" + type +
-          ", value=" + Arrays.toString(value) +
+          ", value=" + StringUtils.bytes2String(value) +
           '}';
     }
   }

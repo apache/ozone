@@ -364,7 +364,7 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
-                            <groups>org.apache.hadoop.hdds.utils.db.managed.NativeTests</groups>
+                            <groups>native</groups>
                             <argLine>${maven-surefire-plugin.argLine}  @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
                         </configuration>
                     </plugin>

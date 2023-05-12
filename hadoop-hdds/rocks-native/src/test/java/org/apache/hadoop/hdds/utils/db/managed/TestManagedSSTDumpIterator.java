@@ -20,11 +20,10 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.ArgumentsProvider;
-import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -95,9 +94,47 @@ public class TestManagedSSTDumpIterator {
     }
   }
 
+  private static Stream<? extends Arguments> keyValueFormatArgs() {
+    return Stream.of(
+        Arguments.of(
+            Named.of("Key starting with a single quote",
+                "'key%1$d=>"),
+            Named.of("Value starting with a number ending with a" +
+                " single quote", "%1$dvalue'")
+        ),
+        Arguments.of(
+            Named.of("Key ending with a number", "key%1$d"),
+            Named.of("Value starting & ending with a number", "%1$dvalue%1$d")
+        ),
+        Arguments.of(
+            Named.of("Key starting with a single quote & ending" +
+                " with a number", "'key%1$d"),
+            Named.of("Value starting & ending with a number " +
+                "& elosed within quotes", "%1$d'value%1$d'")),
+        Arguments.of(
+            Named.of("Key starting with a single quote & ending" +
+                " with a number", "'key%1$d"),
+            Named.of("Value starting & ending with a number " +
+                "& elosed within quotes", "%1$d'value%1$d'")
+        ),
+        Arguments.of(
+            Named.of("Key ending with a number", "key%1$d"),
+            Named.of("Value starting & ending with a number " +
+                "& containing null character & new line character",
+                "%1$dvalue\n\0%1$d")
+        ),
+        Arguments.of(
+            Named.of("Key ending with a number & containing" +
+                " a null character", "key\0%1$d"),
+            Named.of("Value starting & ending with a number " +
+                "& elosed within quotes", "%1$dvalue\r%1$d")
+        )
+    );
+  }
+
   @Native("Managed Rocks Tools")
   @ParameterizedTest
-  @ArgumentsSource(KeyValueFormatArgumentProvider.class)
+  @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
               String valueFormat) throws Exception {
     TreeMap<Pair<String, Integer>, String> keys =
@@ -108,20 +145,5 @@ public class TestManagedSSTDumpIterator {
                 (v1, v2) -> v2,
                 TreeMap::new));
     testSSTDumpIteratorWithKeys(keys);
-  }
-}
-
-class KeyValueFormatArgumentProvider implements ArgumentsProvider {
-  @Override
-  public Stream<? extends Arguments> provideArguments(
-      ExtensionContext context) {
-    return Stream.of(
-        Arguments.of("'key%1$d=>", "%1$dvalue'"),
-        Arguments.of("key%1$d", "%1$dvalue%1$d"),
-        Arguments.of("'key%1$d", "%1$d'value%1$d'"),
-        Arguments.of("'key%1$d", "%1$d'value%1$d'"),
-        Arguments.of("key%1$d", "%1$dvalue\n\0%1$d"),
-        Arguments.of("key\0%1$d", "%1$dvalue\r%1$d")
-    );
   }
 }
