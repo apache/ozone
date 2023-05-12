@@ -267,7 +267,8 @@ public class LeaseManager<T> {
         try {
           // block for event and clear all events as will be 
           // handled by activeLeases before going for next wait
-          leaseKeyBlockingQueue.poll(sleepTime, TimeUnit.MILLISECONDS);
+          // ignore return value
+          T task = leaseKeyBlockingQueue.poll(sleepTime, TimeUnit.MILLISECONDS);
           leaseKeyBlockingQueue.clear();
         } catch (InterruptedException e) {
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
