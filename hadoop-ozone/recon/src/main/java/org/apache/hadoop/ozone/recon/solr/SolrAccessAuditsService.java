@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
@@ -152,11 +151,8 @@ public class SolrAccessAuditsService extends AccessAuditsService {
     SolrUtil solrUtil = new SolrUtil(
         reconNamespaceSummaryManager, omMetadataManager, reconSCM,
         ozoneConfiguration);
-    AtomicReference<EntityReadAccessHeatMapResponse>
-        entityReadAccessHeatMapResponseAtomicReference =
-        solrUtil.queryLogs(normalizePath(path), entityType, startDate,
-            solrHttpClient);
-    return entityReadAccessHeatMapResponseAtomicReference.get();
+    return solrUtil.queryLogs(normalizePath(path), entityType, startDate,
+        solrHttpClient);
   }
 
   private String normalizePath(String path) {

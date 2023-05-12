@@ -255,16 +255,12 @@ public class SolrUtil {
     bucket.setSize(bucket.getSize() + keySize);
   }
 
-  public AtomicReference<EntityReadAccessHeatMapResponse>
+  public EntityReadAccessHeatMapResponse
       queryLogs(String path, String entityType, String startDate,
             SolrHttpClient solrHttpClient) {
-    AtomicReference<EntityReadAccessHeatMapResponse>
-        entityReadAccessHeatMapResponseAtomicRef =
-        new AtomicReference<>();
     try {
-      SecurityUtil.doAsCurrentUser(
-          (PrivilegedExceptionAction<AtomicReference<
-              EntityReadAccessHeatMapResponse>>) () -> {
+      return SecurityUtil.doAsCurrentUser(
+          (PrivilegedExceptionAction<EntityReadAccessHeatMapResponse>) () -> {
             InetSocketAddress solrAddress =
                 HddsUtils.getSolrAddress(ozoneConfiguration);
             if (null == solrAddress) {
@@ -300,17 +296,16 @@ public class SolrUtil {
                     AuditLogFacetsResources.class);
             EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
             if (null != entities && !(ArrayUtils.isEmpty(entities))) {
-              entityReadAccessHeatMapResponseAtomicRef.set(
-                  generateHeatMap(entities));
+              return generateHeatMap(entities);
             }
-            return entityReadAccessHeatMapResponseAtomicRef;
+            return null;
           });
     } catch (JsonProcessingException e) {
       LOG.error("Solr Query Output Processing Error: {} ", e);
     } catch (IOException e) {
       LOG.error("Error while generating the access heatmap: {} ", e);
     }
-    return entityReadAccessHeatMapResponseAtomicRef;
+    return null;
   }
 
   private String escapeQueryParamVal(String path) {
