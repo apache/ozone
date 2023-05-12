@@ -237,6 +237,33 @@ public class ContainerHealthResult {
     public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
       this.hasHealthyReplicas = hasHealthyReplicas;
     }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("UnderReplicatedHealthResult{")
+          .append("containerId=").append(getContainerInfo().getContainerID())
+          .append(", state=").append(getHealthState())
+          .append(", remainingRedundancy=").append(remainingRedundancy);
+      if (dueToDecommission) {
+        sb.append(" +dueToDecommission");
+      }
+      if (sufficientlyReplicatedAfterPending) {
+        sb.append(" +sufficientlyReplicatedAfterPending");
+      }
+      if (unrecoverable) {
+        sb.append(" +unrecoverable");
+      }
+      if (hasHealthyReplicas) {
+        sb.append(" +hasHealthyReplicas");
+      }
+      if (hasUnReplicatedOfflineIndexes) {
+        sb.append(" +hasUnReplicatedOfflineIndexes");
+      }
+      if (requeueCount > 0) {
+        sb.append(" requeued:").append(requeueCount);
+      }
+      return sb.append("}").toString();
+    }
   }
 
   /**
