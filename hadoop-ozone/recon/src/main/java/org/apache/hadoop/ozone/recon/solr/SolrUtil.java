@@ -61,7 +61,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SOLR_TIMEZONE_KEY;
