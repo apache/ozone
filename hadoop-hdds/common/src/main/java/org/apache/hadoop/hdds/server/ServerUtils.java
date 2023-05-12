@@ -18,14 +18,11 @@
 package org.apache.hadoop.hdds.server;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
-import java.util.Set;
 
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -47,6 +44,16 @@ public final class ServerUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ServerUtils.class);
+
+  // Static variables for config names
+  private static final String OZONE_RECON_CONFIG =
+      "ozone.recon.db.dir.permissions";
+  private static final String OZONE_SCM_CONFIG =
+      "ozone.scm.db.dirs.permissions";
+  private static final String OZONE_OM_CONFIG =
+      "ozone.om.db.dirs.permissions";
+  private static final String OZONE_METADATA_CONFIG =
+      "ozone.metadata.dirs.permissions";
 
   private ServerUtils() {
   }
@@ -170,7 +177,6 @@ public final class ServerUtils {
                                             String key,
                                             String componentName) {
     final Collection<String> metadirs = conf.getTrimmedStringCollection(key);
-    FsPermission fsPermission = new FsPermission("750");
     if (metadirs.size() > 1) {
       throw new IllegalArgumentException(
           "Bad config setting " + key +
@@ -187,6 +193,14 @@ public final class ServerUtils {
       }
       try {
         Path path = dbDirPath.toPath();
+
+        // Fetch the permissions for the respective component from the config
+        String permissionValue = getPermissions(componentName, conf);
+        // Convert the octal permission value to FsPermission object which
+        // represents symbolic representation of permissions
+        FsPermission fsPermission = new FsPermission(permissionValue);
+
+        // Set the permissions for the directory
         Files.setPosixFilePermissions(path,
             PosixFilePermissions.fromString(fsPermission.toString()));
       } catch (Exception e) {
@@ -199,27 +213,40 @@ public final class ServerUtils {
     return null;
   }
 
-  public String getPermissions(String componentName, ConfigurationSource conf) {
+
+  /**
+   * Retrieves the permissions configuration for a given component name.
+   *
+   * @param componentName The name of the component.
+   * @param conf          The ConfigurationSource object containing the config.
+   * @return The permissions configuration value for the component.
+   */
+  public static String getPermissions(String componentName,
+                                      ConfigurationSource conf) {
     String configName = "";
 
-    // Assign the appropriate config name based on the componentName
-    if (componentName.equalsIgnoreCase("Recon")) {
-      configName = "ozone.recon.db.dir.perm";
-    } else if (componentName.equalsIgnoreCase("SCM")) {
-      configName = "ozone.scm.db.dirs.permissions";
-    } else if (componentName.equalsIgnoreCase("Ozone")) {
-      configName = "ozone.metadata.dirs.permissions";
-    } else if (componentName.equalsIgnoreCase("OM")) {
-      configName = "ozone.om.db.dirs.permissions";
+    // Convert the component name to lowercase for case-insensitive comparison
+    String lowercaseComponent = componentName.toLowerCase();
+
+    // Assign the appropriate config name based on the lowercase component name
+    if (lowercaseComponent.contains("recon")) {
+      configName = OZONE_RECON_CONFIG;
+    } else if (lowercaseComponent.contains("scm")) {
+      configName = OZONE_SCM_CONFIG;
+    } else if (lowercaseComponent.contains("om")) {
+      configName = OZONE_OM_CONFIG;
     } else {
-      throw new IllegalArgumentException(
-          "Invalid componentName provided: " + componentName);
+      configName = OZONE_METADATA_CONFIG;
     }
 
     String configValue = conf.get(configName);
 
+    // Log the permissions being set for the component name
+    LOG.info("Setting permissions for component: {}", componentName);
+
     return configValue;
   }
+
 
   /**
    * Checks and creates Ozone Metadir Path if it does not exist.
