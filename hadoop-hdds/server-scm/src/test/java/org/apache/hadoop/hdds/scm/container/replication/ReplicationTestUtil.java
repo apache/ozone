@@ -210,6 +210,7 @@ public final class ReplicationTestUtil {
     builder.setState(containerState);
     builder.setNumberOfKeys(keyCount);
     builder.setUsedBytes(bytesUsed);
+    builder.setIsAllReplicaEmpty(keyCount == 0);
     return builder.build();
   }
 
