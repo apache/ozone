@@ -237,7 +237,7 @@ message ContainerInfoProto {
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
-    optional bool isAllReplicaEmpty = 13 [default = false];
+    optional bool isAllReplicaEmpty = 13 [default = true];
 }
 
 message ContainerWithPipeline {

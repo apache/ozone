@@ -449,7 +449,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
-    private boolean isAllReplicaEmpty;
+    private boolean isAllReplicaEmpty = true;
     private long stateEnterTime;
     private String owner;
     private long containerID;
