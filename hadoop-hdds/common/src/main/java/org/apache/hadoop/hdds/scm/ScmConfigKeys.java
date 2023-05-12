@@ -216,8 +216,6 @@ public final class ScmConfigKeys {
       "hdds.rest.http-address";
   public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
-  public static final String HDDS_DATANODE_DIR_PERMISSION =
-      "hdds.datanode.dir.perm";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
