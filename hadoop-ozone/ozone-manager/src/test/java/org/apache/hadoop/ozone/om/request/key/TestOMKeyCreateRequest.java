@@ -629,6 +629,29 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   }
 
+  @Test
+  public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(OzoneConsts.OM_SNAPSHOT_INDICATOR + "/" + keyName);
+
+    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+
+    OMException ex = Assert.assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
+    );
+    Assert.assertTrue(ex.getMessage().contains(
+        "Can not use key name starting with prefix: "
+            + OzoneConsts.OM_SNAPSHOT_INDICATOR));
+  }
+
   protected void addToKeyTable(String keyName) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
