@@ -18,13 +18,11 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 
 import java.io.IOException;
 import java.util.UUID;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 
 /**
  * A composition of {@link DefaultSecretKeySignerClient} and
@@ -62,13 +60,13 @@ public class DefaultSecretKeyClient implements SecretKeyClient {
     return verifierClientDelegate.getSecretKey(id);
   }
 
-  public static SecretKeyClient create(ConfigurationSource conf)
+  public static SecretKeyClient create(ConfigurationSource conf,
+      SecretKeyProtocol secretKeyProtocol)
       throws IOException {
-    SCMSecurityProtocol securityProtocol = getScmSecurityClient(conf);
     SecretKeySignerClient singerClient =
-        new DefaultSecretKeySignerClient(securityProtocol);
+        new DefaultSecretKeySignerClient(secretKeyProtocol);
     SecretKeyVerifierClient verifierClient =
-        new DefaultSecretKeyVerifierClient(securityProtocol, conf);
+        new DefaultSecretKeyVerifierClient(secretKeyProtocol, conf);
     return new DefaultSecretKeyClient(singerClient, verifierClient);
   }
 }

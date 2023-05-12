@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -298,7 +299,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient = initializeCertificateClient(dnCertClient);
 
         if (secConf.isTokenEnabled()) {
-          secretKeyClient = DefaultSecretKeyClient.create(conf);
+          SecretKeyProtocol secretKeyProtocol =
+              HddsServerUtil.getSecretKeyClientForDatanode(conf);
+          secretKeyClient = DefaultSecretKeyClient.create(conf,
+              secretKeyProtocol);
           secretKeyClient.start(conf);
         }
       }
