@@ -917,6 +917,7 @@ public class LegacyReplicationManager {
   private boolean isContainerEmpty(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == LifeCycleState.CLOSED &&
+        container.getIsAllReplicaEmpty() &&
         replicas.stream().allMatch(
             r -> r.getState() == State.CLOSED && r.isEmpty());
   }
@@ -1010,6 +1011,7 @@ public class LegacyReplicationManager {
       InvalidStateTransitionException, TimeoutException {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
+    Preconditions.assertTrue(container.getIsAllReplicaEmpty());
 
     replicas.stream().forEach(rp -> {
       Preconditions.assertTrue(rp.getState() == State.CLOSED);

@@ -159,11 +159,18 @@ public class AbstractContainerReportHandler {
         getOtherReplicas(containerInfo.containerID(), newSource);
     long usedBytes = newReplica.getUsed();
     long keyCount = newReplica.getKeyCount();
+    boolean bAllReplicaEmpty = newReplica.getIsEmpty();
+
     for (ContainerReplica r : otherReplicas) {
       usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
       keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
+      if (!r.isEmpty()) {
+        // If any replica is not empty
+        bAllReplicaEmpty = false;
+      }
     }
     updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
+    containerInfo.setIsAllReplicaEmpty(bAllReplicaEmpty);
   }
 
   private void updateECContainerStats(ContainerInfo containerInfo,
@@ -182,6 +189,7 @@ public class AbstractContainerReportHandler {
           getOtherReplicas(containerInfo.containerID(), newSource);
       long usedBytes = newReplica.getUsed();
       long keyCount = newReplica.getKeyCount();
+      boolean bAllReplicaEmpty = newReplica.getIsEmpty();
       for (ContainerReplica r : otherReplicas) {
         if (r.getReplicaIndex() > 1 && r.getReplicaIndex() <= dataNum) {
           // Ignore all data replicas except the first for stats
@@ -189,8 +197,13 @@ public class AbstractContainerReportHandler {
         }
         usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
         keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
+        if (!r.isEmpty()) {
+          // If any replica is not empty
+          bAllReplicaEmpty = false;
+        }
       }
       updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
+      containerInfo.setIsAllReplicaEmpty(bAllReplicaEmpty);
     }
   }
 
