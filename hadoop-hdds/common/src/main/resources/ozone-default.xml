@@ -670,6 +670,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Ozone Manager The
+      permissions have to be octal.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs</name>
     <value/>
     <tag>OZONE, OM, SCM, CONTAINER, STORAGE, REQUIRED</tag>
@@ -684,11 +692,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.db.dirs.permissions</name>
-    <value>700</value>
+    <name>ozone.metadata.dirs.permissions</name>
+    <value>777</value>
     <description>
-      Permissions for the metadata directories for Ozone Manager The
-      permissions can either be octal or symbolic.
+      Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
+      to store their metadata. The permissions have to be octal.
     </description>
   </property>
 
@@ -730,7 +738,7 @@
   </property>
   <property>
     <name>ozone.scm.db.dirs.permissions</name>
-    <value>700</value>
+    <value>777</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager The
       permissions can either be octal or symbolic.
@@ -2785,7 +2793,7 @@
   </property>
   <property>
     <name>ozone.recon.db.dir.perm</name>
-    <value>700</value>
+    <value>777</value>
     <description>
       Permissions for the metadata directories for Recon The
       permissions can either be octal or symbolic.

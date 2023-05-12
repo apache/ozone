@@ -18,9 +18,16 @@
 package org.apache.hadoop.hdds.server;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
+import java.util.Set;
 
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -163,7 +170,7 @@ public final class ServerUtils {
                                             String key,
                                             String componentName) {
     final Collection<String> metadirs = conf.getTrimmedStringCollection(key);
-
+    FsPermission fsPermission = new FsPermission("750");
     if (metadirs.size() > 1) {
       throw new IllegalArgumentException(
           "Bad config setting " + key +
@@ -178,10 +185,40 @@ public final class ServerUtils {
             dbDirPath + " specified in configuration setting " +
             key);
       }
+      try {
+        Path path = dbDirPath.toPath();
+        Files.setPosixFilePermissions(path,
+            PosixFilePermissions.fromString(fsPermission.toString()));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to set directory permissions for " +
+            dbDirPath + ": " + e.getMessage(), e);
+      }
       return dbDirPath;
     }
 
     return null;
+  }
+
+  public String getPermissions(String componentName, ConfigurationSource conf) {
+    String configName = "";
+
+    // Assign the appropriate config name based on the componentName
+    if (componentName.equalsIgnoreCase("Recon")) {
+      configName = "ozone.recon.db.dir.perm";
+    } else if (componentName.equalsIgnoreCase("SCM")) {
+      configName = "ozone.scm.db.dirs.permissions";
+    } else if (componentName.equalsIgnoreCase("Ozone")) {
+      configName = "ozone.metadata.dirs.permissions";
+    } else if (componentName.equalsIgnoreCase("OM")) {
+      configName = "ozone.om.db.dirs.permissions";
+    } else {
+      throw new IllegalArgumentException(
+          "Invalid componentName provided: " + componentName);
+    }
+
+    String configValue = conf.get(configName);
+
+    return configValue;
   }
 
   /**
