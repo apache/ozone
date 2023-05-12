@@ -579,8 +579,7 @@ public class TestDeleteContainerHandler {
     GenericTestUtils.waitFor(() -> getContainerfromDN(
             hddsDatanodeService, containerId.getId())
             .getContainerData().isEmpty(),
-        500,
-        5 * 2000);
+        500, 5 * 2000);
 
     // Send the delete command again. It should succeed this time.
     command.setTerm(
