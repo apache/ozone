@@ -87,8 +87,7 @@ public class DeleteKeyHandler extends KeyHandler {
         !keyName.contains(TRASH_PREFIX)) {
       keyName = OzoneFSUtils.removeTrailingSlashIfNeeded(keyName);
         // Check if key exists in Ozone
-      boolean bKeyExist = isKeyExist(bucket, keyName);
-      if (!bKeyExist) {
+      if (!isKeyExist(bucket, keyName)) {
         out().printf("Key not found %s %n", keyName);
         return;
       }
@@ -114,9 +113,7 @@ public class DeleteKeyHandler extends KeyHandler {
           : userTrashCurrent).toUri().getPath();
 
       String toKeyName = new Path(userTrashCurrent, keyName).toUri().getPath();
-      bKeyExist = isKeyExist(bucket, toKeyName);
-
-      if (bKeyExist) {
+      if (isKeyExist(bucket, toKeyName)) {
         if (bucket.getFileStatus(toKeyName).isDirectory()) {
           // if directory already exist in trash, just delete the directory
           bucket.deleteKey(keyName);
@@ -129,8 +126,7 @@ public class DeleteKeyHandler extends KeyHandler {
       }
 
       // Check whether trash directory already exist inside bucket
-      bKeyExist = isKeyExist(bucket, trashDirectory);
-      if (!bKeyExist) {
+      if (!isKeyExist(bucket, trashDirectory)) {
         // Trash directory doesn't exist
         // Create directory inside trash
         bucket.createDirectory(trashDirectory);
@@ -156,9 +152,6 @@ public class DeleteKeyHandler extends KeyHandler {
     } catch (IOException e) {
       return false;
     }
-    if (keyDetails == null) {
-      return false;
-    }
-    return true;
+    return (keyDetails != null);
   }
 }
