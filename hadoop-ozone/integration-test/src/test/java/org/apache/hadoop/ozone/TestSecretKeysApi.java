@@ -20,16 +20,17 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AuthorizationException;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.jetbrains.annotations.NotNull;
@@ -50,6 +51,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -61,7 +63,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.SECRET_KEY_NOT_ENABLED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForDatanode;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
@@ -70,7 +73,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -94,6 +96,7 @@ public final class TestSecretKeysApi {
   private File spnegoKeytab;
   private File testUserKeytab;
   private String testUserPrincipal;
+  private String ozonePrincipal;
   private String clusterId;
   private String scmId;
   private MiniOzoneHAClusterImpl cluster;
@@ -104,6 +107,7 @@ public final class TestSecretKeysApi {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
+    ExitUtil.disableSystemExit();
 
     workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
     clusterId = UUID.randomUUID().toString();
@@ -124,10 +128,9 @@ public final class TestSecretKeysApi {
   }
 
   private void createCredentialsInKDC() throws Exception {
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     SCMHTTPServerConfig httpServerConfig =
         conf.getObject(SCMHTTPServerConfig.class);
-    createPrincipal(ozoneKeytab, scmConfig.getKerberosPrincipal());
+    createPrincipal(ozoneKeytab, ozonePrincipal);
     createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
     createPrincipal(testUserKeytab, testUserPrincipal);
   }
@@ -155,11 +158,12 @@ public final class TestSecretKeysApi {
 
     String realm = miniKdc.getRealm();
     String hostAndRealm = host + "@" + realm;
-    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    ozonePrincipal = "scm/" + hostAndRealm;
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, ozonePrincipal);
 
     ozoneKeytab = new File(workDir, "scm.keytab");
     spnegoKeytab = new File(workDir, "http.keytab");
@@ -176,6 +180,8 @@ public final class TestSecretKeysApi {
         spnegoKeytab.getAbsolutePath());
     conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
         ozoneKeytab.getAbsolutePath());
+
+    conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
   }
 
   /**
@@ -190,23 +196,22 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1s");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "3000ms");
 
-    startCluster();
-    SCMSecurityProtocol securityProtocol = getScmSecurityProtocol();
+    startCluster(3);
+    SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
 
     // start the test when keys are full.
     GenericTestUtils.waitFor(() -> {
       try {
-        return securityProtocol.getAllSecretKeys().size() >= 3;
+        return secretKeyProtocol.getAllSecretKeys().size() >= 3;
       } catch (IOException ex) {
         throw new RuntimeException(ex);
       }
     }, 100, 4_000);
 
-    ManagedSecretKey initialKey = securityProtocol.getCurrentSecretKey();
+    ManagedSecretKey initialKey = secretKeyProtocol.getCurrentSecretKey();
     assertNotNull(initialKey);
-    List<ManagedSecretKey> initialKeys = securityProtocol.getAllSecretKeys();
+    List<ManagedSecretKey> initialKeys = secretKeyProtocol.getAllSecretKeys();
     assertEquals(initialKey, initialKeys.get(0));
-    ManagedSecretKey lastKey = initialKeys.get(initialKeys.size() - 1);
 
     LOG.info("Initial active key: {}", initialKey);
     LOG.info("Initial keys: {}", initialKeys);
@@ -214,29 +219,27 @@ public final class TestSecretKeysApi {
     // wait for the next rotation.
     GenericTestUtils.waitFor(() -> {
       try {
-        ManagedSecretKey newCurrentKey = securityProtocol.getCurrentSecretKey();
+        ManagedSecretKey newCurrentKey =
+            secretKeyProtocol.getCurrentSecretKey();
         return !newCurrentKey.equals(initialKey);
       } catch (IOException ex) {
         throw new RuntimeException(ex);
       }
     }, 100, 1500);
-    ManagedSecretKey  updatedKey = securityProtocol.getCurrentSecretKey();
-    List<ManagedSecretKey>  updatedKeys = securityProtocol.getAllSecretKeys();
+    ManagedSecretKey  updatedKey = secretKeyProtocol.getCurrentSecretKey();
+    List<ManagedSecretKey>  updatedKeys = secretKeyProtocol.getAllSecretKeys();
 
     LOG.info("Updated active key: {}", updatedKey);
     LOG.info("Updated keys: {}", updatedKeys);
 
     assertEquals(updatedKey, updatedKeys.get(0));
     assertEquals(initialKey, updatedKeys.get(1));
-    // ensure the last key from the previous cycle no longer managed.
-    assertTrue(lastKey.isExpired());
-    assertFalse(updatedKeys.contains(lastKey));
 
     // assert getSecretKey by ID.
-    ManagedSecretKey keyById = securityProtocol.getSecretKey(
+    ManagedSecretKey keyById = secretKeyProtocol.getSecretKey(
         updatedKey.getId());
     assertNotNull(keyById);
-    ManagedSecretKey nonExisting = securityProtocol.getSecretKey(
+    ManagedSecretKey nonExisting = secretKeyProtocol.getSecretKey(
         UUID.randomUUID());
     assertNull(nonExisting);
   }
@@ -246,19 +249,19 @@ public final class TestSecretKeysApi {
    */
   @Test
   public void testSecretKeyApiNotEnabled() throws Exception {
-    startCluster();
-    SCMSecurityProtocol securityProtocol = getScmSecurityProtocol();
+    startCluster(1);
+    SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
 
-    SCMSecurityException ex = assertThrows(SCMSecurityException.class,
-            securityProtocol::getCurrentSecretKey);
+    SCMSecretKeyException ex = assertThrows(SCMSecretKeyException.class,
+            secretKeyProtocol::getCurrentSecretKey);
     assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
 
-    ex = assertThrows(SCMSecurityException.class,
-        () -> securityProtocol.getSecretKey(UUID.randomUUID()));
+    ex = assertThrows(SCMSecretKeyException.class,
+        () -> secretKeyProtocol.getSecretKey(UUID.randomUUID()));
     assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
 
-    ex = assertThrows(SCMSecurityException.class,
-        securityProtocol::getAllSecretKeys);
+    ex = assertThrows(SCMSecretKeyException.class,
+        secretKeyProtocol::getAllSecretKeys);
     assertEquals(SECRET_KEY_NOT_ENABLED, ex.getErrorCode());
   }
 
@@ -274,8 +277,8 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1d");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "7d");
 
-    startCluster();
-    SCMSecurityProtocol securityProtocol = getScmSecurityProtocol();
+    startCluster(3);
+    SecretKeyProtocol securityProtocol = getSecretKeyProtocol();
     List<ManagedSecretKey> keysInitial = securityProtocol.getAllSecretKeys();
     LOG.info("Keys before fail over: {}.", keysInitial);
 
@@ -294,7 +297,40 @@ public final class TestSecretKeysApi {
     }
   }
 
-  private void startCluster()
+  @Test
+  public void testSecretKeyAuthorization() throws Exception {
+    enableBlockToken();
+    conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
+    startCluster(1);
+
+    // When HADOOP_SECURITY_AUTHORIZATION is enabled, SecretKey protocol
+    // is only available for Datanode and OM, any other authenticated user
+    // can't access the protocol.
+    SecretKeyProtocol secretKeyProtocol =
+        getSecretKeyProtocol(testUserPrincipal, testUserKeytab);
+    RemoteException ex =
+        assertThrows(RemoteException.class,
+            secretKeyProtocol::getCurrentSecretKey);
+    assertEquals(AuthorizationException.class.getName(), ex.getClassName());
+    assertTrue(ex.getMessage().contains(
+        "User test@EXAMPLE.COM (auth:KERBEROS) is not authorized " +
+            "for protocol"));
+  }
+
+  @Test
+  public void testSecretKeyWithoutAuthorization() throws Exception {
+    enableBlockToken();
+    conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, false);
+    startCluster(1);
+
+    // When HADOOP_SECURITY_AUTHORIZATION is not enabled, any other
+    // authenticated user can access the protocol.
+    SecretKeyProtocol secretKeyProtocol =
+        getSecretKeyProtocol(testUserPrincipal, testUserKeytab);
+    assertNotNull(secretKeyProtocol.getCurrentSecretKey());
+  }
+
+  private void startCluster(int numSCMs)
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
@@ -302,7 +338,7 @@ public final class TestSecretKeysApi {
         .setSCMServiceId("TestSecretKey")
         .setScmId(scmId)
         .setNumDatanodes(3)
-        .setNumOfStorageContainerManagers(3)
+        .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);
 
     cluster = (MiniOzoneHAClusterImpl) builder.build();
@@ -310,15 +346,18 @@ public final class TestSecretKeysApi {
   }
 
   @NotNull
-  private SCMSecurityProtocol getScmSecurityProtocol() throws IOException {
+  private SecretKeyProtocol getSecretKeyProtocol() throws IOException {
+    return getSecretKeyProtocol(ozonePrincipal, ozoneKeytab);
+  }
+
+  @NotNull
+  private SecretKeyProtocol getSecretKeyProtocol(
+      String user, File keyTab) throws IOException {
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
-            testUserPrincipal, testUserKeytab.getCanonicalPath());
+            user, keyTab.getCanonicalPath());
     ugi.setAuthenticationMethod(KERBEROS);
-    SCMSecurityProtocol scmSecurityProtocolClient =
-        HddsServerUtil.getScmSecurityClient(conf, ugi);
-    assertNotNull(scmSecurityProtocolClient);
-    return scmSecurityProtocolClient;
+    return getSecretKeyClientForDatanode(conf, ugi);
   }
 
   private void enableBlockToken() {

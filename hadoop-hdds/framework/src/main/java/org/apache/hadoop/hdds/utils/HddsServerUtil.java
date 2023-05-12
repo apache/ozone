@@ -44,14 +44,19 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
-import org.apache.hadoop.hdds.scm.proxy.SingleSCMSecurityProtocolProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -449,16 +454,6 @@ public final class HddsServerUtil {
             UserGroupInformation.getCurrentUser()));
   }
 
-  /**
-   * Create a scm security client to interact with a specific SCM node.
-   */
-  public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientSingleNode(ConfigurationSource conf, String scmNodeId,
-      UserGroupInformation ugi) throws IOException {
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        new SingleSCMSecurityProtocolProxyProvider(conf, ugi, scmNodeId));
-  }
-
   public static SCMSecurityProtocolClientSideTranslatorPB
       getScmSecurityClientWithMaxRetry(OzoneConfiguration conf,
       UserGroupInformation ugi) throws IOException {
@@ -515,6 +510,58 @@ public final class HddsServerUtil {
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
     return TracingUtil.createProxy(scmSecurityClient,
         SCMSecurityProtocolClientSideTranslatorPB.class, conf);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * datanode service, should be use only if user is the Datanode identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf)
+      throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * OM service, should be use only if user is the OM identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForOm(ConfigurationSource conf) throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolOmPB.class),
+        SecretKeyProtocolOmPB.class);
+  }
+
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf,
+      UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf, ugi,
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * SCM service, should be use only if user is the Datanode identity.
+   *
+   * The protocol returned by this method only target a single destination
+   * SCM node.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForScm(ConfigurationSource conf,
+      String scmNodeId, UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SingleSecretKeyProtocolProxyProvider(conf, ugi,
+            SecretKeyProtocolScmPB.class, scmNodeId),
+        SecretKeyProtocolScmPB.class);
   }
 
   /**

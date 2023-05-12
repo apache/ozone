@@ -299,6 +299,18 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECURITY_CLIENT_SCM_CERTIFICATE_PROTOCOL_ACL =
       "hdds.security.client.scm.certificate.protocol.acl";
 
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.om.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.scm.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.datanode.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =

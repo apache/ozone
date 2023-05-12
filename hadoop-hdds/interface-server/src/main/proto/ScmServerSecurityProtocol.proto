@@ -56,7 +56,6 @@ message SCMSecurityRequest {
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
     optional SCMGetCertRequestProto getCertRequest = 13;
-    optional SCMGetSecretKeyRequest getSecretKeyRequest = 14;
 }
 
 message SCMSecurityResponse {
@@ -81,13 +80,6 @@ message SCMSecurityResponse {
     optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
 
     optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
-
-    optional SCMGetCurrentSecretKeyResponse currentSecretKeyResponseProto = 11;
-
-    optional SCMGetSecretKeyResponse getSecretKeyResponseProto = 12;
-
-    optional SCMSecretKeysListResponse secretKeysListResponseProto = 13;
-
 }
 
 enum Type {
@@ -103,9 +95,6 @@ enum Type {
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
     GetCert = 12;
-    GetCurrentSecretKey = 13;
-    GetSecretKey = 14;
-    GetAllSecretKeys = 15;
 }
 
 enum Status {
@@ -126,8 +115,6 @@ enum Status {
     GET_ROOT_CA_CERTIFICATE_FAILED = 15;
     NOT_A_PRIMARY_SCM = 16;
     REVOKE_CERTIFICATE_FAILED = 17;
-    SECRET_KEY_NOT_ENABLED = 18;
-    SECRET_KEY_NOT_INITIALIZED = 19;
 }
 /**
 * This message is send by data node to prove its identity and get an SCM
@@ -261,30 +248,3 @@ message SCMRevokeCertificatesResponseProto {
 service SCMSecurityProtocolService {
     rpc submitRequest (SCMSecurityRequest) returns (SCMSecurityResponse);
 }
-
-message ManagedSecretKey {
-    required UUID id = 1;
-    required uint64 creationTime = 2;
-    required uint64 expiryTime = 3;
-    required string algorithm = 4;
-    required bytes encoded = 5;
-}
-
-message SCMGetSecretKeyRequest {
-    required UUID secretKeyId = 1;
-}
-
-message SCMGetCurrentSecretKeyResponse {
-    required ManagedSecretKey secretKey = 1;
-}
-
-message SCMGetSecretKeyResponse {
-    optional ManagedSecretKey secretKey = 1;
-}
-
-message SCMSecretKeysListResponse {
-    repeated ManagedSecretKey secretKeys = 1;
-}
-
-
-

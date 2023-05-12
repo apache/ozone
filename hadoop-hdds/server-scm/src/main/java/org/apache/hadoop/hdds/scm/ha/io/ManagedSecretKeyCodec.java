@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 
 /**
@@ -37,8 +37,8 @@ public class ManagedSecretKeyCodec implements Codec {
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    SCMSecurityProtocolProtos.ManagedSecretKey message =
-        SCMSecurityProtocolProtos.ManagedSecretKey.parseFrom(value);
+    SCMSecretKeyProtocolProtos.ManagedSecretKey message =
+        SCMSecretKeyProtocolProtos.ManagedSecretKey.parseFrom(value);
     return ManagedSecretKey.fromProtobuf(message);
   }
 }

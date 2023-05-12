@@ -17,23 +17,24 @@
 package org.apache.hadoop.hdds.scm.proxy;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * Proxy provider for
- * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol} against a single
- * SCM node (no fail-over).
+ * Proxy provider for SCMSecretKeyProtocolService against a
+ * single SCM node (no fail-over).
  */
-public class SingleSCMSecurityProtocolProxyProvider
-    extends SCMSecurityProtocolFailoverProxyProvider {
+public class SingleSecretKeyProtocolProxyProvider
+    <T extends SCMSecretKeyProtocolService.BlockingInterface>
+    extends SecretKeyProtocolFailoverProxyProvider<T> {
   private final String scmNodeId;
 
-  public SingleSCMSecurityProtocolProxyProvider(
+  public SingleSecretKeyProtocolProxyProvider(
       ConfigurationSource conf,
       UserGroupInformation userGroupInformation,
+      Class<T> clazz,
       String scmNodeId) {
-    super(conf, userGroupInformation);
+    super(conf, userGroupInformation, clazz);
     this.scmNodeId = scmNodeId;
   }
 
@@ -43,7 +44,7 @@ public class SingleSCMSecurityProtocolProxyProvider
   }
 
   @Override
-  public synchronized void performFailover(SCMSecurityProtocolPB currentProxy) {
+  public synchronized void performFailover(T currentProxy) {
     // do nothing.
   }
 

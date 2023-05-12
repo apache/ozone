@@ -2530,6 +2530,33 @@
     </description>
   </property>
   <property>
+    <name>hdds.security.client.scm.secretkey.om.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access
+      client scm secret key protocol for om.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.client.scm.secretkey.scm.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access
+      client scm secret key protocol for om.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.client.scm.secretkey.datanode.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access
+      client scm secret key protocol for datanodes.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.security.client.protocol.acl</name>
     <value>*</value>
     <tag>SECURITY</tag>

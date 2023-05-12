@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 
 /**
  * Default implementation of {@link SecretKeySignerClient} that fetches
@@ -45,14 +44,14 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeySignerClient.class);
 
-  private final SCMSecurityProtocol scmSecurityProtocol;
+  private final SecretKeyProtocol secretKeyProtocol;
   private final AtomicReference<ManagedSecretKey> cache =
       new AtomicReference<>();
   private ScheduledExecutorService executorService;
 
   public DefaultSecretKeySignerClient(
-      SCMSecurityProtocol scmSecurityProtocol) {
-    this.scmSecurityProtocol = scmSecurityProtocol;
+      SecretKeyProtocol secretKeyProtocol) {
+    this.secretKeyProtocol = secretKeyProtocol;
   }
 
   @Override
@@ -64,7 +63,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   @Override
   public void start(ConfigurationSource conf) throws IOException {
     final ManagedSecretKey initialKey =
-        scmSecurityProtocol.getCurrentSecretKey();
+        secretKeyProtocol.getCurrentSecretKey();
     LOG.info("Initial secret key fetched from SCM: {}.", initialKey);
     cache.set(initialKey);
     scheduleSecretKeyPoller(conf, initialKey.getCreationTime());
@@ -111,7 +110,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     // from SCM.
     if (nextRotate.isBefore(Instant.now())) {
       try {
-        ManagedSecretKey newKey = scmSecurityProtocol.getCurrentSecretKey();
+        ManagedSecretKey newKey = secretKeyProtocol.getCurrentSecretKey();
         if (!newKey.equals(current)) {
           cache.set(newKey);
           LOG.info("New secret key fetched from SCM: {}.", newKey);
@@ -122,11 +121,5 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
             "Error fetching current key from SCM", e);
       }
     }
-  }
-
-  public static DefaultSecretKeySignerClient create(ConfigurationSource conf)
-      throws IOException {
-    SCMSecurityProtocol securityProtocol = getScmSecurityClient(conf);
-    return new DefaultSecretKeySignerClient(securityProtocol);
   }
 }

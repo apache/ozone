@@ -22,9 +22,7 @@ import java.security.cert.CRLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -42,8 +40,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCrl
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetDataNodeCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMCertRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSecretKeyRequest;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLatestCrlIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
@@ -55,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
@@ -185,38 +180,6 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
       String certSignReq) throws IOException {
     return getCertificateChain(nodeDetails, certSignReq)
         .getX509Certificate();
-  }
-
-  @Override
-  public ManagedSecretKey getCurrentSecretKey() throws IOException {
-    SCMSecurityProtocolProtos.ManagedSecretKey secretKeyProto =
-        submitRequest(Type.GetCurrentSecretKey, builder -> {
-        }).getCurrentSecretKeyResponseProto().getSecretKey();
-    return ManagedSecretKey.fromProtobuf(secretKeyProto);
-  }
-
-  @Override
-  public ManagedSecretKey getSecretKey(UUID id) throws IOException {
-    SCMGetSecretKeyRequest request = SCMGetSecretKeyRequest.newBuilder()
-        .setSecretKeyId(HddsProtos.UUID.newBuilder()
-            .setMostSigBits(id.getMostSignificantBits())
-            .setLeastSigBits(id.getLeastSignificantBits())).build();
-    SCMGetSecretKeyResponse response = submitRequest(Type.GetSecretKey,
-        builder -> builder.setGetSecretKeyRequest(request))
-        .getGetSecretKeyResponseProto();
-
-    return response.hasSecretKey() ?
-        ManagedSecretKey.fromProtobuf(response.getSecretKey()) : null;
-  }
-
-  @Override
-  public List<ManagedSecretKey> getAllSecretKeys() throws IOException {
-    List<SCMSecurityProtocolProtos.ManagedSecretKey> secretKeysList =
-        submitRequest(Type.GetAllSecretKeys, builder -> {
-        }).getSecretKeysListResponseProto().getSecretKeysList();
-    return secretKeysList.stream()
-        .map(ManagedSecretKey::fromProtobuf)
-        .collect(Collectors.toList());
   }
 
   /**

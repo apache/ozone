@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
@@ -622,7 +623,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       certClient = new OMCertificateClient(secConfig, omStorage,
           scmInfo == null ? null : scmInfo.getScmId(), this::saveNewCertId,
           this::terminateOM);
-      secretKeyClient = DefaultSecretKeySignerClient.create(conf);
+      SecretKeyProtocol secretKeyProtocol =
+          HddsServerUtil.getSecretKeyClientForOm(conf);
+      secretKeyClient = new DefaultSecretKeySignerClient(secretKeyProtocol);
     }
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager();
