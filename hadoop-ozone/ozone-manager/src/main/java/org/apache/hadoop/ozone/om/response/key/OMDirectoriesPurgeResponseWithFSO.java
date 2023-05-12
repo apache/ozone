@@ -82,6 +82,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         processPaths(fromSnapshot.getMetadataManager(), writeBatch);
         fromSnapshotStore.commitBatchOperation(writeBatch);
       }
+      
+      // update bucket quota in active db for snapshot cleanup
+      for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
+        metadataManager.getBucketTable().putWithBatch(batchOp,
+            metadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+                omBucketInfo.getBucketName()), omBucketInfo);
+      }
     } else {
       processPaths(metadataManager, batchOp);
     }
