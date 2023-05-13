@@ -42,6 +42,8 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
+  public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
+
   /**
    *
    * When set to true, allocate a random free port for ozone container,

@@ -53,7 +53,7 @@ public class TestServerUtils {
 
   /**
    * Test case for {@link ServerUtils#getPermissions}.
-   * Verifies the retrieval of permissions for different component names.
+   * Verifies the retrieval of permissions for different configs.
    */
   @Test
   public void testGetPermissions() {
@@ -65,23 +65,27 @@ public class TestServerUtils {
     conf.set("ozone.metadata.dirs.permissions", "770");
     conf.set("ozone.om.db.dirs.permissions", "700");
 
-    // Test getPermissions for different component names and assert the
+    // Test getPermissions for different config names and assert the
     // returned permissions
-    assertEquals("750", ServerUtils.getPermissions("Recon", conf));
-    assertEquals("775", ServerUtils.getPermissions("SCM", conf));
-    assertEquals("770", ServerUtils.getPermissions("Ozone", conf));
-    assertEquals("700", ServerUtils.getPermissions("OM", conf));
+    assertEquals("750",
+        ServerUtils.getPermissions("ozone.recon.db.dir", conf));
+    assertEquals("775",
+        ServerUtils.getPermissions("ozone.scm.db.dirs", conf));
+    assertEquals("770",
+        ServerUtils.getPermissions("ozone.metadata.dirs", conf));
+    assertEquals("700",
+        ServerUtils.getPermissions("ozone.om.db.dirs", conf));
 
   }
 
   @Test
-  public void testGetPermissionsWithMissingConfiguration() {
-    // Create an empty OzoneConfiguration object
+  public void testGetPermissionsWithInvalidConfig() {
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    // Test getPermissions with a component name that has no corresponding
-    // configuration and assert the default value is returned
-    assertEquals("750", ServerUtils.getPermissions("Recon", conf));
+    // Attempt to get permissions for an invalid config
+    assertThrows(IllegalArgumentException.class, () -> {
+      ServerUtils.getPermissions("invalidKey", conf);
+    });
   }
 
   /**

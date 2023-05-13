@@ -28,9 +28,11 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.http.client.methods.HttpRequestBase;
@@ -46,13 +48,13 @@ public final class ServerUtils {
       ServerUtils.class);
 
   // Static variables for config names
-  private static final String OZONE_RECON_CONFIG =
+  private static final String OZONE_RECON_CONFIG_PERMISSION =
       "ozone.recon.db.dir.permissions";
-  private static final String OZONE_SCM_CONFIG =
+  private static final String OZONE_SCM_CONFIG_PERMISSION =
       "ozone.scm.db.dirs.permissions";
-  private static final String OZONE_OM_CONFIG =
+  private static final String OZONE_OM_CONFIG_PERMISSION =
       "ozone.om.db.dirs.permissions";
-  private static final String OZONE_METADATA_CONFIG =
+  private static final String OZONE_METADATA_CONFIG_PERMISSION =
       "ozone.metadata.dirs.permissions";
 
   private ServerUtils() {
@@ -195,7 +197,7 @@ public final class ServerUtils {
         Path path = dbDirPath.toPath();
 
         // Fetch the permissions for the respective component from the config
-        String permissionValue = getPermissions(componentName, conf);
+        String permissionValue = getPermissions(key, conf);
         // Convert the octal permission value to FsPermission object which
         // represents symbolic representation of permissions
         FsPermission fsPermission = new FsPermission(permissionValue);
@@ -217,34 +219,34 @@ public final class ServerUtils {
   /**
    * Retrieves the permissions configuration for a given component name.
    *
-   * @param componentName The name of the component.
-   * @param conf          The ConfigurationSource object containing the config.
+   * @param key  The name of the config.
+   * @param conf The ConfigurationSource object containing the config.
    * @return The permissions configuration value for the component.
    */
-  public static String getPermissions(String componentName,
+  public static String getPermissions(String key,
                                       ConfigurationSource conf) {
     String configName = "";
 
-    // Convert the component name to lowercase for case-insensitive comparison
-    String lowercaseComponent = componentName.toLowerCase();
-
-    // Assign the appropriate config name based on the lowercase component name
-    if (lowercaseComponent.contains("recon")) {
-      configName = OZONE_RECON_CONFIG;
-    } else if (lowercaseComponent.contains("scm")) {
-      configName = OZONE_SCM_CONFIG;
-    } else if (lowercaseComponent.contains("om")) {
-      configName = OZONE_OM_CONFIG;
+    // Assign the appropriate config name based on the KEY
+    if (key.equals(ReconConfigKeys.OZONE_RECON_DB_DIR)) {
+      configName = OZONE_RECON_CONFIG_PERMISSION;
+    } else if (key.equals(ScmConfigKeys.OZONE_SCM_DB_DIRS)) {
+      configName = OZONE_SCM_CONFIG_PERMISSION;
+    } else if (key.equals(OzoneConfigKeys.OZONE_OM_DB_DIRS)) {
+      configName = OZONE_OM_CONFIG_PERMISSION;
+    } else if (key.equals(OzoneConfigKeys.OZONE_METADATA_DIRS)) {
+      configName = OZONE_METADATA_CONFIG_PERMISSION;
     } else {
-      configName = OZONE_METADATA_CONFIG;
+      throw new IllegalArgumentException("Invalid config passed: " + key);
     }
 
     String configValue = conf.get(configName);
+    if (configValue != null) {
+      return configValue;
+    }
 
-    // Log the permissions being set for the component name
-    LOG.info("Setting permissions for component: {}", componentName);
-
-    return configValue;
+    throw new IllegalArgumentException(
+        "Invalid configuration value for key: " + key);
   }
 
 
