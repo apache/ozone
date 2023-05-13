@@ -78,16 +78,6 @@ public class TestServerUtils {
 
   }
 
-  @Test
-  public void testGetPermissionsWithInvalidConfig() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-
-    // Attempt to get permissions for an invalid config
-    assertThrows(IllegalArgumentException.class, () -> {
-      ServerUtils.getPermissions("invalidKey", conf);
-    });
-  }
-
   /**
    * Test case for {@link ServerUtils#getDirectoryFromConfig}.
    * Verifies the creation of a directory with the expected permissions.

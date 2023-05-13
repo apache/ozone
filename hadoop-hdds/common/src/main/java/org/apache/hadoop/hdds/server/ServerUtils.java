@@ -49,7 +49,7 @@ public final class ServerUtils {
 
   // Static variables for config names
   private static final String OZONE_RECON_CONFIG_PERMISSION =
-      "ozone.recon.db.dir.permissions";
+      "ozone.recon.db.dirs.permissions";
   private static final String OZONE_SCM_CONFIG_PERMISSION =
       "ozone.scm.db.dirs.permissions";
   private static final String OZONE_OM_CONFIG_PERMISSION =
@@ -217,14 +217,14 @@ public final class ServerUtils {
 
 
   /**
-   * Retrieves the permissions configuration for a given component name.
+   * Retrieves the permissions' configuration value for a given config key.
    *
-   * @param key  The name of the config.
-   * @param conf The ConfigurationSource object containing the config.
-   * @return The permissions configuration value for the component.
+   * @param key  The configuration key.
+   * @param conf The ConfigurationSource object containing the config
+   * @return The permissions' configuration value for the specified key.
+   * @throws IllegalArgumentException If the configuration value is not defined
    */
-  public static String getPermissions(String key,
-                                      ConfigurationSource conf) {
+  public static String getPermissions(String key, ConfigurationSource conf) {
     String configName = "";
 
     // Assign the appropriate config name based on the KEY
@@ -234,10 +234,10 @@ public final class ServerUtils {
       configName = OZONE_SCM_CONFIG_PERMISSION;
     } else if (key.equals(OzoneConfigKeys.OZONE_OM_DB_DIRS)) {
       configName = OZONE_OM_CONFIG_PERMISSION;
-    } else if (key.equals(OzoneConfigKeys.OZONE_METADATA_DIRS)) {
-      configName = OZONE_METADATA_CONFIG_PERMISSION;
     } else {
-      throw new IllegalArgumentException("Invalid config passed: " + key);
+      // If the permissions are not defined for the config, we make it fall
+      // back to the default permissions for metadata files and directories
+      configName = OZONE_METADATA_CONFIG_PERMISSION;
     }
 
     String configValue = conf.get(configName);

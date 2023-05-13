@@ -2792,7 +2792,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.db.dir.permissions</name>
+    <name>ozone.recon.db.dirs.permissions</name>
     <value>750</value>
     <description>
       Permissions for the metadata directories for Recon The
