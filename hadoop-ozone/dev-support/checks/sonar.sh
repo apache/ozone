@@ -30,4 +30,4 @@ if [ -f "$PROJECT_DIR/target/coverage/all.xml" ]; then
    find "$PROJECT_DIR" -name pom.xml | grep -v target | xargs dirname | xargs -n1 -IDIR cp "$PROJECT_DIR/target/coverage/all.xml" DIR/target/coverage/
 fi
 
-mvn -B verify -DskipShade -DskipTests -Dskip.npx -Dskip.installnpx org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone
+mvn -B verify -Dbuild-ozonefs=false -DskipTests -Dskip.npx -Dskip.installnpx org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone

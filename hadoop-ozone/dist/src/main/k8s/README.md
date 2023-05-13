@@ -21,7 +21,7 @@ Ozone on Kubernetes
 
 To start Ozone in Kubernetes, you need Kubernetes and kubectl installed. You also need to add the [flekszible](https://github.com/elek/flekszible) binary in your path.
 
-1. Build the project `mvn clean install -DskipShade -DskipTests`
+1. Build the project `mvn clean install -Dbuild-ozonefs=false -DskipTests`
 2. `cd <ozone-root>/hadoop-ozone/dist/target/ozone-X.X../kubernetes/examples/ozone`
 3. `source ../testlib.sh`
 4. `regenerate_resources`

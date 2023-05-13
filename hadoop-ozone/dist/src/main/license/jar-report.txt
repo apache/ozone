@@ -57,8 +57,6 @@ share/ozone/lib/guice.jar
 share/ozone/lib/guice-servlet.jar
 share/ozone/lib/hadoop-annotations.jar
 share/ozone/lib/hadoop-auth.jar
-share/ozone/lib/hadoop-client-api.jar
-share/ozone/lib/hadoop-client-runtime.jar
 share/ozone/lib/hadoop-common.jar
 share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar

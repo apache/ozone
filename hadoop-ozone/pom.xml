@@ -394,10 +394,11 @@
       </properties>
     </profile>
     <profile>
-      <id>build-with-ozonefs</id>
+      <id>build-with-ozonefs-shaded</id>
       <activation>
         <property>
-          <name>!skipShade</name>
+          <name>build-ozonefs</name>
+          <value>shaded</value>
         </property>
       </activation>
       <modules>
@@ -405,6 +406,20 @@
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
         <module>ozonefs-hadoop3-client</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>build-with-ozonefs-unshaded</id>
+      <activation>
+        <property>
+          <name>build-ozonefs</name>
+          <value>unshaded</value>
+        </property>
+      </activation>
+      <modules>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>

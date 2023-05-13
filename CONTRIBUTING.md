@@ -56,7 +56,8 @@ mvn clean verify -DskipTests
 
 ### Useful Maven build options
 
-  * Use `-DskipShade` to skip shaded Ozone FS jar file creation. Saves time, but you can't test integration with other software that uses Ozone as a Hadoop-compatible file system.
+  * Use `-Dbuild-ozonefs=unshaded` to create unshaded Ozone FS jar file.
+  * Use `-Dbuild-ozonefs=false` to skip Ozone FS jar file creation. Saves time, but you can't test integration with other software that uses Ozone as a Hadoop-compatible file system.
   * Use `-DskipRecon` to skip building Recon Web UI. It saves about 2 minutes.
   * Use `-Pdist` to build the binary tarball, similar to the one that gets released
 
