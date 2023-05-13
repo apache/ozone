@@ -82,14 +82,13 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       DBStore nextSnapshotStore = nextSnapshot.getMetadataManager().getStore();
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
-        processKeys(writeBatch, nextSnapshot.getMetadataManager(),
-            nextDBKeysList);
+        processKeys(writeBatch, nextSnapshot.getMetadataManager());
         processDirs(writeBatch, nextSnapshot.getMetadataManager());
         nextSnapshotStore.commitBatchOperation(writeBatch);
       }
     } else {
       // Handle the case where there is no next Snapshot.
-      processKeys(batchOperation, omMetadataManager, nextDBKeysList);
+      processKeys(batchOperation, omMetadataManager);
       processDirs(batchOperation, omMetadataManager);
     }
 
@@ -149,8 +148,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   }
 
   private void processKeys(BatchOperation batchOp,
-      OMMetadataManager metadataManager,
-      List<SnapshotMoveKeyInfos> keyList) throws IOException {
+      OMMetadataManager metadataManager) throws IOException {
 
     // Move renamed keys to only the next snapshot or active DB.
     for (HddsProtos.KeyValue renamedKey: renamedKeysList) {
@@ -158,7 +156,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
           .putWithBatch(batchOp, renamedKey.getKey(), renamedKey.getValue());
     }
 
-    for (SnapshotMoveKeyInfos dBKey : keyList) {
+    for (SnapshotMoveKeyInfos dBKey : nextDBKeysList) {
       RepeatedOmKeyInfo omKeyInfos =
           createRepeatedOmKeyInfo(dBKey.getKeyInfosList());
       if (omKeyInfos == null) {

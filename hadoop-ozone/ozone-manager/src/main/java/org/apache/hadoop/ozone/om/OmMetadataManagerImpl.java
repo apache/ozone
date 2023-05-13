@@ -1494,26 +1494,48 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             //  4. Further optimization: Skip all snapshotted keys altogether
             //  e.g. by prefixing all unreclaimable keys, then calling seek
 
+            // If the last snapshot is deleted and the keys renamed in between
+            // the snapshots will be cleaned up by KDS. So we need to check
+            // in the renamedTable as well.
+            String dbRenameKey = getRenameKey(info.getVolumeName(),
+                info.getBucketName(), info.getObjectID());
+
             if (latestSnapshot != null) {
               Table<String, OmKeyInfo> prevKeyTable =
                   latestSnapshot.getMetadataManager().getKeyTable(
                       bucketInfo.getBucketLayout());
-              String prevDbKey;
-              if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+
+              Table<String, RepeatedOmKeyInfo> prevDeletedTable =
+                  latestSnapshot.getMetadataManager().getDeletedTable();
+              String prevKeyTableDBKey = getSnapshotRenamedTable()
+                  .get(dbRenameKey);
+              String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
+                  info.getBucketName(), info.getKeyName());
+              // format: /volName/bucketName/keyName/objId
+              prevDelTableDBKey = getOzoneDeletePathKey(info.getObjectID(),
+                  prevDelTableDBKey);
+
+              if (prevKeyTableDBKey == null &&
+                  bucketInfo.getBucketLayout().isFileSystemOptimized()) {
                 long volumeId = getVolumeId(info.getVolumeName());
-                prevDbKey = getOzonePathKey(volumeId,
+                prevKeyTableDBKey = getOzonePathKey(volumeId,
                     bucketInfo.getObjectID(),
                     info.getParentObjectID(),
                     info.getKeyName());
-              } else {
-                prevDbKey = getOzoneKey(info.getVolumeName(),
+              } else if (prevKeyTableDBKey == null) {
+                prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
                     info.getBucketName(),
                     info.getKeyName());
               }
 
-              OmKeyInfo omKeyInfo = prevKeyTable.get(prevDbKey);
-              if (omKeyInfo != null &&
-                  info.getObjectID() == omKeyInfo.getObjectID()) {
+              OmKeyInfo omKeyInfo = prevKeyTable.get(prevKeyTableDBKey);
+              // When key is deleted it is no longer in keyTable, we also
+              // have to check deletedTable of previous snapshot
+              RepeatedOmKeyInfo delOmKeyInfo =
+                  prevDeletedTable.get(prevDelTableDBKey);
+              if ((omKeyInfo != null &&
+                  info.getObjectID() == omKeyInfo.getObjectID()) ||
+                  delOmKeyInfo != null) {
                 // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
                 //  active DB's deletedTable if any one of the keys in
                 //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
@@ -1553,18 +1575,35 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                       OmSnapshotManager snapshotManager)
       throws IOException {
 
-    String latestPathSnapshot =
-        snapshotChainManager.getLatestPathSnapshot(volumeName
-            + OM_KEY_PREFIX + bucketName);
-    String snapTableKey = latestPathSnapshot != null ?
-        snapshotChainManager.getTableKey(latestPathSnapshot) : null;
-    SnapshotInfo snapInfo = snapTableKey != null ?
-        getSnapshotInfoTable().get(snapTableKey) : null;
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    String latestPathSnapshot = snapshotChainManager
+        .getLatestPathSnapshot(snapshotPath);
+
+    SnapshotInfo snapInfo = null;
+    while (latestPathSnapshot != null) {
+      String snapTableKey = snapshotChainManager
+          .getTableKey(latestPathSnapshot);
+      snapInfo = getSnapshotInfoTable().get(snapTableKey);
+
+      if (snapInfo != null && snapInfo.getSnapshotStatus() ==
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+        break;
+      }
+
+      // Update latestPathSnapshot if current snapshot is deleted.
+      if (snapshotChainManager.hasPreviousPathSnapshot(
+          snapshotPath, latestPathSnapshot)) {
+        latestPathSnapshot = snapshotChainManager
+            .previousPathSnapshot(snapshotPath, latestPathSnapshot);
+      } else {
+        latestPathSnapshot = null;
+      }
+    }
 
     OmSnapshot omSnapshot = null;
     if (snapInfo != null) {
       omSnapshot = (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
-              bucketName, getSnapshotPrefix(snapInfo.getName()));
+              bucketName, getSnapshotPrefix(snapInfo.getName()), true);
     }
     return omSnapshot;
   }

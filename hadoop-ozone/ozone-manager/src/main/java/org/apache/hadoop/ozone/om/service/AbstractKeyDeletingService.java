@@ -380,7 +380,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
     }
 
     // TODO: need to handle delete with non-ratis
-    if (isRatisEnabled()) {
+    if (isRatisEnabled() && !purgePathRequestList.isEmpty()) {
       submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 

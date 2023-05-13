@@ -301,7 +301,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
         // Block snapshot from loading when it is no longer active e.g. DELETED,
         // unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo);
+        checkSnapshotActive(snapshotInfo, true);
 
         CacheValue<SnapshotInfo> cacheValue =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
@@ -573,7 +573,9 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
   public IOmMetadataReader checkForSnapshot(String volumeName,
-                                            String bucketName, String keyname)
+                                            String bucketName,
+                                            String keyname,
+                                            boolean override)
       throws IOException {
     if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
@@ -591,7 +593,9 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName, snapshotName);
 
       // Block FS API reads when snapshot is not active.
-      checkSnapshotActive(ozoneManager, snapshotTableKey);
+      if (!override) {
+        checkSnapshotActive(ozoneManager, snapshotTableKey);
+      }
 
       // Warn if actual cache size exceeds the soft limit already.
       if (snapshotCache.size() > softCacheSize) {
@@ -673,9 +677,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         volumeName, bucketName, toSnapshotName);
 
     // Block SnapDiff if either of the snapshots is not active.
-    checkSnapshotActive(fromSnapInfo);
-    checkSnapshotActive(toSnapInfo);
-
+    checkSnapshotActive(fromSnapInfo, false);
+    checkSnapshotActive(toSnapInfo, false);
     // Check snapshot creation time
     if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +

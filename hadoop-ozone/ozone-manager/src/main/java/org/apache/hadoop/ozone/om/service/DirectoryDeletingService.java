@@ -203,11 +203,23 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               deletedDirInfo.getBucketName(), omSnapshotManager);
 
       if (latestSnapshot != null) {
+        String dbRenameKey = metadataManager
+            .getRenameKey(deletedDirInfo.getVolumeName(),
+                deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
         Table<String, OmDirectoryInfo> prevDirTable =
             latestSnapshot.getMetadataManager().getDirectoryTable();
+        Table<String, OmKeyInfo> prevDeletedDirTable =
+            latestSnapshot.getMetadataManager().getDeletedDirTable();
+        OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
+        if (prevDeletedDirInfo != null) {
+          return true;
+        }
+        String prevDirTableDBKey = metadataManager.getSnapshotRenamedTable()
+            .get(dbRenameKey);
         // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
         // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-        String prevDbKey = metadataManager.getOzoneDeletePathDirKey(key);
+        String prevDbKey = prevDirTableDBKey == null ?
+            metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
         OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
         return prevDirInfo != null &&
             prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();

@@ -84,7 +84,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+                getSnapshotPrefix(snapshotInfo.getName()), true);
       }
 
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),

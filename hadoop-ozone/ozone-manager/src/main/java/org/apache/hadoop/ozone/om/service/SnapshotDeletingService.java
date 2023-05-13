@@ -149,7 +149,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           OmSnapshot omSnapshot = (OmSnapshot) omSnapshotManager
               .checkForSnapshot(snapInfo.getVolumeName(),
                   snapInfo.getBucketName(),
-                  getSnapshotPrefix(snapInfo.getName()));
+                  getSnapshotPrefix(snapInfo.getName()), true);
 
           Table<String, RepeatedOmKeyInfo> snapshotDeletedTable =
               omSnapshot.getMetadataManager().getDeletedTable();
@@ -197,7 +197,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             omPreviousSnapshot = (OmSnapshot) omSnapshotManager
                 .checkForSnapshot(previousSnapshot.getVolumeName(),
                     previousSnapshot.getBucketName(),
-                    getSnapshotPrefix(previousSnapshot.getName()));
+                    getSnapshotPrefix(previousSnapshot.getName()), true);
 
             previousKeyTable = omPreviousSnapshot
                 .getMetadataManager().getKeyTable(bucketInfo.getBucketLayout());
@@ -417,13 +417,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       if (checkKeyReclaimable(previousKeyTable, renamedTable,
           keyInfo, bucketInfo, volumeId, renamedKey)) {
-        // Move to next non deleted snapshot's deleted table
-        toNextDb.addKeyInfos(keyInfo.getProtobuf(
-            ClientVersion.CURRENT_VERSION));
-      } else {
         // Update in current db's deletedKeyTable
         toReclaim.addKeyInfos(keyInfo
             .getProtobuf(ClientVersion.CURRENT_VERSION));
+      } else {
+        // Move to next non deleted snapshot's deleted table
+        toNextDb.addKeyInfos(keyInfo.getProtobuf(
+            ClientVersion.CURRENT_VERSION));
       }
     }
 
@@ -509,12 +509,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       String dbKey;
       // Handle case when the deleted snapshot is the first snapshot.
       if (previousKeyTable == null) {
-        return false;
+        return true;
       }
 
       // These are uncommitted blocks wrapped into a pseudo KeyInfo
       if (deletedKeyInfo.getObjectID() == OBJECT_ID_RECLAIM_BLOCKS) {
-        return false;
+        return true;
       }
 
       // Construct keyTable or fileTable DB key depending on the bucket type
@@ -556,10 +556,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           .get(renamedKey) : previousKeyTable.get(dbKey);
 
       if (prevKeyInfo == null) {
-        return false;
+        return true;
       }
 
-      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
+      return prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID();
     }
 
     private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)

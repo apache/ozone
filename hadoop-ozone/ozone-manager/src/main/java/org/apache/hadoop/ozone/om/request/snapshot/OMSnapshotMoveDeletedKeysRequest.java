@@ -80,7 +80,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       OmSnapshot omFromSnapshot = (OmSnapshot) omSnapshotManager
           .checkForSnapshot(fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),
-              getSnapshotPrefix(fromSnapshot.getName()));
+              getSnapshotPrefix(fromSnapshot.getName()), true);
 
       nextSnapshot = getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
@@ -101,7 +101,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
         omNextSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),
-                getSnapshotPrefix(nextSnapshot.getName()));
+                getSnapshotPrefix(nextSnapshot.getName()), true);
       }
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

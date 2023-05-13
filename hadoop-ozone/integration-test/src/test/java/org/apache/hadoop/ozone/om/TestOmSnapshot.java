@@ -917,7 +917,7 @@ public class TestOmSnapshot {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     RDBStore snapshotDBStore = (RDBStore)
             ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix))
+            .checkForSnapshot(volumeName, bucketName, snapPrefix, false))
             .getMetadataManager().getStore();
 
     for (String table : snapshotDBStore.getTableNames().values()) {
