@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -557,4 +559,28 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   public boolean isUnrecoverable() {
     return getReplicas().isEmpty();
   }
+
+  public UnderReplicatedHealthResult toUnderHealthResult() {
+    UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
+        getContainer(),
+        getRemainingRedundancy(),
+        inSufficientDueToDecommission(false),
+        isSufficientlyReplicated(true),
+        isUnrecoverable());
+    result.setHasHealthyReplicas(getHealthyReplicaCount() > 0);
+    return result;
+  }
+
+  public OverReplicatedHealthResult toOverHealthResult() {
+    OverReplicatedHealthResult result = new OverReplicatedHealthResult(
+        getContainer(),
+        getExcessRedundancy(false),
+        !isOverReplicated(true));
+    result.setHasMismatchedReplicas(getMisMatchedReplicaCount() > 0);
+    // FIXME not used in RatisReplicationCheckHandler: OK?
+    result.setIsSafelyOverReplicated(isSafelyOverReplicated());
+    return result;
+
+  }
+
 }

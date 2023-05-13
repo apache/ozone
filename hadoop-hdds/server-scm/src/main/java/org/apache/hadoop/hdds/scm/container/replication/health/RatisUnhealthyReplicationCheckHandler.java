@@ -165,29 +165,12 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
-      ContainerHealthResult.UnderReplicatedHealthResult result =
-          new ContainerHealthResult.UnderReplicatedHealthResult(
-              replicaCount.getContainer(),
-              replicaCount.getRemainingRedundancy(),
-              replicaCount.inSufficientDueToDecommission(false),
-              replicaCount.isSufficientlyReplicated(true),
-              replicaCount.isUnrecoverable());
-      result.setHasHealthyReplicas(replicaCount.getHealthyReplicaCount() > 0);
-      return result;
+      return replicaCount.toUnderHealthResult();
     }
 
     boolean isOverReplicated = replicaCount.isOverReplicated(false);
     if (isOverReplicated) {
-      boolean repOkWithPending = !replicaCount.isOverReplicated(true);
-      ContainerHealthResult.OverReplicatedHealthResult result =
-          new ContainerHealthResult.OverReplicatedHealthResult(
-              replicaCount.getContainer(),
-              replicaCount.getExcessRedundancy(false),
-              repOkWithPending);
-      result.setHasMismatchedReplicas(
-          replicaCount.getMisMatchedReplicaCount() > 0);
-      result.setIsSafelyOverReplicated(replicaCount.isSafelyOverReplicated());
-      return result;
+      return replicaCount.toOverHealthResult();
     }
 
     return new ContainerHealthResult.UnHealthyResult(
