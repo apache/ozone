@@ -474,7 +474,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
             containerId, key, keyVersion);
         if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
-            containerKeyPrefix) == 0) {
+            containerKeyPrefix) == 0
+            && !containerKeyMap.containsKey(containerKeyPrefix)) {
           // Save on writes. No need to save same container-key prefix
           // mapping again.
           containerKeyMap.put(containerKeyPrefix, 1);
