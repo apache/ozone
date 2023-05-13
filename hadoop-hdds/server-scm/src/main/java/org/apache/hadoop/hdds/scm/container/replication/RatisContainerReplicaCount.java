@@ -36,6 +36,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
 
 /**
  * Immutable object that is created with a set of ContainerReplica objects and
@@ -52,6 +53,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   private int matchingReplicaCount;
   private int decommissionCount;
   private int maintenanceCount;
+  private int unhealthyDecommissionCount;
+  private int unhealthyMaintenanceCount;
   private int inFlightAdd;
   private int inFlightDel;
   private final int repFactor;
@@ -65,12 +68,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
                                     int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
-    this.unhealthyReplicaCount = 0;
-    this.healthyReplicaCount = 0;
-    this.misMatchedReplicaCount = 0;
-    this.matchingReplicaCount = 0;
-    this.decommissionCount = 0;
-    this.maintenanceCount = 0;
     this.inFlightAdd = inFlightAdd;
     this.inFlightDel = inFlightDelete;
     this.repFactor = replicationFactor;
@@ -85,29 +82,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
         = Math.min(this.repFactor, minHealthyForMaintenance);
     this.container = container;
 
-    for (ContainerReplica cr : this.replicas) {
-      HddsProtos.NodeOperationalState state =
-          cr.getDatanodeDetails().getPersistedOpState();
-      if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
-        decommissionCount++;
-      } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
-        maintenanceCount++;
-      } else if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        unhealthyReplicaCount++;
-      } else if (!ReplicationManager.compareState(container.getState(),
-          cr.getState())) {
-        /*
-        Replica's state is not UNHEALTHY, but it doesn't match the
-        container's state. For example, a CLOSING replica of a CLOSED container.
-         */
-        healthyReplicaCount++;
-        misMatchedReplicaCount++;
-      } else {
-        // replica's state exactly matches container's state
-        healthyReplicaCount++;
-        matchingReplicaCount++;
-      }
-    }
+    countReplicas();
   }
 
   public RatisContainerReplicaCount(ContainerInfo containerInfo,
@@ -127,15 +102,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     this.minHealthyForMaintenance
         = Math.min(this.repFactor, minHealthyForMaintenance);
     this.considerUnhealthy = considerUnhealthy;
-
-    this.unhealthyReplicaCount = 0;
-    this.healthyReplicaCount = 0;
-    this.misMatchedReplicaCount = 0;
-    this.matchingReplicaCount = 0;
-    this.decommissionCount = 0;
-    this.maintenanceCount = 0;
-    this.inFlightAdd = 0;
-    this.inFlightDel = 0;
 
     // collect DNs that have UNHEALTHY replicas
     Set<DatanodeDetails> unhealthyReplicaDNs = new HashSet<>();
@@ -164,27 +130,37 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       }
     }
 
-    for (ContainerReplica cr : this.replicas) {
+    countReplicas();
+  }
+
+  private void countReplicas() {
+    for (ContainerReplica cr : replicas) {
       HddsProtos.NodeOperationalState state =
           cr.getDatanodeDetails().getPersistedOpState();
+      boolean unhealthy =
+          cr.getState() == ContainerReplicaProto.State.UNHEALTHY;
+
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
-        decommissionCount++;
+        if (unhealthy) {
+          unhealthyDecommissionCount++;
+        } else {
+          decommissionCount++;
+        }
       } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
-        maintenanceCount++;
-      } else if (cr.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        if (unhealthy) {
+          unhealthyMaintenanceCount++;
+        } else {
+          maintenanceCount++;
+        }
+      } else if (unhealthy) {
         unhealthyReplicaCount++;
-      } else if (!ReplicationManager.compareState(container.getState(),
-          cr.getState())) {
-        /*
-        Replica's state is not UNHEALTHY, but it doesn't match the
-        container's state. For example, a CLOSING replica of a CLOSED container.
-         */
-        healthyReplicaCount++;
-        misMatchedReplicaCount++;
       } else {
-        // replica's state exactly matches container's state
         healthyReplicaCount++;
-        matchingReplicaCount++;
+        if (compareState(container.getState(), cr.getState())) {
+          matchingReplicaCount++;
+        } else {
+          misMatchedReplicaCount++;
+        }
       }
     }
   }
@@ -202,11 +178,13 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * Total healthy replicas = 3 = 1 matching + 2 mismatched replicas
    */
   public int getHealthyReplicaCount() {
-    return healthyReplicaCount + healthyReplicaCountAdapter();
+    return healthyReplicaCount + healthyReplicaCountAdapter()
+        + decommissionCount + maintenanceCount;
   }
 
   public int getUnhealthyReplicaCount() {
-    return unhealthyReplicaCount + getUnhealthyReplicaCountAdapter();
+    return unhealthyReplicaCount + getUnhealthyReplicaCountAdapter()
+        + unhealthyDecommissionCount + unhealthyMaintenanceCount;
   }
 
   protected int getUnhealthyReplicaCountAdapter() {
@@ -222,11 +200,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   private int getAvailableReplicas() {
+    int available = healthyReplicaCount + healthyReplicaCountAdapter();
     if (considerUnhealthy) {
-      return getHealthyReplicaCount() + getUnhealthyReplicaCount();
-    } else {
-      return getHealthyReplicaCount();
+      available += unhealthyReplicaCount + getUnhealthyReplicaCountAdapter();
     }
+    return available;
   }
 
   /**
@@ -243,12 +221,12 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   @Override
   public int getDecommissionCount() {
-    return decommissionCount;
+    return decommissionCount + unhealthyDecommissionCount;
   }
 
   @Override
   public int getMaintenanceCount() {
-    return maintenanceCount;
+    return maintenanceCount + unhealthyMaintenanceCount;
   }
 
   public int getReplicationFactor() {
