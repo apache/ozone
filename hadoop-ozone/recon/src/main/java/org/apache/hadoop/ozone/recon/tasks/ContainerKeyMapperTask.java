@@ -126,12 +126,15 @@ public class ContainerKeyMapperTask implements ReconOmTask {
             omKeyCount++;
           }
         }
-        // flush and commit left out keys at end
-        if (!flushAndCommitContainerKeyMapToDB(containerKeyMap)) {
-          LOG.error("Unable to flush " +
-              "remaining containerKey information to the DB");
-          return new ImmutablePair<>(getTaskName(), false);
-        }
+      }
+
+      // flush and commit left out keys at end,
+      // also batch write containerKeyCountMap to the containerKeyCountTable
+      if (!flushAndCommitContainerKeyInfoToDB(containerKeyMap,
+          containerKeyCountMap)) {
+        LOG.error("Unable to flush Container Key Count and " +
+            "remaining Container Key information to the DB");
+        return new ImmutablePair<>(getTaskName(), false);
       }
 
       LOG.info("Completed 'reprocess' of ContainerKeyMapperTask.");
@@ -140,32 +143,26 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       LOG.info("It took me {} seconds to process {} keys.",
           (double) duration / 1000.0, omKeyCount);
     } catch (IOException ioEx) {
-      LOG.error("Unable to populate Container Key Prefix data in Recon DB. ",
+      LOG.error("Unable to populate Container Key data in Recon DB. ",
           ioEx);
-      return new ImmutablePair<>(getTaskName(), false);
-    }
-    try {
-      // only batch write containerKeyCountMap to the containerKeyCountTable
-      // containerKeyMap has been written to the DB
-      // deleted container list is not needed since "reprocess" only has
-      // put operations
-      writeToTheDB(Collections.emptyMap(), containerKeyCountMap,
-          Collections.emptyList());
-    } catch (IOException e) {
-      LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       return new ImmutablePair<>(getTaskName(), false);
     }
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private boolean flushAndCommitContainerKeyMapToDB(
-      Map<ContainerKeyPrefix, Integer> containerKeyMap) {
+  private boolean flushAndCommitContainerKeyInfoToDB(
+      Map<ContainerKeyPrefix, Integer> containerKeyMap,
+      Map<Long, Long> containerKeyCountMap) {
     try {
-      writeToTheDB(containerKeyMap, Collections.emptyMap(),
+      // deleted container list is not needed since "reprocess" only has
+      // put operations
+      writeToTheDB(containerKeyMap, containerKeyCountMap,
           Collections.emptyList());
       containerKeyMap.clear();
+      containerKeyCountMap.clear();
     } catch (IOException e) {
-      LOG.error("Unable to write Container Key data in Recon DB.", e);
+      LOG.error("Unable to write Container Key and " +
+          "Container Key Count data in Recon DB.", e);
       return false;
     }
     return true;
@@ -176,7 +173,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     // if containerKeyMap more than entries, flush to DB and clear the map
     if (null != containerKeyMap && containerKeyMap.size() >=
           containerKeyFlushToDBMaxThreshold) {
-      return flushAndCommitContainerKeyMapToDB(containerKeyMap);
+      return flushAndCommitContainerKeyInfoToDB(containerKeyMap,
+          Collections.emptyMap());
     }
     return true;
   }
