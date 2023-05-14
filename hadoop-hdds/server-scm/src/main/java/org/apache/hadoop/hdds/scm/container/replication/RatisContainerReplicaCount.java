@@ -513,11 +513,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * decommissioning.
    */
   public boolean inSufficientDueToDecommission(boolean includePendingAdd) {
-    if (isSufficientlyReplicated(includePendingAdd)) {
-      return false;
-    }
     int delta = redundancyDelta(true, includePendingAdd);
-    return getDecommissionCount() >= delta;
+    return 0 < delta && delta <= getDecommissionCount();
   }
 
   /**
