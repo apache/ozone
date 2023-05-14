@@ -248,7 +248,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
 
   @Override
-  public List<String> getRatisRoles() throws IOException {
+  public List<String> getRatisRoles() {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     RaftPeer leader = getLeader();
     List<String> ratisRoles = new ArrayList<>();
