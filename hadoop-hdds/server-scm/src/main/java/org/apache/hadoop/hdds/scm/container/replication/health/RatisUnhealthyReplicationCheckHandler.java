@@ -65,10 +65,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     }
 
     // Now, consider UNHEALTHY replicas when calculating replication status
-    RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(container,
-            request.getContainerReplicas(), request.getPendingOps(),
-            request.getMaintenanceRedundancy(), true);
+    RatisContainerReplicaCount replicaCount = getReplicaCount(request);
     if (replicaCount.getUnhealthyReplicaCount() == 0) {
       LOG.debug("No UNHEALTHY replicas are present for container {} with " +
           "replicas [{}].", container, request.getContainerReplicas());
@@ -80,7 +77,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
           container.containerID());
     }
 
-    ContainerHealthResult health = checkReplication(request);
+    ContainerHealthResult health = checkReplication(replicaCount);
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
@@ -155,12 +152,19 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
    * Checks if the container is over or under replicated.
    */
   @VisibleForTesting
-  protected ContainerHealthResult checkReplication(
+  ContainerHealthResult checkReplication(ContainerCheckRequest request) {
+    return checkReplication(getReplicaCount(request));
+  }
+
+  private static RatisContainerReplicaCount getReplicaCount(
       ContainerCheckRequest request) {
-    RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(request.getContainerInfo(),
-            request.getContainerReplicas(), request.getPendingOps(),
-            request.getMaintenanceRedundancy(), true);
+    return new RatisContainerReplicaCount(request.getContainerInfo(),
+        request.getContainerReplicas(), request.getPendingOps(),
+        request.getMaintenanceRedundancy(), true);
+  }
+
+  private ContainerHealthResult checkReplication(
+      RatisContainerReplicaCount replicaCount) {
 
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
