@@ -245,16 +245,20 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   @Override
   public String toString() {
-    return "Container State: " + container.getState() +
+    String result = "Container State: " + container.getState() +
         " Replica Count: " + replicas.size() +
-        " Healthy Count: " + healthyReplicaCount +
-        " Unhealthy Count: " + unhealthyReplicaCount +
-        " Decommission Count: " + decommissionCount +
-        " Maintenance Count: " + maintenanceCount +
-        " inFlightAdd Count: " + inFlightAdd +
-        " inFightDel Count: " + inFlightDel +
+        " Healthy (I/D/M): " + healthyReplicaCount +
+            "/" + decommissionCount + "/" + maintenanceCount +
+        " Unhealthy (I/D/M): " + unhealthyReplicaCount +
+            "/" + unhealthyDecommissionCount + "/" + unhealthyMaintenanceCount +
+        " inFlightAdd: " + inFlightAdd +
+        " inFightDel: " + inFlightDel +
         " ReplicationFactor: " + repFactor +
-        " minMaintenance Count: " + minHealthyForMaintenance;
+        " minMaintenance: " + minHealthyForMaintenance;
+    if (considerUnhealthy) {
+      result += " +considerUnhealthy";
+    }
+    return result;
   }
 
   /**
