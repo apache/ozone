@@ -168,10 +168,14 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getDeletedTable()) == 2);
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), multipartKey);
 
     String part2DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(2).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(2).getPartKeyInfo()
+                .getObjectID(), multipartKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

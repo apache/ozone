@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -60,13 +59,12 @@ public class S3MultipartUploadCompleteResponseWithFSO
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> unUsedParts,
+      @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
       @Nonnull BucketLayout bucketLayout,
       @CheckForNull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete,
       @Nonnull long volumeId, @Nonnull long bucketId) {
-    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        bucketLayout, omBucketInfo, keysToDelete);
+    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
+        allKeyInfoToRemove, bucketLayout, omBucketInfo);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
   }
