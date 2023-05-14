@@ -508,12 +508,12 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Checks whether insufficient replication is because of some replicas
    * being on datanodes that were decommissioned.
-   * @param includePendingAdd if pending adds should be considered
+   *
    * @return true if there is insufficient replication and it's because of
    * decommissioning.
    */
-  private boolean inSufficientDueToDecommission(boolean includePendingAdd) {
-    int delta = redundancyDelta(true, includePendingAdd);
+  private boolean inSufficientDueToDecommission() {
+    int delta = redundancyDelta(true, false);
     return 0 < delta && delta <= getDecommissionCount();
   }
 
@@ -548,7 +548,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
         getContainer(),
         getRemainingRedundancy(),
-        inSufficientDueToDecommission(false),
+        inSufficientDueToDecommission(),
         isSufficientlyReplicated(true),
         isUnrecoverable());
     result.setHasHealthyReplicas(getHealthyReplicaCount() > 0);
