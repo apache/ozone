@@ -221,12 +221,16 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   @Override
   public int getDecommissionCount() {
-    return decommissionCount + unhealthyDecommissionCount;
+    return considerUnhealthy
+        ? decommissionCount + unhealthyDecommissionCount
+        : decommissionCount;
   }
 
   @Override
   public int getMaintenanceCount() {
-    return maintenanceCount + unhealthyMaintenanceCount;
+    return considerUnhealthy
+        ? maintenanceCount + unhealthyMaintenanceCount
+        : maintenanceCount;
   }
 
   public int getReplicationFactor() {
@@ -362,7 +366,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       return delta;
     } else if (delta > 0) {
       // May be under-replicated, depending on maintenance.
-      delta = Math.max(0, delta - maintenanceCount);
+      delta = Math.max(0, delta - getMaintenanceCount());
       int neededHealthy =
           Math.max(0, minHealthyForMaintenance - getAvailableReplicas());
       delta = Math.max(neededHealthy, delta);
@@ -513,7 +517,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       return false;
     }
     int delta = redundancyDelta(true, includePendingAdd);
-    return decommissionCount >= delta;
+    return getDecommissionCount() >= delta;
   }
 
   /**
@@ -526,9 +530,10 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * @return Count of remaining redundant replicas.
    */
   public int getRemainingRedundancy() {
-    return Math.max(0,
-        getAvailableReplicas() + decommissionCount + maintenanceCount
-            - inFlightDel - 1);
+    int availableReplicas = getAvailableReplicas()
+        + getDecommissionCount() + getMaintenanceCount();
+
+    return Math.max(0, availableReplicas - inFlightDel - 1);
   }
 
   /**
