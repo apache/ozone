@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.ToIntFunction;
 
 /**
  * A buffer used by {@link Codec}
@@ -167,6 +168,21 @@ public final class CodecBuffer implements AutoCloseable {
   public CodecBuffer put(ByteBuffer buffer) {
     assertRefCnt(1);
     buf.writeBytes(buffer);
+    return this;
+  }
+
+  /**
+   * Put bytes from the given source to this buffer.
+   *
+   * @param source put bytes to a {@link ByteBuffer} and return the size.
+   * @return this object.
+   */
+  public CodecBuffer put(ToIntFunction<ByteBuffer> source) {
+    assertRefCnt(1);
+    final int w = buf.writerIndex();
+    final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
+    final int size = source.applyAsInt(buffer);
+    buf.setIndex(buf.readerIndex(), w + size);
     return this;
   }
 }
