@@ -431,7 +431,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     shutdownHddsDatanode(getHddsDatanodeIndex(dn));
   }
 
-  public String getClusterId() throws IOException {
+  public String getClusterId() {
     return scm.getClientProtocolServer().getScmInfo().getClusterId();
   }
 
@@ -439,10 +439,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
-      IOUtils.closeQuietly(clients.toArray(new AutoCloseable[0]));
-      File baseDir = new File(GenericTestUtils.getTempPath(
-          MiniOzoneClusterImpl.class.getSimpleName() + "-" +
-              getClusterId()));
+      IOUtils.closeQuietly(clients);
+      final File baseDir = new File(getBaseDir());
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();

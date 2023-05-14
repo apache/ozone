@@ -279,6 +279,16 @@ public interface MiniOzoneCluster {
    */
   void shutdownHddsDatanodes();
 
+  String getClusterId();
+
+  default String getName() {
+    return getClass().getSimpleName() + "-" + getClusterId();
+  }
+
+  default String getBaseDir() {
+    return GenericTestUtils.getTempPath(getName());
+  }
+
   /**
    * Builder class for MiniOzoneCluster.
    */

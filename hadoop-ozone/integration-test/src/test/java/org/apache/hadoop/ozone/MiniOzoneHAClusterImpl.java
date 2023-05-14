@@ -267,7 +267,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return scm;
   }
 
-  public String getClusterId() throws IOException {
+  @Override
+  public String getClusterId() {
     return scmhaService.getServices().get(0)
         .getClientProtocolServer().getScmInfo().getClusterId();
   }
