@@ -2057,7 +2057,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisRoles() throws IOException {
+  public String getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
     return server != null ?
         HddsUtils.format(server.getRatisRoles()) : "STANDALONE";
@@ -2164,11 +2164,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // We cannot remove a node if it's currently leader.
     if (scmContext.isLeader() && scmId.equals(getScmId())) {
       throw new IOException("Cannot remove current leader.");
-    }
-
-    // Currently we don't support removal of primordial node.
-    if (scmId.equals(primaryScmNodeId)) {
-      throw new IOException("Removal of primordial node is not supported.");
     }
 
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()

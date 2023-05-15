@@ -130,11 +130,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, null, keyInfo.getUpdateID(), isRatisEnabled);
+            keyInfo, keyInfo.getUpdateID(), isRatisEnabled);
 
         String deletedKey = omMetadataManager
             .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
                 keyInfo.getKeyName());
+        deletedKey = omMetadataManager.getOzoneDeletePathKey(
+            keyInfo.getObjectID(), deletedKey);
 
         // TODO: [SNAPSHOT] Acquire deletedTable write table lock
 

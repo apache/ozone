@@ -153,7 +153,6 @@ public class TestOmContainerLocationCache {
     ExitUtils.disableSystemExit();
 
     conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "127.0.0.1:0");
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");

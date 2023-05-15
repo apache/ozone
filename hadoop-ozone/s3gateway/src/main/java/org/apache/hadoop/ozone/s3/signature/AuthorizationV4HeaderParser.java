@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Collection;
 
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
@@ -49,7 +50,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   private static final String CREDENTIAL = "Credential=";
   private static final String SIGNEDHEADERS = "SignedHeaders=";
   private static final String SIGNATURE = "Signature=";
-
+  private static final String AWS_REQUEST = "aws4_request";
   private String authHeader;
 
   private String dateHeader;
@@ -134,8 +135,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
       String parsedSignature = signature.substring(SIGNATURE.length());
       if (isEmpty(parsedSignature)) {
         throw new MalformedResourceException(
-            "Signature can't be empty: " + signature,
-            authHeader);
+            "Signature can't be empty: " + signature, authHeader);
       }
       try {
         Hex.decodeHex(parsedSignature);
@@ -168,47 +168,50 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
 
     if (credentialObj.getAccessKeyID().isEmpty()) {
       throw new MalformedResourceException(
-          "AWS access id shouldn't be empty. credential: " + credential,
-          authHeader);
+          "AWS access id is empty. credential: " + credential, authHeader);
     }
     if (credentialObj.getAwsRegion().isEmpty()) {
       throw new MalformedResourceException(
-          "AWS region shouldn't be empty. credential: " + credential,
-          authHeader);
+          "AWS region is empty. credential: " + credential, authHeader);
     }
-    if (credentialObj.getAwsRequest().isEmpty()) {
+    if (credentialObj.getAwsRequest().isEmpty() ||
+            !(credentialObj.getAwsRequest().equals(AWS_REQUEST))) {
       throw new MalformedResourceException(
-          "AWS request shouldn't be empty. credential:" + credential,
+          "AWS request is empty or invalid. credential:" + credential,
           authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
       throw new MalformedResourceException(
-          "AWS service shouldn't be empty. credential:" + credential,
-          authHeader);
+          "AWS service is empty. credential:" + credential, authHeader);
     }
 
     // Date should not be empty and within valid range.
     if (!credentialObj.getDate().isEmpty()) {
-      validateDateRange(credentialObj);
+      try {
+        validateDateRange(credentialObj);
+      } catch (DateTimeParseException ex) {
+        throw new MalformedResourceException(
+            "AWS date format is invalid. credential:" + credential, authHeader);
+      }
+
     } else {
       throw new MalformedResourceException(
-          "AWS date shouldn't be empty. credential:{}" + credential,
-          authHeader);
+          "AWS date is empty. credential:{}" + credential, authHeader);
     }
     return credentialObj;
   }
 
   @VisibleForTesting
   public void validateDateRange(Credential credentialObj)
-      throws MalformedResourceException {
+      throws MalformedResourceException, DateTimeParseException {
     LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
     LocalDate now = LocalDate.now();
     if (date.isBefore(now.minus(1, DAYS)) ||
         date.isAfter(now.plus(1, DAYS))) {
       throw new MalformedResourceException(
           "AWS date not in valid range. Date: " + date + " should not be older "
-              + "than 1 day(i.e yesterday) and greater than 1 day(i.e " +
-              "tomorrow).", authHeader);
+              + "than 1 day(i.e yesterday) and "
+              + "greater than 1 day(i.e tomorrow).", authHeader);
     }
   }
 
@@ -218,8 +221,8 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   private String parseAlgorithm(String algorithm)
       throws MalformedResourceException {
     if (isEmpty(algorithm) || !algorithm.equals(AWS4_SIGNING_ALGORITHM)) {
-      throw new MalformedResourceException("Unexpected hash algorithm. Algo:"
-          + algorithm, authHeader);
+      throw new MalformedResourceException(
+          "Unexpected hash algorithm. Algo:" + algorithm, authHeader);
     }
     return algorithm;
   }

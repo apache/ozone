@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -44,8 +46,16 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
           throws IOException {
     Assert.assertNotNull(omBucketInfo);
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
+    Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
+    if (null != keysToDelete) {
+      String deleteKey = omMetadataManager.getOzoneKey(volumeName,
+          bucketName, keyName);
+      deleteKeys.getOmKeyInfoList().stream().forEach(e -> deleteKeyMap.put(
+          omMetadataManager.getOzoneDeletePathKey(e.getObjectID(), deleteKey),
+          new RepeatedOmKeyInfo(e)));
+    }
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeys, volumeId, isHSync);
+        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync);
   }
 
   @NotNull

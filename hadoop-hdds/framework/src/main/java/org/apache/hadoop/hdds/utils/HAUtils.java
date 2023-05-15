@@ -463,7 +463,7 @@ public final class HAUtils {
   }
 
   /**
-   * Retry for ever until CA list matches expected count.
+   * Retry forever until CA list matches expected count.
    * @param task - task to get CA list.
    * @return CA list.
    */
@@ -489,7 +489,7 @@ public final class HAUtils {
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
     List<String> caCertPemList = applyFunction.get();
-    boolean caListUpToDate = caCertPemList.size() == expectedCount;
+    boolean caListUpToDate = caCertPemList.size() >= expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
           "{}.", expectedCount, caCertPemList.size());

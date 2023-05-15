@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singleton;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -165,10 +166,14 @@ public class TestECUnderReplicationHandler {
 
     ArgumentCaptor<List<DatanodeDetails>> captor =
         ArgumentCaptor.forClass(List.class);
-    Mockito.when(ecPlacementPolicy.chooseDatanodes(captor.capture(),
+    // The used list is modified after it is passed to the placement policy,
+    // so a plain Captor won't work.
+    AtomicReference<List<DatanodeDetails>> usedList = new AtomicReference<>();
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(any(), captor.capture(),
             any(), anyInt(), anyLong(), anyLong())
         ).thenAnswer(invocationOnMock -> {
-          int numNodes = invocationOnMock.getArgument(2);
+          usedList.set(new ArrayList<>(invocationOnMock.getArgument(0)));
+          int numNodes = invocationOnMock.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
           for (int i = 0; i < numNodes; i++) {
             targets.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -180,6 +185,11 @@ public class TestECUnderReplicationHandler {
         replicas, Collections.emptyList(), result, 2);
 
     Assertions.assertTrue(captor.getValue().contains(excludedByRM));
+    Assertions.assertEquals(3, usedList.get().size());
+    for (ContainerReplica r : replicas) {
+      Assertions.assertTrue(
+          usedList.get().contains(r.getDatanodeDetails()));
+    }
   }
 
   @Test
@@ -793,10 +803,10 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
 
-    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), Mockito.isNull(),
-            anyInt(), anyLong(), anyLong()))
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
+            Mockito.isNull(), anyInt(), anyLong(), anyLong()))
         .thenAnswer(invocationOnMock -> {
-          int numNodes = invocationOnMock.getArgument(2);
+          int numNodes = invocationOnMock.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
           for (int i = 0; i < numNodes; i++) {
             targets.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -839,12 +849,13 @@ public class TestECUnderReplicationHandler {
     containing that DN. Ensures the test will fail if excludeNodes does not
     contain the DN pending ADD.
      */
-    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), Mockito.isNull(),
-            anyInt(), anyLong(), anyLong()))
+    Mockito.when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
+            Mockito.isNull(), anyInt(), anyLong(), anyLong()))
         .thenAnswer(invocationOnMock -> {
-          List<DatanodeDetails> excludeList = invocationOnMock.getArgument(0);
+          List<DatanodeDetails> usedList = invocationOnMock.getArgument(0);
+          List<DatanodeDetails> excludeList = invocationOnMock.getArgument(1);
           List<DatanodeDetails> targets = new ArrayList<>(1);
-          if (excludeList.contains(dn)) {
+          if (usedList.contains(dn) || excludeList.contains(dn)) {
             targets.add(MockDatanodeDetails.randomDatanodeDetails());
           } else {
             targets.add(dn);
