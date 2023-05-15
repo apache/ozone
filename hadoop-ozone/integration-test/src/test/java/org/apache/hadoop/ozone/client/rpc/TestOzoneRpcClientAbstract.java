@@ -2270,46 +2270,18 @@ public abstract class TestOzoneRpcClientAbstract {
       volB.createBucket(
           bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
-    assertBucketCount(volA, "bucket-", 20);
-    assertBucketHasSnapshotCount(volA, "bucket-", null, true, 20);
-    assertBucketCount(volB, "bucket-", 20);
-    assertBucketHasSnapshotCount(volB, "bucket-", null, true, 10);
-    assertBucketCount(volA, bucketBaseNameA, 10);
-    assertBucketHasSnapshotCount(volA, bucketBaseNameA, null, true, 10);
-    assertBucketCount(volB, bucketBaseNameB, 10);
-    assertBucketHasSnapshotCount(volB, bucketBaseNameB, null, true, 0);
-
-    Iterator<? extends OzoneBucket> volABucketBIter = volA.listBuckets(
-        bucketBaseNameB);
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volABucketBIter.next().getName()
-          .startsWith(bucketBaseNameB + i + "-"));
-    }
-    Assert.assertFalse(volABucketBIter.hasNext());
-
-    Iterator<? extends OzoneBucket> volABucketBHasSnapshotIter =
-        volA.listBuckets(bucketBaseNameB, null, true);
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volABucketBHasSnapshotIter.next().getName()
-          .startsWith(bucketBaseNameB + i + "-"));
-    }
-    Assert.assertFalse(volABucketBIter.hasNext());
-
-    Iterator<? extends OzoneBucket> volBBucketAIter = volB.listBuckets(
-        bucketBaseNameA);
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volBBucketAIter.next().getName()
-          .startsWith(bucketBaseNameA + i + "-"));
-    }
-    Assert.assertFalse(volBBucketAIter.hasNext());
-
-    Iterator<? extends OzoneBucket> volBBucketAHasSnapshotIter =
-        volB.listBuckets(bucketBaseNameA, null, true);
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volBBucketAHasSnapshotIter.next().getName()
-          .startsWith(bucketBaseNameA + i + "-"));
-    }
-    Assert.assertFalse(volBBucketAIter.hasNext());
+    assertBucketCount(volA, "bucket-", null, false, 20);
+    assertBucketCount(volA, "bucket-", null, true, 20);
+    assertBucketCount(volB, "bucket-", null, false, 20);
+    assertBucketCount(volB, "bucket-", null, true, 10);
+    assertBucketCount(volA, bucketBaseNameA, null, false, 10);
+    assertBucketCount(volA, bucketBaseNameA, null, true, 10);
+    assertBucketCount(volB, bucketBaseNameB, null, false, 10);
+    assertBucketCount(volB, bucketBaseNameB, null, true, 0);
+    assertBucketCount(volA, bucketBaseNameB, null, false, 10);
+    assertBucketCount(volA, bucketBaseNameB, null, true, 10);
+    assertBucketCount(volB, bucketBaseNameA, null, false, 10);
+    assertBucketCount(volB, bucketBaseNameA, null, true, 10);
 
   }
 
@@ -4125,7 +4097,7 @@ public abstract class TestOzoneRpcClientAbstract {
     return RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
   }
 
-  private void assertBucketHasSnapshotCount(OzoneVolume volume,
+  private void assertBucketCount(OzoneVolume volume,
                                  String bucketPrefix,
                                  String preBucket,
                                  boolean hasSnapshot,
@@ -4141,17 +4113,4 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(expectedBucketCount, bucketCount);
   }
 
-  private void assertBucketCount(OzoneVolume volume,
-                                 String bucketPrefix,
-                                 int expectedBucketCount) {
-    Iterator<? extends OzoneBucket> bucketIterator =
-        volume.listBuckets(bucketPrefix);
-    int bucketCount = 0;
-    while (bucketIterator.hasNext()) {
-      Assert.assertTrue(
-          bucketIterator.next().getName().startsWith(bucketPrefix));
-      bucketCount++;
-    }
-    Assert.assertEquals(expectedBucketCount, bucketCount);
-  }
 }
