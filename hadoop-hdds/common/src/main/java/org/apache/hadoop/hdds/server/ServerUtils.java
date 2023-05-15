@@ -229,15 +229,15 @@ public final class ServerUtils {
 
     // Assign the appropriate config name based on the KEY
     if (key.equals(ReconConfigKeys.OZONE_RECON_DB_DIR)) {
-      configName = OZONE_RECON_CONFIG_PERMISSION;
+      configName = ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS;
     } else if (key.equals(ScmConfigKeys.OZONE_SCM_DB_DIRS)) {
-      configName = OZONE_SCM_CONFIG_PERMISSION;
+      configName = ScmConfigKeys.OZONE_SCM_DB_DIRS_PERMISSIONS;
     } else if (key.equals(OzoneConfigKeys.OZONE_OM_DB_DIRS)) {
-      configName = OZONE_OM_CONFIG_PERMISSION;
+      configName = OzoneConfigKeys.OZONE_OM_DB_DIRS_PERMISSIONS;
     } else {
       // If the permissions are not defined for the config, we make it fall
       // back to the default permissions for metadata files and directories
-      configName = OZONE_METADATA_CONFIG_PERMISSION;
+      configName = OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS;
     }
 
     String configValue = conf.get(configName);
