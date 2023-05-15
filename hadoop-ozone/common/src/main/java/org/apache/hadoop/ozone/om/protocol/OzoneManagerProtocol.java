@@ -998,4 +998,8 @@ public interface OzoneManagerProtocol
    */
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
+
+  void setTimes(String volumeName, String bucketName, String keyName,
+      long mtime, long atime)
+      throws IOException;
 }

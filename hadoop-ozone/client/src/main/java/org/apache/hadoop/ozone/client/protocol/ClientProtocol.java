@@ -1071,4 +1071,14 @@ public interface ClientProtocol {
                                     String token, int pageSize,
                                     boolean forceFullDiff)
       throws IOException;
+
+  /**
+   * Time to be set for given Ozone object. This operations reset ACL for
+   * given object to list of ACLs provided in argument.
+   * @param obj Ozone object.
+   *
+   * @throws IOException if there is error.
+   * */
+  void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException;
 }

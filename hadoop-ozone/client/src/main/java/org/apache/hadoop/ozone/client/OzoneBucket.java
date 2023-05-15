@@ -890,6 +890,20 @@ public class OzoneBucket extends WithMetadata {
     return result;
   }
 
+  /**
+   * Builder for OmBucketInfo.
+   /**
+   * Adds ACLs to the Bucket.
+   * @param addAcl ACL to be added
+   * @return true - if acl is successfully added, false if acl already exists
+   * for the bucket.
+   * @throws IOException
+   */
+  public void setTimes(String keyName, long mtime, long atime)
+      throws IOException {
+    proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }

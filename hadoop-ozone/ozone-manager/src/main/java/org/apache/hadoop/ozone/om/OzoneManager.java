@@ -4497,6 +4497,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return false;
   }
 
+  @Override
+  public void setTimes(String volumeName, String bucketName, String keyName,
+      long mtime, long atime)
+      throws IOException {
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager

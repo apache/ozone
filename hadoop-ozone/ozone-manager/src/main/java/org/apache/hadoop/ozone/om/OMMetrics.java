@@ -89,6 +89,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSetAcl;
   private @Metric MutableCounterLong numGetAcl;
   private @Metric MutableCounterLong numRemoveAcl;
+  private @Metric MutableCounterLong numSetTime;
   private @Metric MutableCounterLong numGetKeyInfo;
 
   // Failure Metrics
@@ -823,6 +824,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSetAcl.incr();
   }
 
+
   @Override
   public void incNumGetAcl() {
     numGetAcl.incr();
@@ -830,6 +832,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumRemoveAcl() {
     numRemoveAcl.incr();
+  }
+
+  public void incNumSetTime() {
+    numSetTime.incr();
   }
 
   @Override

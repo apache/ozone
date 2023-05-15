@@ -241,7 +241,12 @@ public final class OzoneManagerRatisUtils {
         throw new IOException("Bucket " + bucketName + " is not FSO layout. " +
                 "It does not support lease recovery");
       }
-      return new OMRecoverLeaseRequest(omRequest);
+      break;
+    case SetTimes:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     /*
      * Key requests that can have multiple variants based on the bucket layout
      * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
