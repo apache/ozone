@@ -188,7 +188,8 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetOpenKeyInfo() throws Exception {
-    OmKeyInfo omKeyInfo = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_one", omKeyInfo);
@@ -206,9 +207,12 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetOpenKeyInfoLimitParam() throws Exception {
-    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
-    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_two", true);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
@@ -243,9 +247,12 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetOpenKeyInfoPrevKeyParam() throws Exception {
-    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
-    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_two", true);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
@@ -271,9 +278,12 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetDeletedKeyInfoLimitParam() throws Exception {
-    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
-    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_two", true);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
     reconOMMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
@@ -313,9 +323,12 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetDeletedKeyInfoPrevKeyParam() throws Exception {
-    OmKeyInfo omKeyInfo1 = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
-    OmKeyInfo omKeyInfo2 = getOmKeyInfo("sampleVol", "bucketOne", "key_two");
-    OmKeyInfo omKeyInfo3 = getOmKeyInfo("sampleVol", "bucketOne", "key_three");
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_two", true);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
     RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfo1);
     RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
@@ -347,7 +360,8 @@ public class TestOmDBInsightEndPoint {
 
   @Test
   public void testGetDeletedKeyInfo() throws Exception {
-    OmKeyInfo omKeyInfo = getOmKeyInfo("sampleVol", "bucketOne", "key_one");
+    OmKeyInfo omKeyInfo =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
 
     reconOMMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_one", omKeyInfo);
@@ -372,14 +386,113 @@ public class TestOmDBInsightEndPoint {
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-                                 String keyName) {
+                                 String keyName, boolean isFile) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setFile(isFile)
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(random.nextLong())
         .build();
+  }
+
+  @Test
+  public void testGetDeletedDirInfoLimitParam() throws Exception {
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_one", false);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_two", false);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_three", false);
+
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_one", omKeyInfo1);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_two", omKeyInfo2);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_three", omKeyInfo3);
+
+    OmKeyInfo omKeyInfoCopy =
+        reconOMMetadataManager.getDeletedDirTable()
+            .get("/sampleVol/bucketOne/dir_one");
+    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+
+    Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(2, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getDeletedDirInfoList().size());
+    Assertions.assertEquals("/sampleVol/bucketOne/dir_one",
+        keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
+  }
+
+  @Test
+  public void testGetDeletedDirInfoPrevKeyParam() throws Exception {
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_one", false);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_two", false);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_three", false);
+
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_one", omKeyInfo1);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_two", omKeyInfo2);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_three", omKeyInfo3);
+
+    OmKeyInfo omKeyInfoCopy =
+        reconOMMetadataManager.getDeletedDirTable()
+            .get("/sampleVol/bucketOne/dir_one");
+    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+
+    Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(2,
+        "/sampleVol/bucketOne/dir_one");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(2,
+        keyInsightInfoResp.getDeletedDirInfoList().size());
+    Assertions.assertEquals("/sampleVol/bucketOne/dir_three",
+        keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
+    Assertions.assertEquals("/sampleVol/bucketOne/dir_two",
+        keyInsightInfoResp.getLastKey());
+  }
+
+  @Test
+  public void testGetDeletedDirInfo() throws Exception {
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_one", false);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_two", false);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir_three", false);
+
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_one", omKeyInfo1);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_two", omKeyInfo2);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/sampleVol/bucketOne/dir_three", omKeyInfo3);
+
+    OmKeyInfo omKeyInfoCopy =
+        reconOMMetadataManager.getDeletedDirTable()
+            .get("/sampleVol/bucketOne/dir_one");
+    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+
+    Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(3,
+        keyInsightInfoResp.getDeletedDirInfoList().size());
+    Assertions.assertEquals("/sampleVol/bucketOne/dir_one",
+        keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
+    Assertions.assertEquals("/sampleVol/bucketOne/dir_two",
+        keyInsightInfoResp.getLastKey());
   }
 }

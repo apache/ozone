@@ -215,136 +215,6 @@ public class OMDBInsightEndpoint {
     return Response.ok(openKeyInsightInfo).build();
   }
 
-  /** This method retrieves set of keys/files/dirs pending for deletion.
-   * Sample API Response:
-   * {
-   *   "replicatedTotal": -1530804718628866300,
-   *   "unreplicatedTotal": -1530804718628866300,
-   *   "deletedkeyinfo": [
-   *     {
-   *       "omKeyInfoList": [
-   *         {
-   *           "metadata": {},
-   *           "objectID": 0,
-   *           "updateID": 0,
-   *           "parentObjectID": 0,
-   *           "volumeName": "sampleVol",
-   *           "bucketName": "bucketOne",
-   *           "keyName": "key_one",
-   *           "dataSize": -1530804718628866300,
-   *           "keyLocationVersions": [],
-   *           "creationTime": 0,
-   *           "modificationTime": 0,
-   *           "replicationConfig": {
-   *             "replicationFactor": "ONE",
-   *             "requiredNodes": 1,
-   *             "replicationType": "STANDALONE"
-   *           },
-   *           "fileChecksum": null,
-   *           "fileName": "key_one",
-   *           "acls": [],
-   *           "path": "0/key_one",
-   *           "file": false,
-   *           "latestVersionLocations": null,
-   *           "replicatedSize": -1530804718628866300,
-   *           "fileEncryptionInfo": null,
-   *           "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne',
-   *           key='key_one', dataSize='-1530804718628866186', creationTime='0',
-   *           objectID='0', parentID='0', replication='STANDALONE/ONE',
-   *           fileChecksum='null}",
-   *           "updateIDset": false
-   *         }
-   *       ]
-   *     }
-   *   ],
-   *   "status": "OK"
-   * }
-   */
-  @GET
-  @Path("/deletePending")
-  public Response getDeletedKeyInfo(
-      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-      int limit,
-      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKey) {
-    KeyInsightInfoResponse
-        deletedKeyAndDirInsightInfo = new KeyInsightInfoResponse();
-    getPendingForDeletionKeyInfo(limit, prevKey,
-        deletedKeyAndDirInsightInfo);
-    getPendingForDeletionDirInfo(limit, prevKey,
-        deletedKeyAndDirInsightInfo);
-    return Response.ok(deletedKeyAndDirInsightInfo).build();
-  }
-
-  private void getPendingForDeletionDirInfo(
-      int limit, String prevKey,
-      KeyInsightInfoResponse pendingForDeletionKeyInfo) {
-
-    List<KeyEntityInfo> deletedDirInfoList =
-        pendingForDeletionKeyInfo.getDeletedDirInfoList();
-    List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
-        pendingForDeletionKeyInfo.getRepeatedOmKeyInfoList();
-
-    Table<String, OmKeyInfo> deletedDirTable =
-        omMetadataManager.getDeletedDirTable();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            keyIter = deletedDirTable.iterator()) {
-      boolean skipPrevKey = false;
-      String seekKey = prevKey;
-      String lastKey = "";
-      if (StringUtils.isNotBlank(prevKey)) {
-        skipPrevKey = true;
-        Table.KeyValue<String, OmKeyInfo> seekKeyValue =
-            keyIter.seek(seekKey);
-        // check if RocksDB was able to seek correctly to the given key prefix
-        // if not, then return empty result
-        // In case of an empty prevKeyPrefix, all the keys are returned
-        if (seekKeyValue == null ||
-            (StringUtils.isNotBlank(prevKey) &&
-                !seekKeyValue.getKey().equals(prevKey))) {
-          return;
-        }
-      }
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        String key = kv.getKey();
-        lastKey = key;
-        OmKeyInfo omKeyInfo = kv.getValue();
-        // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKey)) {
-          continue;
-        }
-        KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-        keyEntityInfo.setKey(key);
-        keyEntityInfo.setPath(omKeyInfo.getKeyName());
-        keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(omKeyInfo.getDataSize());
-        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
-        keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-        pendingForDeletionKeyInfo.setUnreplicatedTotal(
-            pendingForDeletionKeyInfo.getUnreplicatedTotal() +
-                keyEntityInfo.getSize());
-        pendingForDeletionKeyInfo.setReplicatedTotal(
-            pendingForDeletionKeyInfo.getReplicatedTotal() +
-                keyEntityInfo.getReplicatedSize());
-        deletedDirInfoList.add(keyEntityInfo);
-        if (deletedDirInfoList.size() + repeatedOmKeyInfoList.size() == limit) {
-          break;
-        }
-      }
-      pendingForDeletionKeyInfo.setLastKey(lastKey);
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    } catch (IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
-    } catch (Exception ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   private void getPendingForDeletionKeyInfo(
       int limit,
       String prevKey,
@@ -399,6 +269,199 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** This method retrieves set of keys/files pending for deletion.
+   *
+   * limit - limits the number of key/files returned.
+   * prevKey - E.g. /vol1/bucket1/key1, this will skip keys till it
+   * seeks correctly to the given prevKey.
+   * Sample API Response:
+   * {
+   *   "replicatedTotal": -1530804718628866300,
+   *   "unreplicatedTotal": -1530804718628866300,
+   *   "deletedkeyinfo": [
+   *     {
+   *       "omKeyInfoList": [
+   *         {
+   *           "metadata": {},
+   *           "objectID": 0,
+   *           "updateID": 0,
+   *           "parentObjectID": 0,
+   *           "volumeName": "sampleVol",
+   *           "bucketName": "bucketOne",
+   *           "keyName": "key_one",
+   *           "dataSize": -1530804718628866300,
+   *           "keyLocationVersions": [],
+   *           "creationTime": 0,
+   *           "modificationTime": 0,
+   *           "replicationConfig": {
+   *             "replicationFactor": "ONE",
+   *             "requiredNodes": 1,
+   *             "replicationType": "STANDALONE"
+   *           },
+   *           "fileChecksum": null,
+   *           "fileName": "key_one",
+   *           "acls": [],
+   *           "path": "0/key_one",
+   *           "file": false,
+   *           "latestVersionLocations": null,
+   *           "replicatedSize": -1530804718628866300,
+   *           "fileEncryptionInfo": null,
+   *           "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne',
+   *           key='key_one', dataSize='-1530804718628866186', creationTime='0',
+   *           objectID='0', parentID='0', replication='STANDALONE/ONE',
+   *           fileChecksum='null}",
+   *           "updateIDset": false
+   *         }
+   *       ]
+   *     }
+   *   ],
+   *   "status": "OK"
+   * }
+   */
+  @GET
+  @Path("/deletePending/keys")
+  public Response getDeletedKeyInfo(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
+      String prevKey) {
+    KeyInsightInfoResponse
+        deletedKeyInsightInfo = new KeyInsightInfoResponse();
+    getPendingForDeletionKeyInfo(limit, prevKey,
+        deletedKeyInsightInfo);
+    return Response.ok(deletedKeyInsightInfo).build();
+  }
+
+  private void getPendingForDeletionDirInfo(
+      int limit, String prevKey,
+      KeyInsightInfoResponse pendingForDeletionKeyInfo) {
+
+    List<KeyEntityInfo> deletedDirInfoList =
+        pendingForDeletionKeyInfo.getDeletedDirInfoList();
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        omMetadataManager.getDeletedDirTable();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            keyIter = deletedDirTable.iterator()) {
+      boolean skipPrevKey = false;
+      String seekKey = prevKey;
+      String lastKey = "";
+      if (StringUtils.isNotBlank(prevKey)) {
+        skipPrevKey = true;
+        Table.KeyValue<String, OmKeyInfo> seekKeyValue =
+            keyIter.seek(seekKey);
+        // check if RocksDB was able to seek correctly to the given key prefix
+        // if not, then return empty result
+        // In case of an empty prevKeyPrefix, all the keys are returned
+        if (seekKeyValue == null ||
+            (StringUtils.isNotBlank(prevKey) &&
+                !seekKeyValue.getKey().equals(prevKey))) {
+          return;
+        }
+      }
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        String key = kv.getKey();
+        lastKey = key;
+        OmKeyInfo omKeyInfo = kv.getValue();
+        // skip the prev key if prev key is present
+        if (skipPrevKey && key.equals(prevKey)) {
+          continue;
+        }
+        KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
+        keyEntityInfo.setKey(key);
+        keyEntityInfo.setPath(omKeyInfo.getKeyName());
+        keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
+        keyEntityInfo.setSize(omKeyInfo.getDataSize());
+        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+        keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
+        pendingForDeletionKeyInfo.setUnreplicatedTotal(
+            pendingForDeletionKeyInfo.getUnreplicatedTotal() +
+                keyEntityInfo.getSize());
+        pendingForDeletionKeyInfo.setReplicatedTotal(
+            pendingForDeletionKeyInfo.getReplicatedTotal() +
+                keyEntityInfo.getReplicatedSize());
+        deletedDirInfoList.add(keyEntityInfo);
+        if (deletedDirInfoList.size() == limit) {
+          break;
+        }
+      }
+      pendingForDeletionKeyInfo.setLastKey(lastKey);
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /** This method retrieves set of directories pending for deletion.
+   *
+   * limit - limits the number of directories returned.
+   * prevKey - E.g. /vol1/bucket1/bucket1/dir1, this will skip dirs till it
+   * seeks correctly to the given prevKey.
+   * Sample API Response:
+   * {
+   *   "replicatedTotal": -1530804718628866300,
+   *   "unreplicatedTotal": -1530804718628866300,
+   *   "deletedkeyinfo": [
+   *     {
+   *       "omKeyInfoList": [
+   *         {
+   *           "metadata": {},
+   *           "objectID": 0,
+   *           "updateID": 0,
+   *           "parentObjectID": 0,
+   *           "volumeName": "sampleVol",
+   *           "bucketName": "bucketOne",
+   *           "keyName": "key_one",
+   *           "dataSize": -1530804718628866300,
+   *           "keyLocationVersions": [],
+   *           "creationTime": 0,
+   *           "modificationTime": 0,
+   *           "replicationConfig": {
+   *             "replicationFactor": "ONE",
+   *             "requiredNodes": 1,
+   *             "replicationType": "STANDALONE"
+   *           },
+   *           "fileChecksum": null,
+   *           "fileName": "key_one",
+   *           "acls": [],
+   *           "path": "0/key_one",
+   *           "file": false,
+   *           "latestVersionLocations": null,
+   *           "replicatedSize": -1530804718628866300,
+   *           "fileEncryptionInfo": null,
+   *           "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne',
+   *           key='key_one', dataSize='-1530804718628866186', creationTime='0',
+   *           objectID='0', parentID='0', replication='STANDALONE/ONE',
+   *           fileChecksum='null}",
+   *           "updateIDset": false
+   *         }
+   *       ]
+   *     }
+   *   ],
+   *   "status": "OK"
+   * }
+   */
+  @GET
+  @Path("/deletePending/dirs")
+  public Response getDeletedDirInfo(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
+      String prevKey) {
+    KeyInsightInfoResponse
+        deletedDirInsightInfo = new KeyInsightInfoResponse();
+    getPendingForDeletionDirInfo(limit, prevKey,
+        deletedDirInsightInfo);
+    return Response.ok(deletedDirInsightInfo).build();
   }
 
   private void updateReplicatedAndUnReplicatedTotal(

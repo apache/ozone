@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
@@ -37,6 +38,7 @@ public class ContainerDiscrepancyInfo {
   private List<Pipeline> pipelines;
 
   @JsonProperty("existsAt")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private String existsAt;
 
   public ContainerDiscrepancyInfo() {
