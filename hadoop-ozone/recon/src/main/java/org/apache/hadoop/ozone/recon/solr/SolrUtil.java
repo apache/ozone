@@ -410,15 +410,25 @@ public class SolrUtil {
         volumeEntity = volumeList.get(0);
       }
       if (null != volumeEntity) {
+        if (validateLength(split, 2)) {
+          return;
+        }
         addBucketData(rootEntity, volumeEntity, split,
             entityMetaData.getReadAccessCount(), keySize);
       } else {
+        if (validateLength(split, 1)) {
+          return;
+        }
         addVolumeData(rootEntity, split,
             entityMetaData.getReadAccessCount(), keySize);
       }
     });
     updateRootEntitySize(rootEntity);
     return rootEntity;
+  }
+
+  private static boolean validateLength(String[] split, int minLength) {
+    return (split.length < minLength);
   }
 
   private long getEntitySize(String path) throws IOException {
