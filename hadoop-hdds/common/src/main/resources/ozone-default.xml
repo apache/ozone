@@ -674,7 +674,8 @@
     <value>750</value>
     <description>
       Permissions for the metadata directories for Ozone Manager The
-      permissions have to be octal.
+      permissions have to be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>
@@ -696,7 +697,8 @@
     <value>750</value>
     <description>
       Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
-      to store their metadata. The permissions have to be octal.
+      to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
+      default permissions for OM,SCM,Recon,Datanode are not set.
     </description>
   </property>
 
@@ -741,7 +743,8 @@
     <value>750</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager The
-      permissions can either be octal or symbolic.
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>
@@ -2796,7 +2799,8 @@
     <value>750</value>
     <description>
       Permissions for the metadata directories for Recon The
-      permissions can either be octal or symbolic.
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>

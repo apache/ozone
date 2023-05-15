@@ -186,16 +186,13 @@ public final class ServerUtils {
       }
       try {
         Path path = dbDirPath.toPath();
-
         // Fetch the permissions for the respective component from the config
         String permissionValue = getPermissions(key, conf);
-        // Convert the octal permission value to FsPermission object which
-        // represents symbolic representation of permissions
-        FsPermission fsPermission = new FsPermission(permissionValue);
+        String symbolicPermission = getSymbolicPermission(permissionValue);
 
         // Set the permissions for the directory
         Files.setPosixFilePermissions(path,
-            PosixFilePermissions.fromString(fsPermission.toString()));
+            PosixFilePermissions.fromString(symbolicPermission));
       } catch (Exception e) {
         throw new RuntimeException("Failed to set directory permissions for " +
             dbDirPath + ": " + e.getMessage(), e);
@@ -204,6 +201,36 @@ public final class ServerUtils {
     }
 
     return null;
+  }
+
+  /**
+   * Fetches the symbolic representation of the permission value.
+   *
+   * @param permissionValue the permission value (octal or symbolic)
+   * @return the symbolic representation of the permission value
+   */
+  private static String getSymbolicPermission(String permissionValue) {
+    if (isSymbolic(permissionValue)) {
+      // For symbolic representation, use it directly
+      return permissionValue;
+    } else {
+      // For octal representation, convert it to FsPermission object and then
+      // to symbolic representation
+      short octalPermission = Short.parseShort(permissionValue, 8);
+      FsPermission fsPermission = new FsPermission(octalPermission);
+      return fsPermission.toString();
+    }
+  }
+
+  /**
+   * Checks if the permission value is in symbolic representation.
+   *
+   * @param permissionValue the permission value to check
+   * @return true if the permission value is in symbolic representation,
+   * false otherwise
+   */
+  private static boolean isSymbolic(String permissionValue) {
+    return permissionValue.matches(".*[rwx].*");
   }
 
 
@@ -259,7 +286,7 @@ public final class ServerUtils {
   }
 
   public static void setOzoneMetaDirPath(OzoneConfiguration conf,
-      String path) {
+                                         String path) {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, path);
   }
 
@@ -269,7 +296,7 @@ public final class ServerUtils {
    * If the directory is missing the method tries to create it.
    *
    * @param conf The ozone configuration object
-   * @param key The configuration key which specify the directory.
+   * @param key  The configuration key which specify the directory.
    * @return The path of the directory.
    */
   public static File getDBPath(ConfigurationSource conf, String key) {

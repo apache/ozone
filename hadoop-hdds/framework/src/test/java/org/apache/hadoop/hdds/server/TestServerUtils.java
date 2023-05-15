@@ -78,14 +78,9 @@ public class TestServerUtils {
 
   }
 
-  /**
-   * Test case for {@link ServerUtils#getDirectoryFromConfig}.
-   * Verifies the creation of a directory with the expected permissions.
-   *
-   * @throws IOException if an I/O error occurs during the test
-   */
   @Test
-  public void testGetDirectoryFromConfig() throws IOException {
+  public void testGetDirectoryFromConfigWithOctalPermissions()
+      throws IOException {
     // Create a temporary directory
     String filePath = folder.getRoot().getAbsolutePath();
 
@@ -94,6 +89,11 @@ public class TestServerUtils {
     String key = "ozone.metadata.dirs";
     String componentName = "Ozone";
     conf.set(key, filePath);
+
+    // Set octal permissions
+    String octalPermissionValue = "750";
+    String octalExpectedPermissions = "rwxr-x---";
+    conf.set("ozone.metadata.dirs.permissions", octalPermissionValue);
 
     // Get the directory using ServerUtils method
     File directory =
@@ -107,19 +107,51 @@ public class TestServerUtils {
     // Get the path of the directory
     Path directoryPath = directory.toPath();
 
-    // Define the expected permissions as a string
-    String expectedPermissions = "rwxr-x---";
-
-    // Convert the expected permissions string to a set of PosixFilePermission
-    Set<PosixFilePermission> expectedPermissionSet =
-        PosixFilePermissions.fromString(expectedPermissions);
+    // Convert the expected octal permissions string to a
+    // set of PosixFilePermission
+    Set<PosixFilePermission> octalExpectedPermissionSet =
+        PosixFilePermissions.fromString(octalExpectedPermissions);
 
     // Get the actual permissions of the directory
     Set<PosixFilePermission> actualPermissionSet =
         Files.getPosixFilePermissions(directoryPath);
 
     // Assert that the expected and actual permissions sets are equal
-    assertEquals(expectedPermissionSet, actualPermissionSet);
+    assertEquals(octalExpectedPermissionSet, actualPermissionSet);
+  }
+
+  @Test
+  public void testGetDirectoryFromConfigWithSymbolicPermissions()
+      throws IOException {
+    // Create a temporary directory
+    String filePath = folder.getRoot().getAbsolutePath();
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String key = "ozone.metadata.dirs";
+    String componentName = "Ozone";
+    conf.set(key, filePath);
+
+    // Set symbolic permissions
+    String symbolicPermissionValue = "rwx------";
+    String symbolicExpectedPermissions = "rwx------";
+    conf.set("ozone.metadata.dirs.permissions", symbolicPermissionValue);
+
+    File directory =
+        ServerUtils.getDirectoryFromConfig(conf, key, componentName);
+
+    assertNotNull(directory);
+    assertTrue(directory.exists());
+    assertTrue(directory.isDirectory());
+
+    Path directoryPath = directory.toPath();
+
+    Set<PosixFilePermission> symbolicExpectedPermissionSet =
+        PosixFilePermissions.fromString(symbolicExpectedPermissions);
+
+    Set<PosixFilePermission> actualPermissionSet =
+        Files.getPosixFilePermissions(directoryPath);
+
+    assertEquals(symbolicExpectedPermissionSet, actualPermissionSet);
   }
 
   @Test
