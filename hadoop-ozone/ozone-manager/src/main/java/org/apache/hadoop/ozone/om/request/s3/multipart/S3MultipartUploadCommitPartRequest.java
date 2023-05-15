@@ -201,7 +201,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
-      multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
+      multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
       multipartKeyInfo.setUpdateID(trxnLogIndex,

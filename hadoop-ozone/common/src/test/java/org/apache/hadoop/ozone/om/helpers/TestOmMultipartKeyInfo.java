@@ -105,7 +105,7 @@ public class TestOmMultipartKeyInfo {
     OmMultipartKeyInfo copy = subject.copyObject();
 
     // WHEN
-    subject.addPartKeyInfo(1, createPart(createKeyInfo()).build());
+    subject.addPartKeyInfo(createPart(createKeyInfo()).build());
 
     // THEN
     assertEquals(0, copy.getPartKeyInfoMap().size());
