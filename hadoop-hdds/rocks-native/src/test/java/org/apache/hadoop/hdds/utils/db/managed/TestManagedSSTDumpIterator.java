@@ -51,7 +51,7 @@ import java.util.stream.Stream;
  */
 public class TestManagedSSTDumpIterator {
 
-  private void testSSTDumpIteratorWithKeys(
+  private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
     File file = File.createTempFile("tmp_sst_file", ".sst");
     file.deleteOnExit();
@@ -71,36 +71,8 @@ public class TestManagedSSTDumpIterator {
         }
       }
       sstFileWriter.finish();
-      sstFileWriter.close();
-      ExecutorService executorService =
-          new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
-              new ArrayBlockingQueue<>(1),
-              new ThreadPoolExecutor.CallerRunsPolicy());
-      ManagedSSTDumpTool tool = new ManagedSSTDumpTool(executorService, 8192);
-      try (ManagedOptions options = new ManagedOptions();
-           ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue> iterator =
-              new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
-                  file.getAbsolutePath(), options) {
-
-            @Override
-            protected KeyValue getTransformedValue(Optional<KeyValue> value) {
-              return value.orElse(null);
-            }
-          }) {
-        while (iterator.hasNext()) {
-          ManagedSSTDumpIterator.KeyValue r = iterator.next();
-          Pair<String, Integer> recordKey = Pair.of(new String(r.getKey(),
-              StandardCharsets.UTF_8), r.getType());
-          Assertions.assertTrue(keys.containsKey(recordKey));
-          Assertions.assertEquals(
-              Optional.ofNullable(keys.get(recordKey)).orElse(""),
-              new String(r.getValue(), StandardCharsets.UTF_8));
-          keys.remove(recordKey);
-        }
-        Assertions.assertEquals(0, keys.size());
-      }
-      executorService.shutdown();
     }
+    return file;
   }
 
   private static Stream<? extends Arguments> keyValueFormatArgs() {
@@ -129,7 +101,7 @@ public class TestManagedSSTDumpIterator {
         Arguments.of(
             Named.of("Key ending with a number", "key%1$d"),
             Named.of("Value starting & ending with a number " +
-                "& containing null character & new line character",
+                    "& containing null character & new line character",
                 "%1$dvalue\n\0%1$d")
         ),
         Arguments.of(
@@ -153,7 +125,7 @@ public class TestManagedSSTDumpIterator {
   private static byte[] getBytes(Long val) {
     byte[] b = new byte[8];
     for (int i = 7; i >= 0; i--) {
-      b[i] = (byte)(val & 0xff);
+      b[i] = (byte) (val & 0xff);
       val = val >> 8;
     }
     return b;
@@ -170,11 +142,11 @@ public class TestManagedSSTDumpIterator {
   private static Stream<? extends Arguments> invalidPipeInputStreamBytes() {
     return Stream.of(
         Arguments.of(Named.of("Invalid 3 byte integer",
-            new byte[] {0, 0, 0})),
+            new byte[]{0, 0, 0})),
         Arguments.of(Named.of("Invalid 2 byte integer",
-            new byte[] {0, 0})),
+            new byte[]{0, 0})),
         Arguments.of(Named.of("Invalid 1 byte integer",
-            new byte[] {0, 0})),
+            new byte[]{0, 0})),
         Arguments.of(Named.of("Invalid key name length",
             Bytes.concat(getBytes(4), getBytes("key")))),
         Arguments.of(Named.of("Invalid Unsigned Long length",
@@ -186,8 +158,8 @@ public class TestManagedSSTDumpIterator {
             Bytes.concat(getBytes(4), getBytes("key1"),
                 getBytes(4L)))),
         Arguments.of(Named.of("Invalid Value",
-                Bytes.concat(getBytes(4), getBytes("key"),
-                    getBytes(4L), getBytes(0)))),
+            Bytes.concat(getBytes(4), getBytes("key"),
+                getBytes(4L), getBytes(0)))),
         Arguments.of(Named.of("Invalid Value length",
             Bytes.concat(getBytes(4), getBytes("key"),
                 getBytes(4L), getBytes(1), getBytes(6),
@@ -195,13 +167,12 @@ public class TestManagedSSTDumpIterator {
     );
   }
 
-
-
   @Native("Managed Rocks Tools")
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
-              String valueFormat) throws Exception {
+                                               String valueFormat)
+      throws Exception {
     TreeMap<Pair<String, Integer>, String> keys =
         IntStream.range(0, 100).boxed().collect(
             Collectors.toMap(
@@ -209,7 +180,36 @@ public class TestManagedSSTDumpIterator {
                 i -> i % 2 == 0 ? "" : String.format(valueFormat, i),
                 (v1, v2) -> v2,
                 TreeMap::new));
-    testSSTDumpIteratorWithKeys(keys);
+    File file = createSSTFileWithKeys(keys);
+    ExecutorService executorService =
+        new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(1),
+            new ThreadPoolExecutor.CallerRunsPolicy());
+    ManagedSSTDumpTool tool = new ManagedSSTDumpTool(executorService, 8192);
+    try (ManagedOptions options = new ManagedOptions(); ManagedSSTDumpIterator
+        <ManagedSSTDumpIterator.KeyValue> iterator =
+        new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
+            file.getAbsolutePath(), options) {
+          @Override
+          protected KeyValue getTransformedValue(
+              Optional<KeyValue> value) {
+            return value.orElse(null);
+          }
+        }
+    ) {
+      while (iterator.hasNext()) {
+        ManagedSSTDumpIterator.KeyValue r = iterator.next();
+        Pair<String, Integer> recordKey = Pair.of(new String(r.getKey(),
+            StandardCharsets.UTF_8), r.getType());
+        Assertions.assertTrue(keys.containsKey(recordKey));
+        Assertions.assertEquals(
+            Optional.ofNullable(keys.get(recordKey)).orElse(""),
+            new String(r.getValue(), StandardCharsets.UTF_8));
+        keys.remove(recordKey);
+      }
+      Assertions.assertEquals(0, keys.size());
+    }
+    executorService.shutdown();
   }
 
   @ParameterizedTest
@@ -225,7 +225,7 @@ public class TestManagedSSTDumpIterator {
     Mockito.when(future.isDone()).thenReturn(false);
     Mockito.when(future.get()).thenReturn(0);
     Mockito.when(tool.run(Matchers.any(String[].class),
-        Matchers.any(ManagedOptions.class)))
+            Matchers.any(ManagedOptions.class)))
         .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
             byteArrayInputStream));
     try (ManagedOptions options = new ManagedOptions()) {

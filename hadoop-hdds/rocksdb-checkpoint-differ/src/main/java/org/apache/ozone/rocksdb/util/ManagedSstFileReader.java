@@ -18,6 +18,7 @@
 
 package org.apache.ozone.rocksdb.util;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -142,7 +143,7 @@ public class ManagedSstFileReader {
                 options) {
               @Override
               protected String getTransformedValue(Optional<KeyValue> value) {
-                return value.map(v -> new String(v.getKey(), UTF_8))
+                return value.map(v -> StringUtils.bytes2String(v.getKey()))
                     .orElse(null);
               }
             };
@@ -215,7 +216,7 @@ public class ManagedSstFileReader {
     public boolean hasNext() {
       try {
         do {
-          if (!Objects.isNull(currentFileIterator) &&
+          if (Objects.nonNull(currentFileIterator) &&
               currentFileIterator.hasNext()) {
             return true;
           }
