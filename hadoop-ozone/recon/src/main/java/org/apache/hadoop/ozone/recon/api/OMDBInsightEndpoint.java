@@ -282,6 +282,8 @@ public class OMDBInsightEndpoint {
 
     List<KeyEntityInfo> deletedDirInfoList =
         pendingForDeletionKeyInfo.getDeletedDirInfoList();
+    List<RepeatedOmKeyInfo> repeatedOmKeyInfoList =
+        pendingForDeletionKeyInfo.getRepeatedOmKeyInfoList();
 
     Table<String, OmKeyInfo> deletedDirTable =
         omMetadataManager.getDeletedDirTable();
@@ -327,7 +329,7 @@ public class OMDBInsightEndpoint {
             pendingForDeletionKeyInfo.getReplicatedTotal() +
                 keyEntityInfo.getReplicatedSize());
         deletedDirInfoList.add(keyEntityInfo);
-        if (deletedDirInfoList.size() == limit) {
+        if (deletedDirInfoList.size() + repeatedOmKeyInfoList.size() == limit) {
           break;
         }
       }
