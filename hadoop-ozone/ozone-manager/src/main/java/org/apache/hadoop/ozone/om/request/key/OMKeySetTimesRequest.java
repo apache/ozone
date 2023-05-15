@@ -33,11 +33,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -76,7 +74,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   private long modificationTime;
 
   public OMKeySetTimesRequest(OMRequest omRequest, BucketLayout bucketLayout) {
-    super(omRequest);
+    super(omRequest, bucketLayout);
     OzoneManagerProtocolProtos.SetTimesRequest setTimesRequest =
         getOmRequest().getSetTimesRequest();
     volumeName = setTimesRequest.getVolumeName();
@@ -84,8 +82,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     keyName = setTimesRequest.getKeyName();
     // ignore accessTime
     modificationTime = setTimesRequest.getMtime();
-
-    //initializeBucketLayout(ozoneManager);
   }
 
   protected String getVolumeName() {
@@ -123,22 +119,23 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMKeySetTimesResponse(createErrorOMResponse(omResponse, exception),
-        getBucketLayout());
+    return new OMKeySetTimesResponse(createErrorOMResponse(
+        omResponse, exception), getBucketLayout());
   }
 
-  //@Override
   void onComplete(Result result, boolean operationResult,
       IOException exception, long trxnLogIndex, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Set time: {} to path: {} success!", modificationTime, getKeyName());
+        LOG.debug("Set time: {} to path: {} success!", modificationTime,
+            getKeyName());
       }
       break;
     case FAILURE:
-      LOG.error("Set time {} to path {} failed!", modificationTime, getKeyName(), exception);
+      LOG.error("Set time {} to path {} failed!", modificationTime,
+          getKeyName(), exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeySetTimesRequest: {}",
@@ -154,9 +151,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
   }
 
-  void apply(OmKeyInfo omKeyInfo, long mtime) {
+  void apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    omKeyInfo.setModificationTime(mtime);
+    long mtime = getModificationTime();
+    if (mtime != -1) {
+      omKeyInfo.setModificationTime(getModificationTime());
+    }
   }
 
   @Override
@@ -177,12 +177,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     boolean operationResult = false;
     Result result = null;
     try {
-      //ObjectParser objectParser = new ObjectParser(getPath(),
-      //    ObjectType.KEY);
-
-      volume = getVolumeName(); // objectParser.getVolume();
-      bucket = getBucketName(); // objectParser.getBucket();
-      key = getKeyName(); // objectParser.getKey();
+      volume = getVolumeName();
+      bucket = getBucketName();
+      key = getKeyName();
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
@@ -206,9 +203,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      long modificationTime = omKeyInfo.getModificationTime();
-      omKeyInfo.setModificationTime(modificationTime);
-
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(dbKey),
@@ -229,7 +223,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       }
     }
 
-    //OzoneObj obj = getObject();
     Map<String, String> auditMap = new LinkedHashMap<>();
     onComplete(result, operationResult, exception, trxnLogIndex,
         ozoneManager.getAuditLogger(), auditMap);

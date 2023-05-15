@@ -2516,4 +2516,23 @@ public class TestRootedOzoneFileSystem {
         () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
             finalToSnap));
   }
+
+  @Test
+  public void testSetTimes() throws Exception {
+    // Create a file
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucketPath1 = new Path(volumePath1, bucket1.getName());
+    Path path = new Path(bucketPath1, "key1");
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    fs.setTimes(path, 1000, 2000);
+
+    FileStatus fileStatus = fs.getFileStatus(path);
+    // Trash Current directory should still have been created.
+    Assert.assertEquals(1000, fileStatus.getModificationTime());
+  }
 }

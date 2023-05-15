@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -37,7 +36,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -161,19 +159,13 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
-  @Override
-  void apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
-    // No need to check not null here, this will be never called with null.
-    omKeyInfo.setModificationTime(getModificationTime());
-  }
-
   OMClientResponse onSuccess(OMResponse.Builder omResponse,
       OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir,
       long volumeId, long bucketId) {
     omResponse.setSuccess(operationResult);
     omResponse.setSetTimesResponse(
         OzoneManagerProtocolProtos.SetTimesResponse.newBuilder());
-    return new OMKeySetTimesResponseWithFSO(omResponse.build(), omKeyInfo, isDir,
-        getBucketLayout(), volumeId, bucketId);
+    return new OMKeySetTimesResponseWithFSO(omResponse.build(), omKeyInfo,
+        isDir, getBucketLayout(), volumeId, bucketId);
   }
 }

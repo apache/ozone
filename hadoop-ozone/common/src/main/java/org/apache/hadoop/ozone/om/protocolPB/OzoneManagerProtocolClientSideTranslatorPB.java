@@ -2222,6 +2222,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setBucketName(bucketName)
             .setKeyName(keyName)
             .setMtime(mtime)
+            .setAtime(atime)
             .build();
 
     OMRequest omRequest = createOMRequest(Type.SetTimes)
