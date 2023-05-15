@@ -299,8 +299,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     Preconditions.checkNotNull(usedNodes);
     Preconditions.checkNotNull(healthyNodes);
     Preconditions.checkState(nodesRequired >= 1);
-    Preconditions.checkState(usedNodes.size() >= 0 &&
-        usedNodes.size() <= 2);
 
     if (nodesRequired + usedNodes.size() !=
         HddsProtos.ReplicationFactor.THREE.getNumber()) {
