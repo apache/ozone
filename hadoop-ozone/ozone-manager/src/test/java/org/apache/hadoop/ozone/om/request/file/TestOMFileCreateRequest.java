@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
@@ -355,8 +356,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
           () -> omFileCreateRequest.preExecute(ozoneManager));
 
       Assert.assertTrue(ex.getMessage().contains(
-          "Can not use key name starting with prefix: "
-              + OM_SNAPSHOT_INDICATOR));
+          "Cannot create key under path reserved for snapshot: "
+              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
     }
   }
 

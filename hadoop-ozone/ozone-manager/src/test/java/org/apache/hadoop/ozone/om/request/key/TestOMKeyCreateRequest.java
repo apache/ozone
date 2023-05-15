@@ -54,6 +54,8 @@ import org.junit.runners.Parameterized;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
@@ -648,8 +650,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
     );
     Assert.assertTrue(ex.getMessage().contains(
-        "Can not use key name starting with prefix: "
-            + OzoneConsts.OM_SNAPSHOT_INDICATOR));
+        "Cannot create key under path reserved for snapshot: "
+            + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
   }
 
   protected void addToKeyTable(String keyName) throws Exception {

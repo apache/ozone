@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 
 /**
@@ -94,9 +95,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
     // Verify key name
-    if (keyArgs.getKeyName().startsWith(OM_SNAPSHOT_INDICATOR)) {
-      throw new OMException("Can not use key name starting with prefix: "
-          + OM_SNAPSHOT_INDICATOR, OMException.ResultCodes.INVALID_KEY_NAME);
+    if (keyArgs.getKeyName().startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new OMException("Cannot create key under path reserved for "
+          + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+          OMException.ResultCodes.INVALID_KEY_NAME);
     }
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,

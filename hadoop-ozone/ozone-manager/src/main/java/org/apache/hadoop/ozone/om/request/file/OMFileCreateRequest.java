@@ -30,7 +30,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -72,6 +71,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
 /**
@@ -94,9 +95,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
     // Verify key name
-    if (keyArgs.getKeyName().startsWith(OzoneConsts.OM_SNAPSHOT_INDICATOR)) {
-      throw new OMException("Can not use key name starting with prefix: "
-          + OzoneConsts.OM_SNAPSHOT_INDICATOR,
+    if (keyArgs.getKeyName().startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new OMException("Cannot create key under path reserved for "
+          + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
           OMException.ResultCodes.INVALID_KEY_NAME);
     }
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
