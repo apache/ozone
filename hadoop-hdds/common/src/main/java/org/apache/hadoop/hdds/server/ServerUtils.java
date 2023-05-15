@@ -47,15 +47,6 @@ public final class ServerUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
       ServerUtils.class);
 
-  // Static variables for config names
-  private static final String OZONE_RECON_CONFIG_PERMISSION =
-      "ozone.recon.db.dirs.permissions";
-  private static final String OZONE_SCM_CONFIG_PERMISSION =
-      "ozone.scm.db.dirs.permissions";
-  private static final String OZONE_OM_CONFIG_PERMISSION =
-      "ozone.om.db.dirs.permissions";
-  private static final String OZONE_METADATA_CONFIG_PERMISSION =
-      "ozone.metadata.dirs.permissions";
 
   private ServerUtils() {
   }
