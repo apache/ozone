@@ -58,7 +58,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
  *
  * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
  * |<-     capacity                  ->|
- *              |     fsAvail      |-------other-------    |
+ *              |     fsAvail      |-------other-----------|
  * |<-                   fsCapacity                      ->|
  *
  * What we could directly get from local fs:
