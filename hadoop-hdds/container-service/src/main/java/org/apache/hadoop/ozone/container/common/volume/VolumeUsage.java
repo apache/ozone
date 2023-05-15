@@ -18,12 +18,17 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.CachingSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT;
 
 /**
  * Class that wraps the space df of the Datanode Volumes used by SCM
@@ -34,6 +39,8 @@ public class VolumeUsage implements SpaceUsageSource {
   private final CachingSpaceUsageSource source;
   private boolean shutdownComplete;
   private long reservedInBytes;
+
+  private static final Logger LOG = LoggerFactory.getLogger(VolumeUsage.class);
 
   VolumeUsage(SpaceUsageCheckParams checkParams) {
     source = new CachingSpaceUsageSource(checkParams);
@@ -106,23 +113,36 @@ public class VolumeUsage implements SpaceUsageSource {
   }
 
   /**
-   * If 'hdds.datanode.volume.min.free.space.percent' is defined,
-   * it will be honored first ie the min space would be calculated as
-   * a percent of volume capacity else it will fall back to
-   * 'hdds.datanode.volume.min.free.space' which has a default value configured.
+   * If 'hdds.datanode.volume.min.free.space' is defined,
+   * it will be honored first. If it is not defined and
+   * 'hdds.datanode.volume.min.free.space.' is defined,it will honor this
+   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
    */
   public static long getMinVolumeFreeSpace(ConfigurationSource conf,
       long capacity) {
     if (conf.isConfigured(
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE) && conf.isConfigured(
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
+      LOG.error(
+          "Both {} and {} are set. Set either one, not both. If both are set,"
+              + "it will use default value which is {} as min free space",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
+    }
+
+    if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE)) {
+      return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
+    } else if (conf.isConfigured(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT)) {
       float volumeMinFreeSpacePercent = Float.parseFloat(
-          conf.get(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
+          conf.get(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT));
       return (long) (capacity * volumeMinFreeSpacePercent);
     }
-    return (long) conf.getStorageSize(
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
-        StorageUnit.BYTES);
+    // either properties are not configured,then return
+    // HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT,
+    return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
 
   }
 }

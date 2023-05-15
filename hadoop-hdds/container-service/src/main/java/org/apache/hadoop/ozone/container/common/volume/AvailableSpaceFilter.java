@@ -45,8 +45,7 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
     long volumeFreeSpace =
         VolumeUsage.getMinVolumeFreeSpace(vol.getConf(), volumeCapacity);
     boolean hasEnoughSpace =
-        (available > requiredSpace) &&
-            (free > volumeFreeSpace);
+        available > Math.max(requiredSpace, volumeFreeSpace);
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
