@@ -156,7 +156,7 @@ public class TestCloseContainerEventHandler {
     Mockito.verify(mockLeaseManager, atLeastOnce())
         .acquire(any(), anyLong(), any());
     Assert.assertTrue(leaseList.size() > 0);
-    // immediate check if event is published, it should not publish in 500ms
+    // immediate check if event is published
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
     // wait for event to happen

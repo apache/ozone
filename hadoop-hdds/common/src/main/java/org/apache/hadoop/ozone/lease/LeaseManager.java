@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.lease;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -27,7 +26,7 @@ import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
 
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +49,7 @@ public class LeaseManager<T> {
   private final String name;
   private final long defaultTimeout;
   private Map<T, Lease<T>> activeLeases;
-  private BlockingQueue<T> leaseKeyBlockingQueue;
+  private Semaphore semaphore = new Semaphore(0);
   private LeaseMonitor leaseMonitor;
   private Thread leaseMonitorThread;
   private boolean isRunning;
@@ -66,7 +65,6 @@ public class LeaseManager<T> {
   public LeaseManager(String name, long defaultTimeout) {
     this.name = name;
     this.defaultTimeout = defaultTimeout;
-    leaseKeyBlockingQueue = new LinkedBlockingQueue<>();
   }
 
   /**
@@ -125,7 +123,7 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    leaseKeyBlockingQueue.add(resource);
+    semaphore.release();
     return lease;
   }
 
@@ -154,7 +152,7 @@ public class LeaseManager<T> {
     Lease<T> lease = new Lease<>(resource, timeout);
     lease.registerCallBack(callback);
     activeLeases.put(resource, lease);
-    leaseKeyBlockingQueue.add(resource);
+    semaphore.release();
     return lease;
   }
 
@@ -201,12 +199,15 @@ public class LeaseManager<T> {
    * {@link Lease} will be released (callbacks on leases will not be
    * executed).
    */
-  public void shutdown() {
+  public synchronized void shutdown() {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
+    // added extra release for case when interrupt is called
+    // before going to semaphore's tryAcquire. This will ensure release
+    //  of wait and exit of while loop as leaseMonitor.disable() is done.
+    semaphore.release();
     leaseMonitorThread.interrupt();
-    leaseKeyBlockingQueue.clear();
     for (T resource : activeLeases.keySet()) {
       try {
         release(resource);
@@ -265,11 +266,7 @@ public class LeaseManager<T> {
         }
 
         try {
-          // block for event and clear all events as will be 
-          // handled by activeLeases before going for next wait
-          // ignore return value
-          T task = leaseKeyBlockingQueue.poll(sleepTime, TimeUnit.MILLISECONDS);
-          leaseKeyBlockingQueue.clear();
+          semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
