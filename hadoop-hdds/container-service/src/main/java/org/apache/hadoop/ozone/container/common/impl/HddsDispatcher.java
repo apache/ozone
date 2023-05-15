@@ -540,8 +540,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    */
   private void sendCloseContainerActionIfNeeded(Container container) {
     // We have to find a more efficient way to close a container.
-    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(
-        container.getContainerData().getVolume());
+    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
@@ -569,12 +568,19 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  private boolean isVolumeFull(HddsVolume volume) {
-    long volumeCapacity = volume.getCapacity();
-    long volumeFreeSpaceToSpare =
-        VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
-    long volumeAvailable = volume.getAvailable();
-    return (volumeAvailable <= volumeFreeSpaceToSpare);
+  private boolean isVolumeFull(Container container) {
+    boolean isOpen = Optional.ofNullable(container)
+        .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
+        .orElse(Boolean.FALSE);
+    if (isOpen) {
+      HddsVolume volume = container.getContainerData().getVolume();
+      long volumeCapacity = volume.getCapacity();
+      long volumeFreeSpaceToSpare =
+          VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
+      long volumeAvailable = volume.getAvailable();
+      return (volumeAvailable <= volumeFreeSpaceToSpare);
+    }
+    return false;
   }
 
   private boolean isContainerUnhealthy(Container container) {
