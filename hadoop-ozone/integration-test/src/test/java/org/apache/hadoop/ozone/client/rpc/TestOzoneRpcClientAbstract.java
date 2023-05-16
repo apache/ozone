@@ -577,6 +577,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 
   @Test
@@ -703,7 +704,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Invalid bucket name: invalid#bucket",
+        "Bucket or Volume name has an unsupported character : #",
         () -> volume.createBucket(bucketName));
   }
 

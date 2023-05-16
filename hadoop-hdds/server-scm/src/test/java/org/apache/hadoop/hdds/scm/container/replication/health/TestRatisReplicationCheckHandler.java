@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -210,6 +211,39 @@ public class TestRatisReplicationCheckHandler {
     Assert.assertTrue(result.underReplicatedDueToDecommission());
 
     Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedDueToAllDecommissioning() {
+    Pair<HddsProtos.NodeOperationalState, Integer> state =
+        Pair.of(DECOMMISSIONING, 0);
+
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        state, state, state);
+
+    ContainerCheckRequest checkRequest = requestBuilder
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .build();
+
+    ContainerHealthResult healthResult = healthCheck.checkHealth(checkRequest);
+    Assert.assertEquals(HealthState.UNDER_REPLICATED,
+        healthResult.getHealthState());
+    Assert.assertEquals(UnderReplicatedHealthResult.class,
+        healthResult.getClass());
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthResult;
+
+    Assert.assertEquals(2, result.getRemainingRedundancy());
+    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    Assert.assertTrue(result.underReplicatedDueToDecommission());
+
+    Assert.assertTrue(healthCheck.handle(checkRequest));
     Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
     Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
     Assert.assertEquals(1, report.getStat(

@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -511,21 +510,6 @@ public final class OMFileRequest {
 
     omMetadataManager.getKeyTable(bucketLayout)
         .addCacheEntry(dbFileKey, omFileInfo, trxnLogIndex);
-  }
-
-  /**
-   * Updating the list of OmKeyInfo eligible for deleting blocks.
-   *
-   * @param omMetadataManager OM Metadata Manager
-   * @param dbDeletedKey      Ozone key in deletion table
-   * @param keysToDelete      Repeated OMKeyInfos
-   * @param trxnLogIndex      transaction log index
-   */
-  public static void addDeletedTableCacheEntry(
-          OMMetadataManager omMetadataManager, String dbDeletedKey,
-          RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
-    omMetadataManager.getDeletedTable().addCacheEntry(
-        dbDeletedKey, keysToDelete, trxnLogIndex);
   }
 
   /**

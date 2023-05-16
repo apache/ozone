@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto3Codec;
 
 import java.util.Collections;
 import java.util.List;
@@ -25,16 +28,28 @@ import java.util.List;
 /**
  * Helper class to convert between protobuf lists and Java lists of
  * {@link ContainerProtos.ChunkInfo} objects.
+ * <p>
+ * This class is immutable.
  */
 public class ChunkInfoList {
-  private List<ContainerProtos.ChunkInfo> chunks;
+  private static final Codec<ChunkInfoList> CODEC = new DelegatedCodec<>(
+      Proto3Codec.get(ContainerProtos.ChunkInfoList.class),
+      ChunkInfoList::getFromProtoBuf,
+      ChunkInfoList::getProtoBufMessage,
+      true);
+
+  public static Codec<ChunkInfoList> getCodec() {
+    return CODEC;
+  }
+
+  private final List<ContainerProtos.ChunkInfo> chunks;
 
   public ChunkInfoList(List<ContainerProtos.ChunkInfo> chunks) {
-    this.chunks = chunks;
+    this.chunks = Collections.unmodifiableList(chunks);
   }
 
   public List<ContainerProtos.ChunkInfo> asList() {
-    return Collections.unmodifiableList(chunks);
+    return chunks;
   }
 
   /**

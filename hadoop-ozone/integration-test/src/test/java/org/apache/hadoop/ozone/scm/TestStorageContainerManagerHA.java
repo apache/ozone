@@ -298,7 +298,7 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  public void testGetRatisRolesDetail() throws IOException {
+  public void testGetRatisRolesDetail() {
     Set<String> resultSet = new HashSet<>();
     for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
       resultSet.addAll(scm.getScmHAManager().getRatisServer().getRatisRoles());

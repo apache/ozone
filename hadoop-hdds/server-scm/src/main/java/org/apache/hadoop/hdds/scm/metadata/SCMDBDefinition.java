@@ -107,7 +107,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           ContainerInfo.class,
           new ContainerInfoCodec());
 
@@ -152,7 +152,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "move",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           MoveDataNodePair.class,
           new MoveDataNodePairCodec());
 

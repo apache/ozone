@@ -402,7 +402,8 @@ public class TestSnapshotDeletingService {
         ReplicationType.RATIS, CONTENT);
     client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_ONE,
         "bucket1key4", false);
-    assertTableRowCount(deletedTable, 1);
+    assertTableRowCount(keyTable, 1);
+    assertTableRowCount(deletedTable, 0);
 
     // Create Snapshot 3.
     client.getProxy().createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
