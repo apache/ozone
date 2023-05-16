@@ -934,15 +934,20 @@ public class TestOmSnapshot {
     String snapshotName = createSnapshot(volumeName, bucketName);
 
     // RocksDBCheckpointDiffer should be not null for active store metadata.
-    assertNotNull(cluster.getOzoneManager().getMetadataManager().getStore()
-        .getRocksDBCheckpointDiffer());
+    RDBStore activeDbStore =
+        (RDBStore) cluster.getOzoneManager().getMetadataManager().getStore();
+    assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
+    assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
 
     OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName, snapshotName);
 
+    RDBStore snapshotDbStore =
+        (RDBStore) omSnapshot.getMetadataManager().getStore();
+            // RocksDBCheckpointDiffer should be null for snapshot metadata.
+    assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
     // RocksDBCheckpointDiffer should be null for snapshot metadata.
-    assertNull(omSnapshot.getMetadataManager().getStore()
-        .getRocksDBCheckpointDiffer());
+    assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
   }
 }

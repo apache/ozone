@@ -78,6 +78,7 @@ public class RDBStore implements DBStore {
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
+  private final ManagedDBOptions dbOptions;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
@@ -97,6 +98,7 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
         dbJmxBeanNameName;
+    this.dbOptions = dbOptions;
 
     try {
       if (enableCompactionDag) {
@@ -189,6 +191,14 @@ public class RDBStore implements DBStore {
 
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
+  }
+
+
+  /**
+   * Returns the RocksDB's DBOptions.
+   */
+  public ManagedDBOptions getDbOptions() {
+    return dbOptions;
   }
 
   @Override
