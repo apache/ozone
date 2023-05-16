@@ -37,7 +37,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 
 /**
- * Unit tests for the on-demand container scanner.
+ * Unit tests for the background container data scanner.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestBackgroundContainerDataScanner extends
@@ -73,7 +73,8 @@ public class TestBackgroundContainerDataScanner extends
   @Override
   public void testUnscannedContainerIsScanned() {
     // If there is no last scanned time, the container should be scanned.
-    Mockito.when(healthy.getContainerData().lastDataScanTime()).thenReturn(Optional.empty());
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
+        .thenReturn(Optional.empty());
     scanner.runIteration();
     Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
   }

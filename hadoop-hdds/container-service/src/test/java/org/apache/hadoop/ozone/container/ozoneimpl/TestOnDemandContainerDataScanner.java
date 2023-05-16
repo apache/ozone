@@ -80,7 +80,8 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testUnscannedContainerIsScanned() throws Exception {
     // If there is no last scanned time, the container should be scanned.
-    Mockito.when(healthy.getContainerData().lastDataScanTime()).thenReturn(Optional.empty());
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
+        .thenReturn(Optional.empty());
     scanContainer(healthy);
     Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
   }

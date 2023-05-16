@@ -35,7 +35,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 
 /**
- * Unit tests for the on-demand container scanner.
+ * Unit tests for the background container metadata scanner.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestBackgroundContainerMetadataScanner extends

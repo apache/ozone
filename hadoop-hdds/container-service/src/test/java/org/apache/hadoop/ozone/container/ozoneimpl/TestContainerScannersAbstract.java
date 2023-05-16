@@ -41,9 +41,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * This test verifies the container scanner metrics functionality.
+ * General testing guidelines for the various container scanners whose tests
+ * subclass this one.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("checkstyle:VisibilityModifier")
 public abstract class TestContainerScannersAbstract {
 
   private static final AtomicLong CONTAINER_SEQ_ID = new AtomicLong(100);
@@ -80,7 +82,8 @@ public abstract class TestContainerScannersAbstract {
   public abstract void testRecentlyScannedContainerIsSkipped() throws Exception;
 
   @Test
-  public abstract void testPreviouslyScannedContainerIsScanned() throws Exception;
+  public abstract void testPreviouslyScannedContainerIsScanned()
+      throws Exception;
 
   @Test
   public abstract void testUnscannedContainerIsScanned() throws Exception;
