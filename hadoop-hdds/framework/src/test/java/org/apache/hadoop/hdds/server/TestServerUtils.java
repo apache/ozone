@@ -27,7 +27,9 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -60,21 +62,21 @@ public class TestServerUtils {
     // Create an OzoneConfiguration object and set the permissions
     // for different keys
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.recon.db.dir.perm", "750");
-    conf.set("ozone.scm.db.dirs.permissions", "775");
-    conf.set("ozone.metadata.dirs.permissions", "770");
-    conf.set("ozone.om.db.dirs.permissions", "700");
+    conf.set(ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS, "750");
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS_PERMISSIONS, "775");
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS, "770");
+    conf.set(OzoneConfigKeys.OZONE_OM_DB_DIRS_PERMISSIONS, "700");
 
     // Test getPermissions for different config names and assert the
     // returned permissions
     assertEquals("750",
-        ServerUtils.getPermissions("ozone.recon.db.dir", conf));
+        ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, conf));
     assertEquals("775",
-        ServerUtils.getPermissions("ozone.scm.db.dirs", conf));
+        ServerUtils.getPermissions(ScmConfigKeys.OZONE_SCM_DB_DIRS, conf));
     assertEquals("770",
-        ServerUtils.getPermissions("ozone.metadata.dirs", conf));
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_METADATA_DIRS, conf));
     assertEquals("700",
-        ServerUtils.getPermissions("ozone.om.db.dirs", conf));
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf));
 
   }
 
@@ -86,14 +88,15 @@ public class TestServerUtils {
 
     // Create an OzoneConfiguration object
     OzoneConfiguration conf = new OzoneConfiguration();
-    String key = "ozone.metadata.dirs";
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
     String componentName = "Ozone";
     conf.set(key, filePath);
 
     // Set octal permissions
     String octalPermissionValue = "750";
     String octalExpectedPermissions = "rwxr-x---";
-    conf.set("ozone.metadata.dirs.permissions", octalPermissionValue);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS,
+        octalPermissionValue);
 
     // Get the directory using ServerUtils method
     File directory =
@@ -127,14 +130,15 @@ public class TestServerUtils {
     String filePath = folder.getRoot().getAbsolutePath();
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    String key = "ozone.metadata.dirs";
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
     String componentName = "Ozone";
     conf.set(key, filePath);
 
     // Set symbolic permissions
     String symbolicPermissionValue = "rwx------";
     String symbolicExpectedPermissions = "rwx------";
-    conf.set("ozone.metadata.dirs.permissions", symbolicPermissionValue);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS,
+        symbolicPermissionValue);
 
     File directory =
         ServerUtils.getDirectoryFromConfig(conf, key, componentName);
@@ -163,7 +167,7 @@ public class TestServerUtils {
 
     // Create an OzoneConfiguration object
     OzoneConfiguration conf = new OzoneConfiguration();
-    String key = "ozone.metadata.dirs";
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
     String componentName = "Ozone";
     conf.set(key, dir1.getAbsolutePath() + "," + dir2.getAbsolutePath());
 
@@ -178,7 +182,7 @@ public class TestServerUtils {
   public void testGetDirectoryFromConfigWithNoDirectory() {
     // Create an empty OzoneConfiguration object
     OzoneConfiguration conf = new OzoneConfiguration();
-    String key = "ozone.metadata.dirs";
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
     String componentName = "Ozone";
 
     // Get the directory using ServerUtils method

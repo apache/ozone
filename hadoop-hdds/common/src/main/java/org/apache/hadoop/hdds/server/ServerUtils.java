@@ -159,8 +159,10 @@ public final class ServerUtils {
   }
 
   /**
-   * Utility method to get value of a given key that corresponds to a DB
-   * directory.
+   * Utility method to retrieve the value of a key representing a DB directory
+   * and create a File object for the directory. The method also sets the
+   * directory permissions based on the configuration.
+   *
    * @param conf configuration bag
    * @param key Key to test
    * @param componentName Which component's key is this

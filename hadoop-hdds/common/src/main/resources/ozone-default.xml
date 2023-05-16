@@ -673,7 +673,7 @@
     <name>ozone.om.db.dirs.permissions</name>
     <value>750</value>
     <description>
-      Permissions for the metadata directories for Ozone Manager The
+      Permissions for the metadata directories for Ozone Manager. The
       permissions have to be octal or symbolic. If the default permissions are not set
       then the default value of 750 will be used.
     </description>
@@ -742,7 +742,7 @@
     <name>ozone.scm.db.dirs.permissions</name>
     <value>750</value>
     <description>
-      Permissions for the metadata directories for Storage Container Manager The
+      Permissions for the metadata directories for Storage Container Manager. The
       permissions can either be octal or symbolic. If the default permissions are not set
       then the default value of 750 will be used.
     </description>
@@ -2798,7 +2798,7 @@
     <name>ozone.recon.db.dirs.permissions</name>
     <value>750</value>
     <description>
-      Permissions for the metadata directories for Recon The
+      Permissions for the metadata directories for Recon. The
       permissions can either be octal or symbolic. If the default permissions are not set
       then the default value of 750 will be used.
     </description>
