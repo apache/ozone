@@ -207,6 +207,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
                   sequenceNumber.toString(), type)));
       nextKey = Optional.of(new KeyValue(key.get(), sequenceNumber, type, val));
     } catch (IOException e) {
+      // TODO [Snapshot] : Throw custom snapshot exception
       throw new RuntimeIOException(e);
     }
     return getTransformedValue(currentKey);
