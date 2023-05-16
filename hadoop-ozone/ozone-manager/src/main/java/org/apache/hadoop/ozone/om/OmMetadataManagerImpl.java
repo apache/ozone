@@ -372,22 +372,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // metadata constructor for snapshots
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
       boolean isSnapshotInCache) throws IOException {
-    lock = new OmReadOnlyLock();
-    omEpoch = 0;
-    String snapshotDir = OMStorage.getOmDbDir(conf) +
-        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
-    File metaDir = new File(snapshotDir);
-    String dbName = OM_DB_NAME + snapshotDirName;
-    // The check is only to prevent every snapshot read to perform a disk IO
-    // and check if a checkpoint dir exists. If entry is present in cache,
-    // it is most likely DB entries will get flushed in this wait time.
-    if (isSnapshotInCache) {
-      File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
-      RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
+    try {
+      lock = new OmReadOnlyLock();
+      omEpoch = 0;
+      String snapshotDir = OMStorage.getOmDbDir(conf) +
+          OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
+      File metaDir = new File(snapshotDir);
+      String dbName = OM_DB_NAME + snapshotDirName;
+      // The check is only to prevent every snapshot read to perform a disk IO
+      // and check if a checkpoint dir exists. If entry is present in cache,
+      // it is most likely DB entries will get flushed in this wait time.
+      if (isSnapshotInCache) {
+        File checkpoint =
+            Paths.get(metaDir.toPath().toString(), dbName).toFile();
+        RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
+      }
+      setStore(loadDB(conf, metaDir, dbName, false,
+          java.util.Optional.of(Boolean.TRUE), false));
+      initializeOmTables(false);
+    } catch (IOException e) {
+      stop();
+      throw e;
     }
-    setStore(loadDB(conf, metaDir, dbName, false,
-            java.util.Optional.of(Boolean.TRUE), false));
-    initializeOmTables(false);
   }
 
   @Override

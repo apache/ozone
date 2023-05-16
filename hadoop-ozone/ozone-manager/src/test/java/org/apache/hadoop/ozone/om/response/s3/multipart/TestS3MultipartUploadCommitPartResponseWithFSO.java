@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -149,7 +151,9 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
         omMetadataManager.getDeletedTable()));
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), multipartKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));
@@ -203,9 +207,10 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
             parentID, fileName, clientId);
 
+    String keyNameInvalid = keyName + "invalid";
     S3MultipartUploadCommitPartResponse s3MultipartUploadCommitPartResponse =
             createS3CommitMPUResponseFSO(volumeName, bucketName, parentID,
-                    keyName + "invalid", multipartUploadID,
+                    keyNameInvalid, multipartUploadID,
                     omMultipartKeyInfo.getPartKeyInfo(1),
                     omMultipartKeyInfo, OzoneManagerProtocolProtos.Status
                             .NO_SUCH_MULTIPART_UPLOAD_ERROR, openKey);
@@ -223,9 +228,13 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     // openkey entry should be there in delete table.
     Assert.assertEquals(1, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
-
-    Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
-            openKey));
+    String deletedKey = omMetadataManager
+        .getMultipartKey(volumeName, bucketName, keyNameInvalid,
+            multipartUploadID);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, deletedKey);
+    Assert.assertTrue(rangeKVs.size() > 0);
   }
 
   private String getKeyName() {

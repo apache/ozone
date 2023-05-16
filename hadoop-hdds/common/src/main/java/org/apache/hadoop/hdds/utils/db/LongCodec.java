@@ -27,6 +27,12 @@ import java.util.function.IntFunction;
  * Codec to convert Long to/from byte array.
  */
 public final class LongCodec implements Codec<Long> {
+  private static final LongCodec CODEC = new LongCodec();
+
+  public static LongCodec get() {
+    return CODEC;
+  }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

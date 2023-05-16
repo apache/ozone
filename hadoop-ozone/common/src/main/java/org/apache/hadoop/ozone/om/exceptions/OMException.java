@@ -262,7 +262,7 @@ public class OMException extends IOException {
     INVALID_SNAPSHOT_ERROR,
     CONTAINS_SNAPSHOT,
     SSL_CONNECTION_FAILURE,
-
+    RENAME_OPEN_FILE,
     S3_SECRET_ALREADY_EXISTS
   }
 }

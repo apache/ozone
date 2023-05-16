@@ -575,14 +575,24 @@ public final class OzoneConfigKeys {
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
 
+
+  // Values for bucket layout configurations.
+  public static final String OZONE_BUCKET_LAYOUT_LEGACY =
+      "LEGACY";
+  public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+      "FILE_SYSTEM_OPTIMIZED";
+  public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
+      "OBJECT_STORE";
+
   public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
       "ozone.client.fs.default.bucket.layout";
-
   public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
-      "FILE_SYSTEM_OPTIMIZED";
+      OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
 
-  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY =
-      "LEGACY";
+  public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY =
+      "ozone.s3g.default.bucket.layout";
+  public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT =
+      OZONE_BUCKET_LAYOUT_OBJECT_STORE;
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";

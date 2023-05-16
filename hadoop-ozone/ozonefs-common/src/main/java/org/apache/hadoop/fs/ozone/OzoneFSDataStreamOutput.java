@@ -50,6 +50,12 @@ public class OzoneFSDataStreamOutput extends OutputStream
     byteBufferStreamOutput.write(b, off, len);
   }
 
+  @Override
+  public void write(byte[] b, int off, int len)
+      throws IOException {
+    write(ByteBuffer.wrap(b));
+  }
+
   /**
    * Writes the specified byte to this output stream. The general
    * contract for <code>write</code> is that one byte is written

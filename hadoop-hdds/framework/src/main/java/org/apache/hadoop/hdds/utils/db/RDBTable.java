@@ -75,6 +75,16 @@ class RDBTable implements Table<byte[], byte[]> {
     db.put(family, key, value);
   }
 
+  public void putWithBatch(BatchOperation batch, CodecBuffer key,
+      CodecBuffer value) throws IOException {
+    if (batch instanceof RDBBatchOperation) {
+      ((RDBBatchOperation) batch).put(family, key, value);
+    } else {
+      throw new IllegalArgumentException("Unexpected batch class: "
+          + batch.getClass().getSimpleName());
+    }
+  }
+
   @Override
   public void putWithBatch(BatchOperation batch, byte[] key, byte[] value)
       throws IOException {
