@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -219,14 +221,14 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
-  @Test
-  public void testUnderReplicatedDueToAllDecommissioning() {
-    Pair<HddsProtos.NodeOperationalState, Integer> state =
-        Pair.of(DECOMMISSIONING, 0);
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.container.replication.TestRatisContainerReplicaCount#outOfServiceStates")
+  void testUnderReplicatedDueToAllOutOfService(HddsProtos.NodeOperationalState state) {
+    Pair<HddsProtos.NodeOperationalState, Integer> pair = Pair.of(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        state, state, state);
+        pair, pair, pair);
 
     ContainerCheckRequest checkRequest = requestBuilder
         .setContainerReplicas(replicas)

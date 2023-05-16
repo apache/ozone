@@ -57,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TestRatisContainerReplicaCount {
 
-  static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
+  public static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
     return EnumSet.of(
         DECOMMISSIONING, DECOMMISSIONED,
         ENTERING_MAINTENANCE, IN_MAINTENANCE);
