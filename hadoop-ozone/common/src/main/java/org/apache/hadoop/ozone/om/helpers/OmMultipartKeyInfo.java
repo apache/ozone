@@ -36,7 +36,9 @@ import java.util.TreeMap;
  */
 public final class OmMultipartKeyInfo extends WithObjectID {
   /**
-   * An Array wrapper providing PartKeyInfo sorted by partNumber.
+   * An unmodifiable Array wrapper providing PartKeyInfo sorted by partNumber,
+   * Whenever a PartKeyInfo is added, it returns a new shallow copy of
+   * the PartKeyInfoMap instance.
    */
   public static class PartKeyInfoMap implements Iterable<PartKeyInfo> {
     static final Comparator<Object> PART_NUMBER_COMPARATOR = (o1, o2) -> {
@@ -94,7 +96,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
      * @return The PartKeyInfo with the specified part number.
      *         If no such PartKeyInfo exists, returns null.
      */
-    PartKeyInfo get(int partNumber) {
+    public PartKeyInfo get(int partNumber) {
       final int i = Collections.binarySearch(
           sorted, partNumber, PART_NUMBER_COMPARATOR);
       return i >= 0 ? sorted.get(i) : null;
@@ -107,6 +109,10 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     @Override
     public Iterator<PartKeyInfo> iterator() {
       return sorted.iterator();
+    }
+
+    public PartKeyInfo lastEntry() {
+      return sorted.get(size() - 1);
     }
   }
 
@@ -340,7 +346,8 @@ public final class OmMultipartKeyInfo extends WithObjectID {
   }
 
   public OmMultipartKeyInfo copyObject() {
-    // When PartKeyInfoMap is modified, a shallow copy will be created first,
+    // PartKeyInfoMap is an immutable data structure. Whenever a PartKeyInfo
+    // is added, it returns a new shallow copy of the PartKeyInfoMap Object
     // so here we can directly pass in partKeyInfoMap
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationConfig,
         partKeyInfoMap, objectID, updateID, parentID);
