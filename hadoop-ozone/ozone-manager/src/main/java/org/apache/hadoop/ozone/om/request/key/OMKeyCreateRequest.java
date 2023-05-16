@@ -95,7 +95,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
     // Verify key name
-    if (keyArgs.getKeyName().startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+    if (keyArgs.getKeyName().
+        startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
       throw new OMException("Cannot create key under path reserved for "
           + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
           OMException.ResultCodes.INVALID_KEY_NAME);

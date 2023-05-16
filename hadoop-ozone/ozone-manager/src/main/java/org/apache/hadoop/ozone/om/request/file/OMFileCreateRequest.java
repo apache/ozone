@@ -30,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -95,7 +96,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
     // Verify key name
-    if (keyArgs.getKeyName().startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+    if (keyArgs.getKeyName()
+        .startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
       throw new OMException("Cannot create key under path reserved for "
           + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
           OMException.ResultCodes.INVALID_KEY_NAME);
