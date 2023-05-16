@@ -46,8 +46,8 @@ interface IInsightsState {
   isLoading: boolean;
   fileCountsResponse: IFileCountResponse[];
   containerCountResponse: IContainerCountResponse[];
-  plotData: Plotly.Data[];
-  containerData: Plotly.Data[];
+  fileCountData: Plotly.Data[];
+  containerCountData: Plotly.Data[];
   volumeBucketMap: Map<string, Set<string>>;
   selectedVolumes: IOption[];
   selectedBuckets: IOption[];
@@ -73,8 +73,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       isLoading: false,
       fileCountsResponse: [],
       containerCountResponse: [],
-      plotData: [],
-      containerData: [],
+      fileCountData: [],
+      containerCountData: [],
       volumeBucketMap: new Map<string, Set<string>>(),
       selectedBuckets: [],
       selectedVolumes: [],
@@ -148,7 +148,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         filteredData = filteredData.filter(item => selectedBucketValues.has(item.bucket));
       }
 
-      const xyMap: Map<number, number> = filteredData.reduce(
+      const xyFileCountMap: Map<number, number> = filteredData.reduce(
         (map: Map<number, number>, current) => {
           const fileSize = current.fileSize;
           const oldCount = map.has(fileSize) ? map.get(fileSize)! : 0;
@@ -157,7 +157,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         }, new Map<number, number>());
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
-      const xValues = Array.from(xyMap.keys()).map(value => {
+      const xFileCountValues = Array.from(xyFileCountMap.keys()).map(value => {
         const upperbound = size(value);
         const upperboundPower = Math.log2(value);
         // For 1024 which is 2^10, the lowerbound is 0, since we start binning
@@ -166,16 +166,16 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return `${lowerbound} - ${upperbound}`;
       });
       
-      const xyConatainerCountMap: Map<number, number> = containerCountResponse.reduce(
+      const xyContainerCountMap: Map<number, number> = containerCountResponse.reduce(
         (map: Map<number, number>, current) => {
-          const fileSize = current.containerSize;
-          const oldCount = map.has(fileSize) ? map.get(fileSize)! : 0;
-          map.set(fileSize, oldCount + current.count);
+          const containerSize = current.containerSize;
+          const oldCount = map.has(containerSize) ? map.get(containerSize)! : 0;
+          map.set(containerSize, oldCount + current.count);
           return map;
         }, new Map<number, number>());
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
-      const xContainerCountValues = Array.from(xyConatainerCountMap.keys()).map(value => {
+      const xContainerCountValues = Array.from(xyContainerCountMap.keys()).map(value => {
         const upperbound = size(value);
         const upperboundPower = Math.log2(value);
         // For 1024 which is 2^10, the lowerbound is 0, since we start binning
@@ -185,22 +185,22 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
 
       let keysize = [];
-      keysize = Array.from(xyConatainerCountMap.keys()).map(value => {
+      keysize = Array.from(xyContainerCountMap.keys()).map(value => {
         return (size(value) );
       });
 
       this.setState({
-        plotData: [{
+        fileCountData: [{
           type: 'bar',
-          x: xValues,
-          y: Array.from(xyMap.values()),
+          x: xFileCountValues,
+          y: Array.from(xyFileCountMap.values()),
           name: 'file count'
         }],
-        containerData: [{
+        containerCountData: [{
           type: 'pie',
           hole: 0.2,
-          values: Array.from(xyConatainerCountMap.values()),  
-          customdata: Array.from(xyConatainerCountMap.values()),
+          values: Array.from(xyContainerCountMap.values()),  
+          customdata: Array.from(xyContainerCountMap.values()),
           labels: xContainerCountValues, 
           text: keysize,
           hovertemplate: 'Container Count: %{customdata}<br>Container Size: %{text}<extra></extra>'
@@ -263,8 +263,8 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   render() {
-    const {plotData, isLoading, selectedBuckets, volumeOptions,
-      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled, containerCountResponse, containerData} = this.state;
+    const {fileCountData, isLoading, selectedBuckets, volumeOptions,
+      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled, containerCountResponse, containerCountData} = this.state;
     return (
       <div className='insights-container'>
         <div className='page-header'>
@@ -319,7 +319,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                         <Row>
                           <Col>
                             <Plot
-                              data={plotData}
+                              data={fileCountData}
                               layout={
                                 {
                                   width: 800,
@@ -344,7 +344,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                         <Row>
                           <Col>
                             <Plot
-                              data={containerData}
+                              data={containerCountData}
                               layout={
                                 {
                                   width: 850,
@@ -360,7 +360,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                           </Col>
                         </Row>
                       </div> :
-                      <div>No data to visualize Container size distribution. Add files to Ozone to see a visualization on Container size distribution.</div>)}
+                      <div>No data to visualize container size distribution. Add files to Ozone to see a visualization on container size distribution.</div>)}
                 </div>
               }
             </TabPane>
