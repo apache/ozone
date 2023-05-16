@@ -248,7 +248,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
 
   @Override
-  public List<String> getRatisRoles() throws IOException {
+  public List<String> getRatisRoles() {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     RaftPeer leader = getLeader();
     List<String> ratisRoles = new ArrayList<>();
@@ -266,7 +266,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
                   .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress.getHostAddress()))));
+                  .concat(":".concat(peerInetAddress == null ? "" :
+                      peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

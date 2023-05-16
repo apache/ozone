@@ -179,9 +179,15 @@ public final class OzoneConfigKeys {
       "ozone.administrators.groups";
 
   public static final String OZONE_S3_ADMINISTRATORS =
-          "ozone.s3.administrators";
+      "ozone.s3.administrators";
   public static final String OZONE_S3_ADMINISTRATORS_GROUPS =
-          "ozone.s3.administrators.groups";
+      "ozone.s3.administrators.groups";
+
+  public static final String OZONE_READONLY_ADMINISTRATORS =
+      "ozone.readonly.administrators";
+  public static final String OZONE_READONLY_ADMINISTRATORS_GROUPS =
+      "ozone.readonly.administrators.groups";
+
   /**
    * Used only for testing purpose. Results in making every user an admin.
    * */
@@ -569,14 +575,24 @@ public final class OzoneConfigKeys {
       OZONE_CLIENT_BUCKET_REPLICATION_CONFIG_REFRESH_PERIOD_DEFAULT_MS =
       300 * 1000;
 
+
+  // Values for bucket layout configurations.
+  public static final String OZONE_BUCKET_LAYOUT_LEGACY =
+      "LEGACY";
+  public static final String OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED =
+      "FILE_SYSTEM_OPTIMIZED";
+  public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
+      "OBJECT_STORE";
+
   public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
       "ozone.client.fs.default.bucket.layout";
-
   public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
-      "FILE_SYSTEM_OPTIMIZED";
+      OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
 
-  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY =
-      "LEGACY";
+  public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY =
+      "ozone.s3g.default.bucket.layout";
+  public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT =
+      OZONE_BUCKET_LAYOUT_OBJECT_STORE;
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_OMAUDIT =
       "ozone.audit.log.debug.cmd.list.omaudit";
@@ -599,11 +615,6 @@ public final class OzoneConfigKeys {
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
       "org.apache.hadoop.ozone.om.TrashPolicyOzone";
 
-
-  public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
-      "ozone.om.snapshot.cache.max.size";
-  public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
-
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
       "ozone.om.snapshot.compaction.dag.max.time.allowed";
@@ -620,15 +631,16 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);
 
-  public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
-      "ozone.om.snapshot.force.full.diff";
-
-  public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
-
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
       "ozone.om.delta.update.data.size.max.limit";
   public static final String
       OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT = "1024MB";
+
+  public static final TimeDuration
+      OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION_DEFAULT =
+      TimeDuration.valueOf(150, TimeUnit.SECONDS);
+  public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
+      "ozone.scm.close.container.wait.duration";
 
   /**
    * There is no need to instantiate this class.

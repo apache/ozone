@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.utils.db;
 /**
  * Codec to convert byte array to/from byte array.
  */
-public class ByteArrayCodec implements Codec<byte[]> {
+public final class ByteArrayCodec implements Codec<byte[]> {
 
   @Override
   public byte[] toPersistedFormat(byte[] bytes) {

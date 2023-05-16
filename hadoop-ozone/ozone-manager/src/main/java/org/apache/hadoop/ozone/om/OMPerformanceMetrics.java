@@ -83,6 +83,8 @@ public class OMPerformanceMetrics {
   @Metric(about = "Client requests forcing container info cache refresh")
   private MutableRate forceContainerCacheRefresh;
 
+  @Metric(about = "checkAccess latency in nanoseconds")
+  private MutableRate checkAccessLatencyNs;
 
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
@@ -139,5 +141,9 @@ public class OMPerformanceMetrics {
 
   public void setForceContainerCacheRefresh(boolean value) {
     forceContainerCacheRefresh.add(value ? 1L : 0L);
+  }
+
+  public void setCheckAccessLatencyNs(long latencyInNs) {
+    checkAccessLatencyNs.add(latencyInNs);
   }
 }

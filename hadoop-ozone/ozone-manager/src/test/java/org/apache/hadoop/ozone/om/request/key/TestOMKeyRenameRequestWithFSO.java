@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -74,13 +75,38 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         toKeyParentInfo.getObjectID(), "toKey");
   }
 
+  @Test
+  public void testRenameOpenFile() throws Exception {
+    fromKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
+        String.valueOf(1234));
+    addKeyToTable(fromKeyInfo);
+    OMRequest modifiedOmRequest =
+        doPreExecute(createRenameKeyRequest(
+            volumeName, bucketName, fromKeyName, toKeyName));
+    OMKeyRenameRequest omKeyRenameRequest =
+        getOMKeyRenameRequest(modifiedOmRequest);
+    OMClientResponse response =
+            omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
+        response.getOMResponse().getStatus());
+  }
+
   @Override
   @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
-    String invalidToKeyName = "";
+    String invalidToKeyName = "invalid:";
     Assert.assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, fromKeyName, invalidToKeyName)));  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithEmptyToKey() throws Exception {
+    String emptyToKeyName = "";
+    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName,
+        bucketName, fromKeyName, emptyToKeyName));
+    Assert.assertEquals(omRequest.getRenameKeyRequest().getToKeyName(), "");
+  }
 
   @Override
   @Test
@@ -133,10 +159,11 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   }
 
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
-    OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(originalOmRequest, getBucketLayout());
+    OMKeyRenameRequestWithFSO omKeyRenameRequestWithFSO =
+        new OMKeyRenameRequestWithFSO(originalOmRequest, getBucketLayout());
 
-    OMRequest modifiedOmRequest = omKeyRenameRequest.preExecute(ozoneManager);
+    OMRequest modifiedOmRequest
+        = omKeyRenameRequestWithFSO.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set and modification time is
     // set in KeyArgs.

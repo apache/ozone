@@ -1,5 +1,6 @@
 dependencies:
   '@babel/core': 7.10.2
+  '@fontsource/roboto': 4.5.8
   '@types/classnames': 2.2.10
   '@types/jest': 24.0.12
   '@types/node': 11.13.9
@@ -1980,6 +1981,10 @@ packages:
     dev: false
     resolution:
       integrity: sha512-6U71C2Wp7r5XtFtQzYrW5iKFT67OixrSxjI4MptCHzdSVlgabczzqLe0ZSgnub/5Kp4hSbpDB1tMytZY9pwxxA==
+  /@fontsource/roboto/4.5.8:
+    dev: false
+    resolution:
+      integrity: sha512-CnD7zLItIzt86q4Sj3kZUiLcBk1dSk81qcqgMGaZe7SQ1P8hFNxhMl5AZthK1zrDM5m74VVhaOpuMGIL4gagaA==
   /@hapi/address/2.1.4:
     dev: false
     resolution:
@@ -17122,6 +17127,7 @@ packages:
       integrity: sha1-xWK9MRNkPzRDokXRJAa4i2m5qf8=
 specifiers:
   '@babel/core': ^7.0.0
+  '@fontsource/roboto': ^4.5.8
   '@types/classnames': ^2.2.10
   '@types/jest': 24.0.12
   '@types/node': 11.13.9

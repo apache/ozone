@@ -220,7 +220,7 @@ public class BlockDeletingService extends BackgroundService {
           long minReplicatedIndex =
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
-          if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
+          if (minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "

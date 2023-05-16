@@ -18,20 +18,17 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -218,18 +215,7 @@ public class MiniOzoneClusterProvider {
         MiniOzoneCluster cluster = null;
         try {
           builder.setClusterId(UUID.randomUUID().toString());
-
-          OzoneConfiguration newConf = new OzoneConfiguration(conf);
-          List<Integer> portList = getFreePortList(4);
-          newConf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
-              "127.0.0.1:" + portList.get(0));
-          newConf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY,
-              "127.0.0.1:" + portList.get(1));
-          newConf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
-              "127.0.0.1:" + portList.get(2));
-          newConf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY,
-              portList.get(3));
-          builder.setConf(newConf);
+          builder.setConf(new OzoneConfiguration(conf));
 
           cluster = builder.build();
           cluster.waitForClusterToBeReady();
@@ -277,10 +263,4 @@ public class MiniOzoneClusterProvider {
     createdClusters.clear();
   }
 
-  private List<Integer> getFreePortList(int size) {
-    return org.apache.ratis.util.NetUtils.createLocalServerAddress(size)
-        .stream()
-        .map(inetSocketAddress -> inetSocketAddress.getPort())
-        .collect(Collectors.toList());
-  }
 }

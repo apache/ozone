@@ -26,7 +26,12 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -36,6 +41,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -135,12 +142,24 @@ public class DBCheckpointServlet extends HttpServlet {
 
     DBCheckpoint checkpoint = null;
     try {
-
       boolean flush = false;
       String flushParam =
           request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
       if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.valueOf(flushParam);
+        flush = Boolean.parseBoolean(flushParam);
+      }
+
+      List<String> receivedSstList = new ArrayList<>();
+      List<String> excludedSstList = new ArrayList<>();
+      String[] sstParam = request.getParameterValues(
+          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
+      if (sstParam != null) {
+        receivedSstList.addAll(
+            Arrays.stream(sstParam)
+            .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+            .distinct()
+            .collect(Collectors.toList()));
+        LOG.info("Received excluding SST {}", receivedSstList);
       }
 
       checkpoint = dbStore.getCheckpoint(flush);
@@ -164,12 +183,20 @@ public class DBCheckpointServlet extends HttpServlet {
 
       Instant start = Instant.now();
       writeDbDataToStream(checkpoint, request,
-          response.getOutputStream());
+          response.getOutputStream(), receivedSstList, excludedSstList);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+
+      LOG.info("Excluded SST {} from the latest checkpoint.",
+          excludedSstList);
+      if (!excludedSstList.isEmpty()) {
+        dbMetrics.incNumIncrementalCheckpoint();
+      }
+      dbMetrics.setLastCheckpointStreamingNumSSTExcluded(
+          excludedSstList.size());
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
       dbMetrics.incNumCheckpoints();
     } catch (Exception e) {
@@ -196,12 +223,20 @@ public class DBCheckpointServlet extends HttpServlet {
    * @param ignoredRequest The httpRequest which generated this checkpoint.
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
+   * @param toExcludeList the files to be excluded
+   * @param excludedList  the files excluded
+   *
    */
   public void writeDbDataToStream(DBCheckpoint checkpoint,
-                                  HttpServletRequest ignoredRequest,
-                                  OutputStream destination)
+      HttpServletRequest ignoredRequest,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList)
       throws IOException, InterruptedException {
-    writeDBCheckpointToStream(checkpoint, destination);
-  }
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
 
+    writeDBCheckpointToStream(checkpoint, destination,
+        toExcludeList, excludedList);
+  }
 }

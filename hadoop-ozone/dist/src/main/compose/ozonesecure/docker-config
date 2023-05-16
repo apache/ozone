@@ -22,12 +22,6 @@ CORE-SITE.XML_hadoop.proxyuser.httpfs.groups=*
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
-# TODO: HDDS-7495
-#   S3 security tests need object store layout from s3 gateway. Other tests on
-#   this cluster use `ozone fs`. The config to set an S3 gateway specific bucket
-#   layout will be added in HDDS-7495. Until then, the server side default must
-#   be changed for all tests on this cluster to work.
-OZONE-SITE.XML_ozone.default.bucket.layout=LEGACY
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
@@ -79,11 +73,10 @@ OZONE-SITE.XML_ozone.httpfs.kerberos.keytab.file=/etc/security/keytabs/httpfs.ke
 OZONE-SITE.XML_ozone.httpfs.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
 
 OZONE-SITE.XML_hdds.scm.replication.thread.interval=5s
-OZONE-SITE.XML_hdds.scm.replication.enable.legacy=false
 OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.container.report.interval=60s
-OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
+OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
@@ -183,3 +176,6 @@ OZONE-SITE.XML_ozone.om.multitenancy.ranger.sync.timeout=10s
 # change or let all OMs write to AccessController if this dev flag is set.
 #
 OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger=true
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

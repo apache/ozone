@@ -105,6 +105,8 @@ public class RocksDBStoreMetrics implements MetricsSource {
   private static final String NUM_FILES_AT_LEVEL = "num_files_at_level";
   private static final String SIZE_AT_LEVEL = "size_at_level";
 
+  private static final String LAST_SEQUENCE_NUMBER = "last_sequence_number";
+
   public RocksDBStoreMetrics(Statistics statistics, RocksDatabase db,
       String dbName) {
     this.contextName = ROCKSDB_CONTEXT_PREFIX + dbName;
@@ -130,7 +132,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     MetricsSource metricsSource = ms.getSource(metrics.contextName);
     if (metricsSource != null) {
-      return (RocksDBStoreMetrics)metricsSource;
+      return (RocksDBStoreMetrics) metricsSource;
     } else {
       return ms.register(metrics.contextName, "RocksDB Metrics", metrics);
     }
@@ -147,6 +149,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
     getHistogramData(rb);
     getTickerTypeData(rb);
     getDBPropertyData(rb);
+    getLatestSequenceNumber(rb);
   }
 
   /**
@@ -168,7 +171,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
         try {
           Method method =
               HistogramData.class.getMethod("get" + histogramAttribute);
-          double metricValue =  (double) method.invoke(histogram);
+          double metricValue = (double) method.invoke(histogram);
           rb.addGauge(Interns.info(histogramType.name() + "_" +
                   histogramAttribute.toUpperCase(), "RocksDBStat"),
               metricValue);
@@ -247,7 +250,7 @@ public class RocksDBStoreMetrics implements MetricsSource {
     Map<Integer, Map<String, Long>> sizeStatPerCF = new HashMap<>();
     Map<String, Long> numStat;
     Map<String, Long> sizeStat;
-    for (LiveFileMetaData file: liveFileMetaDataList) {
+    for (LiveFileMetaData file : liveFileMetaDataList) {
       numStat = numStatPerCF.get(file.level());
       String cf = Strings.fromByteArray(file.columnFamilyName());
       if (numStat != null) {
@@ -281,10 +284,15 @@ public class RocksDBStoreMetrics implements MetricsSource {
     for (Map.Entry<Integer, Map<String, Long>> entry: numStatPerCF.entrySet()) {
       numStat = entry.getValue();
       numStat.forEach((cf, v) -> rb.addCounter(Interns.info(
-            cf + "_" + metricName + entry.getKey(), "RocksDBProperty"), v));
+          cf + "_" + metricName + entry.getKey(), "RocksDBProperty"), v));
       rb.addCounter(
           Interns.info(metricName + entry.getKey(), "RocksDBProperty"),
           numStat.values().stream().mapToLong(p -> p.longValue()).sum());
     }
+  }
+
+  private void getLatestSequenceNumber(MetricsRecordBuilder rb) {
+    rb.addCounter(Interns.info(LAST_SEQUENCE_NUMBER, "RocksDBStat"),
+        rocksDB.getLatestSequenceNumber());
   }
 }

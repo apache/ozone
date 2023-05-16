@@ -102,15 +102,15 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       // multipart upload. So, delete this part information.
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(openKey);
-
-      repeatedOmKeyInfo =
           OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
-          repeatedOmKeyInfo, openPartKeyInfoToBeDeleted.getUpdateID(),
+              openPartKeyInfoToBeDeleted.getUpdateID(),
               isRatisEnabled);
+      // multi-part key format is volumeName/bucketName/keyName/uploadId
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          openPartKeyInfoToBeDeleted.getObjectID(), multipartKey);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          openKey, repeatedOmKeyInfo);
+          deleteKey, repeatedOmKeyInfo);
     }
 
     if (getOMResponse().getStatus() == OK) {
@@ -135,15 +135,15 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       OmKeyInfo partKeyToBeDeleted =
           OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
 
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable()
-              .get(oldPartKeyInfo.getPartName());
-
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKeyToBeDeleted,
-          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          partKeyToBeDeleted,
+          omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
+      // multi-part key format is volumeName/bucketName/keyName/uploadId
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          partKeyToBeDeleted.getObjectID(), multipartKey);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          oldPartKeyInfo.getPartName(), repeatedOmKeyInfo);
+          deleteKey, repeatedOmKeyInfo);
     }
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,

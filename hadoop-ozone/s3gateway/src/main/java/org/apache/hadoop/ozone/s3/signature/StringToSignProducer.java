@@ -20,17 +20,14 @@ package org.apache.hadoop.ozone.s3.signature;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
 import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
@@ -56,13 +54,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class StringToSignProducer {
 
-  public static final String X_AMZ_CONTENT_SHA256 = "X-Amz-Content-SHA256";
-  public static final String X_AMAZ_DATE = "X-Amz-Date";
+  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
+  public static final String X_AMAZ_DATE = "x-amz-date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
-  private static final String HOST = "host";
+  public static final String HOST = "host";
   private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
@@ -116,6 +114,10 @@ public final class StringToSignProducer {
     uri = (uri.trim().length() > 0) ? uri : "/";
     // Encode URI and preserve forward slashes
     strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
+    if (signatureInfo.getDateTime() == null) {
+      LOG.error("DateTime Header not found.");
+      throw S3_AUTHINFO_CREATION_ERROR;
+    }
     strToSign.append(signatureInfo.getDateTime() + NEWLINE);
     strToSign.append(credentialScope + NEWLINE);
 
@@ -183,19 +185,38 @@ public final class StringToSignProducer {
         canonicalHeaders.append(NEWLINE);
 
         // Set for testing purpose only to skip date and host validation.
-        validateSignedHeader(schema, header, headerValue);
+        try {
+          validateSignedHeader(schema, header, headerValue);
+        } catch (DateTimeParseException ex) {
+          LOG.error("DateTime format invalid.", ex);
+          throw S3_AUTHINFO_CREATION_ERROR;
+        }
 
       } else {
-        throw new RuntimeException("Header " + header + " not present in " +
-            "request but requested to be signed.");
+        LOG.error("Header " + header + " not present in "
+            + "request but requested to be signed.");
+        throw S3_AUTHINFO_CREATION_ERROR;
       }
     }
+
+    validateCanonicalHeaders(canonicalHeaders.toString(), headers,
+        unsignedPayload);
 
     String payloadHash;
     if (UNSIGNED_PAYLOAD.equals(
         headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
+      // According to AWS Sig V4 documentation
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/
+      // sig-v4-header-based-auth.html
+      // Note: The x-amz-content-sha256 header is required
+      // for all AWS Signature Version 4 requests.(using Authorization header)
+      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
+        LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
+            + " header for signed payload");
+        throw S3_AUTHINFO_CREATION_ERROR;
+      }
       payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
     }
     String canonicalRequest = method + NEWLINE
@@ -269,7 +290,6 @@ public final class StringToSignProducer {
     StringBuilder result = new StringBuilder();
     for (String p : params) {
       if (!p.equals("X-Amz-Signature")) {
-
         if (result.length() > 0) {
           result.append("&");
         }
@@ -287,29 +307,19 @@ public final class StringToSignProducer {
       String schema,
       String header,
       String headerValue
-  )
-      throws OS3Exception {
+  ) throws OS3Exception, DateTimeParseException {
     switch (header) {
     case HOST:
-      try {
-        URI hostUri = new URI(schema + "://" + headerValue);
-        InetAddress.getByName(hostUri.getHost());
-        // TODO: Validate if current request is coming from same host.
-      } catch (UnknownHostException | URISyntaxException e) {
-        LOG.error("Host value mentioned in signed header is not valid. " +
-            "Host:{}", headerValue);
-        throw S3_AUTHINFO_CREATION_ERROR;
-      }
       break;
     case X_AMAZ_DATE:
-      LocalDate date = LocalDate.parse(headerValue, TIME_FORMATTER);
-      LocalDate now = LocalDate.now();
+      LocalDateTime date = LocalDateTime.parse(headerValue, TIME_FORMATTER);
+      LocalDateTime now = LocalDateTime.now();
       if (date.isBefore(now.minus(PRESIGN_URL_MAX_EXPIRATION_SECONDS, SECONDS))
           || date.isAfter(now.plus(PRESIGN_URL_MAX_EXPIRATION_SECONDS,
           SECONDS))) {
-        LOG.error("AWS date not in valid range. Request timestamp:{} should " +
-                "not be older than {} seconds.", headerValue,
-            PRESIGN_URL_MAX_EXPIRATION_SECONDS);
+        LOG.error("AWS date not in valid range. Request timestamp:{} should "
+            + "not be older than {} seconds.",
+            headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
         throw S3_AUTHINFO_CREATION_ERROR;
       }
       break;
@@ -318,6 +328,37 @@ public final class StringToSignProducer {
       break;
     default:
       break;
+    }
+  }
+
+  /**
+   * According to AWS Sig V4 documentation:
+   * https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
+   * The CanonicalHeaders list must include the following:
+   * HTTP host header..
+   * Any x-amz-* headers that you plan to include
+   * in your request must also be added.
+   *
+   * @param canonicalHeaders
+   * @param headers
+   */
+  private static void validateCanonicalHeaders(
+      String canonicalHeaders,
+      Map<String, String> headers,
+      Boolean unsignedPaylod
+  ) throws OS3Exception {
+    if (!canonicalHeaders.contains(HOST + ":")) {
+      LOG.error("The SignedHeaders list must include HTTP Host header");
+      throw S3_AUTHINFO_CREATION_ERROR;
+    }
+    for (String header : headers.keySet().stream()
+        .filter(s -> s.startsWith("x-amz-"))
+        .collect(Collectors.toSet())) {
+      if (!(canonicalHeaders.contains(header + ":"))) {
+        LOG.error("The SignedHeaders list must include all "
+            + "x-amz-* headers in the request");
+        throw S3_AUTHINFO_CREATION_ERROR;
+      }
     }
   }
 

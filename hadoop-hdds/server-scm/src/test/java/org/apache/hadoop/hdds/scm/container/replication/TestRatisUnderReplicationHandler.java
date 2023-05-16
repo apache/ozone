@@ -41,19 +41,28 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.times;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -79,15 +88,18 @@ public class TestRatisUnderReplicationHandler {
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
     replicationManager = Mockito.mock(ReplicationManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
     Mockito.when(replicationManager.getConfig())
-        .thenReturn(new ReplicationManagerConfiguration());
+        .thenReturn(ozoneConfiguration.getObject(
+            ReplicationManagerConfiguration.class));
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
       DatanodeDetails, and NodeState as HEALTHY.
     */
     Mockito.when(
-        replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+        replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
           return new NodeStatus(dn.getPersistedOpState(),
@@ -96,7 +108,7 @@ public class TestRatisUnderReplicationHandler {
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent);
+        replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
         commandsSent);
   }
@@ -253,13 +265,120 @@ public class TestRatisUnderReplicationHandler {
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
         testProcessing(replicas, Collections.emptyList(),
-            getUnderReplicatedHealthResult(), 2, 1);
-    Assert.assertEquals(1, commands.size());
-    Pair<DatanodeDetails, SCMCommand<?>> command = commands.stream()
-        .findFirst().get();
-
-    Assert.assertEquals(closedReplica.getDatanodeDetails(), command.getKey());
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertEquals(closedReplica.getDatanodeDetails(),
+            command.getKey()));
   }
+
+  /**
+   * Tests that a CLOSED RATIS container with 2 CLOSED replicas and 1
+   * UNHEALTHY replica is correctly seen as under replicated. And, under
+   * replication is fixed by sending a command to replicate either of the
+   * CLOSED replicas.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica()
+      throws IOException {
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 1);
+    commands.forEach(
+        command -> Assert.assertNotEquals(unhealthyReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
+  @Test
+  public void testOnlyHighestBcsidShouldBeASource() throws IOException {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1));
+    ContainerReplica valid = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.CLOSED, 2);
+    replicas.add(valid);
+
+    testProcessing(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2, 1);
+
+    // Ensure that the replica with SEQ=2 is the only source sent
+    Mockito.verify(replicationManager).sendThrottledReplicationCommand(
+        any(ContainerInfo.class),
+        Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
+        any(DatanodeDetails.class), anyInt());
+  }
+
+  @Test
+  public void testCorrectUsedAndExcludedNodesPassed() throws IOException {
+    PlacementPolicy mockPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(mockPolicy.chooseDatanodes(any(), any(), any(),
+        anyInt(), anyLong(), anyLong()))
+        .thenReturn(Collections.singletonList(
+            MockDatanodeDetails.randomDatanodeDetails()));
+
+    ArgumentCaptor<List<DatanodeDetails>> usedNodesCaptor =
+        ArgumentCaptor.forClass(List.class);
+
+    ArgumentCaptor<List<DatanodeDetails>> excludedNodesCaptor =
+        ArgumentCaptor.forClass(List.class);
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(mockPolicy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    ContainerReplica good = createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1);
+    replicas.add(good);
+
+    ContainerReplica unhealthy = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY, 1);
+    replicas.add(unhealthy);
+
+    ContainerReplica decommissioning =
+        createContainerReplica(container.containerID(), 0,
+            DECOMMISSIONING, State.CLOSED, 1);
+    replicas.add(decommissioning);
+
+    ContainerReplica maintenance =
+        createContainerReplica(container.containerID(), 0,
+            IN_MAINTENANCE, State.CLOSED, 1);
+    replicas.add(maintenance);
+
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails pendingRemove = MockDatanodeDetails.randomDatanodeDetails();
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0));
+
+    handler.processAndSendCommands(replicas, pendingOps,
+        getUnderReplicatedHealthResult(), 2);
+
+
+    Mockito.verify(mockPolicy, times(1)).chooseDatanodes(
+        usedNodesCaptor.capture(), excludedNodesCaptor.capture(), any(),
+        anyInt(), anyLong(), anyLong());
+
+    List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
+    List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();
+
+    Assertions.assertTrue(usedNodes.contains(good.getDatanodeDetails()));
+    Assertions.assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
+    Assertions.assertTrue(usedNodes.contains(pendingAdd));
+
+    Assertions.assertTrue(excludedNodes.contains(
+        unhealthy.getDatanodeDetails()));
+    Assertions.assertTrue(excludedNodes.contains(
+        decommissioning.getDatanodeDetails()));
+    Assertions.assertTrue(excludedNodes.contains(pendingRemove));
+  }
+
 
   /**
    * Tests whether the specified expectNumCommands number of commands are
