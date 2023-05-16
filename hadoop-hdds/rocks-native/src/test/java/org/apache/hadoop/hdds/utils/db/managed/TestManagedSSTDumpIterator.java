@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Named;
@@ -32,6 +33,8 @@ import org.mockito.Mockito;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
@@ -114,21 +117,17 @@ public class TestManagedSSTDumpIterator {
   }
 
   private static byte[] getBytes(Integer val) {
-    byte[] b = new byte[4];
-    for (int i = 3; i >= 0; i--) {
-      b[i] = val.byteValue();
-      val = val >> 8;
-    }
-    return b;
+    ByteBuffer destByteBuffer = ByteBuffer.allocate(4);
+    destByteBuffer.order(ByteOrder.BIG_ENDIAN);
+    destByteBuffer.putInt(val);
+    return destByteBuffer.array();
   }
 
   private static byte[] getBytes(Long val) {
-    byte[] b = new byte[8];
-    for (int i = 7; i >= 0; i--) {
-      b[i] = (byte) (val & 0xff);
-      val = val >> 8;
-    }
-    return b;
+    ByteBuffer destByteBuffer = ByteBuffer.allocate(8);
+    destByteBuffer.order(ByteOrder.BIG_ENDIAN);
+    destByteBuffer.putLong(val);
+    return destByteBuffer.array();
   }
 
   private static byte[] getBytes(String val) {
