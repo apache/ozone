@@ -199,7 +199,7 @@ public class LeaseManager<T> {
    * {@link Lease} will be released (callbacks on leases will not be
    * executed).
    */
-  public synchronized void shutdown() {
+  public void shutdown() {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
@@ -266,7 +266,8 @@ public class LeaseManager<T> {
         }
 
         try {
-          semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
+          // ignore return value, just used for wait
+          boolean b = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
