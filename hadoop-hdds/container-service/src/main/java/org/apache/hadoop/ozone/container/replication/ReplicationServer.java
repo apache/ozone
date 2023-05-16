@@ -77,7 +77,7 @@ public class ReplicationServer {
     this.port = replicationConfig.getPort();
 
     int replicationServerWorkers =
-        replicationConfig.getReplicationServerWorkers();
+        replicationConfig.getReplicationMaxStreams();
     this.executor =
         new ThreadPoolExecutor(replicationServerWorkers,
             replicationServerWorkers,
@@ -193,20 +193,6 @@ public class ReplicationServer {
             "executor pool size."
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
-
-    @Config(key = "server.workers", defaultValue = "10", description = "server workers.", tags = {
-        DATANODE, MANAGEMENT})
-    private int replicationServerWorkers;
-
-    public int getReplicationServerWorkers() {
-      return replicationServerWorkers;
-    }
-
-    public ReplicationConfig setReplicationServerWorkers(
-        int replicationServerWorkers) {
-      this.replicationServerWorkers = replicationServerWorkers;
-      return this;
-    }
 
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
