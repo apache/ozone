@@ -222,8 +222,10 @@ public class TestRatisReplicationCheckHandler {
   }
 
   @ParameterizedTest
-  @MethodSource("org.apache.hadoop.hdds.scm.container.replication.TestRatisContainerReplicaCount#outOfServiceStates")
-  void testUnderReplicatedDueToAllOutOfService(HddsProtos.NodeOperationalState state) {
+  @MethodSource("org.apache.hadoop.hdds.scm.container.replication." +
+      "TestRatisContainerReplicaCount#outOfServiceStates")
+  void testUnderReplicatedDueToAllOutOfService(
+      HddsProtos.NodeOperationalState state) {
     Pair<HddsProtos.NodeOperationalState, Integer> pair = Pair.of(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
