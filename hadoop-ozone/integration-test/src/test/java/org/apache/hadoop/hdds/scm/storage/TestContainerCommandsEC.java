@@ -320,26 +320,26 @@ public class TestContainerCommandsEC {
                 .build()));
     dn2Service.getDatanodeStateMachine().getContext()
         .addCommand(deleteBlocksCommand);
-    XceiverClientGrpc client = new XceiverClientGrpc(
-        createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf());
 
-    // Wait for the block to be actually deleted
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ListBlockResponseProto response = ContainerProtocolCalls
-            .listBlock(client, orphanContainerID, null, Integer.MAX_VALUE,
-                orphanContainerToken);
-        for (BlockData bd : response.getBlockDataList()) {
-          if (bd.getBlockID().getLocalID() == localID) {
-            return false;
+    try (XceiverClientGrpc client = new XceiverClientGrpc(
+        createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
+      // Wait for the block to be actually deleted
+      GenericTestUtils.waitFor(() -> {
+        try {
+          ListBlockResponseProto response = ContainerProtocolCalls
+              .listBlock(client, orphanContainerID, null, Integer.MAX_VALUE,
+                  orphanContainerToken);
+          for (BlockData bd : response.getBlockDataList()) {
+            if (bd.getBlockID().getLocalID() == localID) {
+              return false;
+            }
           }
+          return true;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
         }
-        return true;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 500, 30000);
-    client.close();
+      }, 500, 30000);
+    }
 
     ECReconstructionCoordinator coordinator = new ECReconstructionCoordinator(
         config, certClient, null, ECReconstructionMetrics.create());
@@ -375,18 +375,19 @@ public class TestContainerCommandsEC {
     // Check the block listing for the recovered containers 4 or 5 and they
     // should be present but with no blocks as the only block in the container
     // was an orphan block.
-    XceiverClientGrpc reconClient = new XceiverClientGrpc(
+    try (XceiverClientGrpc reconClient = new XceiverClientGrpc(
         createSingleNodePipeline(orphanPipeline, targetNodeMap.get(4), 4),
-        cluster.getConf());
-    ListBlockResponseProto response = ContainerProtocolCalls
-        .listBlock(reconClient, orphanContainerID, null, Integer.MAX_VALUE,
-            orphanContainerToken);
-    long count = response.getBlockDataList().stream()
-        .filter(bd -> bd.getBlockID().getLocalID() == localID)
-        .count();
+        cluster.getConf())) {
+      ListBlockResponseProto response = ContainerProtocolCalls
+          .listBlock(reconClient, orphanContainerID, null, Integer.MAX_VALUE,
+              orphanContainerToken);
+      long count = response.getBlockDataList().stream()
+          .filter(bd -> bd.getBlockID().getLocalID() == localID)
+          .count();
 
-    Assert.assertEquals(0L, count);
-    Assert.assertEquals(0, response.getBlockDataList().size());
+      Assert.assertEquals(0L, count);
+      Assert.assertEquals(0, response.getBlockDataList().size());
+    }
   }
 
   @Test
