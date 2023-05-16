@@ -57,18 +57,12 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
-    OzoneManagerProtocolProtos.SetTimesRequest.Builder setTimesRequestBuilder =
-        getOmRequest().getSetTimesRequest().toBuilder();
-
-    return getOmRequest().toBuilder().setSetTimesRequest(setTimesRequestBuilder)
-        .setUserInfo(getUserInfo()).build();
+    return super.preExecute(ozoneManager);
   }
 
   public OMKeySetTimesRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout) {
     super(omReq, bucketLayout);
-    OzoneManagerProtocolProtos.SetTimesRequest setTimesRequest =
-        getOmRequest().getSetTimesRequest();
   }
 
   @Override
@@ -88,12 +82,9 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     boolean operationResult = false;
     Result result = null;
     try {
-      //ObjectParser objectParser = new ObjectParser(getPath(),
-      //    OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
-
-      volume = getVolumeName(); //objectParser.getVolume();
-      bucket = getBucketName(); //objectParser.getBucket();
-      key = getKeyName(); //objectParser.getKey();
+      volume = getVolumeName();
+      bucket = getBucketName();
+      key = getKeyName();
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
@@ -146,7 +137,6 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       }
     }
 
-    //OzoneObj obj = getObject();
     Map<String, String> auditMap = new LinkedHashMap<>();
     onComplete(result, operationResult, exception, trxnLogIndex,
         ozoneManager.getAuditLogger(), auditMap);

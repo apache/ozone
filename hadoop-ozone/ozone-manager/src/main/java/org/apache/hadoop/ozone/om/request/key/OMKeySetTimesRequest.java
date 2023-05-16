@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -58,12 +59,20 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OzoneManagerProtocolProtos.SetTimesRequest.Builder setTimesRequestBuilder =
-        getOmRequest().getSetTimesRequest().toBuilder();
+    OMRequest request = super.preExecute(ozoneManager);
+    SetTimesRequest setTimesRequest = request.getSetTimesRequest();
+    String keyPath = setTimesRequest.getKeyName();
+    String normalizedKeyPath =
+        validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+            keyPath, getBucketLayout());
 
-    return getOmRequest().toBuilder()
-        .setSetTimesRequest(setTimesRequestBuilder)
-        .setUserInfo(getUserInfo())
+    return request.toBuilder()
+        .setSetTimesRequest(
+            setTimesRequest.toBuilder()
+                .setVolumeName(getVolumeName())
+                .setBucketName(getBucketName())
+                .setKeyName(normalizedKeyPath)
+                .setMtime(getModificationTime()))
         .build();
   }
 

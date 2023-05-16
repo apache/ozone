@@ -2228,8 +2228,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(Type.SetTimes)
         .setSetTimesRequest(setTimesRequest).build();
 
-    SetTimesResponse setTimesResponse =
-        handleError(submitRequest(omRequest)).getSetTimesResponse();
+    handleError(submitRequest(omRequest));
   }
 
   @VisibleForTesting
