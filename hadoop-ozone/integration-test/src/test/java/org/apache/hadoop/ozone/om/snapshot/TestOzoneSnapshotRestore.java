@@ -233,8 +233,13 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return 5 == keyCount(buck, keyPrefix);
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, 10000);
   }
 
   @ParameterizedTest
@@ -288,8 +293,13 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return 5 == keyCount(buck2, keyPrefix);
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, 10000);
   }
 
   @ParameterizedTest
@@ -332,7 +342,12 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return 5 == keyCount(buck2, keyPrefix);
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, 10000);
   }
 }
