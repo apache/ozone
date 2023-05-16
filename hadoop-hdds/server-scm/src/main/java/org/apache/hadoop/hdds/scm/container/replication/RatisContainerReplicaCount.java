@@ -512,7 +512,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * @return true if there is insufficient replication and it's because of
    * decommissioning.
    */
-  private boolean inSufficientDueToDecommission() {
+  boolean inSufficientDueToDecommission() {
     int delta = redundancyDelta(true, false);
     return 0 < delta && delta <= getDecommissionCount();
   }

@@ -26,9 +26,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -53,6 +56,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Class used to test the RatisContainerReplicaCount class.
  */
 class TestRatisContainerReplicaCount {
+
+  static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
+    return EnumSet.of(
+        DECOMMISSIONING, DECOMMISSIONED,
+        ENTERING_MAINTENANCE, IN_MAINTENANCE);
+  }
 
   @Test
   void testThreeHealthyReplica() {
@@ -206,14 +215,16 @@ class TestRatisContainerReplicaCount {
     validate(rcnt, true, 0, false);
   }
 
-  @Test
-  void testOneDecommissionedReplica() {
+  @ParameterizedTest
+  @MethodSource("outOfServiceStates")
+  void testOneDecommissionedReplica(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONING);
+        registerNodes(IN_SERVICE, IN_SERVICE, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
+    assertTrue(rcnt.inSufficientDueToDecommission());
   }
 
   @Test
