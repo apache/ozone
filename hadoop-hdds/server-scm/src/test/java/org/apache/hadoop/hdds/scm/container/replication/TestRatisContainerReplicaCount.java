@@ -224,7 +224,7 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
-    assertTrue(rcnt.inSufficientDueToOutOfService());
+    assertTrue(rcnt.insufficientDueToOutOfService());
   }
 
   @Test

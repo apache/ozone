@@ -512,7 +512,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * @return true if there is insufficient replication and it's because of
    * decommissioning.
    */
-  boolean inSufficientDueToOutOfService() {
+  boolean insufficientDueToOutOfService() {
     int delta = redundancyDelta(true, false);
     return 0 < delta && delta <= getDecommissionCount() + getMaintenanceCount();
   }
@@ -548,7 +548,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
         getContainer(),
         getRemainingRedundancy(),
-        inSufficientDueToOutOfService(),
+        insufficientDueToOutOfService(),
         isSufficientlyReplicated(true),
         isUnrecoverable());
     result.setHasHealthyReplicas(getHealthyReplicaCount() > 0);
