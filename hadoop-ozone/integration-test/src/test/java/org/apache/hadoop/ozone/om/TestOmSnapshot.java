@@ -927,4 +927,32 @@ public class TestOmSnapshot {
     }
   }
 
+  @Test
+  public void testSnapshotMetrics()
+      throws IOException, InterruptedException, TimeoutException {
+    String snapshotName = UUID.randomUUID().toString();
+    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
+
+    long numSnapshotCreates = omMetrics.getNumSnapshotCreates();
+    long numSnapshotActive = omMetrics.getNumSnapshotActive();
+    long numSnapshotCreateFails = omMetrics.getNumSnapshotCreateFails();
+
+    createSnapshot(volumeName, bucketName, snapshotName);
+    omMetrics = leaderOzoneManager.getMetrics();
+
+    assertEquals(1, omMetrics.getNumSnapshotCreates() - numSnapshotCreates);
+    assertEquals(1, omMetrics.getNumSnapshotActive() - numSnapshotActive);
+    assertEquals(0,
+        omMetrics.getNumSnapshotCreateFails() - numSnapshotCreateFails);
+
+    IOException ioException = assertThrows(IOException.class, () ->
+        createSnapshot(volumeName, bucketName, snapshotName));
+    assertEquals("Snapshot already exists", ioException.getMessage());
+
+    omMetrics = leaderOzoneManager.getMetrics();
+    assertEquals(2, omMetrics.getNumSnapshotCreates() - numSnapshotCreates);
+    assertEquals(1, omMetrics.getNumSnapshotActive() - numSnapshotActive);
+    assertEquals(1,
+        omMetrics.getNumSnapshotCreateFails() - numSnapshotCreateFails);
+  }
 }
