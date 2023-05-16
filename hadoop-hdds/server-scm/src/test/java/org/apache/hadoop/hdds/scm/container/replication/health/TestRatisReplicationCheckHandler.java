@@ -308,9 +308,8 @@ public class TestRatisReplicationCheckHandler {
   @Test
   public void testUnderReplicatedAndUnrecoverable() {
     ContainerInfo container = createContainerInfo(repConfig);
-    Set<ContainerReplica> replicas = Collections.EMPTY_SET;
 
-    requestBuilder.setContainerReplicas(replicas)
+    requestBuilder.setContainerReplicas(Collections.emptySet())
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
