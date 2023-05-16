@@ -35,7 +35,10 @@ import java.util.TreeMap;
  * upload part information of the key.
  */
 public final class OmMultipartKeyInfo extends WithObjectID {
-  static class PartKeyInfoMap implements Iterable<PartKeyInfo> {
+  /**
+   * An Array wrapper providing PartKeyInfo sorted by partNumber.
+   */
+  public static class PartKeyInfoMap implements Iterable<PartKeyInfo> {
     static final Comparator<Object> PART_NUMBER_COMPARATOR = (o1, o2) -> {
       final int partNumber1 = o1 instanceof PartKeyInfo ?
           ((PartKeyInfo) o1).getPartNumber() : (int) o1;
@@ -188,11 +191,8 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     return creationTime;
   }
 
-  public TreeMap<Integer, PartKeyInfo> getPartKeyInfoMap() {
-    TreeMap<Integer, PartKeyInfo> treeMap = new TreeMap<>();
-    partKeyInfoMap.forEach(
-        partKeyInfo -> treeMap.put(partKeyInfo.getPartNumber(), partKeyInfo));
-    return treeMap;
+  public PartKeyInfoMap getPartKeyInfoMap() {
+    return partKeyInfoMap;
   }
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {

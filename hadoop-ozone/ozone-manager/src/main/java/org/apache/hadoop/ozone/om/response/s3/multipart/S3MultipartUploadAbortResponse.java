@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
@@ -89,11 +87,7 @@ public class S3MultipartUploadAbortResponse extends OmKeyResponse {
         multipartKey);
 
     // Move all the parts to delete table
-    TreeMap<Integer, PartKeyInfo > partKeyInfoMap =
-        omMultipartKeyInfo.getPartKeyInfoMap();
-    for (Map.Entry<Integer, PartKeyInfo > partKeyInfoEntry :
-        partKeyInfoMap.entrySet()) {
-      PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
+    for (PartKeyInfo partKeyInfo: omMultipartKeyInfo.getPartKeyInfoMap()) {
       OmKeyInfo currentKeyPartInfo =
           OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 

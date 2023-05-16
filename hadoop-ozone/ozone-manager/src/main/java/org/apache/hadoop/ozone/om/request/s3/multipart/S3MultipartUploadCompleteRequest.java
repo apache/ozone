@@ -175,8 +175,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             failureMessage(requestedVolume, requestedBucket, keyName),
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
-      TreeMap<Integer, PartKeyInfo> partKeyInfoMap =
-          multipartKeyInfo.getPartKeyInfoMap();
+
+      TreeMap<Integer, PartKeyInfo> partKeyInfoMap = new TreeMap<>();
+      multipartKeyInfo.getPartKeyInfoMap().forEach(partKeyInfo ->
+          partKeyInfoMap.put(partKeyInfo.getPartNumber(), partKeyInfo));
 
       if (partsList.size() > 0) {
         if (partKeyInfoMap.size() == 0) {
