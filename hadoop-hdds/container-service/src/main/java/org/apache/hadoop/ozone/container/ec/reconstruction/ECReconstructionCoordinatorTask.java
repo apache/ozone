@@ -60,12 +60,10 @@ public class ECReconstructionCoordinatorTask
     // 4. Write the recovered chunks to given targets/write locally to
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
-    long containerID = this.reconstructionCommandInfo.getContainerID();
     long start = Time.monotonicNow();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Starting the EC reconstruction of the container {}",
-          containerID);
-    }
+
+    LOG.info("{}", this);
+
     try {
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
@@ -73,12 +71,12 @@ public class ECReconstructionCoordinatorTask
           reconstructionCommandInfo.getSourceNodeMap(),
           reconstructionCommandInfo.getTargetNodeMap());
       long elapsed = Time.monotonicNow() - start;
-      LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
       setStatus(Status.DONE);
+      LOG.info("{} in {} ms", this, elapsed);
     } catch (Exception e) {
       long elapsed = Time.monotonicNow() - start;
-      LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
       setStatus(Status.FAILED);
+      LOG.warn("{} after {} ms", this, elapsed, e);
     }
   }
 

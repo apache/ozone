@@ -154,7 +154,9 @@ public class ECReconstructionCoordinator implements Closeable {
       for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
           .entrySet()) {
         DatanodeDetails dn = indexDnPair.getValue();
-        Integer index = indexDnPair.getKey();
+        int index = indexDnPair.getKey();
+        LOG.debug("Creating container {} on datanode {} for index {}",
+            containerID, dn, index);
         containerOperationClient
             .createRecoveringContainer(containerID, dn, repConfig,
                 containerToken, index);
@@ -172,6 +174,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
       // 3. Close containers
       for (DatanodeDetails dn: recoveringContainersCreatedDNs) {
+        LOG.debug("Closing container {} on datanode {}", containerID, dn);
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
