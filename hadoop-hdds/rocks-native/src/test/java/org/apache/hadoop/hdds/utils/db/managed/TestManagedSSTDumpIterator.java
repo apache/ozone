@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Named;
