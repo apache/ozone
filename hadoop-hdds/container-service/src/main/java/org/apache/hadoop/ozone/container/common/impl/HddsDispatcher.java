@@ -577,7 +577,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       long volumeCapacity = volume.getCapacity();
       long volumeFreeSpaceToSpare =
           VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
-      long volumeAvailable = volume.getAvailable();
+      long volumeFree = volume.getAvailable();
+      long volumeCommitted = volume.getCommittedBytes();
+      long volumeAvailable = volumeFree - volumeCommitted;
       return (volumeAvailable <= volumeFreeSpaceToSpare);
     }
     return false;
