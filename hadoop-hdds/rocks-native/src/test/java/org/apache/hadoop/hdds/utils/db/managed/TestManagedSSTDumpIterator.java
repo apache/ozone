@@ -52,6 +52,7 @@ import java.util.stream.Stream;
 /**
  * Test for ManagedSSTDumpIterator.
  */
+@Native("Managed Rocks Tools")
 public class TestManagedSSTDumpIterator {
 
   private File createSSTFileWithKeys(
@@ -166,7 +167,6 @@ public class TestManagedSSTDumpIterator {
     );
   }
 
-  @Native("Managed Rocks Tools")
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
@@ -210,6 +210,7 @@ public class TestManagedSSTDumpIterator {
     }
     executorService.shutdown();
   }
+
 
   @ParameterizedTest
   @MethodSource("invalidPipeInputStreamBytes")
