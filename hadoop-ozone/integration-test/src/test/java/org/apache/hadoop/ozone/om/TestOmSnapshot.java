@@ -933,9 +933,9 @@ public class TestOmSnapshot {
   public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
     String snapshotName = createSnapshot(volumeName, bucketName);
 
-    // RocksDBCheckpointDiffer should be not null for active store metadata.
     RDBStore activeDbStore =
         (RDBStore) cluster.getOzoneManager().getMetadataManager().getStore();
+    // RocksDBCheckpointDiffer should be not null for active DB store.
     assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
     assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
 
@@ -945,9 +945,8 @@ public class TestOmSnapshot {
 
     RDBStore snapshotDbStore =
         (RDBStore) omSnapshot.getMetadataManager().getStore();
-            // RocksDBCheckpointDiffer should be null for snapshot metadata.
+    // RocksDBCheckpointDiffer should be null for snapshot DB store.
     assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
-    // RocksDBCheckpointDiffer should be null for snapshot metadata.
     assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
   }
 }
