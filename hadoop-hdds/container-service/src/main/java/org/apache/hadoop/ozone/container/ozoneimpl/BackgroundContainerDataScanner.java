@@ -65,7 +65,7 @@ public class BackgroundContainerDataScanner extends
 
   private boolean shouldScan(Container<?> container) {
     return container.shouldScanData() &&
-        !ContainerUtils.recentlyScanned(container, minScanGap);
+        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 
   @Override

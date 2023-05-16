@@ -76,29 +76,13 @@ public final class OnDemandContainerDataScanner {
   }
 
   private static boolean shouldScan(Container<?> container) {
-    boolean shouldScan = true;
-    long containerID = container.getContainerData().getContainerID();
     if (instance == null) {
       LOG.debug("Skipping on demand scan for container {} since scanner was " +
-              "not initialized.", containerID);
-      shouldScan = false;
-    } else if (!container.shouldScanData()) {
-      LOG.debug("Skipping on demand scan for container {} in state {}.",
-          containerID, container.getContainerState());
-      shouldScan = false;
-    } else if (ContainerUtils.recentlyScanned(container, instance.minScanGap)) {
-      Optional<Instant> lastScanTime =
-          container.getContainerData().lastDataScanTime();
-      String lastScanTimeStr = "never";
-      if (lastScanTime.isPresent()) {
-        lastScanTimeStr = "at " + lastScanTime.get();
-      }
-      LOG.debug("Skipping on demand scan for container {} which was last " +
-              "scanned {}. Current time is {}.",
-          containerID, lastScanTimeStr, Instant.now());
-      shouldScan = false;
+          "not initialized.", container.getContainerData().getContainerID());
     }
-    return shouldScan;
+    return instance != null &&
+        container.shouldScanData() &&
+        !ContainerUtils.recentlyScanned(container, instance.minScanGap, LOG);
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {

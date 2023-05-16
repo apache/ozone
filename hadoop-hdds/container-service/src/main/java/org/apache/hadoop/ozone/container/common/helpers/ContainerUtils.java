@@ -237,17 +237,26 @@ public final class ContainerUtils {
   }
 
   public static boolean recentlyScanned(Container<?> container,
-      long minScanGap) {
+      long minScanGap, Logger log) {
     Optional<Instant> lastScanTime =
         container.getContainerData().lastDataScanTime();
+    Instant now = Instant.now();
     // Container is considered recently scanned if it was scanned within the
     // configured time frame. If the optional is empty, the container was
     // never scanned.
-
-    return lastScanTime.map(scanInstant ->
-        Duration.between(Instant.now(), scanInstant).abs()
+    boolean recentlyScanned = lastScanTime.map(scanInstant ->
+        Duration.between(now, scanInstant).abs()
             .compareTo(Duration.ofMillis(minScanGap)) < 0)
         .orElse(false);
+
+    if (recentlyScanned && log.isDebugEnabled()) {
+      log.debug("Skipping scan for container {} which was last " +
+              "scanned at {}. Current time is {}.",
+          container.getContainerData().getContainerID(), lastScanTime.get(),
+          now);
+    }
+
+    return recentlyScanned;
   }
 
   /**
