@@ -13,6 +13,7 @@
 *** Settings ***
 Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
+Library             DateTime
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/freon.robot
 Suite Setup         Setup Test
@@ -31,21 +32,30 @@ Basic key generation and validation
     Freon OCKG    prefix=${random}
     Freon OCKV    prefix=${random}
 
-Find wait time
-    ${waitTime} =       Execute       printenv | grep hdds.x509.default.duration | sed 's/OZONE-SITE.XML_hdds.x509.default.duration=//' | sed 's/PT//'
-    ${result} =       Set Variable if    "${waitTime}" != "${EMPTY}"      ${waitTime}    0s
-    [return]            ${result}
+Find certificate duration
+    ${waitTime} =     Execute               ozone getconf confKey hdds.x509.default.duration | sed 's/PT//'
+    ${result} =       Set Variable if       "${waitTime}" != "${EMPTY}"      ${waitTime}    0s
+    [return]          ${result}
 
 Get datanode cert serial
     ${certSerial}       Execute     openssl s_client -connect "${datanode}":"${port}" -showcerts | openssl x509 -noout -serial | grep serial | sed 's/serial=//'
     [return]            ${certSerial}
 
+Datanode has new certificate
+    [arguments]             ${certId}
+    ${newCertId} =          Get datanode cert serial
+    Should Not Be Equal     ${certId}    ${newCertId}
+
+Double duration
+    [arguments]             ${duration}
+    ${doubleDuration} =     Add Time To Time    ${duration}     ${duration}
+    [return]                  ${doubleDuration}
+
 *** Test Cases ***
 Test datanode functions before and after certificate rotation
     Basic key generation and validation
-    ${sleepTime} =    Find wait time
-    ${certId1} =      Get datanode cert serial
-    Sleep	       ${sleepTime}
+    ${certDuration} =    Find certificate duration
+    ${doubleDuration} =  Double duration     ${certDuration}
+    ${certId1} =         Get datanode cert serial
+    Wait Until Keyword Succeeds     ${doubleDuration}   5sec    Datanode has new certificate    ${certId1}
     Basic key generation and validation
-    ${certId2} =        Get datanode cert serial
-    Should Not Be Equal     ${certId1}      ${certId2}
