@@ -26,5 +26,10 @@
     <value>org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory$None</value>
   </property>
 
+  <property>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>0MB</value>
+  </property>
+
 
 </configuration>
