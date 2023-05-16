@@ -217,14 +217,14 @@ class TestRatisContainerReplicaCount {
 
   @ParameterizedTest
   @MethodSource("outOfServiceStates")
-  void testOneDecommissionedReplica(HddsProtos.NodeOperationalState state) {
+  void testOneOutOfServiceReplica(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
         registerNodes(IN_SERVICE, IN_SERVICE, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
     validate(rcnt, false, 1, false);
-    assertTrue(rcnt.inSufficientDueToDecommission());
+    assertTrue(rcnt.inSufficientDueToOutOfService());
   }
 
   @Test

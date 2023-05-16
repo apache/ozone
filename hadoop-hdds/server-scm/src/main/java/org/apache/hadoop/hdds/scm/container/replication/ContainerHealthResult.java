@@ -105,7 +105,7 @@ public class ContainerHealthResult {
     private static final int DECOMMISSION_REDUNDANCY = 5;
 
     private final int remainingRedundancy;
-    private final boolean dueToDecommission;
+    private final boolean dueToOutOfService;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
     private boolean hasHealthyReplicas;
@@ -113,19 +113,19 @@ public class ContainerHealthResult {
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
-        int remainingRedundancy, boolean dueToDecommission,
+        int remainingRedundancy, boolean dueToOutOfService,
         boolean replicatedOkWithPending, boolean unrecoverable) {
-      this(containerInfo, remainingRedundancy, dueToDecommission,
+      this(containerInfo, remainingRedundancy, dueToOutOfService,
           replicatedOkWithPending, unrecoverable, HealthState.UNDER_REPLICATED);
     }
 
     protected UnderReplicatedHealthResult(ContainerInfo containerInfo,
-        int remainingRedundancy, boolean dueToDecommission,
+        int remainingRedundancy, boolean dueToOutOfService,
         boolean replicatedOkWithPending, boolean unrecoverable,
         HealthState healthState) {
       super(containerInfo, healthState);
       this.remainingRedundancy = remainingRedundancy;
-      this.dueToDecommission = dueToDecommission;
+      this.dueToOutOfService = dueToOutOfService;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
     }
@@ -155,7 +155,7 @@ public class ContainerHealthResult {
      */
     public int getWeightedRedundancy() {
       int result = requeueCount;
-      if (dueToDecommission) {
+      if (dueToOutOfService) {
         result += DECOMMISSION_REDUNDANCY;
       } else {
         result += getRemainingRedundancy();
@@ -183,8 +183,8 @@ public class ContainerHealthResult {
      * unavailable.
      * @return True is the under-replication is caused by decommission.
      */
-    public boolean underReplicatedDueToDecommission() {
-      return dueToDecommission;
+    public boolean underReplicatedDueToOutOfService() {
+      return dueToOutOfService;
     }
 
     /**
@@ -244,8 +244,8 @@ public class ContainerHealthResult {
           .append("containerId=").append(getContainerInfo().getContainerID())
           .append(", state=").append(getHealthState())
           .append(", remainingRedundancy=").append(remainingRedundancy);
-      if (dueToDecommission) {
-        sb.append(" +dueToDecommission");
+      if (dueToOutOfService) {
+        sb.append(" +dueToOutOfService");
       }
       if (sufficientlyReplicatedAfterPending) {
         sb.append(" +sufficientlyReplicatedAfterPending");

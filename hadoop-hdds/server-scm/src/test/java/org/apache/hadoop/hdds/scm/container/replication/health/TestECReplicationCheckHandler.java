@@ -125,7 +125,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(1, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -152,7 +152,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(1, result.getRemainingRedundancy());
     assertTrue(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     // Fixed with pending so nothing added to the queue
@@ -164,7 +164,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommission() {
+  public void testUnderReplicatedDueToOutOfService() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -180,7 +180,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(2, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertTrue(result.underReplicatedDueToDecommission());
+    assertTrue(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -191,7 +191,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionFixedWithPending() {
+  public void testUnderReplicatedDueToOutOfServiceFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -211,7 +211,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(2, result.getRemainingRedundancy());
     assertTrue(result.isReplicatedOkAfterPending());
-    assertTrue(result.underReplicatedDueToDecommission());
+    assertTrue(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     // Fixed with pending so nothing added to the queue
@@ -223,7 +223,7 @@ public class TestECReplicationCheckHandler {
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionAndMissingReplica() {
+  public void testUnderReplicatedDueToOutOfServiceAndMissingReplica() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -242,7 +242,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(1, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -266,7 +266,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(-1, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
 
     assertTrue(healthCheck.handle(request));
@@ -304,7 +304,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(-1, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
     assertTrue(result.hasUnreplicatedOfflineIndexes());
 
@@ -347,7 +347,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(-1, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
     assertFalse(result.hasUnreplicatedOfflineIndexes());
 
@@ -392,7 +392,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
     assertEquals(0, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(healthCheck.handle(request));
     assertEquals(1, repQueue.underReplicatedQueueSize());

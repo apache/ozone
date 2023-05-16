@@ -1604,7 +1604,7 @@ public class TestLegacyReplicationManager {
      * decommissioned replicas.
      */
     @Test
-    public void testUnderReplicatedDueToDecommission()
+    public void testUnderReplicatedDueToOutOfService()
         throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);

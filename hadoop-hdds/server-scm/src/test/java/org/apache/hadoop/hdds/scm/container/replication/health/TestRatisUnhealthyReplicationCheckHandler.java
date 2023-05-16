@@ -184,7 +184,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         result.getHealthState());
     assertEquals(0, result.getRemainingRedundancy());
     assertFalse(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(1, repQueue.underReplicatedQueueSize());
@@ -218,7 +218,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         result.getHealthState());
     assertEquals(1, result.getRemainingRedundancy());
     assertTrue(result.isReplicatedOkAfterPending());
-    assertFalse(result.underReplicatedDueToDecommission());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
