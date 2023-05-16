@@ -457,15 +457,15 @@ public class ECReconstructionCoordinator implements Closeable {
     while (resultIterator.hasNext()) {
       Map.Entry<Long, BlockData[]> entry = resultIterator.next();
       BlockData[] blockDataArr = entry.getValue();
-      for (Integer i : sourceNodeMap.keySet()) {
+      for (Map.Entry<Integer, DatanodeDetails> e : sourceNodeMap.entrySet()) {
         // There should be an entry in the Array for each keyset node. If there
         // is not, this is an orphaned stripe and we should remove it from the
         // result.
-        if (blockDataArr[i - 1] == null) {
+        if (blockDataArr[e.getKey() - 1] == null) {
           LOG.warn("In container {} block {} does not have a putBlock entry " +
               "for index {} on datanode {} making it an orphan block / " +
               "stripe. It will not be reconstructed", containerID,
-              entry.getKey(), i, sourceNodeMap.get(i));
+              entry.getKey(), e.getKey(), e.getValue());
           resultIterator.remove();
           break;
         }

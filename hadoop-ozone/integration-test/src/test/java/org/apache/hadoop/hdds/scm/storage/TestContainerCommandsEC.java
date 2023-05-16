@@ -285,6 +285,10 @@ public class TestContainerCommandsEC {
       }
     }
 
+    if (dn2 == null || dn2Service == null) {
+      throw new RuntimeException("Could not find datanode hosting index 2");
+    }
+
     // Wait for all replicas in the pipeline to report as closed.
     GenericTestUtils.waitFor(() -> {
       try {
