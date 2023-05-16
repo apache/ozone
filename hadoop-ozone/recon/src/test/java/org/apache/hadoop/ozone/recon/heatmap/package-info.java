@@ -19,4 +19,4 @@
 /**
  * This package contains solr access related and some util classes.
  */
-package org.apache.hadoop.ozone.recon.solr;
+package org.apache.hadoop.ozone.recon.heatmap;

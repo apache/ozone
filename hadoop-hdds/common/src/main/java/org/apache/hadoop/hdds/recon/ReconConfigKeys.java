@@ -38,6 +38,8 @@ public final class ReconConfigKeys {
       "ozone.recon.address";
   public static final String OZONE_SOLR_ADDRESS_KEY =
       "solr.address";
+  public static final String OZONE_RECON_HEATMAP_PROVIDER_KEY =
+      "ozone.recon.heatmap.provider";
   public static final String OZONE_RECON_SOLR_TIMEZONE_KEY =
       "ozone.recon.solr.timezone";
   public static final String OZONE_RECON_ADDRESS_DEFAULT =

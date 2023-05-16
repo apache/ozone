@@ -16,14 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.solr;
+package org.apache.hadoop.ozone.recon.heatmap;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.AuditLogFacetsResources;
+import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
-import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -37,19 +41,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.time.Instant;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.powermock.api.mockito.PowerMockito.when;
 
 /**
- * This class test Solr Access Utility Methods.
+ * This class test heatmap provider's data to be consumed
+ * and used for generating heatmap.
  */
-public class TestSolrUtil {
+public class TestHeatMapInfo {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -57,9 +58,8 @@ public class TestSolrUtil {
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration ozoneConfiguration;
-  private SolrHttpClient solrHttpClient;
-  private String solrAuditResp;
-  private SolrUtil solrUtilUnderTest;
+  private String auditRespStr;
+  private HeatMapUtil heatMapUtilUnderTest;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
@@ -79,14 +79,13 @@ public class TestSolrUtil {
             .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(SolrUtil.class)
+            .addBinding(HeatMapUtil.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
     ozoneConfiguration =
         reconTestInjector.getInstance(OzoneConfiguration.class);
-    solrUtilUnderTest = reconTestInjector.getInstance(SolrUtil.class);
-    solrHttpClient = mock(SolrHttpClient.class);
-    solrAuditResp = "{\n" +
+    heatMapUtilUnderTest = reconTestInjector.getInstance(HeatMapUtil.class);
+    auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
         "    \"status\": 0,\n" +
@@ -742,15 +741,23 @@ public class TestSolrUtil {
   }
 
   @Test
-  public void testQueryLogs() throws IOException {
+  public void testHeatMapGeneratedInfo() throws IOException {
     // Setup
-    when(solrHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
-        solrAuditResp);
-    String startDate = String.valueOf(Instant.now().toEpochMilli() + 100000);
     // Run the test
+    JsonElement jsonElement = JsonParser.parseString(auditRespStr);
+    JsonObject jsonObject = jsonElement.getAsJsonObject();
+    JsonElement facets = jsonObject.get("facets");
+    JsonObject facetsBucketsObject =
+        facets.getAsJsonObject().get("resources")
+            .getAsJsonObject();
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    AuditLogFacetsResources auditLogFacetsResources =
+        objectMapper.readValue(
+            facetsBucketsObject.toString(), AuditLogFacetsResources.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        solrUtilUnderTest.queryLogs("/", "key", startDate,
-            solrHttpClient);
+        heatMapUtilUnderTest.generateHeatMap(entities);
     Assertions.assertTrue(
         entityReadAccessHeatMapResponse.getChildren().size() > 0);
     Assertions.assertEquals(12,
@@ -764,17 +771,6 @@ public class TestSolrUtil {
     Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
         getLabel());
 
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void testSolrConfigNotAvailable() throws IOException {
-    ozoneConfiguration.set(OZONE_SOLR_ADDRESS_KEY, "");
-    String startDate = String.valueOf(Instant.now().toEpochMilli() + 100000);
-    // Run the test
-    when(solrHttpClient.sendRequest(any(HttpRequestWrapper.class))).thenReturn(
-        solrAuditResp);
-    solrUtilUnderTest.queryLogs("/", "key", startDate,
-        solrHttpClient);
   }
 
 }

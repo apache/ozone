@@ -17,92 +17,49 @@
  * under the License.
  */
 
-package org.apache.hadoop.ozone.recon.solr;
+package org.apache.hadoop.ozone.recon.heatmap;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
-import org.apache.hadoop.ozone.recon.api.types.AuditLogFacetsResources;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.api.types.LastXUnit;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.http.HttpRequestWrapper;
-import org.apache.hadoop.ozone.recon.http.SolrHttpClient;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.security.SecurityUtil;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.solr.client.solrj.util.ClientUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.security.PrivilegedExceptionAction;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_SOLR_TIMEZONE_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
 
 /**
  * This class is general utility class for handling
  * Solr query functions.
  */
-public class SolrUtil {
+public class HeatMapUtil {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SolrUtil.class);
-  public static final String DEFAULT_TIMEZONE_VALUE = "UTC";
-
+      LoggerFactory.getLogger(HeatMapUtil.class);
   private OzoneConfiguration ozoneConfiguration;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
-  private SimpleDateFormat dateFormat = new SimpleDateFormat(
-      "yyyy-MM-dd'T'HH:mm:ss'Z'");
-  private final String timeZone;
 
   @Inject
-  public SolrUtil(ReconNamespaceSummaryManager
+  public HeatMapUtil(ReconNamespaceSummaryManager
                       namespaceSummaryManager,
-                  ReconOMMetadataManager omMetadataManager,
-                  OzoneStorageContainerManager reconSCM,
-                  OzoneConfiguration ozoneConfiguration) {
+                     ReconOMMetadataManager omMetadataManager,
+                     OzoneStorageContainerManager reconSCM,
+                     OzoneConfiguration ozoneConfiguration) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
     this.ozoneConfiguration = ozoneConfiguration;
-    this.timeZone = this.ozoneConfiguration.get(OZONE_RECON_SOLR_TIMEZONE_KEY,
-        DEFAULT_TIMEZONE_VALUE);
-    if (timeZone != null) {
-      LOG.info("Setting timezone to " + timeZone);
-      try {
-        dateFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
-      } catch (Throwable t) {
-        LOG.error("Error setting timezone. TimeZone = " + timeZone);
-      }
-    }
   }
 
   private void addBucketData(
@@ -254,134 +211,7 @@ public class SolrUtil {
     bucket.setSize(bucket.getSize() + keySize);
   }
 
-  public EntityReadAccessHeatMapResponse
-      queryLogs(String path, String entityType, String startDate,
-            SolrHttpClient solrHttpClient) {
-    try {
-      return SecurityUtil.doAsCurrentUser(
-          (PrivilegedExceptionAction<EntityReadAccessHeatMapResponse>) () -> {
-            InetSocketAddress solrAddress =
-                HddsUtils.getSolrAddress(ozoneConfiguration);
-            if (null == solrAddress) {
-              throw new ConfigurationException(String.format("For heatmap " +
-                      "feature Solr host and port configuration must be " +
-                      "provided for config key %s. Example format -> " +
-                      "<Host>:<Port>",
-                  OZONE_SOLR_ADDRESS_KEY));
-            }
-            List<NameValuePair> urlParameters = new ArrayList<>();
-            validateAndAddSolrReqParam(escapeQueryParamVal(path),
-                "resource", urlParameters);
-            validateAndAddSolrReqParam(entityType, "resType", urlParameters);
-            validateStartDate(startDate, urlParameters);
-            final String solrAuditResp =
-                solrHttpClient.sendRequest(
-                    prepareHttpRequest(urlParameters, solrAddress,
-                        "/solr/ranger_audits/query"));
-            LOG.info("Solr Response: {}", solrAuditResp);
-            JsonElement jsonElement = JsonParser.parseString(solrAuditResp);
-            JsonObject jsonObject = jsonElement.getAsJsonObject();
-            JsonElement facets = jsonObject.get("facets");
-            JsonElement resources = facets.getAsJsonObject().get("resources");
-            JsonObject facetsBucketsObject = new JsonObject();
-            if (null != resources) {
-              facetsBucketsObject = resources.getAsJsonObject();
-            }
-            ObjectMapper objectMapper = new ObjectMapper();
-
-            AuditLogFacetsResources auditLogFacetsResources =
-                objectMapper.readValue(
-                    facetsBucketsObject.toString(),
-                    AuditLogFacetsResources.class);
-            EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
-            if (null != entities && !(ArrayUtils.isEmpty(entities))) {
-              return generateHeatMap(entities);
-            }
-            return null;
-          });
-    } catch (JsonProcessingException e) {
-      LOG.error("Solr Query Output Processing Error: {} ", e);
-    } catch (IOException e) {
-      LOG.error("Error while generating the access heatmap: {} ", e);
-    }
-    return null;
-  }
-
-  private String escapeQueryParamVal(String path) {
-    StringBuilder sb = new StringBuilder();
-    if (!StringUtils.isEmpty(path)) {
-      sb.append("*");
-      sb.append(ClientUtils.escapeQueryChars(path));
-      sb.append("*");
-    }
-    return sb.toString();
-  }
-
-  private void validateStartDate(String startDate,
-                                 List<NameValuePair> urlParameters) {
-    if (!StringUtils.isEmpty(startDate)) {
-      ZonedDateTime lastXUnitsOfZonedDateTime = null;
-      if (null == LastXUnit.getType(startDate)) {
-        startDate = validateStartDate(startDate);
-      }
-      if (null != LastXUnit.getType(startDate)) {
-        lastXUnitsOfZonedDateTime =
-            lastXUnitsOfTime(LastXUnit.getType(startDate));
-      } else {
-        lastXUnitsOfZonedDateTime =
-            epochMilliSToZDT(startDate);
-      }
-      urlParameters.add(new BasicNameValuePair("fq",
-          setDateRange("evtTime",
-              Date.from(lastXUnitsOfZonedDateTime.toInstant()), null)));
-    }
-  }
-
-  private void validateAndAddSolrReqParam(
-      String paramVal, String paramName,
-      List<NameValuePair> urlParameters) {
-    if (!StringUtils.isEmpty(paramVal)) {
-      StringBuilder sb = new StringBuilder(paramName);
-      sb.append(":");
-      sb.append(paramVal);
-      urlParameters.add(new BasicNameValuePair("fq", sb.toString()));
-    }
-  }
-
-  private HttpRequestWrapper prepareHttpRequest(
-      List<NameValuePair> urlParameters, InetSocketAddress solrAddress,
-      String uri) {
-    // add request parameter, form parameters
-    urlParameters.add(new BasicNameValuePair("q", "*:*"));
-    urlParameters.add(new BasicNameValuePair("wt", "json"));
-    urlParameters.add(new BasicNameValuePair("fl",
-        "access, agent, repo, resource, resType, event_count"));
-    urlParameters.add(new BasicNameValuePair("fq", "access:read"));
-    urlParameters.add(new BasicNameValuePair("fq", "repo:cm_ozone"));
-
-    urlParameters.add(new BasicNameValuePair("sort", "event_count desc"));
-    urlParameters.add(new BasicNameValuePair("start", "0"));
-    urlParameters.add(new BasicNameValuePair("rows", "0"));
-
-    urlParameters.add(new BasicNameValuePair("json.facet", "{\n" +
-        "    resources:{\n" +
-        "      type : terms,\n" +
-        "      field : resource,\n" +
-        "      sort : \"read_access_count desc\",\n" +
-        "      limit : 100,\n" +
-        "      facet:{\n" +
-        "        read_access_count : \"sum(event_count)\"\n" +
-        "      }\n" +
-        "    }\n" +
-        "  }"));
-    HttpRequestWrapper requestWrapper =
-        new HttpRequestWrapper(solrAddress.getHostName(),
-            solrAddress.getPort(), uri,
-            urlParameters, HttpRequestWrapper.HttpReqType.POST);
-    return requestWrapper;
-  }
-
-  private EntityReadAccessHeatMapResponse generateHeatMap(
+  public EntityReadAccessHeatMapResponse generateHeatMap(
       EntityMetaData[] entities) {
     EntityReadAccessHeatMapResponse rootEntity =
         new EntityReadAccessHeatMapResponse();
@@ -447,65 +277,15 @@ public class SolrUtil {
     return 256L;
   }
 
-  public String setDateRange(String fieldName, Date fromDate, Date toDate) {
-    String fromStr = "*";
-    String toStr = "NOW";
-    if (fromDate != null) {
-      fromStr = dateFormat.format(fromDate);
+  public EntityReadAccessHeatMapResponse retrieveData(
+      IHeatMapProvider heatMapProvider, String normalizePath,
+      String entityType,
+      String startDate) throws Exception {
+    EntityMetaData[] entities = heatMapProvider.retrieveData(normalizePath,
+        entityType, startDate);
+    if (null != entities && !(ArrayUtils.isEmpty(entities))) {
+      return generateHeatMap(entities);
     }
-    if (toDate != null) {
-      toStr = dateFormat.format(toDate);
-    }
-    return fieldName + ":[" + fromStr + " TO " + toStr + "]";
-  }
-
-  private String validateStartDate(String startDate) {
-    long epochMilliSeconds = 0L;
-    try {
-      epochMilliSeconds = Long.parseLong(startDate);
-    } catch (NumberFormatException nfe) {
-      LOG.error(
-          "Unsupported Last X units of time : {}, falling back to default 24H",
-          startDate);
-      return LastXUnit.TWENTY_FOUR_HOUR.getValue();
-    }
-    if (epochMilliSeconds > Instant.now().toEpochMilli()) {
-      LOG.error(
-          "Unsupported Last X units of time : {}, falling back to default 24H",
-          startDate);
-      return LastXUnit.TWENTY_FOUR_HOUR.getValue();
-    }
-    return startDate;
-  }
-
-  private ZonedDateTime epochMilliSToZDT(String epochMilliSeconds) {
-    Long lEpochMilliSeconds = Long.parseLong(epochMilliSeconds);
-    return ZonedDateTime.ofInstant(
-        Instant.ofEpochMilli(lEpochMilliSeconds),
-        TimeZone.getTimeZone(timeZone).toZoneId());
-  }
-
-  private ZonedDateTime lastXUnitsOfTime(LastXUnit lastXUnit) {
-    ZonedDateTime zonedDateTime = null;
-    switch (lastXUnit) {
-    case TWENTY_FOUR_HOUR:
-      zonedDateTime = Instant.now().atZone(
-              TimeZone.getTimeZone(timeZone).toZoneId())
-          .minus(24, ChronoUnit.HOURS);
-      break;
-    case SEVEN_DAYS:
-      zonedDateTime = Instant.now().atZone(
-          TimeZone.getTimeZone(timeZone).toZoneId()).minus(7, ChronoUnit.DAYS);
-      break;
-    case NINETY_DAYS:
-      zonedDateTime = Instant.now().atZone(
-              TimeZone.getTimeZone(timeZone).toZoneId())
-          .minus(90, ChronoUnit.DAYS);
-      break;
-    default:
-      throw new IllegalArgumentException(
-          "Unsupported Last X units of time : " + lastXUnit);
-    }
-    return zonedDateTime;
+    return null;
   }
 }

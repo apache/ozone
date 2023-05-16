@@ -18,24 +18,10 @@
 
 package org.apache.hadoop.hdds;
 
+import com.google.common.base.Preconditions;
+import com.google.common.net.HostAndPort;
 import com.google.protobuf.ServiceException;
-import javax.management.ObjectName;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.TreeMap;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -58,17 +44,36 @@ import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.SizeInBytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
-import com.google.common.net.HostAndPort;
-import org.apache.commons.lang3.StringUtils;
+import javax.management.ObjectName;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.TreeMap;
+
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_SERVER_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
@@ -76,14 +81,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.token.SecretManager;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.util.SizeInBytes;
-import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * HDDS specific stateless utility functions.
@@ -350,52 +347,6 @@ public final class HddsUtils {
     }
     int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
     return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
-   * Retrieve the socket addresses of Apache Solr Server.
-   *
-   * @return Apache Solr server address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getSolrAddress(
-      ConfigurationSource conf) {
-    String solrAddresses = conf.get(OZONE_SOLR_ADDRESS_KEY);
-    LOG.info("Solr Live Host Addresses: {}", solrAddresses);
-    if (StringUtils.isEmpty(solrAddresses)) {
-      throw new IllegalArgumentException(String.format("For heatmap " +
-              "feature Solr host and port configuration must be provided " +
-              "for config key %s. Example format -> <Host>:<Port>",
-          OZONE_SOLR_ADDRESS_KEY));
-    }
-    String[] splitAddresses = solrAddresses.split(",");
-    if (solrAddresses.length() > 0) {
-      String name = splitAddresses[0];
-      if (StringUtils.isEmpty(name)) {
-        return null;
-      }
-      Optional<String> hostname = getHostName(name);
-      if (!hostname.isPresent()) {
-        throw new IllegalArgumentException("Invalid hostname for Solr Server: "
-            + name);
-      }
-      int port = OZONE_SOLR_SERVER_PORT_DEFAULT;
-      try {
-        port = getHostPort(name).orElse(OZONE_SOLR_SERVER_PORT_DEFAULT);
-      } catch (Exception exp) {
-        String[] hostPort = name.split(":");
-        if (hostPort.length > 1) {
-          // Below split is done to extract out port number from
-          // SOLR HOST URL format in zookeeper node.
-          // URL format: https://<host>:<port>_solr
-          String[] portSplit = hostPort[1].split("_");
-          port = portSplit.length > 1 ? Integer.parseInt(portSplit[0]) :
-              OZONE_SOLR_SERVER_PORT_DEFAULT;
-        }
-      }
-      return NetUtils.createSocketAddr(hostname.get(), port);
-    }
-    return null;
   }
 
   /**

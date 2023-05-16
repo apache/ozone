@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.solr.SolrAccessAuditsService;
+import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -27,6 +27,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -47,12 +48,11 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_TYPE;
     " based audit logs.")
 public class AccessHeatMapEndpoint {
 
-  private SolrAccessAuditsService solrAccessAuditsService;
+  private HeatMapServiceImpl heatMapService;
 
   @Inject
-  public AccessHeatMapEndpoint(
-      SolrAccessAuditsService solrAccessAuditsService) {
-    this.solrAccessAuditsService = solrAccessAuditsService;
+  public AccessHeatMapEndpoint(HeatMapServiceImpl heatMapService) {
+    this.heatMapService = heatMapService;
   }
 
   /**
@@ -79,9 +79,14 @@ public class AccessHeatMapEndpoint {
       @DefaultValue("key") @QueryParam(RECON_ENTITY_TYPE) String entityType,
       @DefaultValue("24H") @QueryParam(RECON_ACCESS_METADATA_START_DATE)
       String startDate) {
-    EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        solrAccessAuditsService.querySolrForOzoneAudit(path, entityType,
-            startDate);
+    EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse = null;
+    try {
+      entityReadAccessHeatMapResponse =
+          heatMapService.retrieveData(path, entityType, startDate);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
     return Response.ok(entityReadAccessHeatMapResponse).build();
   }
 }

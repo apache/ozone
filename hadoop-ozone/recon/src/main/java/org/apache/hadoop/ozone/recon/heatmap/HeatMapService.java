@@ -17,7 +17,14 @@
  * under the License.
  */
 
+package org.apache.hadoop.ozone.recon.heatmap;
+
+import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+
 /**
- * This package contains related classes for Solr AccessAudits Service.
+ * This is an abstract class acting as an interface for access to Solr Service.
  */
-package org.apache.hadoop.ozone.recon.solr;
+public abstract class HeatMapService {
+  public abstract EntityReadAccessHeatMapResponse retrieveData(
+      String path, String entityType, String startDate) throws Exception;
+}
