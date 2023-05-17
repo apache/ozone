@@ -611,6 +611,19 @@ public class TestContainerEndpoint {
     // The results will be limited to 2 containers only
     assertEquals(2, containers.size());
     assertEquals(2, data.getTotalCount());
+
+    // test if prevKey parameter in containerResponse works as expected
+    response = containerEndpoint.getContainers(5, 0L);
+    responseObject = (ContainersResponse) response.getEntity();
+    data = responseObject.getContainersResponseData();
+    containers = new ArrayList<>(data.getContainers());
+    // The results will be limited to 5 containers only
+    // Get the last container ID from the List
+    long expectedLastContainerID =
+        containers.get(containers.size() - 1).getContainerID();
+    long actualLastContainerID = data.getPrevKey();
+    // test if prev-key param works as expected
+    assertEquals(expectedLastContainerID, actualLastContainerID);
   }
 
   @Test
@@ -629,8 +642,9 @@ public class TestContainerEndpoint {
 
     ContainersResponse.ContainersResponseData data =
         responseObject.getContainersResponseData();
-    // Ensure that the total count of containers is 4
-    assertEquals(4, data.getTotalCount());
+    // Ensure that the total count of containers is 3 as containers having
+    // ID's 1,2, will be skipped and the next 3 containers will be returned
+    assertEquals(3, data.getTotalCount());
 
     List<ContainerMetadata> containers = new ArrayList<>(data.getContainers());
 
@@ -638,10 +652,10 @@ public class TestContainerEndpoint {
 
     ContainerMetadata containerMetadata = iterator.next();
 
-    // Ensure that the containers list size is 4
-    assertEquals(4, containers.size());
-    // Ensure that the first container ID is 2
-    assertEquals(2L, containerMetadata.getContainerID());
+    // Ensure that the containers list size is 3
+    assertEquals(3, containers.size());
+    // Ensure that the first container ID is 3
+    assertEquals(3L, containerMetadata.getContainerID());
 
     // test for negative cases
     response = containerEndpoint.getContainers(-1, 0L);
