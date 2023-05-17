@@ -31,7 +31,7 @@ index 9261ba47d..1e62b88a3 100644
  
  }  // namespace ROCKSDB_NAMESPACE
 diff --git a/table/sst_file_dumper.cc b/table/sst_file_dumper.cc
-index eefbaaeee..80723a068 100644
+index eefbaaeee..98d37dd5c 100644
 --- a/table/sst_file_dumper.cc
 +++ b/table/sst_file_dumper.cc
 @@ -45,7 +45,7 @@ SstFileDumper::SstFileDumper(const Options& options,
@@ -135,7 +135,7 @@ index eefbaaeee..80723a068 100644
      }
    } else {
      char error_msg_buffer[80];
-@@ -427,12 +430,54 @@ Status SstFileDumper::SetOldTableOptions() {
+@@ -427,12 +430,53 @@ Status SstFileDumper::SetOldTableOptions() {
    assert(table_properties_ == nullptr);
    options_.table_factory = std::make_shared<BlockBasedTableFactory>();
    if (!silent_) {
@@ -190,7 +190,7 @@ index eefbaaeee..80723a068 100644
  Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
                                       bool has_from, const std::string& from_key,
                                       bool has_to, const std::string& to_key,
-@@ -478,22 +523,19 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
+@@ -478,22 +522,19 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
  
      if (print_kv) {
        if (!decode_blob_index_ || ikey.type != kTypeBlobIndex) {
