@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
@@ -60,7 +59,6 @@ public class TestHeatMapInfo {
 
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneConfiguration ozoneConfiguration;
   private String auditRespStr;
   private HeatMapUtil heatMapUtilUnderTest;
 
@@ -85,8 +83,6 @@ public class TestHeatMapInfo {
             .addBinding(HeatMapUtil.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    ozoneConfiguration =
-        reconTestInjector.getInstance(OzoneConfiguration.class);
     heatMapUtilUnderTest = reconTestInjector.getInstance(HeatMapUtil.class);
     auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +

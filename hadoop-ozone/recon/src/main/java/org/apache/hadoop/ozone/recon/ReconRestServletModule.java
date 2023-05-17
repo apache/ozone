@@ -76,7 +76,6 @@ public class ReconRestServletModule extends ServletModule {
   private void configureApi(String baseApiPath, String... packages) {
     StringBuilder sb = new StringBuilder();
     Set<String> adminEndpoints = new HashSet<>();
-    Set<String> internalOnlyEndpoints = new HashSet<>();
 
     for (String pkg : packages) {
       if (sb.length() > 0) {
