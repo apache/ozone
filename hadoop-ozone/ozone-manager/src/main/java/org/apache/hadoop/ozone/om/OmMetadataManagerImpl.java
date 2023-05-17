@@ -388,7 +388,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), false));
+          java.util.Optional.of(Boolean.TRUE), false, false));
       initializeOmTables(false);
     } catch (IOException e) {
       stop();
@@ -530,7 +530,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty(), true);
+            java.util.Optional.empty(), true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -539,13 +539,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                        disableAutoCompaction)
           throws IOException {
     return loadDB(configuration, metaDir, dbName, readOnly,
-        disableAutoCompaction, true);
+        disableAutoCompaction, true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
                                    disableAutoCompaction,
+                               boolean enableCompactionDag,
                                boolean createCheckpointDirs)
       throws IOException {
     final int maxFSSnapshots = configuration.getInt(
@@ -557,7 +558,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
-        .setEnableCompactionLog(true)
+        .setEnableCompactionDag(enableCompactionDag)
         .setCreateCheckpointDirs(createCheckpointDirs);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);

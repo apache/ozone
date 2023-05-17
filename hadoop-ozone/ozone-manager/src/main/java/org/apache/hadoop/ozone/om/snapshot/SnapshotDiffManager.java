@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +56,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
@@ -221,7 +223,9 @@ public class SnapshotDiffManager implements AutoCloseable {
             .build()
     );
 
-    Path path = Paths.get(differ.getMetadataDir(), "snapDiff");
+    RDBStore rdbStore = (RDBStore) ozoneManager.getMetadataManager().getStore();
+    Objects.requireNonNull(rdbStore, "DBStore can't be null.");
+    Path path = Paths.get(rdbStore.getSnapshotMetadataDir(), "snapDiff");
     createEmptySnapDiffDir(path);
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
