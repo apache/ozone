@@ -324,8 +324,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-      clientProtocolServer = new HddsDatanodeClientProtocolServer(this, conf,
-          HddsVersionInfo.HDDS_VERSION_INFO);
+      clientProtocolServer = new HddsDatanodeClientProtocolServer(
+          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO);
 
       // Get admin list
       String omStarterUser =

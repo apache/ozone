@@ -21,12 +21,16 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -57,6 +61,11 @@ public class ReconfigureCommands implements Callable<Void>,
       required = true)
   private String address;
 
+  @CommandLine.Option(names = {"--type", "-t"},
+      description = "The type of server",
+      required = false)
+  private String type;
+
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
@@ -72,4 +81,19 @@ public class ReconfigureCommands implements Callable<Void>,
     return OzoneAdmin.class;
   }
 
+  public String getType() {
+    return type != null ? type : "";
+  }
+
+  public List<String> getAllOperableNodesClientRpcAddress() {
+    List<String> nodes;
+    try (ScmClient scmClient = new ContainerOperationClient(
+        parent.createOzoneConfiguration())) {
+      nodes = ReconfigureSubCommandUtil
+          .getAllOperableNodesClientRpcAddress(scmClient);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    return nodes;
+  }
 }
