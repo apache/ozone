@@ -89,7 +89,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     long omKeyCount = 0;
 
     // In-memory maps for fast look up and batch write
-    // key -> containerId
+    // (container, key) -> count
     Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
     // containerId -> key count
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
@@ -202,7 +202,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     // in "process" without batching since the maximum number of keys
     // is bounded by delta limit configurations
 
-    // key -> containerId
+    // (container, key) -> count
     Map<ContainerKeyPrefix, Integer> containerKeyMap = new HashMap<>();
     // containerId -> key count
     Map<Long, Long> containerKeyCountMap = new HashMap<>();
@@ -490,8 +490,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           }
 
           // increment the count and update containerKeyCount.
-          // keyCount will be 0 if containerID is not found. So, there is no
-          // need to initialize keyCount for the first time.
           containerKeyCountMap.put(containerId, ++keyCount);
         }
       }
