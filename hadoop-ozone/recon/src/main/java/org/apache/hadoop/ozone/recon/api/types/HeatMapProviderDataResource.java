@@ -18,19 +18,23 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.Arrays;
 
 /**
- * This class is used to encapsulate entity's audit log event metadata objects.
+ * This class is used to encapsulate entity's access metadata objects.
  */
-public class AuditLogFacetsResources {
-  private EntityMetaData[] buckets;
+public class HeatMapProviderDataResource {
+  @JsonProperty("buckets")
+  private EntityMetaData[] metaDataList;
 
-  public EntityMetaData[] getBuckets() {
-    return Arrays.copyOfRange(buckets, 0, buckets.length);
+  public EntityMetaData[] getMetaDataList() {
+    return Arrays.copyOfRange(metaDataList, 0, metaDataList.length);
   }
 
-  public void setBuckets(EntityMetaData[] buckets) {
-    this.buckets = Arrays.copyOfRange(buckets, 0, buckets.length);
+  public void setMetaDataList(EntityMetaData[] metaDataList) {
+    this.metaDataList = Arrays.copyOfRange(metaDataList, 0,
+        metaDataList.length);
   }
 }

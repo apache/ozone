@@ -25,24 +25,53 @@ import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * This class is to retrieve heatmap data in a specific format for processing.
  */
 public class HeatMapProviderImpl implements IHeatMapProvider {
   private OzoneConfiguration ozoneConfiguration;
   private ReconOMMetadataManager omMetadataManager;
+
+  /**
+   * This method allows heatmap provider to implement fetching of access
+   * metadata of entities (volumes/buckets/keys/files) to return data
+   * in below desired format for generation of heatmap.
+   * List of EntityMetaData objects. Sample EntityMetaData object:
+   * entityMetaDataObj:
+   * val = "hivevol1676574631/hiveencbuck1676574631/enc_path/hive_tpcds/
+   * store_sales/store_sales.dat"
+   * readAccessCount = 155074
+   *
+   * @param path path of entity (volume/bucket/key)
+   * @param entityType type of entity (volume/bucket/key)
+   * @param startDate the start date since when access metadata to be retrieved
+   * @return the list of EntityMetaData objects
+   * @throws Exception
+   */
   @Override
-  public EntityMetaData[] retrieveData(String normalizePath,
-                                       String entityType,
-                                       String startDate) {
-    return null;
+  public List<EntityMetaData> retrieveData(String path,
+                                           String entityType,
+                                           String startDate) throws Exception {
+    return Collections.emptyList();
   }
 
+  /**
+   * Initializes the config variables and
+   * other objects needed by HeatMapProvider.
+   * @param ozoneConf
+   * @param omMetadataMgr
+   * @param namespaceSummaryManager
+   * @param reconSCM
+   * @throws Exception
+   */
   @Override
   public void init(OzoneConfiguration ozoneConf,
                    ReconOMMetadataManager omMetadataMgr,
                    ReconNamespaceSummaryManager namespaceSummaryManager,
-                   OzoneStorageContainerManager reconSCM) {
+                   OzoneStorageContainerManager reconSCM) throws Exception {
     this.ozoneConfiguration = ozoneConf;
     this.omMetadataManager = omMetadataMgr;
   }

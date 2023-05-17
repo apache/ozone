@@ -23,7 +23,6 @@ import com.google.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -45,35 +44,47 @@ public class HeatMapServiceImpl extends HeatMapService {
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
   private IHeatMapProvider heatMapProvider;
+  private HeatMapUtil heatMapUtil;
 
   @Inject
   public HeatMapServiceImpl(OzoneConfiguration ozoneConfiguration,
                             ReconNamespaceSummaryManager
-                                     namespaceSummaryManager,
+                                namespaceSummaryManager,
                             ReconOMMetadataManager omMetadataManager,
-                            OzoneStorageContainerManager reconSCM)
-      throws Exception {
+                            OzoneStorageContainerManager reconSCM) {
     this.ozoneConfiguration = ozoneConfiguration;
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
+    heatMapUtil =
+        new HeatMapUtil(reconNamespaceSummaryManager, omMetadataManager,
+            reconSCM, ozoneConfiguration);
     initializeProvider();
   }
 
-  private void initializeProvider() throws Exception {
+  private void initializeProvider() {
     String heatMapProviderCls = ozoneConfiguration.get(
         OZONE_RECON_HEATMAP_PROVIDER_KEY);
     LOG.info("HeatMapProvider: {}", heatMapProviderCls);
     if (StringUtils.isEmpty(heatMapProviderCls)) {
       heatMapProvider = new HeatMapProviderImpl();
     } else {
-      IHeatMapProvider iHeatMapProvider =
-          ReconUtils.loadHeatMapProvider(heatMapProviderCls);
+      IHeatMapProvider iHeatMapProvider = null;
+      try {
+        iHeatMapProvider = heatMapUtil.loadHeatMapProvider(heatMapProviderCls);
+      } catch (Exception e) {
+        LOG.error("Loading HeatMapProvider fails!!! : {}", e);
+        return;
+      }
       if (null != iHeatMapProvider) {
-        iHeatMapProvider.init(ozoneConfiguration, omMetadataManager,
-            reconNamespaceSummaryManager, reconSCM);
+        try {
+          iHeatMapProvider.init(ozoneConfiguration, omMetadataManager,
+              reconNamespaceSummaryManager, reconSCM);
+        } catch (Exception e) {
+          LOG.error("Initializing HeatMapProvider fails!!! : {}", e);
+        }
       } else {
-        LOG.warn("HeatMapProvider implementation failed to load !!!");
+        LOG.error("Loading HeatMapProvider fails!!!");
       }
     }
   }
@@ -83,9 +94,6 @@ public class HeatMapServiceImpl extends HeatMapService {
       String path,
       String entityType,
       String startDate) throws Exception {
-    HeatMapUtil heatMapUtil = new HeatMapUtil(
-        reconNamespaceSummaryManager, omMetadataManager, reconSCM,
-        ozoneConfiguration);
     return heatMapUtil.retrieveData(heatMapProvider, validatePath(path),
         entityType, startDate);
   }

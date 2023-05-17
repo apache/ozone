@@ -25,9 +25,9 @@ import com.google.gson.JsonParser;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.AuditLogFacetsResources;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+import org.apache.hadoop.ozone.recon.api.types.HeatMapProviderDataResource;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -41,6 +41,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -752,12 +755,14 @@ public class TestHeatMapInfo {
             .getAsJsonObject();
     ObjectMapper objectMapper = new ObjectMapper();
 
-    AuditLogFacetsResources auditLogFacetsResources =
+    HeatMapProviderDataResource auditLogFacetsResources =
         objectMapper.readValue(
-            facetsBucketsObject.toString(), AuditLogFacetsResources.class);
-    EntityMetaData[] entities = auditLogFacetsResources.getBuckets();
+            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
+    List<EntityMetaData> entityMetaDataList =
+        Arrays.stream(entities).collect(Collectors.toList());
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        heatMapUtilUnderTest.generateHeatMap(entities);
+        heatMapUtilUnderTest.generateHeatMap(entityMetaDataList);
     Assertions.assertTrue(
         entityReadAccessHeatMapResponse.getChildren().size() > 0);
     Assertions.assertEquals(12,

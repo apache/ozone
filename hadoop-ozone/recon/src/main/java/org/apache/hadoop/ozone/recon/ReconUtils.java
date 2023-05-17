@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.recon.heatmap.IHeatMapProvider;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -341,27 +340,5 @@ public class ReconUtils {
       index += 1;
     }
     return index;
-  }
-
-  /**
-   * This method loads heatMapProvider implementation class.
-   *
-   * @param className - load the class and instantiate object.
-   * @return the implementation class object of IHeatMapProvider
-   * @throws Exception
-   */
-  public static IHeatMapProvider loadHeatMapProvider(String className)
-      throws Exception {
-    try {
-      Class<?> clazz = Class.forName(className);
-      Object o = clazz.newInstance();
-      if (o instanceof IHeatMapProvider) {
-        return (IHeatMapProvider) o;
-      }
-      return null;
-    } catch (ClassNotFoundException | InstantiationException |
-             IllegalAccessException e) {
-      throw new Exception(e);
-    }
   }
 }

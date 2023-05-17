@@ -20,7 +20,7 @@
 package org.apache.hadoop.ozone.recon.heatmap;
 
 import com.google.inject.Inject;
-import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
@@ -210,15 +210,97 @@ public class HeatMapUtil {
     bucket.setSize(bucket.getSize() + keySize);
   }
 
+  /**
+   * Transforms the access metadata of entities (provided by heatmap provider)
+   * by grouping them in their respective buckets and volumes  in tree structure
+   * format which is easy for heatmap UI to consume.
+   * Sample Data Format:
+   * {
+   *   "label": "root",
+   *   "children": [
+   *     {
+   *       "label": "hivevol1676574631",
+   *       "children": [
+   *         {
+   *           "label": "hiveencbuck1676574631",
+   *           "children": [
+   *             {
+   *               "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+   *               "size": 256,
+   *               "accessCount": 155074,
+   *               "color": 1
+   *             },
+   *             {
+   *               "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+   *               "size": 256,
+   *               "accessCount": 68567,
+   *               "color": 0.442
+   *             }
+   *           ],
+   *           "size": 3584,
+   *           "minAccessCount": 2924,
+   *           "maxAccessCount": 155074
+   *         },
+   *         {
+   *           "label": "hivebuck1676574631",
+   *           "children": [
+   *             {
+   *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+   *               "size": 256,
+   *               "accessCount": 155069,
+   *               "color": 1
+   *             },
+   *             {
+   *               "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+   *               "size": 256,
+   *               "accessCount": 68566,
+   *               "color": 0.442
+   *             }
+   *           ],
+   *           "size": 3584,
+   *           "minAccessCount": 2924,
+   *           "maxAccessCount": 155069
+   *         }
+   *       ],
+   *       "size": 7168
+   *     },
+   *     {
+   *       "label": "hivevol1675429570",
+   *       "children": [
+   *         {
+   *           "label": "hivebuck1675429570",
+   *           "children": [
+   *             {
+   *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+   *               "size": 256,
+   *               "accessCount": 129977,
+   *               "color": 1
+   *             }          ],
+   *           "size": 3072,
+   *           "minAccessCount": 3195,
+   *           "maxAccessCount": 129977
+   *         }
+   *       ],
+   *       "size": 6144
+   *     }
+   *   ],
+   *   "size": 25600,
+   *   "minAccessCount": 2924,
+   *   "maxAccessCount": 155074
+   * }
+   * @param entityMetaDataList list of entity's access metadata objects
+   * @return transformed data to be consumed by heatmap UI.
+   */
   public EntityReadAccessHeatMapResponse generateHeatMap(
-      EntityMetaData[] entities) {
+      List<EntityMetaData> entityMetaDataList) {
     EntityReadAccessHeatMapResponse rootEntity =
         new EntityReadAccessHeatMapResponse();
-    rootEntity.setMinAccessCount(entities[0].getReadAccessCount());
+    rootEntity.setMinAccessCount(
+        entityMetaDataList.get(0).getReadAccessCount());
     rootEntity.setLabel("root");
     List<EntityReadAccessHeatMapResponse> children =
         rootEntity.getChildren();
-    Arrays.stream(entities).forEach(entityMetaData -> {
+    entityMetaDataList.forEach(entityMetaData -> {
       String path = entityMetaData.getVal();
       String[] split = path.split("/");
       if (split.length == 0) {
@@ -281,12 +363,38 @@ public class HeatMapUtil {
       String entityType,
       String startDate) throws Exception {
     if (null != heatMapProvider) {
-      EntityMetaData[] entities = heatMapProvider.retrieveData(normalizePath,
-          entityType, startDate);
-      if (null != entities && !(ArrayUtils.isEmpty(entities))) {
-        return generateHeatMap(entities);
+      List<EntityMetaData> entityMetaDataList = heatMapProvider
+          .retrieveData(normalizePath, entityType, startDate);
+      if (null != entityMetaDataList &&
+          (CollectionUtils.isNotEmpty(entityMetaDataList))) {
+        // Transforms and return heatmap data by grouping access metadata of
+        // entities in their respective buckets and volumes in tree structure.
+        // Refer the javadoc for more details.ß
+        return generateHeatMap(entityMetaDataList);
       }
     }
-    return null;
+    return new EntityReadAccessHeatMapResponse();
+  }
+
+  /**
+   * This method loads heatMapProvider implementation class.
+   *
+   * @param className - load the class and instantiate object.
+   * @return the implementation class object of IHeatMapProvider
+   * @throws Exception
+   */
+  public static IHeatMapProvider loadHeatMapProvider(String className)
+      throws Exception {
+    try {
+      Class<?> clazz = Class.forName(className);
+      Object o = clazz.newInstance();
+      if (o instanceof IHeatMapProvider) {
+        return (IHeatMapProvider) o;
+      }
+      return null;
+    } catch (ClassNotFoundException | InstantiationException |
+             IllegalAccessException e) {
+      throw new Exception(e);
+    }
   }
 }

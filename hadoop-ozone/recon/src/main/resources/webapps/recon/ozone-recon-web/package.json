@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@ant-design/icons": "^5.0.1",
     "@babel/core": "^7.0.0",
     "@fontsource/roboto": "^4.5.8",
     "@types/classnames": "^2.2.10",

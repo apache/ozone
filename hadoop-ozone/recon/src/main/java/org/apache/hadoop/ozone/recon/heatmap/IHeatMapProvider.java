@@ -25,16 +25,44 @@ import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
+import java.util.List;
+
 /**
  * This interface is to provide heatmap data.
  */
 public interface IHeatMapProvider {
-  EntityMetaData[] retrieveData(
-      String normalizePath,
+  /**
+   * This method allows heatmap provider to implement fetching of access
+   * metadata of entities (volumes/buckets/keys/files) to return data
+   * in below desired format for generation of heatmap.
+   * List of EntityMetaData objects. Sample EntityMetaData object:
+   * entityMetaDataObj:
+   * val = "hivevol1676574631/hiveencbuck1676574631/enc_path/hive_tpcds/
+   * store_sales/store_sales.dat"
+   * readAccessCount = 155074
+   *
+   * @param path path of entity (volume/bucket/key)
+   * @param entityType type of entity (volume/bucket/key)
+   * @param startDate the start date since when access metadata to be retrieved
+   * @return the list of EntityMetaData objects
+   * @throws Exception
+   */
+  List<EntityMetaData> retrieveData(
+      String path,
       String entityType,
       String startDate) throws Exception;
+
+  /**
+   * Initializes the config variables and
+   * other objects needed by HeatMapProvider.
+   * @param ozoneConfiguration
+   * @param omMetadataManager
+   * @param namespaceSummaryManager
+   * @param reconSCM
+   * @throws Exception
+   */
   void init(OzoneConfiguration ozoneConfiguration,
             ReconOMMetadataManager omMetadataManager,
             ReconNamespaceSummaryManager namespaceSummaryManager,
-            OzoneStorageContainerManager reconSCM);
+            OzoneStorageContainerManager reconSCM) throws Exception;
 }
