@@ -278,6 +278,7 @@ public class OMDBInsightEndpoint {
    * seeks correctly to the given prevKey.
    * Sample API Response:
    * {
+   *   "lastKey": "vol1/bucket1/key1",
    *   "replicatedTotal": -1530804718628866300,
    *   "unreplicatedTotal": -1530804718628866300,
    *   "deletedkeyinfo": [
@@ -321,7 +322,7 @@ public class OMDBInsightEndpoint {
    * }
    */
   @GET
-  @Path("/deletePending/keys")
+  @Path("/deletePending")
   public Response getDeletedKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
@@ -408,6 +409,7 @@ public class OMDBInsightEndpoint {
    * seeks correctly to the given prevKey.
    * Sample API Response:
    * {
+   *   "lastKey": "vol1/bucket1/bucket1/dir1"
    *   "replicatedTotal": -1530804718628866300,
    *   "unreplicatedTotal": -1530804718628866300,
    *   "deletedkeyinfo": [
