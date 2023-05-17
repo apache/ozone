@@ -3622,6 +3622,16 @@
   </property>
 
   <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Fully qualified heatmap provider implementation class name.
+      E.g. org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
