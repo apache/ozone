@@ -48,7 +48,7 @@ public class TestOzoneManagerHASnapshot extends TestOzoneManagerHA {
    * passed or empty.
    */
   @Test
-  public void testUniqueSnapshotName() throws Exception {
+  public void testSnapshotNameConsistency() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String volumeName = ozoneBucket.getVolumeName();
     String bucketName = ozoneBucket.getName();
@@ -116,5 +116,6 @@ public class TestOzoneManagerHASnapshot extends TestOzoneManagerHA {
 
     await().atMost(Duration.ofSeconds(180))
         .until(() -> getCluster().getOMLeader() != null);
+    assertNotNull(getCluster().getOMLeader());
   }
 }
