@@ -20,12 +20,17 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
+
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 
 /**
  * Persistent map backed by RocksDB.
@@ -85,9 +90,33 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   }
 
   @Override
-  public ClosableIterator<Map.Entry<K, V>> iterator() {
-    ManagedRocksIterator iterator =
-        new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
+  public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
+                                                    Optional<K> upperBound) {
+    ManagedReadOptions readOptions;
+    RocksIterator rocksIterator;
+    if (lowerBound.isPresent() || upperBound.isPresent()) {
+      readOptions = new ManagedReadOptions();
+      try {
+        if (lowerBound.isPresent()) {
+          readOptions.setIterateLowerBound(new ManagedSlice(
+              codecRegistry.asRawData(lowerBound.get())));
+        }
+
+        if (upperBound.isPresent()) {
+          readOptions.setIterateLowerBound(new ManagedSlice(
+              codecRegistry.asRawData(upperBound.get())));
+        }
+      } catch (IOException exception) {
+        // TODO: [SNAPSHOT] Fail gracefully.
+        throw new RuntimeException(exception);
+      }
+
+      rocksIterator = db.get().newIterator(columnFamilyHandle, readOptions);
+    } else {
+      rocksIterator = db.get().newIterator(columnFamilyHandle);
+    }
+
+    ManagedRocksIterator iterator = new ManagedRocksIterator(rocksIterator);
     iterator.get().seekToFirst();
 
     return new ClosableIterator<Map.Entry<K, V>>() {
