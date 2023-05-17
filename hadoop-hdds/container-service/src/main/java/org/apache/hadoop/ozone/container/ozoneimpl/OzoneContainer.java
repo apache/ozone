@@ -329,8 +329,16 @@ public class OzoneContainer {
       return;
     }
     initOnDemandContainerScanner(c);
-    initMetadataScanner(c);
-    initContainerScanner(c);
+
+    // This config is for testing the scanners in isolation.
+    if (c.isMetadataScanEnabled()) {
+      initMetadataScanner(c);
+    }
+
+    // This config is for testing the scanners in isolation.
+    if (c.isDataScanEnabled()) {
+      initContainerScanner(c);
+    }
   }
 
   private void initContainerScanner(ContainerScannerConfiguration c) {
