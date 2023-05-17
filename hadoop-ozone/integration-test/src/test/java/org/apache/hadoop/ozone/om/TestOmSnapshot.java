@@ -909,7 +909,6 @@ public class TestOmSnapshot {
     cluster.restartOzoneManager();
     await().atMost(Duration.ofSeconds(120)).
         until(() -> cluster.getOzoneManager().isRunning());
-    Thread.sleep(1000L);
 
     response = store.snapshotDiff(volumeName, bucketName,
         snapshot1, snapshot2, null, 0, false);

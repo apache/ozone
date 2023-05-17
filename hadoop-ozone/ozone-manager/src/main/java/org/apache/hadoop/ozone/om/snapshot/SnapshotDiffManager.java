@@ -1271,7 +1271,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private void closeExecutorService(ExecutorService executorService,
                                     String serviceName) {
     if (executorService != null) {
-      LOG.info("Shutting down executorService {}", serviceName);
+      LOG.info("Shutting down executorService: '{}'", serviceName);
       executorService.shutdownNow();
       try {
         if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {

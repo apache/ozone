@@ -71,26 +71,22 @@ public class TestOzoneManagerHASnapshot extends TestOzoneManagerHA {
     getCluster().shutdownOzoneManager(omLeader);
     getCluster().restartOzoneManager(omLeader, true);
 
-    await().atMost(Duration.ofSeconds(120)).
-        until(() -> getCluster().getOMLeader() != null);
+    await().atMost(Duration.ofSeconds(120))
+        .until(() -> getCluster().getOMLeader() != null);
 
     String newLeader = getCluster().getOMLeader().getOMNodeId();
 
     if (Objects.equals(oldLeader, newLeader)) {
-      // If old leader becomes leader again. Wait for some time to snapshot diff
-      // job finish because OM will load IN_PROGRESS on the startup.
-      Thread.sleep(1000L);
-      response =
-          getObjectStore().snapshotDiff(volumeName, bucketName, snapshot1,
-              snapshot2, null, 0, false);
+      // If old leader becomes leader again. Job should be done by this time.
+      response = getObjectStore().snapshotDiff(volumeName, bucketName,
+          snapshot1, snapshot2, null, 0, false);
       assertEquals(DONE, response.getJobStatus());
       assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
     } else {
       // If new leader is different from old leader. SnapDiff request will be
       // new to OM, and job status should be IN_PROGRESS.
-      response =
-          getObjectStore().snapshotDiff(volumeName, bucketName, snapshot1,
-              snapshot2, null, 0, false);
+      response = getObjectStore().snapshotDiff(volumeName, bucketName,
+          snapshot1, snapshot2, null, 0, false);
       assertEquals(IN_PROGRESS, response.getJobStatus());
       while (true) {
         response =
@@ -107,7 +103,7 @@ public class TestOzoneManagerHASnapshot extends TestOzoneManagerHA {
   }
 
   @Test
-  public void testUniqueSnapshotId() throws Exception {
+  public void testSnapshotIdConsistency() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String volumeName = ozoneBucket.getVolumeName();
     String bucketName = ozoneBucket.getName();
