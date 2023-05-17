@@ -60,10 +60,6 @@ export const routes: IRoute[] = [
     component: MissingContainers,
   },
   {
-    path: '/HeatMap',
-    component: HeatMap
-  },
-  {
     path: '/:NotFound',
     component: NotFound
   }

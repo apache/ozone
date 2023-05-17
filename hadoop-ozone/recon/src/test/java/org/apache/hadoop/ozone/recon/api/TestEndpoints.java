@@ -642,7 +642,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
-    Assertions.assertEquals(3, clusterStateResponse.getDeletedKeys());
+    Assertions.assertEquals(3, clusterStateResponse.getKeysPendingDeletion());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 

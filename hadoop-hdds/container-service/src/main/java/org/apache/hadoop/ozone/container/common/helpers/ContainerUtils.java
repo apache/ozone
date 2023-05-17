@@ -88,7 +88,7 @@ public final class ContainerUtils {
             ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
       }
     } else {
-      log.info(logInfo, request.getCmdType(), request.getTraceID(),
+      log.warn(logInfo, request.getCmdType(), request.getTraceID(),
           ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
     }
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())

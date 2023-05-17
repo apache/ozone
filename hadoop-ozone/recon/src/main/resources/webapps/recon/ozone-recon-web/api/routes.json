@@ -23,6 +23,5 @@
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",
-  "/containers/unhealthy": "/unhealthyContainers",
-  "/heatmap/readaccess?startDate=*&path=*&entityType=*": "/heatmap"
+  "/containers/unhealthy": "/unhealthyContainers"
 }

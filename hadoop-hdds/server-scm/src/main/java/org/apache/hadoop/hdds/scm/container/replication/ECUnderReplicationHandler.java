@@ -124,19 +124,15 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       return 0;
     }
 
-    // don't place reconstructed replicas on exclude nodes, since they already
-    // have replicas
-    List<DatanodeDetails> excludedNodes = replicas.stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList());
-    // DNs that are already waiting to receive replicas cannot be targets
-    excludedNodes.addAll(
-        pendingOps.stream()
-        .filter(containerReplicaOp -> containerReplicaOp.getOpType() ==
-            ContainerReplicaOp.PendingOpType.ADD)
-        .map(ContainerReplicaOp::getTarget)
-        .collect(Collectors.toList()));
+    ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
+        ReplicationManagerUtil.getExcludedAndUsedNodes(
+            new ArrayList<>(replicas), Collections.emptySet(), pendingOps,
+            replicationManager);
+    List<DatanodeDetails> excludedNodes
+        = excludedAndUsedNodes.getExcludedNodes();
     excludedNodes.addAll(replicationManager.getExcludedNodes());
+    List<DatanodeDetails> usedNodes
+        = excludedAndUsedNodes.getUsedNodes();
 
     final ContainerID id = container.containerID();
     int commandsSent = 0;
@@ -162,14 +158,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         IOException firstException = null;
         try {
           commandsSent += processMissingIndexes(replicaCount, sources,
-              availableSourceNodes, excludedNodes);
+              availableSourceNodes, excludedNodes, usedNodes);
         } catch (InsufficientDatanodesException
             | CommandTargetOverloadedException  e) {
           firstException = e;
         }
         try {
           commandsSent += processDecommissioningIndexes(replicaCount, sources,
-              availableSourceNodes, excludedNodes);
+              availableSourceNodes, excludedNodes, usedNodes);
         } catch (InsufficientDatanodesException
             | CommandTargetOverloadedException e) {
           if (firstException == null) {
@@ -178,7 +174,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         }
         try {
           commandsSent += processMaintenanceOnlyIndexes(replicaCount, sources,
-              excludedNodes);
+              excludedNodes, usedNodes);
         } catch (InsufficientDatanodesException
             | CommandTargetOverloadedException e) {
           if (firstException == null) {
@@ -272,7 +268,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       ECContainerReplicaCount replicaCount, Map<Integer,
       Pair<ContainerReplica, NodeStatus>> sources,
       List<DatanodeDetails> availableSourceNodes,
-      List<DatanodeDetails> excludedNodes) throws IOException {
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> usedNodes) throws IOException {
     ContainerInfo container = replicaCount.getContainer();
     ECReplicationConfig repConfig =
         (ECReplicationConfig)container.getReplicationConfig();
@@ -286,7 +283,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       int expectedTargets = missingIndexes.size();
       final List<DatanodeDetails> selectedDatanodes =
           ReplicationManagerUtil.getTargetDatanodes(containerPlacement,
-              expectedTargets, null, excludedNodes, currentContainerSize,
+              expectedTargets, usedNodes, excludedNodes, currentContainerSize,
               container);
 
       // If we got less targets than missing indexes, we need to prune the
@@ -297,7 +294,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             missingIndexes.size()).clear();
       }
       if (validatePlacement(availableSourceNodes, selectedDatanodes)) {
-        excludedNodes.addAll(selectedDatanodes);
+        usedNodes.addAll(selectedDatanodes);
         // TODO - what are we adding all the selected nodes to available
         //        sources?
         availableSourceNodes.addAll(selectedDatanodes);
@@ -357,18 +354,19 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       ECContainerReplicaCount replicaCount,
       Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
       List<DatanodeDetails> availableSourceNodes,
-      List<DatanodeDetails> excludedNodes) throws IOException {
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> usedNodes)
+      throws IOException {
     ContainerInfo container = replicaCount.getContainer();
     Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
     int commandsSent = 0;
     if (decomIndexes.size() > 0) {
       final List<DatanodeDetails> selectedDatanodes =
           ReplicationManagerUtil.getTargetDatanodes(containerPlacement,
-              decomIndexes.size(), null, excludedNodes, currentContainerSize,
-              container);
+              decomIndexes.size(), usedNodes, excludedNodes,
+              currentContainerSize, container);
 
       if (validatePlacement(availableSourceNodes, selectedDatanodes)) {
-        excludedNodes.addAll(selectedDatanodes);
+        usedNodes.addAll(selectedDatanodes);
         Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
         // In this case we need to do one to one copy.
         CommandTargetOverloadedException overloadedException = null;
@@ -382,11 +380,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           ContainerReplica sourceReplica = source.getLeft();
           if (!iterator.hasNext()) {
             LOG.warn("Couldn't find enough targets. Available source"
-                + " nodes: {}, the target nodes: {}, excluded nodes: {}"
-                + "  and the decommission indexes: {}",
+                + " nodes: {}, the target nodes: {}, excluded nodes: {},"
+                + " usedNodes: {}, and the decommission indexes: {}",
                 sources.values().stream()
                     .map(Pair::getLeft).collect(Collectors.toSet()),
-                selectedDatanodes, excludedNodes, decomIndexes);
+                selectedDatanodes, excludedNodes, usedNodes, decomIndexes);
             break;
           }
           try {
@@ -430,7 +428,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private int processMaintenanceOnlyIndexes(
       ECContainerReplicaCount replicaCount,
       Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
-      List<DatanodeDetails> excludedNodes) throws IOException {
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> usedNodes)
+      throws IOException {
     Set<Integer> maintIndexes = replicaCount.maintenanceOnlyIndexes(true);
     if (maintIndexes.isEmpty()) {
       return 0;
@@ -444,9 +443,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       return 0;
     }
     List<DatanodeDetails> targets = ReplicationManagerUtil.getTargetDatanodes(
-        containerPlacement, maintIndexes.size(), null, excludedNodes,
+        containerPlacement, maintIndexes.size(), usedNodes, excludedNodes,
         currentContainerSize, container);
-    excludedNodes.addAll(targets);
+    usedNodes.addAll(targets);
 
     Iterator<DatanodeDetails> iterator = targets.iterator();
     int commandsSent = 0;
@@ -466,11 +465,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       ContainerReplica sourceReplica = source.getLeft();
       if (!iterator.hasNext()) {
         LOG.warn("Couldn't find enough targets. Available source"
-                + " nodes: {}, target nodes: {}, excluded nodes: {} and"
+                + " nodes: {}, target nodes: {}, excluded nodes: {},"
+                + " usedNodes: {} and"
                 + " maintenance indexes: {}",
             sources.values().stream()
                 .map(Pair::getLeft).collect(Collectors.toSet()),
-            targets, excludedNodes, maintIndexes);
+            targets, excludedNodes, usedNodes, maintIndexes);
         break;
       }
       try {
