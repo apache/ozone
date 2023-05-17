@@ -26,6 +26,7 @@ import org.junit.Test;
 
 import javax.net.ssl.TrustManager;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -51,16 +52,16 @@ public class TestReloadingX509TrustManager {
     TrustManager tm =
         caClient.getServerKeyStoresFactory().getTrustManagers()[0];
     X509Certificate cert1 = caClient.getLatestRootCACertificate();
-    assertEquals(cert1,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
+    assertTrue(isCertAcceptedInTrustManager(cert1, tm));
 
     caClient.renewRootCA();
     caClient.renewKey();
     X509Certificate cert2 = caClient.getLatestRootCACertificate();
     assertNotEquals(cert1, cert2);
 
-    assertEquals(cert2,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
+
+    assertTrue(isCertAcceptedInTrustManager(cert1, tm));
+    assertTrue(isCertAcceptedInTrustManager(cert2, tm));
 
     assertTrue(reloaderLog.getOutput().contains(
         "ReloadingX509TrustManager is reloaded"));
@@ -68,5 +69,12 @@ public class TestReloadingX509TrustManager {
     // Make sure there are two reload happened, one for server, one for client
     assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),
         "ReloadingX509TrustManager is reloaded"));
+  }
+
+  private boolean isCertAcceptedInTrustManager(X509Certificate cert,
+      TrustManager tm) {
+    X509Certificate[] acceptedIssuers =
+        ((ReloadingX509TrustManager) tm).getAcceptedIssuers();
+    return Arrays.asList(acceptedIssuers).contains(cert);
   }
 }

@@ -54,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -112,6 +113,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private PublicKey publicKey;
   private CertPath certPath;
   private Map<String, CertPath> certificateMap;
+  private Set<CertPath> rootCerts;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -139,6 +141,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
+    this.rootCerts = ConcurrentHashMap.newKeySet();
 
     updateCertSerialId(certSerialId);
   }
@@ -190,6 +193,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.ROOT.getFileNamePrefix().length()));
+                  rootCerts.add(allCertificates);
                   if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
                     latestRootCaCertSerialId = tmpRootCaCertSerailId;
                   }
@@ -863,6 +867,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }
     return null;
+  }
+
+  @Override
+  public Set<X509Certificate> getAllRootCaCerts() {
+    return rootCerts.stream().
+        map(this::firstCertificateFrom)
+        .collect(Collectors.toSet());
   }
 
   @Override
