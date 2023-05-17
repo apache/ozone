@@ -108,7 +108,7 @@ public class TestOzoneECClient {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(String omServiceId)
+      protected OmTransport createOmTransport()
           throws IOException {
         return transport;
       }

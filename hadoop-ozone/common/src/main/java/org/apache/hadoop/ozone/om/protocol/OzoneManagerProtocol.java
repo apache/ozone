@@ -1071,4 +1071,11 @@ public interface OzoneManagerProtocol
    */
   boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException;
+  /**
+   * Renew the leases of a client.
+   *
+   * @return true if renewal is successful
+   * @throws IOException if an error occurs
+   */
+  boolean renewLease() throws IOException;
 }

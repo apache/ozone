@@ -140,6 +140,7 @@ enum Type {
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
+  RenewLease = 125;
 }
 
 enum SafeMode {
@@ -270,6 +271,7 @@ message OMRequest {
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
+  optional RenewLeaseRequest                RenewLeaseRequest              = 125;
 }
 
 message OMResponse {
@@ -385,6 +387,7 @@ message OMResponse {
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
+  optional RenewLeaseResponse                RenewLeaseResponse            = 125;
 }
 
 enum Status {
@@ -1970,6 +1973,12 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message RenewLeaseRequest {
+}
+
+message RenewLeaseResponse {
 }
 
 /**

@@ -168,6 +168,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewLeaseRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SafeMode;
@@ -2364,9 +2365,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     case GET:
       return SafeMode.GET;
     default:
-      throw new IllegalArgumentException("Unsupported safe mode action " +
-          action);
+      throw new IllegalArgumentException(
+          "Unsupported safe mode action " + action);
     }
+  }
+
+  @Override
+  public boolean renewLease() throws IOException {
+    RenewLeaseRequest renewLeaseRequest =
+        RenewLeaseRequest.newBuilder().build();
+
+    OMRequest omRequest = createOMRequest(Type.RenewLease)
+        .setRenewLeaseRequest(renewLeaseRequest).build();
+
+    handleError(submitRequest(omRequest));
+    return true;
   }
 
   @VisibleForTesting

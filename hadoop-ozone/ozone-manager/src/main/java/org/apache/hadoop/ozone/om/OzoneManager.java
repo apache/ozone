@@ -4476,8 +4476,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     switch (action) {
     case ENTER:
-      throw new OMException("Enter safe mode is unsupported",
-          INTERNAL_ERROR);
+      throw new OMException("Enter safe mode is unsupported", INTERNAL_ERROR);
     case FORCE_EXIT:
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
@@ -4488,6 +4487,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Unsupported safe mode action " + action,
           INTERNAL_ERROR);
     }
+  }
+
+  @Override
+  public boolean renewLease() throws IOException {
+    return true;
   }
 
   /**

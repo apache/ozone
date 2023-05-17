@@ -83,7 +83,7 @@ public class TestOzoneClient {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(String omServiceId)
+      protected OmTransport createOmTransport()
           throws IOException {
         return new MockOmTransport(blkAllocator);
       }

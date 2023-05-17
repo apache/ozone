@@ -96,8 +96,7 @@ public class TestReplicatedFileChecksumHelper {
     rpcClient = new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(
-          String omServiceId)
+      protected OmTransport createOmTransport()
           throws IOException {
         return new MockOmTransport();
       }

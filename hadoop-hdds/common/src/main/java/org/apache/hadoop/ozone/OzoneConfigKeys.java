@@ -657,6 +657,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
 
+  public static final int LEASE_HARDLIMIT_DEFAULT = 20 * 60;
+  public static final long LEASE_SOFTLIMIT_PERIOD_DEFAULT = 60000L;
+
   /**
    * There is no need to instantiate this class.
    */

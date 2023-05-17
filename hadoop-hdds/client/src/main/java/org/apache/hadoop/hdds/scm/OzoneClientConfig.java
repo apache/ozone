@@ -29,6 +29,8 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.LEASE_HARDLIMIT_DEFAULT;
+
 /**
  * Configuration values for Ozone Client.
  */
@@ -214,6 +216,20 @@ public class OzoneClientConfig {
   private String checksumCombineMode =
       ChecksumCombineMode.COMPOSITE_CRC.name();
 
+  @Config(key = "lease-hard-limit-ms",
+      defaultValue =  "1200",
+      description = "Determines the namenode automatic lease recovery " +
+          "interval in milliseconds.",
+      tags = ConfigTag.CLIENT)
+  private int leaseHardLimit = LEASE_HARDLIMIT_DEFAULT;
+
+  @Config(key = "timeout",
+      defaultValue =  "1200",
+      description = "Determines the timeout for lease renewal request in " +
+          "milliseconds",
+      tags = ConfigTag.CLIENT)
+  private int timeout = 0;
+
   @Config(key = "fs.default.bucket.layout",
       defaultValue = "FILE_SYSTEM_OPTIMIZED",
       type = ConfigType.STRING,
@@ -398,5 +414,13 @@ public class OzoneClientConfig {
 
   public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
     this.datastreamPipelineMode = datastreamPipelineMode;
+  }
+
+  public int getLeaseHardLimitPeriod() {
+    return leaseHardLimit;
+  }
+
+  public int getTimeout() {
+    return timeout;
   }
 }

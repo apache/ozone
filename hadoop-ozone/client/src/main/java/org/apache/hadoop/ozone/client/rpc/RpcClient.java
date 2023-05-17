@@ -196,6 +196,7 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
+  private final String omServiceId;
   private final ACLType userRights;
   private final ACLType groupRights;
   private final ClientId clientId = ClientId.randomId();
@@ -211,6 +212,8 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
   private final ContainerClientMetrics clientMetrics;
+  private volatile boolean clientRunning = true;
+  private final RpcClientFileLease fileLease;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -224,6 +227,7 @@ public class RpcClient implements ClientProtocol {
     Preconditions.checkNotNull(conf);
     this.conf = conf;
     this.ugi = UserGroupInformation.getCurrentUser();
+    this.omServiceId = omServiceId;
     // Get default acl rights for user and group.
     OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
     this.userRights = aclConfig.getUserDefaultRights();
@@ -231,7 +235,7 @@ public class RpcClient implements ClientProtocol {
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
-    OmTransport omTransport = createOmTransport(omServiceId);
+    OmTransport omTransport = createOmTransport();
     OzoneManagerProtocolClientSideTranslatorPB
         ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
@@ -324,6 +328,8 @@ public class RpcClient implements ClientProtocol {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
     this.clientMetrics = ContainerClientMetrics.acquire();
+    this.fileLease = new RpcClientFileLease(omServiceId, ugi,
+        ozoneManagerClient, clientId, clientConfig, this);
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -384,7 +390,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @VisibleForTesting
-  protected OmTransport createOmTransport(String omServiceId)
+  protected OmTransport createOmTransport()
       throws IOException {
     return OmTransportFactory.create(conf, ugi, omServiceId);
   }
@@ -1660,6 +1666,8 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
+    clientRunning = false;
+    fileLease.closeAllFilesBeingWritten(false);
     if (ecReconstructExecutor != null) {
       ecReconstructExecutor.shutdownNow();
       ecReconstructExecutor = null;
@@ -2245,7 +2253,8 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
-        .setClientMetrics(clientMetrics);
+        .setClientMetrics(clientMetrics)
+        .setLeaseEventListener(fileLease);
   }
 
   @Override
@@ -2377,5 +2386,28 @@ public class RpcClient implements ClientProtocol {
       }
     }
     return executor;
+  }
+
+  /** @return true if the client is running */
+  public boolean isClientRunning() {
+    return clientRunning;
+  }
+
+  /**
+   * Renew leases.
+   * @return true if lease was renewed. May return false if this
+   * client has been closed or has no files open.
+   **/
+  public boolean renewLease() throws IOException {
+    return fileLease.renewLease();
+  }
+
+  public ClientId getClientId() {
+    return clientId;
+  }
+
+  @VisibleForTesting
+  OzoneClientConfig getConf() {
+    return clientConfig;
   }
 }
