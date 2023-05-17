@@ -94,6 +94,9 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   private Optional<byte[]> getNextByteArray() throws IOException {
     Optional<Integer> size = getNextNumberInStream();
     if (size.isPresent()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Allocating byte array, size: {}", size.get());
+      }
       byte[] b = new byte[size.get()];
       int n = processOutput.read(b);
       if (n >= 0 && n != size.get()) {
@@ -207,7 +210,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
                   sequenceNumber.toString(), type)));
       nextKey = Optional.of(new KeyValue(key.get(), sequenceNumber, type, val));
     } catch (IOException e) {
-      // TODO [Snapshot] : Throw custom snapshot exception
+      // TODO [SNAPSHOT] Throw custom snapshot exception
       throw new RuntimeIOException(e);
     }
     return getTransformedValue(currentKey);

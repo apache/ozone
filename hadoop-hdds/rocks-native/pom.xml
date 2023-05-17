@@ -370,7 +370,7 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <groups>native</groups>
-                            <argLine>${maven-surefire-plugin.argLine}  @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
+                            <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
                         </configuration>
                     </plugin>
                 </plugins>

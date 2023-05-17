@@ -162,7 +162,6 @@ index eefbaaeee..80723a068 100644
 +
 +void write(const std::string& value, FILE* file) {
 +  write(value.data(), (int)value.length(), file);
-+
 +}
 +
 +void write(Slice &slice, FILE* file) {
@@ -176,16 +175,16 @@ index eefbaaeee..80723a068 100644
 +  int idx = 7;
 +  while (idx >= 0) {
 +    b[idx] = sequenceNumber % 256;
-+    sequenceNumber/=256;
++    sequenceNumber /= 256;
 +    idx -= 1;
 +  }
 +  fwrite(b, 8, 1, file);
 +}
 +
 +void write(ParsedInternalKey &key, FILE* file) {
-+    write(key.user_key, file);
-+    write(key.sequence, file);
-+    write(static_cast<int>(key.type), file);
++  write(key.user_key, file);
++  write(key.sequence, file);
++  write(static_cast<int>(key.type), file);
 +}
 +
  Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
