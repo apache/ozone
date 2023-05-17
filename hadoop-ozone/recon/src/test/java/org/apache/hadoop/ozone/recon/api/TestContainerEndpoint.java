@@ -612,7 +612,8 @@ public class TestContainerEndpoint {
     assertEquals(2, containers.size());
     assertEquals(2, data.getTotalCount());
 
-    // test if prevKey parameter in containerResponse works as expected
+    // test if prevKey parameter in containerResponse works as expected for
+    // sequential container Ids
     response = containerEndpoint.getContainers(5, 0L);
     responseObject = (ContainersResponse) response.getEntity();
     data = responseObject.getContainersResponseData();
@@ -621,8 +622,29 @@ public class TestContainerEndpoint {
     // Get the last container ID from the List
     long expectedLastContainerID =
         containers.get(containers.size() - 1).getContainerID();
+    // Get the last container ID from the response
     long actualLastContainerID = data.getPrevKey();
     // test if prev-key param works as expected
+    assertEquals(expectedLastContainerID, actualLastContainerID);
+
+    // test if prevKey/lastContainerID object in containerResponse works
+    // as expected for non-sequential container Ids
+    for (int i = 10; i <= 50; i += 10) {
+      final ContainerInfo info = newContainerInfo(i);
+      reconContainerManager.addNewContainer(
+          new ContainerWithPipeline(info, pipeline));
+    }
+
+    response = containerEndpoint.getContainers(10, 0L);
+    responseObject = (ContainersResponse) response.getEntity();
+    data = responseObject.getContainersResponseData();
+    containers = new ArrayList<>(data.getContainers());
+    // The results will be limited to 10 containers only
+    // Get the last container ID from the List
+    expectedLastContainerID =
+        containers.get(containers.size() - 1).getContainerID();
+    // Get the last container ID from the Response
+    actualLastContainerID = data.getPrevKey();
     assertEquals(expectedLastContainerID, actualLastContainerID);
   }
 
@@ -656,6 +678,13 @@ public class TestContainerEndpoint {
     assertEquals(3, containers.size());
     // Ensure that the first container ID is 3
     assertEquals(3L, containerMetadata.getContainerID());
+
+    // test if prevKey/lastContainerID object in containerResponse works as
+    // expected when both limit and prevKey parameters are provided to method
+    long expectedLastContainerID =
+        containers.get(containers.size() - 1).getContainerID();
+    long actualLastContainerID = data.getPrevKey();
+    assertEquals(expectedLastContainerID, actualLastContainerID);
 
     // test for negative cases
     response = containerEndpoint.getContainers(-1, 0L);
