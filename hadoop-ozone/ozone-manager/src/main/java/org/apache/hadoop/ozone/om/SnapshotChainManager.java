@@ -452,7 +452,7 @@ public class SnapshotChainManager {
         .getNextSnapshotID() == null) {
       LOG.error("No following snapshot for provided snapshotId {} and " +
           "snapshotPath {}.", snapshotID, snapshotPath);
-      throw new NoSuchElementException(String.format("Ne following snapshot " +
+      throw new NoSuchElementException(String.format("No following snapshot " +
           "found in snapshot chain for snapshotId: %s and snapshotPath: " +
           "%s.", snapshotID, snapshotPath));
     }
@@ -482,8 +482,8 @@ public class SnapshotChainManager {
         .get(snapshotID)
         .getPreviousSnapshotID() == null) {
       LOG.error("No preceding snapshot for provided snapshotId: {} and " +
-          "snapshotPath: {}", snapshotPath, snapshotID);
-      throw new NoSuchElementException(String.format("Ne preceding snapshot " +
+          "snapshotPath: {}", snapshotID, snapshotPath);
+      throw new NoSuchElementException(String.format("No preceding snapshot " +
               "found in snapshot chain for snapshotId: %s and snapshotPath: " +
               "%s.", snapshotID, snapshotPath));
     }
