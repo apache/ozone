@@ -444,6 +444,36 @@ public class ECReconstructionCoordinator implements Closeable {
         resultMap.put(blockID.getLocalID(), blkDataArr);
       }
     }
+    // When a stripe is written, the put block is sent to all nodes even if
+    // that nodes has zero bytes written to it. If the
+    // client does not get an ACK from all nodes, it will abandon the stripe,
+    // which can leave incomplete stripes on the DNs. Therefore, we should check
+    // that all blocks in the result map have an entry for all nodes. If they
+    // do not, it means this is an abandoned stripe and we should not attempt
+    // to reconstruct it.
+    // Note that if some nodes report different values for the block length,
+    // it also indicate garbage data at the end of the block. A different part
+    // of the code handles this and only reconstructs the valid part of the
+    // block, ie the minimum length reported by the nodes.
+    Iterator<Map.Entry<Long, BlockData[]>> resultIterator
+        = resultMap.entrySet().iterator();
+    while (resultIterator.hasNext()) {
+      Map.Entry<Long, BlockData[]> entry = resultIterator.next();
+      BlockData[] blockDataArr = entry.getValue();
+      for (Map.Entry<Integer, DatanodeDetails> e : sourceNodeMap.entrySet()) {
+        // There should be an entry in the Array for each keyset node. If there
+        // is not, this is an orphaned stripe and we should remove it from the
+        // result.
+        if (blockDataArr[e.getKey() - 1] == null) {
+          LOG.warn("In container {} block {} does not have a putBlock entry " +
+              "for index {} on datanode {} making it an orphan block / " +
+              "stripe. It will not be reconstructed", containerID,
+              entry.getKey(), e.getKey(), e.getValue());
+          resultIterator.remove();
+          break;
+        }
+      }
+    }
     return resultMap;
   }
 
