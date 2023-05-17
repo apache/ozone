@@ -77,9 +77,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -118,7 +116,6 @@ public class TestOmSnapshot {
   private static OzoneManager ozoneManager;
   private static RDBStore rdbStore;
   private static OzoneBucket ozoneBucket;
-  private static File metaDir;
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -195,7 +192,6 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(conf);
   }
 
   @AfterClass
@@ -849,9 +845,9 @@ public class TestOmSnapshot {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
-    String snapshotDirName = metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName();
+    String snapshotDirName =
+        OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(),
+            snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils
         .waitFor(() -> new File(snapshotDirName).exists(), 1000, 120000);
     return snapshotKeyPrefix;
@@ -923,11 +919,9 @@ public class TestOmSnapshot {
     if (response.getJobStatus() == DONE) {
       assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
     } else if (response.getJobStatus() == IN_PROGRESS) {
-      Thread.sleep(response.getWaitTimeInMs());
-      response = store.snapshotDiff(volumeName, bucketName,
-          snapshot1, snapshot2, null, 0, false);
-      assertEquals(DONE, response.getJobStatus());
-      assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
+      SnapshotDiffReportOzone diffReport =
+          fetchReportPage(snapshot1, snapshot2, null, 0);
+      assertEquals(100, diffReport.getDiffList().size());
     } else {
       fail("Unexpected job status for the test.");
     }
@@ -943,19 +937,11 @@ public class TestOmSnapshot {
     String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(5);
     createSnapshots(snapshot1, snapshot2);
 
-    SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
-        snapshot1, snapshot2, null, pageSize, false);
+    SnapshotDiffReportOzone diffReport = fetchReportPage(snapshot1, snapshot2,
+        null, pageSize);
 
-    assertEquals(IN_PROGRESS, response.getJobStatus());
-    Thread.sleep(response.getWaitTimeInMs());
-
-    response = store.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
-        null, pageSize, false);
-    assertEquals(DONE, response.getJobStatus());
-
-    List<DiffReportEntry> diffReportEntries =
-        new ArrayList<>(response.getSnapshotDiffReport().getDiffList());
-    String nextToken = response.getSnapshotDiffReport().getToken();
+    List<DiffReportEntry> diffReportEntries = diffReport.getDiffList();
+    String nextToken = diffReport.getToken();
 
     // Restart the OM and no need to wait because snapDiff job finished before
     // the restart.
@@ -963,19 +949,31 @@ public class TestOmSnapshot {
     await().atMost(Duration.ofSeconds(120)).
         until(() -> cluster.getOzoneManager().isRunning());
 
-    response = store.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
-        nextToken, pageSize, false);
-
-    // Assert that job is done before start fetching the report otherwise fail.
-    assertEquals(DONE, response.getJobStatus());
-
     while (nextToken == null || StringUtils.isNotEmpty(nextToken)) {
-      response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-          snapshot2, nextToken, pageSize, false);
-      diffReportEntries.addAll(response.getSnapshotDiffReport().getDiffList());
-      nextToken = response.getSnapshotDiffReport().getToken();
+      diffReport = fetchReportPage(snapshot1, snapshot2, nextToken, pageSize);
+      diffReportEntries.addAll(diffReport.getDiffList());
+      nextToken = diffReport.getToken();
     }
     assertEquals(100, diffReportEntries.size());
+  }
+
+  private SnapshotDiffReportOzone fetchReportPage(String fromSnapshot,
+                                                  String toSnapshot,
+                                                  String token,
+                                                  int pageSize)
+      throws IOException, InterruptedException {
+
+    while (true) {
+      SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
+          fromSnapshot, toSnapshot, token, pageSize, false);
+      if (response.getJobStatus() == IN_PROGRESS) {
+        Thread.sleep(response.getWaitTimeInMs());
+      } else if (response.getJobStatus() == DONE) {
+        return response.getSnapshotDiffReport();
+      } else {
+        fail("Unexpected job status for the test.");
+      }
+    }
   }
 
   private void createSnapshots(String snapshot1,
