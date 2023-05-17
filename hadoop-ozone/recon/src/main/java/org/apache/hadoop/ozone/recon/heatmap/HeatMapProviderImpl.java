@@ -32,9 +32,6 @@ import java.util.List;
  * This class is to retrieve heatmap data in a specific format for processing.
  */
 public class HeatMapProviderImpl implements IHeatMapProvider {
-  private OzoneConfiguration ozoneConfiguration;
-  private ReconOMMetadataManager omMetadataManager;
-
   /**
    * This method allows heatmap provider to implement fetching of access
    * metadata of entities (volumes/buckets/keys/files) to return data
@@ -72,7 +69,5 @@ public class HeatMapProviderImpl implements IHeatMapProvider {
                    ReconOMMetadataManager omMetadataMgr,
                    ReconNamespaceSummaryManager namespaceSummaryManager,
                    OzoneStorageContainerManager reconSCM) throws Exception {
-    this.ozoneConfiguration = ozoneConf;
-    this.omMetadataManager = omMetadataMgr;
   }
 }
