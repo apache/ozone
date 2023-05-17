@@ -104,6 +104,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -208,11 +209,11 @@ public class TestBlockDeletingService {
     data = (KeyValueContainerData) containerSet.getContainer(
         containerID).getContainerData();
     data.setSchemaVersion(schemaVersion);
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
           containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-    } else if (schemaVersion.equals(SCHEMA_V2)
-        || schemaVersion.equals(SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, SCHEMA_V2)
+        || isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
           containerID, numOfChunksPerBlock, buffer, chunkManager,
           container, data);
@@ -297,7 +298,7 @@ public class TestBlockDeletingService {
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
 
-        if (schemaVersion.equals(SCHEMA_V3)) {
+        if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
           DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
               (DatanodeStoreSchemaThreeImpl) ds;
           dnStoreThreeImpl.getDeleteTransactionTable()
@@ -383,12 +384,12 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(DBHandle meta,
       KeyValueContainerData data) throws IOException {
-    if (data.getSchemaVersion().equals(SCHEMA_V1)) {
+    if (data.hasSchema(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
           .getRangeKVs(null, 100, data.containerPrefix(),
               data.getDeletingBlockKeyFilter())
           .size();
-    } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
+    } else if (data.hasSchema(SCHEMA_V2)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
@@ -404,7 +405,7 @@ public class TestBlockDeletingService {
         }
       }
       return pendingBlocks;
-    } else if (data.getSchemaVersion().equals(SCHEMA_V3)) {
+    } else if (data.hasSchema(SCHEMA_V3)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
@@ -437,7 +438,7 @@ public class TestBlockDeletingService {
   @Test
   public void testPendingDeleteBlockReset() throws Exception {
     // This test is not relevant for schema V1.
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       return;
     }
 

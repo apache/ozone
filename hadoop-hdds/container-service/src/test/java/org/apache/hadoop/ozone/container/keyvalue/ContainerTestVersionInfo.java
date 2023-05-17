@@ -27,6 +27,7 @@ import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
  * Class to hold version info for container data and metadata.
@@ -75,7 +76,7 @@ public class ContainerTestVersionInfo {
   }
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       ContainerTestUtils.enableSchemaV3(conf);
     } else {
       ContainerTestUtils.disableSchemaV3(conf);

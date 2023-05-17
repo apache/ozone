@@ -85,6 +85,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -331,7 +332,7 @@ public class TestContainerPersistence {
 
   @Test
   public void testDeleteContainer() throws IOException {
-    assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     long testContainerID = getTestContainerID();
     Container<KeyValueContainerData> container = addContainer(containerSet,
         testContainerID);

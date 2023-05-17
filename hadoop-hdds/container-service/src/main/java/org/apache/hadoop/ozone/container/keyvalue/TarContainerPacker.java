@@ -189,7 +189,7 @@ public class TarContainerPacker
   }
 
   public static Path getDbPath(KeyValueContainerData containerData) {
-    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+    if (containerData.hasSchema(SCHEMA_V3)) {
       return DatanodeStoreSchemaThreeImpl.getDumpDir(
           new File(containerData.getMetadataPath())).toPath();
     } else {
@@ -207,7 +207,7 @@ public class TarContainerPacker
     Path dbPath = Paths.get(containerData.getDbFile().getPath());
     Path relativePath = containerPath.relativize(dbPath);
 
-    if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+    if (containerData.hasSchema(SCHEMA_V3)) {
       Path metadataDir = KeyValueContainerLocationUtil.getContainerMetaDataPath(
           baseDir.toString()).toPath();
       return DatanodeStoreSchemaThreeImpl.getDumpDir(metadataDir.toFile())
