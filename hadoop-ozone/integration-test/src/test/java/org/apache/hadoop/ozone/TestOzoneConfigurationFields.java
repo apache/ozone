@@ -21,16 +21,16 @@ import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
-
-import java.util.Arrays;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
+
+import java.util.Arrays;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
@@ -108,8 +108,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
-        ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY,
-        ReconConfigKeys.OZONE_RECON_SOLR_TIMEZONE_KEY,
+        ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,

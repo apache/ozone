@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api.filters;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.recon.heatmap.IHeatMapProvider;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,8 +30,10 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
+import static org.apache.hadoop.ozone.recon.ReconUtils.loadHeatMapProvider;
 
 /**
  * This is a filter for internal heatmap feature.
@@ -39,15 +41,15 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KE
 public class HeatMapFilter implements Filter {
   private static Logger log = LoggerFactory.getLogger(HeatMapFilter.class);
 
-  private String solrAddressForHeatMap;
+  private String heatMapProviderImplCls;
 
   public HeatMapFilter() {
   }
 
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
-    solrAddressForHeatMap = filterConfig.
-        getInitParameter(OZONE_SOLR_ADDRESS_KEY);
+    heatMapProviderImplCls = filterConfig.
+        getInitParameter(OZONE_RECON_HEATMAP_PROVIDER_KEY);
   }
 
   @Override
@@ -56,13 +58,20 @@ public class HeatMapFilter implements Filter {
       throws IOException, ServletException {
     String reason;
     int errCode = HttpStatus.SC_FAILED_DEPENDENCY;
-    HttpServletResponse httpResponse = (HttpServletResponse)servletResponse;
-    if (StringUtils.isEmpty(solrAddressForHeatMap)) {
-      reason = "Solr Address Not Configured";
-      httpResponse.setStatus(errCode, reason);
-      httpResponse.sendError(errCode, reason);
-    } else {
-      filterChain.doFilter(servletRequest, servletResponse);
+    HttpServletResponse httpResponse = (HttpServletResponse) servletResponse;
+    try {
+      IHeatMapProvider iHeatMapProvider =
+          loadHeatMapProvider(heatMapProviderImplCls);
+      String startDate = String.valueOf(Instant.now().toEpochMilli() - 100000);
+      if (null == iHeatMapProvider.retrieveData("/", "key", startDate)) {
+        reason = "HeatMapProvider implementation not available.";
+        httpResponse.setStatus(errCode, reason);
+        httpResponse.sendError(errCode, reason);
+      } else {
+        filterChain.doFilter(servletRequest, servletResponse);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 

@@ -39,8 +39,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * This class is general utility class for handling
- * Solr query functions.
+ * This class is general utility class for keeping heatmap utility functions.
  */
 public class HeatMapUtil {
   private static final Logger LOG =
@@ -281,10 +280,12 @@ public class HeatMapUtil {
       IHeatMapProvider heatMapProvider, String normalizePath,
       String entityType,
       String startDate) throws Exception {
-    EntityMetaData[] entities = heatMapProvider.retrieveData(normalizePath,
-        entityType, startDate);
-    if (null != entities && !(ArrayUtils.isEmpty(entities))) {
-      return generateHeatMap(entities);
+    if (null != heatMapProvider) {
+      EntityMetaData[] entities = heatMapProvider.retrieveData(normalizePath,
+          entityType, startDate);
+      if (null != entities && !(ArrayUtils.isEmpty(entities))) {
+        return generateHeatMap(entities);
+      }
     }
     return null;
   }

@@ -17,6 +17,6 @@
  */
 
 /**
- * This package contains solr access related and some util classes.
+ * This package contains heatmap feature related test classes.
  */
 package org.apache.hadoop.ozone.recon.heatmap;

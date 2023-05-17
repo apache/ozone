@@ -37,15 +37,14 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_TYPE;
 
 
 /**
- * Endpoint for querying access metadata from Apache Solr
- * audit data documents to generate heatmap in Recon.
+ * Endpoint for querying access metadata from HeatMapProvider interface
+ * to generate heatmap in Recon.
  */
 @Path("/heatmap")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
 @InternalOnly(feature = "Heatmap", description = "Heatmap feature has " +
-    "dependency on Solr service component which is indexing ozone ranger" +
-    " based audit logs.")
+    "dependency on heatmap provider service component implementation.")
 public class AccessHeatMapEndpoint {
 
   private HeatMapServiceImpl heatMapService;

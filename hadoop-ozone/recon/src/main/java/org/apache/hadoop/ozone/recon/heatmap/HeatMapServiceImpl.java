@@ -23,6 +23,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -67,9 +68,13 @@ public class HeatMapServiceImpl extends HeatMapService {
       heatMapProvider = new HeatMapProviderImpl();
     } else {
       IHeatMapProvider iHeatMapProvider =
-          loadHeatMapProvider(heatMapProviderCls);
-      iHeatMapProvider.init(ozoneConfiguration, omMetadataManager,
-          reconNamespaceSummaryManager, reconSCM);
+          ReconUtils.loadHeatMapProvider(heatMapProviderCls);
+      if (null != iHeatMapProvider) {
+        iHeatMapProvider.init(ozoneConfiguration, omMetadataManager,
+            reconNamespaceSummaryManager, reconSCM);
+      } else {
+        LOG.warn("HeatMapProvider implementation failed to load !!!");
+      }
     }
   }
 
@@ -90,20 +95,5 @@ public class HeatMapServiceImpl extends HeatMapService {
       path = path.substring(1);
     }
     return path;
-  }
-
-  private IHeatMapProvider loadHeatMapProvider(String className)
-      throws Exception {
-    try {
-      Class<?> clazz = Class.forName(className);
-      Object o = clazz.newInstance();
-      if (o instanceof IHeatMapProvider) {
-        return (IHeatMapProvider) o;
-      }
-      return null;
-    } catch (ClassNotFoundException | InstantiationException |
-             IllegalAccessException e) {
-      throw new Exception(e);
-    }
   }
 }

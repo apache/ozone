@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.recon.heatmap;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 
 /**
- * This is an abstract class acting as an interface for access to Solr Service.
+ * This is an abstract class for implementation of access to HeatMap Service.
  */
 public abstract class HeatMapService {
   public abstract EntityReadAccessHeatMapResponse retrieveData(

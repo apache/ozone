@@ -36,7 +36,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_SOLR_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
  * Filter class acts as framework to apply filters to endpoint paths which are
@@ -95,7 +95,8 @@ public class ReconInternalComponentFilter implements Filter {
     // This can be map of other parameters (can be added in future) if a
     // heatmap feature have dependency on other parameters as well.
     Map<String, String> parameters = new HashMap<>();
-    parameters.put(OZONE_SOLR_ADDRESS_KEY, conf.get(OZONE_SOLR_ADDRESS_KEY));
+    parameters.put(OZONE_RECON_HEATMAP_PROVIDER_KEY,
+        conf.get(OZONE_RECON_HEATMAP_PROVIDER_KEY));
     return parameters;
   }
 

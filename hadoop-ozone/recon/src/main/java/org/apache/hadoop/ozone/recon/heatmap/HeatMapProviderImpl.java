@@ -35,7 +35,7 @@ public class HeatMapProviderImpl implements IHeatMapProvider {
   public EntityMetaData[] retrieveData(String normalizePath,
                                        String entityType,
                                        String startDate) {
-    return new EntityMetaData[0];
+    return null;
   }
 
   @Override

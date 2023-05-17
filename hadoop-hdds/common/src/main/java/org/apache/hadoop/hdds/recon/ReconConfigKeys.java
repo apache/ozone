@@ -36,12 +36,8 @@ public final class ReconConfigKeys {
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
-  public static final String OZONE_SOLR_ADDRESS_KEY =
-      "solr.address";
   public static final String OZONE_RECON_HEATMAP_PROVIDER_KEY =
       "ozone.recon.heatmap.provider";
-  public static final String OZONE_RECON_SOLR_TIMEZONE_KEY =
-      "ozone.recon.solr.timezone";
   public static final String OZONE_RECON_ADDRESS_DEFAULT =
       "0.0.0.0:9891";
   public static final String OZONE_RECON_HTTP_ADDRESS_KEY =
@@ -57,7 +53,6 @@ public final class ReconConfigKeys {
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9891;
-  public static final int OZONE_SOLR_SERVER_PORT_DEFAULT = 8995;
   // Prometheus HTTP endpoint including port
   // ex: http://prometheus:9090
   public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
