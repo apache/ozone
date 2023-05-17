@@ -92,7 +92,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   @Override
   public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
                                                     Optional<K> upperBound) {
-    ManagedReadOptions readOptions;
+    final ManagedReadOptions readOptions;
     RocksIterator rocksIterator;
     if (lowerBound.isPresent() || upperBound.isPresent()) {
       readOptions = new ManagedReadOptions();
@@ -113,6 +113,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
 
       rocksIterator = db.get().newIterator(columnFamilyHandle, readOptions);
     } else {
+      readOptions = null;
       rocksIterator = db.get().newIterator(columnFamilyHandle);
     }
 
@@ -162,6 +163,9 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       @Override
       public void close() {
         iterator.close();
+        if (readOptions != null) {
+          readOptions.close();
+        }
       }
     };
   }
