@@ -449,7 +449,6 @@ Apache License 2.0
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
    org.awaitility:awaitility
-   org.apache.solr:solr-solrj
 
 MIT
 =====================

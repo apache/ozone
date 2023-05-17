@@ -231,7 +231,8 @@ public class HeatMapUtil {
    *               "color": 1
    *             },
    *             {
-   *               "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+   *               "label": "enc_path/hive_tpcds/catalog_sales/
+   *               catalog_sales.dat",
    *               "size": 256,
    *               "accessCount": 68567,
    *               "color": 0.442
@@ -251,7 +252,8 @@ public class HeatMapUtil {
    *               "color": 1
    *             },
    *             {
-   *               "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+   *               "label": "reg_path/hive_tpcds/catalog_sales/
+   *               catalog_sales.dat",
    *               "size": 256,
    *               "accessCount": 68566,
    *               "color": 0.442
