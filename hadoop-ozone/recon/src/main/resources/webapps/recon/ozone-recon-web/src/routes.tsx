@@ -24,7 +24,6 @@ import {IRoute} from './types/routes.types';
 import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
 import {DiskUsage} from './views/diskUsage/diskUsage';
-import {HeatMap} from './views/heatMap/heatMap';
 
 export const routes: IRoute[] = [
   {
