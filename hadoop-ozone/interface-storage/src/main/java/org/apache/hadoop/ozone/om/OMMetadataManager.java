@@ -370,7 +370,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
 
-  Table<String, String> getSnapshotRenamedKeyTable();
+  Table<String, String> getSnapshotRenamedTable();
 
   /**
    * Gets the OM Meta table.
@@ -492,7 +492,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in
-   * snapshotRenamedKeyTable.
+   * snapshotRenamedTable.
    *
    * @param volume   - volume name
    * @param bucket   - bucket name

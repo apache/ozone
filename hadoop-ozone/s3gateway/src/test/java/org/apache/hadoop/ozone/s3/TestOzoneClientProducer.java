@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
@@ -128,6 +130,15 @@ public class TestOzoneClientProducer {
         {
             "", null, null, null, null, null
         },
+        // AWS V2 signature
+        {
+            "AWS AKIDEXAMPLE:St7bHPOdkmsX/GITGe98rOQiUCg=",
+            "",
+            "s3g:9878",
+            "",
+            "Wed, 22 Mar 2023 17:00:06 +0000",
+            "application/octet-stream"
+        }
     });
   }
 
@@ -154,18 +165,22 @@ public class TestOzoneClientProducer {
         fail("Empty AuthHeader must fail");
       }
     } catch (WebApplicationException ex) {
-      if (authHeader == null || authHeader.equals("")) {
-        // Empty auth header should be 403
+      if (authHeader == null || authHeader.isEmpty() ||
+              authHeader.startsWith("AWS ")) {
+        // Empty auth header and unsupported AWS signature
+        // should fail with Invalid Request.
         Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
-        // TODO: Should return XML in body like this (bot not for now):
-        // <Error>
-        //   <Code>AccessDenied</Code><Message>Access Denied</Message>
-        //   <RequestId>...</RequestId><HostId>...</HostId>
-        // </Error>
+        Assert.assertEquals(S3_AUTHINFO_CREATION_ERROR.getErrorMessage(),
+            ex.getMessage());
       } else {
-        // Other requests have stale timestamp and thus should fail
+        // Other requests have stale timestamp and
+        // should fail with Malformed Authorization Header.
         Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
+        Assert.assertEquals(MALFORMED_HEADER.getErrorMessage(),
+            ex.getMessage());
+
       }
+
     } catch (Exception ex) {
       fail("Unexpected exception: " + ex);
     }

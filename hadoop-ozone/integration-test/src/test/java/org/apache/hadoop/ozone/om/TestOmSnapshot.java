@@ -82,6 +82,8 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMI
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -163,6 +165,8 @@ public class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         forceFullSnapshotDiff);
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
@@ -914,15 +918,35 @@ public class TestOmSnapshot {
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     RDBStore snapshotDBStore = (RDBStore)
-            ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
+        ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
             .checkForSnapshot(volumeName, bucketName, snapPrefix))
             .getMetadataManager().getStore();
 
     for (String table : snapshotDBStore.getTableNames().values()) {
       Assertions.assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
-              .getHandle().getDescriptor()
-              .getOptions().disableAutoCompactions());
+          .getHandle().getDescriptor()
+          .getOptions().disableAutoCompactions());
     }
   }
 
+  @Test
+  public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
+    String snapshotName = createSnapshot(volumeName, bucketName);
+
+    RDBStore activeDbStore =
+        (RDBStore) cluster.getOzoneManager().getMetadataManager().getStore();
+    // RocksDBCheckpointDiffer should be not null for active DB store.
+    assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
+    assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
+
+    OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
+        .getOmSnapshotManager()
+        .checkForSnapshot(volumeName, bucketName, snapshotName);
+
+    RDBStore snapshotDbStore =
+        (RDBStore) omSnapshot.getMetadataManager().getStore();
+    // RocksDBCheckpointDiffer should be null for snapshot DB store.
+    assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
+    assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
+  }
 }

@@ -420,8 +420,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     rocksOptions.setListeners(list);
   }
 
-  public void setRocksDBForCompactionTracking(DBOptions rocksOptions)
-      throws RocksDBException {
+  public void setRocksDBForCompactionTracking(DBOptions rocksOptions) {
     setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
   }
 

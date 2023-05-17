@@ -45,6 +45,12 @@ public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
   }
 
   @Override
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    return rm.getInflightReplicationCount() >= pendingOpLimit;
+  }
+
+  @Override
   protected int sendDatanodeCommands(
           ReplicationManager replicationManager,
           ContainerHealthResult.UnderReplicatedHealthResult healthResult)

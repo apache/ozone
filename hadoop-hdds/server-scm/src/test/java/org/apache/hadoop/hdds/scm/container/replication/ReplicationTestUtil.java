@@ -284,7 +284,8 @@ public final class ReplicationTestUtil {
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
-        if (excludedNodes.contains(nodeToReturn)) {
+        if (excludedNodes.contains(nodeToReturn)
+            || usedNodes.contains(nodeToReturn)) {
           throw new SCMException("Insufficient Nodes available to choose",
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
         }

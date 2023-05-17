@@ -110,6 +110,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
+    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
     OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(omMetadataReader);

@@ -515,10 +515,10 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY should be 0 because it is counted as decommissioned
-    assertEquals(0, rcnt.getUnhealthyReplicaCount());
-    // 1 because the UNHEALTHY replica is on a decommissioned node
-    assertEquals(1, rcnt.getDecommissionCount());
+    // UNHEALTHY decommissioned is counted, too
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=false
+    assertEquals(0, rcnt.getDecommissionCount());
 
     // Now, test by considering UNHEALTHY replicas
     rcnt = new RatisContainerReplicaCount(container, replicas,
@@ -533,8 +533,9 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY should be 0 because it is counted as decommissioned
-    assertEquals(0, rcnt.getUnhealthyReplicaCount());
+    // UNHEALTHY decommissioned is counted as unhealthy
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=true
     assertEquals(1, rcnt.getDecommissionCount());
   }
 

@@ -39,12 +39,16 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -54,6 +58,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jetbrains.annotations.NotNull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +84,9 @@ public class ReconContainerMetadataManagerImpl
 
   @Inject
   private Configuration sqlConfiguration;
+
+  @Inject
+  private ReconOMMetadataManager omMetadataManager;
 
   @Inject
   public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
@@ -455,6 +463,8 @@ public class ReconContainerMetadataManagerImpl
         ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
         Long containerID = containerKeyPrefix.getContainerId();
         Integer numberOfKeys = keyValue.getValue();
+        List<Pipeline> pipelines =
+            getPipelines(containerKeyPrefix);
 
         // break the loop if limit has been reached
         // and one more new entity needs to be added to the containers map
@@ -469,10 +479,32 @@ public class ReconContainerMetadataManagerImpl
         ContainerMetadata containerMetadata = containers.get(containerID);
         containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() +
             numberOfKeys);
+        containerMetadata.setPipelines(pipelines);
         containers.put(containerID, containerMetadata);
       }
     }
     return containers;
+  }
+
+  @NotNull
+  private List<Pipeline> getPipelines(ContainerKeyPrefix containerKeyPrefix)
+      throws IOException {
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+        .getSkipCache(containerKeyPrefix.getKeyPrefix());
+    if (null == omKeyInfo) {
+      omKeyInfo =
+          omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+              .getSkipCache(containerKeyPrefix.getKeyPrefix());
+    }
+    List<Pipeline> pipelines = new ArrayList<>();
+    if (null != omKeyInfo) {
+      omKeyInfo.getKeyLocationVersions().stream().map(
+          omKeyLocationInfoGroup ->
+              omKeyLocationInfoGroup.getLocationList()
+                  .stream().map(omKeyLocationInfo -> pipelines.add(
+                      omKeyLocationInfo.getPipeline())));
+    }
+    return pipelines;
   }
 
   @Override

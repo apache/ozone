@@ -300,7 +300,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     DatanodeTestUtils.injectDataDirFailure(dbDir);
     if (schemaV3) {
       // remove rocksDB from cache
-      DatanodeStoreCache.getInstance().shutdownCache();
+      DatanodeStoreCache.getInstance().removeDB(dbDir.getAbsolutePath());
     }
 
     // simulate bad volume by removing write permission on root dir

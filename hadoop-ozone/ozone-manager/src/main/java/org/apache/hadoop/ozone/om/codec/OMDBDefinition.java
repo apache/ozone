@@ -231,22 +231,22 @@ public class OMDBDefinition implements DBDefinition {
           new OmDBSnapshotInfoCodec());
 
   /**
-   * SnapshotRenamedKeyTable that complements the keyTable (or fileTable)
-   * entries of the immediately previous snapshot in the same snapshot
-   * scope (bucket or volume).
+   * SnapshotRenamedTable that complements the keyTable (or fileTable)
+   * and dirTable entries of the immediately previous snapshot in the
+   * same snapshot scope (bucket or volume).
    * <p>
-   * Key renames between the two subsequent snapshots are captured, this
+   * Key/Dir renames between the two subsequent snapshots are captured, this
    * information is used in {@link SnapshotDeletingService} to check if the
-   * renamedKey is present in the previous snapshot's keyTable
+   * renamedKey or renamedDir is present in the previous snapshot's keyTable
    * (or fileTable).
    */
   public static final DBColumnFamilyDefinition<String, String>
-      SNAPSHOT_RENAMED_KEY_TABLE =
+      SNAPSHOT_RENAMED_TABLE =
       new DBColumnFamilyDefinition<>(
-          OmMetadataManagerImpl.SNAPSHOT_RENAMED_KEY_TABLE,
+          OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE,
           String.class,  // /volumeName/bucketName/objectID
           new StringCodec(),
-          String.class, // path to the key in previous snapshot's key(file)Table
+          String.class, // path to key in prev snapshot's key(file)/dir Table.
           new StringCodec());
 
   @Override
@@ -268,7 +268,7 @@ public class OMDBDefinition implements DBDefinition {
         FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
         TENANT_ACCESS_ID_TABLE,
         PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_KEY_TABLE};
+        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_TABLE};
   }
 }
 

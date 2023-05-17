@@ -113,7 +113,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     @Override
-    public BackgroundTaskResult call() throws Exception {
+    public BackgroundTaskResult call() {
       // Check if this is the Leader OM. If not leader, no need to execute this
       // task.
       if (shouldRun()) {
@@ -125,6 +125,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  OM would have to keep track of which snapshot the key is coming
           //  from. And PurgeKeysRequest would have to be adjusted to be able
           //  to operate on snapshot checkpoints.
+
+          // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedTable write lock
           List<BlockGroup> keyBlocksList = manager
               .getPendingDeletionKeys(keyLimitPerTask);
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
@@ -136,6 +138,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
         }
+        // TODO: [SNAPSHOT] HDDS-8067. Release deletedTable write lock
+        //  in finally block
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();

@@ -255,7 +255,9 @@ public class KeyManagerImpl implements KeyManager {
       openKeyCleanupService.start();
     }
 
-    if (snapshotSstFilteringService == null) {
+    if (snapshotSstFilteringService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
+
       long serviceInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
@@ -272,7 +274,9 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    if (snapshotDeletingService == null) {
+    if (snapshotDeletingService == null &&
+        ozoneManager.isFilesystemSnapshotEnabled()) {
+
       long snapshotServiceInterval = configuration.getTimeDuration(
           OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL_DEFAULT,
@@ -405,9 +409,11 @@ public class KeyManagerImpl implements KeyManager {
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfoDirectoryAware(volumeName, bucketName, keyName);
-        if (bucketLayout.isLegacy() && value != null && !value.isFile()) {
-          value = null; // Legacy buckets do not report key info for directories
+        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        if (value != null) {
+          // For Legacy & OBS buckets, any key is a file by default. This is to
+          // keep getKeyInfo compatible with OFS clients.
+          value.setFile(true);
         }
       }
     } catch (IOException ex) {
@@ -434,24 +440,6 @@ public class KeyManagerImpl implements KeyManager {
       slimLocationVersion(value);
     }
     return value;
-  }
-
-  private OmKeyInfo getOmKeyInfoDirectoryAware(String volumeName,
-            String bucketName, String keyName) throws IOException {
-    OmKeyInfo keyInfo = getOmKeyInfo(volumeName, bucketName, keyName);
-
-    // Check if the key is a directory.
-    if (keyInfo != null) {
-      keyInfo.setFile(true);
-      return keyInfo;
-    }
-
-    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-    OmKeyInfo dirKeyInfo = getOmKeyInfo(volumeName, bucketName, dirKey);
-    if (dirKeyInfo != null) {
-      dirKeyInfo.setFile(false);
-    }
-    return dirKeyInfo;
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,

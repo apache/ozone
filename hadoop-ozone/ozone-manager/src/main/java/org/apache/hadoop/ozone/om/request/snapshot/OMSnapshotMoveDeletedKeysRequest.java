@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
+ * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 

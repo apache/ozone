@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
@@ -683,6 +685,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   transferScmLeadership(
                       request.getTransferScmLeadershipRequest()))
               .build();
+      case DecommissionScm:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setDecommissionScmResponse(decommissionScm(
+                  request.getDecommissionScmRequest()))
+              .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1209,5 +1218,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     String newLeaderId = request.getNewLeaderId();
     impl.transferLeadership(newLeaderId);
     return TransferLeadershipResponseProto.getDefaultInstance();
+  }
+
+  public DecommissionScmResponseProto decommissionScm(
+      DecommissionScmRequestProto request) throws IOException {
+    return impl.decommissionScm(
+        request.getScmId());
   }
 }
