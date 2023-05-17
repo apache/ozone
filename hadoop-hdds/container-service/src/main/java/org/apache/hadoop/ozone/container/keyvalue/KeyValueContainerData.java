@@ -130,7 +130,11 @@ public class KeyValueContainerData extends ContainerData {
    * container's database.
    */
   public void setSchemaVersion(String version) {
-    schemaVersion = version;
+    if (version == null) {
+      schemaVersion = OzoneConsts.SCHEMA_V1;
+    } else {
+      schemaVersion = version;
+    }
   }
 
   /**
