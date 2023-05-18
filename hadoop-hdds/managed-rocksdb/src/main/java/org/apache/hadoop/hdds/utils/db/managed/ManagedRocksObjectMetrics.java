@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "Ozone Manage RocksObject Metrics",
     context = OzoneConsts.OZONE)
 public class ManagedRocksObjectMetrics {
-  static final ManagedRocksObjectMetrics INSTANCE = create();
+  public static final ManagedRocksObjectMetrics INSTANCE = create();
 
   private static final String SOURCE_NAME =
       ManagedRocksObjectMetrics.class.getSimpleName();
@@ -52,6 +52,13 @@ public class ManagedRocksObjectMetrics {
 
   void increaseLeakObject() {
     totalLeakObjects.incr();
+  }
+
+  public void assertNoLeaks() {
+    final long cnt = totalLeakObjects.value();
+    if (cnt > 0) {
+      throw new AssertionError("Found " + cnt + " leaked objects, check logs");
+    }
   }
 
   void increaseManagedObject() {

@@ -18,17 +18,34 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
+import java.util.function.IntFunction;
+import javax.annotation.Nonnull;
 
 import org.apache.hadoop.hdds.StringUtils;
 
 /**
  * Codec to convert String to/from byte array.
  */
-public class StringCodec implements Codec<String> {
+public final class StringCodec implements Codec<String> {
+  @Override
+  public boolean supportCodecBuffer() {
+    return true;
+  }
 
   @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
+  public CodecBuffer toCodecBuffer(@Nonnull String object,
+      IntFunction<CodecBuffer> allocator) {
+    final byte[] array = toPersistedFormat(object);
+    return allocator.apply(array.length).put(array);
+  }
+
+  @Override
+  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return StringUtils.bytes2String(buffer.asReadOnlyByteBuffer());
+  }
+
+  @Override
+  public byte[] toPersistedFormat(String object) {
     if (object != null) {
       return StringUtils.string2Bytes(object);
     } else {

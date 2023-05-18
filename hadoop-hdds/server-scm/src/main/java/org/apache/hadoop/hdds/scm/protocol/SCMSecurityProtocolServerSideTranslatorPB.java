@@ -86,14 +86,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
-    // For request type GetSCMCertificate we don't need leader check. As
-    // primary SCM may not be leader SCM.
-    if (!request.getCmdType().equals(GetSCMCertificate)) {
-      if (!scm.checkLeader()) {
-        RatisUtil.checkRatisException(
-            scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-            scm.getSecurityProtocolRpcPort(), scm.getScmId());
-      }
+    if (!scm.checkLeader()) {
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getSecurityProtocolRpcPort(), scm.getScmId());
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
@@ -250,7 +246,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMGetSCMCertRequestProto request)
       throws IOException {
 
-    if (!scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+    if (!scm.getScmStorageConfig().isSCMHAEnabled()) {
       throw createNotHAException();
     }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),

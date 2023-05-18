@@ -61,7 +61,6 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
@@ -205,8 +204,7 @@ public class TestSstFilteringService {
 
     String dbSnapshots = rocksDbDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     String snapshotDirName =
-        dbSnapshots + OM_KEY_PREFIX + OM_DB_NAME + snapshotInfo
-            .getCheckpointDirName();
+        OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
     for (LiveFileMetaData file : allFiles) {
       File sstFile =

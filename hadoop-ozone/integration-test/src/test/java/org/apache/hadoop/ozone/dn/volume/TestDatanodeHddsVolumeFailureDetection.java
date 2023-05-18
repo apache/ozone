@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -150,6 +151,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
 
   @After
   public void shutdown() throws IOException {
+    IOUtils.closeQuietly(scmClient);
     if (ozClient != null) {
       ozClient.close();
     }
@@ -298,7 +300,7 @@ public class TestDatanodeHddsVolumeFailureDetection {
     DatanodeTestUtils.injectDataDirFailure(dbDir);
     if (schemaV3) {
       // remove rocksDB from cache
-      DatanodeStoreCache.getInstance().shutdownCache();
+      DatanodeStoreCache.getInstance().removeDB(dbDir.getAbsolutePath());
     }
 
     // simulate bad volume by removing write permission on root dir

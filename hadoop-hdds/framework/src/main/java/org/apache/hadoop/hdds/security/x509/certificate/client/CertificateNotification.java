@@ -26,10 +26,10 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 public interface CertificateNotification {
   /**
    * Notify the class implementing this interface that certificate is renewed.
-   * Note that the new leader can possibly be this server.
-   *
+   * @param certClient the certificate client who call this function
    * @param oldCertId The old cert id before renew.
    * @param newCertId The new cert id after renew.
    */
-  void notifyCertificateRenewed(String oldCertId, String newCertId);
+  void notifyCertificateRenewed(CertificateClient certClient,
+      String oldCertId, String newCertId);
 }

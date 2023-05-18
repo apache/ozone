@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -122,6 +123,7 @@ public class TestCloseContainerHandlingByClient {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -329,9 +331,10 @@ public class TestCloseContainerHandlingByClient {
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    OzoneInputStream inputStream = bucket.readKey(keyName);
     byte[] readData = new byte[keyLen];
-    inputStream.read(readData);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(readData);
+    }
     Assert.assertArrayEquals(writtenData, readData);
 
     // Though we have written only block initially, the close will hit

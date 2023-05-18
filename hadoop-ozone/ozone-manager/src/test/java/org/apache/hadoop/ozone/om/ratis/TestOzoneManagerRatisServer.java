@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -135,10 +136,11 @@ public class TestOzoneManagerRatisServer {
   }
 
   @After
-  public void shutdown() {
+  public void shutdown() throws IOException {
     if (omRatisServer != null) {
       omRatisServer.stop();
     }
+    certClient.close();
   }
 
   /**

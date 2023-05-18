@@ -131,6 +131,7 @@ public class OzoneBucket extends WithMetadata {
 
   private String sourceVolume;
   private String sourceBucket;
+  private boolean sourcePathExist = true;
 
   /**
    * Quota of bytes allocated for the bucket.
@@ -887,6 +888,14 @@ public class OzoneBucket extends WithMetadata {
     boolean result = proxy.setBucketOwner(volumeName, name, userName);
     this.owner = userName;
     return result;
+  }
+
+  public void setSourcePathExist(boolean b) {
+    this.sourcePathExist = b;
+  }
+
+  public boolean isSourcePathExist() {
+    return this.sourcePathExist;
   }
 
   public static Builder newBuilder(ConfigurationSource conf,

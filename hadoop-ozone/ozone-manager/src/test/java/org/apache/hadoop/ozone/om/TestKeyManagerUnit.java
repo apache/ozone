@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -68,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
@@ -324,21 +322,18 @@ public class TestKeyManagerUnit {
 
   private OmMultipartInfo addinitMultipartUploadToCache(
       String volume, String bucket, String key) {
-    Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
-        new HashMap<>();
     String uploadID = UUID.randomUUID().toString();
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
-        .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.of(multipartKeyInfo),
-            RandomUtils.nextInt()));
+            uploadID)),
+        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
@@ -346,8 +341,7 @@ public class TestKeyManagerUnit {
       String volume, String bucket, String key, String uploadID) {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), new CacheValue<>(Optional.absent(),
-            RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.nextInt()));
   }
 
   @Test

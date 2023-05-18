@@ -198,10 +198,12 @@ public class StorageContainerServiceProviderImpl
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
-            try (SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
-                hostAddress, grpcPort, configuration,
-                new ReconCertificateClient(new SecurityConfig(configuration),
-                    reconStorage, null, null))) {
+            SecurityConfig secConf = new SecurityConfig(configuration);
+            try (ReconCertificateClient certClient =
+                     new ReconCertificateClient(
+                         secConf, reconStorage, null, null);
+                 SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
+                     hostAddress, grpcPort, configuration, certClient)) {
               downloadClient.download(targetFile.toPath()).get();
             } catch (ExecutionException | InterruptedException e) {
               LOG.error("Rocks DB checkpoint downloading failed", e);

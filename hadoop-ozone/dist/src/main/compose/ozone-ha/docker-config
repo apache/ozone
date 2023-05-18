@@ -19,6 +19,7 @@ CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts=*
 CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
 
 CORE-SITE.XML_fs.defaultFS=ofs://omservice/
+CORE-SITE.XML_fs.trash.interval=1
 
 OZONE-SITE.XML_ozone.om.service.ids=omservice
 OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3
@@ -47,6 +48,7 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
+OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop

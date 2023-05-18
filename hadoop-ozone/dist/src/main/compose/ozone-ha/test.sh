@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA
+#suite:HA-unsecure
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -28,11 +28,20 @@ export OM_SERVICE_ID=omservice
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env
+start_docker_env 5
 
 execute_robot_test ${SCM} basic/ozone-shell-single.robot
 execute_robot_test ${SCM} basic/links.robot
-execute_robot_test ${SCM} s3
+
+execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
+
+exclude=""
+for bucket in generated; do
+  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  # some tests are independent of the bucket type, only need to be run once
+  exclude="--exclude no-bucket-type"
+done
+
 execute_robot_test ${SCM} freon
 execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
 

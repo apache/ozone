@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -130,6 +131,8 @@ public class TestOpenKeyCleanupService {
   @Timeout(300)
   public void testCleanupExpiredOpenKeys(
       int numDEFKeys, int numFSOKeys, boolean hsync) throws Exception {
+    LOG.info("numDEFKeys={}, numFSOKeys={}, hsync? {}",
+        numDEFKeys, numFSOKeys, hsync);
 
     OpenKeyCleanupService openKeyCleanupService =
         (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
@@ -139,15 +142,21 @@ public class TestOpenKeyCleanupService {
     Thread.sleep(SERVICE_INTERVAL.toMillis());
     final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
     final long oldrunCount = openKeyCleanupService.getRunCount();
+    LOG.info("oldkeyCount={}, oldrunCount={}", oldkeyCount, oldrunCount);
+    assertEquals(0, oldkeyCount);
 
+    final OMMetrics metrics = om.getMetrics();
+    assertEquals(0, metrics.getNumKeyHSyncs());
+    assertEquals(0, metrics.getNumOpenKeysCleaned());
+    assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
     final int keyCount = numDEFKeys + numFSOKeys;
-    createOpenKeys(numDEFKeys, hsync, BucketLayout.DEFAULT);
+    createOpenKeys(numDEFKeys, false, BucketLayout.DEFAULT);
     createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD.toMillis());
 
-    assertExpiredOpenKeys(numDEFKeys == 0, hsync, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(numDEFKeys == 0, false, BucketLayout.DEFAULT);
     assertExpiredOpenKeys(numFSOKeys == 0, hsync,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
@@ -164,9 +173,18 @@ public class TestOpenKeyCleanupService {
 
     assertTrue(openKeyCleanupService.getSubmittedOpenKeyCount() >=
         oldkeyCount + keyCount);
-    assertExpiredOpenKeys(true, hsync, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
     assertExpiredOpenKeys(true, hsync,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    if (hsync) {
+      assertEquals(numDEFKeys, metrics.getNumOpenKeysCleaned());
+      assertTrue(metrics.getNumOpenKeysHSyncCleaned() >= numFSOKeys);
+      assertEquals(numFSOKeys, metrics.getNumKeyHSyncs());
+    } else {
+      assertEquals(keyCount, metrics.getNumOpenKeysCleaned());
+      assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
+      assertEquals(0, metrics.getNumKeyHSyncs());
+    }
   }
 
   void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,

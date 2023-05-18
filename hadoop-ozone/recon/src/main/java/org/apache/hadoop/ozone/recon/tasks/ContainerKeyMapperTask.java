@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -90,18 +91,24 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       reconContainerMetadataManager
               .reinitWithNewContainerDataFromOm(new HashMap<>());
 
-      Table<String, OmKeyInfo> omKeyInfoTable =
-          omMetadataManager.getKeyTable(getBucketLayout());
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               keyIter = omKeyInfoTable.iterator()) {
-        while (keyIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-          OmKeyInfo omKeyInfo = kv.getValue();
-          handlePutOMKeyEvent(kv.getKey(), omKeyInfo, containerKeyMap,
-              containerKeyCountMap, deletedKeyCountList);
-          omKeyCount++;
+      // loop over both key table and file table
+      for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        Table<String, OmKeyInfo> omKeyInfoTable =
+            omMetadataManager.getKeyTable(layout);
+        try (
+            TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+                keyIter = omKeyInfoTable.iterator()) {
+          while (keyIter.hasNext()) {
+            Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+            OmKeyInfo omKeyInfo = kv.getValue();
+            handlePutOMKeyEvent(kv.getKey(), omKeyInfo, containerKeyMap,
+                containerKeyCountMap, deletedKeyCountList);
+            omKeyCount++;
+          }
         }
       }
+
       LOG.info("Completed 'reprocess' of ContainerKeyMapperTask.");
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
@@ -127,7 +134,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
   }
 
   public Collection<String> getTaskTables() {
-    return Collections.singletonList(KEY_TABLE);
+    List<String> taskTables = new ArrayList<>();
+    taskTables.add(KEY_TABLE);
+    taskTables.add(FILE_TABLE);
+    return taskTables;
   }
 
   @Override
@@ -371,10 +381,6 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       reconContainerMetadataManager
           .incrementContainerCountBy(containerCountToIncrement);
     }
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
 }

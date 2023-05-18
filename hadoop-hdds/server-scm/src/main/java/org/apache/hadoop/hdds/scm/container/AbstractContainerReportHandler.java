@@ -289,10 +289,27 @@ public class AbstractContainerReportHandler {
       }
 
       if (replica.getState() == State.CLOSED) {
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica.", containerId, datanode);
         Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
+
+        /*
+        For an EC container, only the first index and the parity indexes are
+        guaranteed to have block data. So, update the container's state in SCM
+        only if replica index is one of these indexes.
+         */
+        if (container.getReplicationType()
+            .equals(HddsProtos.ReplicationType.EC)) {
+          int replicaIndex = replica.getReplicaIndex();
+          int dataNum =
+              ((ECReplicationConfig)container.getReplicationConfig()).getData();
+          if (replicaIndex != 1 && replicaIndex <= dataNum) {
+            break;
+          }
+        }
+
+        logger.info("Moving container {} to CLOSED state, datanode {} " +
+            "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
       }

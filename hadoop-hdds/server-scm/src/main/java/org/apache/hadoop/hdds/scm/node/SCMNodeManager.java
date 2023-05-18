@@ -90,6 +90,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
@@ -136,7 +138,8 @@ public class SCMNodeManager implements NodeManager {
    * consistent view of the node state.
    */
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-
+  private final String opeState = "OPSTATE";
+  private final String comState = "COMSTATE";
   /**
    * Constructs SCM machine Manager.
    */
@@ -819,6 +822,37 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Get the total number of pending commands of the given types on the given
+   * datanode. For each command, this includes both the number of commands
+   * queued in SCM which will be sent to the datanode on the next heartbeat,
+   * and the number of commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * All commands are retrieved under a single read lock, so the counts are
+   * consistent.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The list of command Types To query.
+   * @return A Map of commandType to Integer with an entry for each command type
+   *         passed.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType)
+      throws NodeNotFoundException {
+    Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+    readLock().lock();
+    try {
+      for (SCMCommandProto.Type type : cmdType) {
+        counts.put(type, getTotalDatanodeCommandCount(datanodeDetails, type));
+      }
+      return counts;
+    } finally {
+      readLock().unlock();
+    }
+  }
+
+  /**
    * Returns the aggregated node stats.
    *
    * @return the aggregated node stats.
@@ -1026,17 +1060,29 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
-    Map<String, List<String>> nodes = new HashMap<>();
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
+    Map<String, Map<String, String>> nodes = new HashMap<>();
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       String hostName = dni.getHostName();
-      NodeStatus nodestatus = dni.getNodeStatus();
-      NodeState health = nodestatus.getHealth();
-      NodeOperationalState operationalState = nodestatus.getOperationalState();
-      List<String> ls = new ArrayList<>();
-      ls.add(health.name());
-      ls.add(operationalState.name());
-      nodes.put(hostName, ls);
+      DatanodeDetails.Port httpPort = dni.getPort(HTTP);
+      DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
+      String opstate = "";
+      String healthState = "";
+      if (dni.getNodeStatus() != null) {
+        opstate = dni.getNodeStatus().getOperationalState().toString();
+        healthState = dni.getNodeStatus().getHealth().toString();
+      }
+      Map<String, String> map = new HashMap<>();
+      map.put(opeState, opstate);
+      map.put(comState, healthState);
+      if (httpPort != null) {
+        map.put(httpPort.getName().toString(), httpPort.getValue().toString());
+      }
+      if (httpsPort != null) {
+        map.put(httpsPort.getName().toString(),
+                  httpsPort.getValue().toString());
+      }
+      nodes.put(hostName, map);
     }
     return nodes;
   }

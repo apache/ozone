@@ -23,11 +23,16 @@ import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.FileNotFoundException;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -65,6 +70,10 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 
 // TODO
 //  8. Handle bootstrapping rocksDB for a new OM follower node
@@ -92,6 +101,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
 
+  private final String metadataDir;
   private final String sstBackupDir;
   private final String activeDBLocationStr;
 
@@ -158,16 +168,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   private long reconstructionSnapshotGeneration;
   private String reconstructionLastSnapshotID;
 
-  /**
-   * Dummy object that acts as a write lock in compaction listener.
-   */
-  private final Object compactionListenerWriteLock = new Object();
-
   private final ScheduledExecutorService executor;
+  private boolean closed;
   private final long maxAllowedTimeInDag;
 
+  private ColumnFamilyHandle snapshotInfoTableCFHandle;
+
   /**
-   * Constructor.
+   * This is a package private constructor and should not be used other than
+   * testing. Caller should use RocksDBCheckpointDifferHolder#getInstance() to
+   * get RocksDBCheckpointDiffer instance.
    * Note that previous compaction logs are loaded by RDBStore after this
    * object's initialization by calling loadAllCompactionLogs().
    *
@@ -175,22 +185,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @param sstBackupDirName Name of the SST backup dir under metadata dir.
    * @param compactionLogDirName Name of the compaction log dir.
    * @param activeDBLocationName Active RocksDB directory's location.
-   * @param maxTimeAllowedForSnapshotInDagInMs Time after which snapshot will be
-   *                                           pruned from the DAG by daemon.
-   * @param pruneCompactionDagDaemonRunIntervalInMs Internal at which DAG
-   *                                               pruning daemon will run.
+   * @param configuration ConfigurationSource.
    */
-  public RocksDBCheckpointDiffer(String metadataDirName,
-                                 String sstBackupDirName,
-                                 String compactionLogDirName,
-                                 String activeDBLocationName,
-                                 long maxTimeAllowedForSnapshotInDagInMs,
-                                 long pruneCompactionDagDaemonRunIntervalInMs) {
+  @VisibleForTesting
+  RocksDBCheckpointDiffer(String metadataDirName,
+                          String sstBackupDirName,
+                          String compactionLogDirName,
+                          String activeDBLocationName,
+                          ConfigurationSource configuration) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
     Preconditions.checkNotNull(compactionLogDirName);
     Preconditions.checkNotNull(activeDBLocationName);
 
+    this.metadataDir = metadataDirName;
     this.compactionLogDir =
         createCompactionLogDir(metadataDirName, compactionLogDirName);
     this.sstBackupDir = Paths.get(metadataDirName, sstBackupDirName) + "/";
@@ -198,7 +206,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
 
     // Active DB location is used in getSSTFileSummary
     this.activeDBLocationStr = activeDBLocationName + "/";
-    this.maxAllowedTimeInDag = maxTimeAllowedForSnapshotInDagInMs;
+    this.maxAllowedTimeInDag = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    long pruneCompactionDagDaemonRunIntervalInMs =
+        configuration.getTimeDuration(
+            OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+            OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.executor = Executors.newSingleThreadScheduledExecutor();
@@ -219,19 +236,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     }
   }
 
-  private String createCompactionLogDir(String metadataDir,
+  private String createCompactionLogDir(String metadataDirName,
                                         String compactionLogDirName) {
 
-    final File parentDir = new File(metadataDir);
+    final File parentDir = new File(metadataDirName);
     if (!parentDir.exists()) {
-      if (!parentDir.mkdir()) {
+      if (!parentDir.mkdirs()) {
         LOG.error("Error creating compaction log parent dir.");
         return null;
       }
     }
 
     final String compactionLogDirectory =
-        Paths.get(metadataDir, compactionLogDirName).toString();
+        Paths.get(metadataDirName, compactionLogDirName).toString();
     File clDir = new File(compactionLogDirectory);
     if (!clDir.exists() && !clDir.mkdir()) {
       LOG.error("Error creating compaction log dir.");
@@ -298,9 +315,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
-    if (executor != null) {
-      executor.shutdown();
+  public void close() {
+    synchronized (this) {
+      if (!closed) {
+        closed = true;
+        if (executor != null) {
+          executor.shutdown();
+        }
+      }
     }
   }
 
@@ -341,21 +363,24 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Append (then flush) to the current compaction log file path.
    * Note: This does NOT automatically append newline to the log.
    */
-  private synchronized void appendToCurrentCompactionLog(String content) {
+  private void appendToCurrentCompactionLog(String content) {
     if (currentCompactionLogPath == null) {
       LOG.error("Unable to append compaction log. "
           + "Compaction log path is not set. "
           + "Please check initialization.");
       throw new RuntimeException("Compaction log path not set");
     }
-    try (BufferedWriter bw = Files.newBufferedWriter(
-        Paths.get(currentCompactionLogPath),
-        StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-      bw.write(content);
-      bw.flush();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to append compaction log to " +
-          currentCompactionLogPath, e);
+
+    synchronized (this) {
+      try (BufferedWriter bw = Files.newBufferedWriter(
+          Paths.get(currentCompactionLogPath),
+          StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+        bw.write(content);
+        bw.flush();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to append compaction log to " +
+            currentCompactionLogPath, e);
+      }
     }
   }
 
@@ -395,52 +420,88 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     rocksOptions.setListeners(list);
   }
 
-  public void setRocksDBForCompactionTracking(DBOptions rocksOptions)
-      throws RocksDBException {
+  public void setRocksDBForCompactionTracking(DBOptions rocksOptions) {
     setRocksDBForCompactionTracking(rocksOptions, new ArrayList<>());
+  }
+
+  /**
+   * Set SnapshotInfoTable DB column family handle to be used in DB listener.
+   * @param snapshotInfoTableCFHandle ColumnFamilyHandle
+   */
+  public void setSnapshotInfoTableCFHandle(
+      ColumnFamilyHandle snapshotInfoTableCFHandle) {
+    Preconditions.checkNotNull(snapshotInfoTableCFHandle,
+        "Column family handle should not be null");
+    this.snapshotInfoTableCFHandle = snapshotInfoTableCFHandle;
+  }
+
+  /**
+   * Helper method to check whether the SnapshotInfoTable column family is empty
+   * in a given DB instance.
+   * @param db RocksDB instance
+   * @return true when column family is empty, false otherwise
+   */
+  private boolean isSnapshotInfoTableEmpty(RocksDB db) {
+    // Can't use metadataManager.getSnapshotInfoTable().isEmpty() or use
+    // any wrapper classes here. Any of those introduces circular dependency.
+    // The solution here is to use raw RocksDB API.
+
+    // There is this small gap when the db is open but the handle is not yet set
+    // in RDBStore. Compaction could theoretically happen during that small
+    // window. This condition here aims to handle that (falls back to not
+    // skipping compaction tracking).
+    if (snapshotInfoTableCFHandle == null) {
+      LOG.warn("Snapshot info table column family handle is not set!");
+      // Proceed to log compaction in this case
+      return false;
+    }
+
+    // SnapshotInfoTable has table cache. But that wouldn't matter in this case
+    // because the first SnapshotInfo entry would have been written to the DB
+    // right before checkpoint happens in OMSnapshotCreateResponse.
+    //
+    // Note the goal of compaction DAG is to track all compactions that happened
+    // _after_ a DB checkpoint is taken.
+
+    try (ManagedRocksIterator it = ManagedRocksIterator.managed(
+        db.newIterator(snapshotInfoTableCFHandle))) {
+      it.get().seekToFirst();
+      return !it.get().isValid();
+    }
   }
 
   private AbstractEventListener newCompactionBeginListener() {
     return new AbstractEventListener() {
       @Override
       public void onCompactionBegin(RocksDB db,
-          CompactionJobInfo compactionJobInfo) {
+                                    CompactionJobInfo compactionJobInfo) {
 
-        // TODO: Skip (return) if no snapshot has been taken yet
+        if (compactionJobInfo.inputFiles().size() == 0) {
+          LOG.error("Compaction input files list is empty");
+          return;
+        }
 
         // Note the current compaction listener implementation does not
         // differentiate which column family each SST store. It is tracking
         // all SST files.
-
-        synchronized (compactionListenerWriteLock) {
-
-          if (compactionJobInfo.inputFiles().size() == 0) {
-            LOG.error("Compaction input files list is empty");
+        synchronized (this) {
+          if (closed) {
             return;
           }
 
-          // Create hardlink backups for the SST files that are going
-          // to be deleted after this RDB compaction.
-          for (String file : compactionJobInfo.inputFiles()) {
-            LOG.debug("Creating hard link for '{}'", file);
-            String saveLinkFileName =
-                sstBackupDir + new File(file).getName();
-            Path link = Paths.get(saveLinkFileName);
-            Path srcFile = Paths.get(file);
-            try {
-              Files.createLink(link, srcFile);
-            } catch (FileAlreadyExistsException ignored) {
-              // This could happen if a previous compaction is a "trivial move",
-              // where output SSTs files are exactly the same as input files.
-              // Those SSTs are simply moved to the next level without rewrites
-              // or renames.
-              LOG.debug("SST file already exists: {}", file);
-            } catch (IOException e) {
-              LOG.error("Exception in creating hard link for {}", file);
-              throw new RuntimeException("Failed to create hard link", e);
-            }
+          // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+          // i.e. No snapshot exists in OM.
+          if (isSnapshotInfoTableEmpty(db)) {
+            return;
           }
+        }
 
+        // Create hardlink backups for the SST files that are going
+        // to be deleted after this RDB compaction.
+        for (String file : compactionJobInfo.inputFiles()) {
+          LOG.debug("Creating hard link for '{}'", file);
+          createLink(Paths.get(sstBackupDir, new File(file).getName()),
+              Paths.get(file));
         }
       }
     };
@@ -452,66 +513,102 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
 
-        // TODO: Skip (return) if no snapshot has been taken yet
+        if (compactionJobInfo.inputFiles().isEmpty()) {
+          LOG.error("Compaction input files list is empty");
+          return;
+        }
 
-        synchronized (compactionListenerWriteLock) {
+        if (new HashSet<>(compactionJobInfo.inputFiles())
+            .equals(new HashSet<>(compactionJobInfo.outputFiles()))) {
+          LOG.info("Skipped the compaction entry. Compaction input files: " +
+                  "{} and output files: {} are same.",
+              compactionJobInfo.inputFiles(),
+              compactionJobInfo.outputFiles());
+          return;
+        }
 
-          if (compactionJobInfo.inputFiles().isEmpty()) {
-            LOG.error("Compaction input files list is empty");
+        final StringBuilder sb = new StringBuilder();
+
+        if (LOG.isDebugEnabled()) {
+          // Print compaction reason for this entry in the log file
+          // e.g. kLevelL0FilesNum / kLevelMaxLevelSize.
+          sb.append(COMPACTION_LOG_COMMENT_LINE_PREFIX)
+              .append(compactionJobInfo.compactionReason())
+              .append('\n');
+        }
+
+        // Mark the beginning of a compaction log
+        sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
+
+        // Trim DB path, only keep the SST file name
+        final int filenameOffset =
+            compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
+
+        // Append the list of input files
+        final List<String> inputFiles = compactionJobInfo.inputFiles();
+        // Trim the file path, leave only the SST file name without extension
+        inputFiles.replaceAll(s -> s.substring(
+            filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+        final String inputFilesJoined =
+            String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, inputFiles);
+        sb.append(inputFilesJoined);
+
+        // Insert delimiter between input files and output files
+        sb.append(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
+
+        // Append the list of output files
+        final List<String> outputFiles = compactionJobInfo.outputFiles();
+        outputFiles.replaceAll(s -> s.substring(
+            filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
+        final String outputFilesJoined =
+            String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, outputFiles);
+        sb.append(outputFilesJoined);
+
+        // End of line
+        sb.append('\n');
+
+        String content = sb.toString();
+
+        synchronized (this) {
+          if (closed) {
             return;
           }
 
-          final StringBuilder sb = new StringBuilder();
-
-          if (LOG.isDebugEnabled()) {
-            // Print compaction reason for this entry in the log file
-            // e.g. kLevelL0FilesNum / kLevelMaxLevelSize.
-            sb.append(COMPACTION_LOG_COMMENT_LINE_PREFIX)
-                .append(compactionJobInfo.compactionReason())
-                .append('\n');
+          // Skip compaction DAG tracking if the snapshotInfoTable is empty.
+          // i.e. No snapshot exists in OM.
+          if (isSnapshotInfoTableEmpty(db)) {
+            return;
           }
 
-          // Mark the beginning of a compaction log
-          sb.append(COMPACTION_LOG_ENTRY_LINE_PREFIX);
-
-          // Trim DB path, only keep the SST file name
-          final int filenameOffset =
-              compactionJobInfo.inputFiles().get(0).lastIndexOf("/") + 1;
-
-          // Append the list of input files
-          final List<String> inputFiles = compactionJobInfo.inputFiles();
-          // Trim the file path, leave only the SST file name without extension
-          inputFiles.replaceAll(s -> s.substring(
-              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          final String inputFilesJoined =
-              String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, inputFiles);
-          sb.append(inputFilesJoined);
-
-          // Insert delimiter between input files and output files
-          sb.append(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
-
-          // Append the list of output files
-          final List<String> outputFiles = compactionJobInfo.outputFiles();
-          outputFiles.replaceAll(s -> s.substring(
-              filenameOffset, s.length() - SST_FILE_EXTENSION_LENGTH));
-          final String outputFilesJoined =
-              String.join(COMPACTION_LOG_ENTRY_FILE_DELIMITER, outputFiles);
-          sb.append(outputFilesJoined);
-
-          // End of line
-          sb.append('\n');
-
           // Write input and output file names to compaction log
-          appendToCurrentCompactionLog(sb.toString());
+          appendToCurrentCompactionLog(content);
 
           // Populate the DAG
-          // TODO: Once SnapshotChainManager is put into use, set snapshotID to
-          //  snapshotChainManager.getLatestGlobalSnapshot()
+          // TODO: [SNAPSHOT] Once SnapshotChainManager is put into use,
+          //  set snapshotID to snapshotChainManager.getLatestGlobalSnapshot()
           populateCompactionDAG(inputFiles, outputFiles, null,
               db.getLatestSequenceNumber());
         }
       }
     };
+  }
+
+  /**
+   * Creates a hard link between provided link and source.
+   * It doesn't throw any exception if {@link Files#createLink} throws
+   * {@link FileAlreadyExistsException} while creating hard link.
+   */
+  private void createLink(Path link, Path source) {
+    try {
+      Files.createLink(link, source);
+    } catch (FileAlreadyExistsException ignored) {
+      // This could happen if another thread tried to create the same hard link
+      // and succeeded.
+      LOG.debug("SST file already exists: {}", source);
+    } catch (IOException e) {
+      LOG.error("Exception in creating hard link for {}", source);
+      throw new RuntimeException("Failed to create hard link", e);
+    }
   }
 
   /**
@@ -598,7 +695,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @return a list of SST files (without extension) in the DB.
    */
   public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
-    RocksDB rocksDB = null;
+    ManagedRocksDB rocksDB = null;
     HashSet<String> liveFiles = new HashSet<>();
 
     final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
@@ -606,15 +703,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         getCFDescriptorList(cfOpts);
     final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
-    try (DBOptions dbOptions = new DBOptions()
-        .setParanoidChecks(true)) {
-
-      rocksDB = RocksDB.openReadOnly(dbOptions, dbPathArg,
+    try (ManagedDBOptions managedDBOptions = new ManagedDBOptions()) {
+      managedDBOptions.setParanoidChecks(true);
+      rocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
           cfDescriptors, columnFamilyHandles);
       // Note it retrieves only the selected column families by the descriptor
       // i.e. keyTable, directoryTable, fileTable
       List<LiveFileMetaData> liveFileMetaDataList =
-          rocksDB.getLiveFilesMetaData();
+          rocksDB.get().getLiveFilesMetaData();
       LOG.debug("SST File Metadata for DB: " + dbPathArg);
       for (LiveFileMetaData m : liveFileMetaDataList) {
         LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
@@ -636,40 +732,42 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   /**
    * Process each line of compaction log text file input and populate the DAG.
    */
-  synchronized void processCompactionLogLine(String line) {
+  void processCompactionLogLine(String line) {
 
     LOG.debug("Processing line: {}", line);
 
-    if (line.startsWith("#")) {
-      // Skip comments
-      LOG.debug("Comment line, skipped");
-    } else if (line.startsWith(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX)) {
-      SnapshotLogInfo snapshotLogInfo = getSnapshotLogInfo(line);
-      reconstructionSnapshotGeneration = snapshotLogInfo.snapshotGenerationId;
-      reconstructionLastSnapshotID = snapshotLogInfo.snapshotId;
-    } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
-      // Read compaction log entry
+    synchronized (this) {
+      if (line.startsWith("#")) {
+        // Skip comments
+        LOG.debug("Comment line, skipped");
+      } else if (line.startsWith(COMPACTION_LOG_SEQ_NUM_LINE_PREFIX)) {
+        SnapshotLogInfo snapshotLogInfo = getSnapshotLogInfo(line);
+        reconstructionSnapshotGeneration = snapshotLogInfo.snapshotGenerationId;
+        reconstructionLastSnapshotID = snapshotLogInfo.snapshotId;
+      } else if (line.startsWith(COMPACTION_LOG_ENTRY_LINE_PREFIX)) {
+        // Read compaction log entry
 
-      // Trim the beginning
-      line = line.substring(COMPACTION_LOG_ENTRY_LINE_PREFIX.length());
-      String[] io =
-          line.split(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
+        // Trim the beginning
+        line = line.substring(COMPACTION_LOG_ENTRY_LINE_PREFIX.length());
+        String[] io =
+            line.split(COMPACTION_LOG_ENTRY_INPUT_OUTPUT_FILES_DELIMITER);
 
-      if (io.length != 2) {
-        if (line.endsWith(":")) {
-          LOG.debug("Ignoring compaction log line for SST deletion");
-        } else {
-          LOG.error("Invalid line in compaction log: {}", line);
+        if (io.length != 2) {
+          if (line.endsWith(":")) {
+            LOG.debug("Ignoring compaction log line for SST deletion");
+          } else {
+            LOG.error("Invalid line in compaction log: {}", line);
+          }
+          return;
         }
-        return;
-      }
 
-      String[] inputFiles = io[0].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
-      String[] outputFiles = io[1].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
-      populateCompactionDAG(asList(inputFiles), asList(outputFiles),
-          reconstructionLastSnapshotID, reconstructionSnapshotGeneration);
-    } else {
-      LOG.error("Invalid line in compaction log: {}", line);
+        String[] inputFiles = io[0].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
+        String[] outputFiles = io[1].split(COMPACTION_LOG_ENTRY_FILE_DELIMITER);
+        populateCompactionDAG(asList(inputFiles), asList(outputFiles),
+            reconstructionLastSnapshotID, reconstructionSnapshotGeneration);
+      } else {
+        LOG.error("Invalid line in compaction log: {}", line);
+      }
     }
   }
 
@@ -690,23 +788,26 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Load existing compaction log files to the in-memory DAG.
    * This only needs to be done once during OM startup.
    */
-  public synchronized void loadAllCompactionLogs() {
-    if (compactionLogDir == null) {
-      throw new RuntimeException("Compaction log directory must be set first");
-    }
-    reconstructionSnapshotGeneration = 0L;
-    try {
-      try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
-          .filter(e -> e.toString().toLowerCase()
-              .endsWith(COMPACTION_LOG_FILE_NAME_SUFFIX))
-          .sorted()) {
-        for (Path logPath : pathStream.collect(Collectors.toList())) {
-          readCompactionLogToDAG(logPath.toString());
-        }
+  public void loadAllCompactionLogs() {
+    synchronized (this) {
+      if (compactionLogDir == null) {
+        throw new RuntimeException("Compaction log directory must be set " +
+            "first");
       }
-    } catch (IOException e) {
-      throw new RuntimeException("Error listing compaction log dir " +
-          compactionLogDir, e);
+      reconstructionSnapshotGeneration = 0L;
+      try {
+        try (Stream<Path> pathStream = Files.list(Paths.get(compactionLogDir))
+            .filter(e -> e.toString().toLowerCase()
+                .endsWith(COMPACTION_LOG_FILE_NAME_SUFFIX))
+            .sorted()) {
+          for (Path logPath : pathStream.collect(Collectors.toList())) {
+            readCompactionLogToDAG(logPath.toString());
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Error listing compaction log dir " +
+            compactionLogDir, e);
+      }
     }
   }
 
@@ -741,23 +842,39 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   }
 
   /**
-   * A wrapper of getSSTDiffList() that returns the absolute path of SST files,
-   * rather than SST file names without extension.
+   * A wrapper of getSSTDiffList() that copies the SST files to the
+   * `sstFilesDirForSnapDiffJob` dir for the snap diff job and returns the
+   * absolute path of SST files with extension in the provided dir.
    *
    * @param src source snapshot
    * @param dest destination snapshot
+   * @param sstFilesDirForSnapDiffJob dir to create hardlinks for SST files
+   *                                 for snapDiff job.
    * @return A list of SST files without extension.
    *         e.g. ["/path/to/sstBackupDir/000050.sst",
    *               "/path/to/sstBackupDir/000060.sst"]
    */
   public List<String> getSSTDiffListWithFullPath(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
+      DifferSnapshotInfo src,
+      DifferSnapshotInfo dest,
+      String sstFilesDirForSnapDiffJob
+  ) throws IOException {
 
-    List<String> sstDiffList = getSSTDiffList(src, dest);
+    synchronized (this) {
+      List<String> sstDiffList = getSSTDiffList(src, dest);
 
-    return sstDiffList.stream()
-        .map(sst -> getSSTFullPath(sst, src.getDbPath()))
-        .collect(Collectors.toList());
+      return sstDiffList.stream()
+          .map(
+              sst -> {
+                String sstFullPath = getSSTFullPath(sst, src.getDbPath());
+                Path link = Paths.get(sstFilesDirForSnapDiffJob,
+                    sst + SST_FILE_EXTENSION);
+                Path srcFile = Paths.get(sstFullPath);
+                createLink(link, srcFile);
+                return link.toString();
+              })
+          .collect(Collectors.toList());
+    }
   }
 
   /**
@@ -771,8 +888,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * @param dest destination snapshot
    * @return A list of SST files without extension. e.g. ["000050", "000060"]
    */
-  public synchronized List<String> getSSTDiffList(
-      DifferSnapshotInfo src, DifferSnapshotInfo dest) throws IOException {
+  public List<String> getSSTDiffList(DifferSnapshotInfo src,
+                                     DifferSnapshotInfo dest)
+      throws IOException {
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
@@ -937,6 +1055,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     }
   }
 
+  public String getMetadataDir() {
+    return metadataDir;
+  }
+
   static class NodeComparator
       implements Comparator<CompactionNode>, Serializable {
     public int compare(CompactionNode a, CompactionNode b) {
@@ -981,7 +1103,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     } catch (RocksDBException e) {
       LOG.warn("Can't get num of keys in SST '{}': {}", file, e.getMessage());
     } catch (FileNotFoundException e) {
-      LOG.info("Can't find SST '{}'", file, e);
+      LOG.info("Can't find SST '{}'", file);
     }
     CompactionNode fileNode = new CompactionNode(
         file, snapshotID, numKeys, seqNum);
@@ -1036,7 +1158,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
         getLastCompactionSstFiles(olderSnapshotsLogFilePaths);
 
     Set<String> sstFileNodesRemoved =
-        pruneSnapshotFileNodesFromDag(lastCompactionSstFiles);
+        pruneSstFileNodesFromDag(lastCompactionSstFiles);
     removeSstFile(sstFileNodesRemoved);
     deleteOlderSnapshotsCompactionFiles(olderSnapshotsLogFilePaths);
   }
@@ -1122,7 +1244,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    * Prunes forward and backward DAGs when oldest snapshot with compaction
    * history gets deleted.
    */
-  public Set<String > pruneSnapshotFileNodesFromDag(List<String> sstFileNodes) {
+  public Set<String> pruneSstFileNodesFromDag(List<String> sstFileNodes) {
     Set<CompactionNode> startNodes = new HashSet<>();
     for (String sstFileNode : sstFileNodes) {
       CompactionNode infileNode = compactionNodeMap.get(sstFileNode);
@@ -1134,15 +1256,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
       startNodes.add(infileNode);
     }
 
-    pruneBackwardDag(backwardCompactionDAG, startNodes);
-    Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG,
-        startNodes);
+    synchronized (this) {
+      pruneBackwardDag(backwardCompactionDAG, startNodes);
+      Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG,
+          startNodes);
 
-    // Remove SST file nodes from compactionNodeMap too,
-    // since those nodes won't be needed after clean up.
-    sstFilesPruned.forEach(compactionNodeMap::remove);
-
-    return sstFilesPruned;
+      // Remove SST file nodes from compactionNodeMap too,
+      // since those nodes won't be needed after clean up.
+      sstFilesPruned.forEach(compactionNodeMap::remove);
+      return sstFilesPruned;
+    }
   }
 
   /**
@@ -1154,18 +1277,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = startNodes;
 
-    while (!currentLevel.isEmpty()) {
-      Set<CompactionNode> nextLevel = new HashSet<>();
-      for (CompactionNode current : currentLevel) {
-        if (!backwardDag.nodes().contains(current)) {
-          continue;
-        }
+    synchronized (this) {
+      while (!currentLevel.isEmpty()) {
+        Set<CompactionNode> nextLevel = new HashSet<>();
+        for (CompactionNode current : currentLevel) {
+          if (!backwardDag.nodes().contains(current)) {
+            continue;
+          }
 
-        nextLevel.addAll(backwardDag.predecessors(current));
-        backwardDag.removeNode(current);
-        removedFiles.add(current.getFileName());
+          nextLevel.addAll(backwardDag.predecessors(current));
+          backwardDag.removeNode(current);
+          removedFiles.add(current.getFileName());
+        }
+        currentLevel = nextLevel;
       }
-      currentLevel = nextLevel;
     }
 
     return removedFiles;
@@ -1180,19 +1305,21 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
     Set<String> removedFiles = new HashSet<>();
     Set<CompactionNode> currentLevel = new HashSet<>(startNodes);
 
-    while (!currentLevel.isEmpty()) {
-      Set<CompactionNode> nextLevel = new HashSet<>();
-      for (CompactionNode current : currentLevel) {
-        if (!forwardDag.nodes().contains(current)) {
-          continue;
+    synchronized (this) {
+      while (!currentLevel.isEmpty()) {
+        Set<CompactionNode> nextLevel = new HashSet<>();
+        for (CompactionNode current : currentLevel) {
+          if (!forwardDag.nodes().contains(current)) {
+            continue;
+          }
+
+          nextLevel.addAll(forwardDag.successors(current));
+          forwardDag.removeNode(current);
+          removedFiles.add(current.getFileName());
         }
 
-        nextLevel.addAll(forwardDag.successors(current));
-        forwardDag.removeNode(current);
-        removedFiles.add(current.getFileName());
+        currentLevel = nextLevel;
       }
-
-      currentLevel = nextLevel;
     }
 
     return removedFiles;
@@ -1330,8 +1457,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
    */
   public void pruneSstFiles() {
     Set<String> nonLeafSstFiles;
-
-    synchronized (compactionListenerWriteLock) {
+    synchronized (this) {
       nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
           .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
           .map(node -> node.getFileName())
@@ -1354,5 +1480,31 @@ public class RocksDBCheckpointDiffer implements AutoCloseable {
   @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
+  }
+
+  /**
+   * Holder for RocksDBCheckpointDiffer instance.
+   * This is to protect from creating more than one instance of
+   * RocksDBCheckpointDiffer per RocksDB dir and use the single instance per dir
+   * throughout the whole OM process.
+   */
+  public static class RocksDBCheckpointDifferHolder {
+    private static final ConcurrentMap<String, RocksDBCheckpointDiffer>
+        INSTANCE_MAP = new ConcurrentHashMap<>();
+
+    public static RocksDBCheckpointDiffer getInstance(
+        String metadataDirName,
+        String sstBackupDirName,
+        String compactionLogDirName,
+        String activeDBLocationName,
+        ConfigurationSource configuration
+    ) {
+      return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
+          new RocksDBCheckpointDiffer(metadataDirName,
+              sstBackupDirName,
+              compactionLogDirName,
+              activeDBLocationName,
+              configuration));
+    }
   }
 }

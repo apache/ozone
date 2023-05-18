@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -133,6 +134,10 @@ public class TestContainerReplicationEndToEnd {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
+    if (xceiverClientManager != null) {
+      xceiverClientManager.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -182,8 +187,6 @@ public class TestContainerReplicationEndToEnd {
     Thread.sleep(2 * containerReportInterval);
     DatanodeDetails oldReplicaNode = pipeline.getFirstNode();
     // now move the container to the closed on the datanode.
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.ContainerCommandRequestProto.Builder request =
         ContainerProtos.ContainerCommandRequestProto.newBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
@@ -191,7 +194,13 @@ public class TestContainerReplicationEndToEnd {
     request.setContainerID(containerID);
     request.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    xceiverClient.sendCommand(request.build());
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
+    try {
+      xceiverClient.sendCommand(request.build());
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
+    }
     // wait for container to move to closed state in SCM
     Thread.sleep(2 * containerReportInterval);
     Assert.assertTrue(

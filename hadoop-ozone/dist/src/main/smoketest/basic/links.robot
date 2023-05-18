@@ -42,11 +42,12 @@ Setup ACL tests
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
     Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
     Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}
-    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/readable-link
-    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/link-to-unreadable-bucket
+
+    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
+    Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
+    Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/readable-link
+    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/link-to-unreadable-bucket
 
 Can follow link with read access
     Execute             kdestroy
@@ -104,7 +105,7 @@ Key list passthrough
                         Should Contain              ${source_list}    key2
 
 Key delete passthrough
-                        Execute                     ozone sh key delete ${target}/link1/key2
+                        Execute                     ozone sh key delete --skipTrash ${target}/link1/key2
     ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Not Contain          ${source_list}    key2
 

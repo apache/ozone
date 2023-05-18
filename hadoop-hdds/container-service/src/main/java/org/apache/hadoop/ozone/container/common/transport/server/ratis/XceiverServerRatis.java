@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -58,10 +57,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -498,14 +497,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static Parameters createTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      List<X509Certificate> caList = HAUtils.buildCAX509List(caClient,
-          conf.getConfiguration());
+      KeyStoresFactory managerFactory =
+          caClient.getServerKeyStoresFactory();
       GrpcTlsConfig serverConfig = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, true);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], true);
       GrpcTlsConfig clientConfig = new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          caList, false);
+          managerFactory.getKeyManagers()[0],
+          managerFactory.getTrustManagers()[0], false);
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 

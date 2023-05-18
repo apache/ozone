@@ -211,13 +211,13 @@ You can also create data and double check with `ozone debug` tool if all the con
 
 ```shell
 bin/ozone freon randomkeys --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=10000 --keySize=524288 --replicationType=RATIS --numOfThreads=8 --factor=THREE --bufferSize=1048576
- 
- 
-// use debug ldb to check scm db on all the machines
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ ls
- 
- 
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ scan --with-keys --column_family=containers
+
+
+# use debug ldb to check scm.db on all the machines
+bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
+
+
+bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 ```
 
 ## Migrating from existing SCM

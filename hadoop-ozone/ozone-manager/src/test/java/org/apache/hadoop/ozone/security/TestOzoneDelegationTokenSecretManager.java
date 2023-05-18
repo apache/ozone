@@ -175,6 +175,7 @@ public class TestOzoneDelegationTokenSecretManager {
   @After
   public void tearDown() throws IOException {
     secretManager.stop();
+    certificateClient.close();
   }
 
   @Test

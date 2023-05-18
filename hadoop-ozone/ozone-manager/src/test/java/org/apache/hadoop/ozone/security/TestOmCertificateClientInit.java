@@ -36,6 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -108,7 +109,8 @@ public class TestOmCertificateClientInit {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
+    omCertificateClient.close();
     omCertificateClient = null;
     FileUtils.deleteQuietly(metaDirPath.toFile());
   }

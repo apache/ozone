@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
@@ -89,12 +90,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
+  private final BlockDeletingServiceMetrics blockDeleteMetrics;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, int threadPoolSize, int queueLimit) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
+    this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
     this.executor = Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
@@ -368,9 +371,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       int newDeletionBlocks, long txnID, DeletionMarker marker)
       throws IOException {
     long containerId = delTX.getContainerID();
-    if (!isTxnIdValid(containerId, containerData, delTX)) {
-      return;
-    }
+    logDeleteTransaction(containerId, containerData, delTX);
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -391,9 +392,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    if (!isTxnIdValid(containerId, containerData, delTX)) {
-      return;
-    }
+    logDeleteTransaction(containerId, containerData, delTX);
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -482,23 +481,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  private boolean isTxnIdValid(long containerId,
+  private void logDeleteTransaction(long containerId,
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
-    boolean b = true;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}", containerId,
-          containerData.getMetadataPath());
+      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+          containerId, containerData.getMetadataPath(), delTX.getTxID());
     }
 
     if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Ignoring delete blocks for containerId: %d."
-                + " Outdated delete transactionId %d < %d", containerId,
-            delTX.getTxID(), containerData.getDeleteTransactionId()));
-      }
-      b = false;
+      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
+      LOG.info(String.format("Delete blocks for containerId: %d"
+              + " is either received out of order or retried,"
+              + " %d <= %d", containerId, delTX.getTxID(),
+          containerData.getDeleteTransactionId()));
     }
-    return b;
   }
 
   @Override

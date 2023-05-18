@@ -29,7 +29,7 @@ import java.util.List;
  */
 public class BadDataLocationException extends IOException {
 
-  private List<DatanodeDetails> failedLocations = new ArrayList<>();
+  private final List<DatanodeDetails> failedLocations = new ArrayList<>();
   private int failedLocationIndex;
 
   public BadDataLocationException(DatanodeDetails dn) {
@@ -51,6 +51,13 @@ public class BadDataLocationException extends IOException {
   public BadDataLocationException(DatanodeDetails dn, Throwable ex) {
     super(ex);
     failedLocations.add(dn);
+  }
+
+  public BadDataLocationException(int failedIndex,
+      Throwable ex, List<DatanodeDetails> failedLocations) {
+    super(ex);
+    failedLocationIndex = failedIndex;
+    this.failedLocations.addAll(failedLocations);
   }
 
   public BadDataLocationException(DatanodeDetails dn, int failedIndex,

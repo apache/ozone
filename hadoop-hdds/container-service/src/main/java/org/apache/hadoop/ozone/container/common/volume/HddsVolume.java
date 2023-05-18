@@ -119,7 +119,7 @@ public class HddsVolume extends StorageVolume {
   private HddsVolume(Builder b) throws IOException {
     super(b);
 
-    if (!b.getFailedVolume()) {
+    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
       this.setState(VolumeState.NOT_INITIALIZED);
       this.volumeIOStats = new VolumeIOStats(b.getVolumeRootStr(),
           this.getStorageDir().toString());
@@ -128,7 +128,8 @@ public class HddsVolume extends StorageVolume {
       this.committedBytes = new AtomicLong(0);
 
       LOG.info("Creating HddsVolume: {} of storage type : {} capacity : {}",
-          getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
+          getStorageDir(), b.getStorageType(),
+              getVolumeInfo().get().getCapacity());
 
       initialize();
     } else {

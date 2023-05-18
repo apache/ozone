@@ -1235,15 +1235,16 @@ public class KeyValueHandler extends Handler {
              = BlockUtils.getDB(
         (KeyValueContainerData) container.getContainerData(),
         conf)) {
-      BlockIterator<BlockData>
-          blockIterator = dbHandle.getStore().
-          getBlockIterator(container.getContainerData().getContainerID());
       StringBuilder stringBuilder = new StringBuilder();
-      while (blockIterator.hasNext()) {
-        nonZero = true;
-        stringBuilder.append(blockIterator.nextBlock());
-        if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
-          break;
+      try (BlockIterator<BlockData>
+          blockIterator = dbHandle.getStore().
+          getBlockIterator(container.getContainerData().getContainerID())) {
+        while (blockIterator.hasNext()) {
+          nonZero = true;
+          stringBuilder.append(blockIterator.nextBlock());
+          if (stringBuilder.length() > StorageUnit.KB.toBytes(32)) {
+            break;
+          }
         }
       }
       if (nonZero) {

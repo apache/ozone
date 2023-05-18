@@ -272,7 +272,9 @@ public class TarContainerPacker
   }
 
   private static ArchiveOutputStream tar(OutputStream output) {
-    return new TarArchiveOutputStream(output);
+    TarArchiveOutputStream os = new TarArchiveOutputStream(output);
+    os.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+    return os;
   }
 
   @VisibleForTesting

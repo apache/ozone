@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -30,16 +30,58 @@ import org.apache.commons.lang3.ClassUtils;
 
 /**
  * Collection of available codecs.
+ * This class is immutable.
  */
-public class CodecRegistry {
+public final class CodecRegistry {
+  /** To build {@link CodecRegistry}. */
+  public static class Builder {
+    private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
 
-  private Map<Class, Codec<?>> valueCodecs;
+    public <T> Builder addCodec(Class<T> type, Codec<T> codec) {
+      codecs.put(type, codec);
+      return this;
+    }
 
-  public CodecRegistry() {
-    valueCodecs = new HashMap<>();
-    valueCodecs.put(String.class, new StringCodec());
-    valueCodecs.put(Long.class, new LongCodec());
-    valueCodecs.put(byte[].class, new ByteArrayCodec());
+    public CodecRegistry build() {
+      return new CodecRegistry(codecs);
+    }
+  }
+
+  public static Builder newBuilder() {
+    return new Builder()
+        .addCodec(String.class, new StringCodec())
+        .addCodec(Long.class, new LongCodec())
+        .addCodec(Integer.class, new IntegerCodec())
+        .addCodec(byte[].class, new ByteArrayCodec());
+  }
+
+  private static final class CodecMap {
+    private final Map<Class<?>, Codec<?>> map;
+
+    private CodecMap(Map<Class<?>, Codec<?>> map) {
+      this.map = Collections.unmodifiableMap(new HashMap<>(map));
+    }
+
+    <T> Codec<T> get(Class<T> clazz) {
+      final Codec<?> codec = map.get(clazz);
+      return (Codec<T>) codec;
+    }
+
+    Codec<?> get(List<Class<?>> classes) {
+      for (Class<?> clazz : classes) {
+        final Codec<?> codec = get(clazz);
+        if (codec != null) {
+          return codec;
+        }
+      }
+      return null;
+    }
+  }
+
+  private final CodecMap valueCodecs;
+
+  private CodecRegistry(Map<Class<?>, Codec<?>> valueCodecs) {
+    this.valueCodecs = new CodecMap(valueCodecs);
   }
 
   /**
@@ -55,8 +97,7 @@ public class CodecRegistry {
     if (rawData == null) {
       return null;
     }
-    Codec codec = getCodec(format);
-    return (T) codec.fromPersistedFormat(rawData);
+    return getCodecFromClass(format).fromPersistedFormat(rawData);
   }
 
   /**
@@ -65,14 +106,12 @@ public class CodecRegistry {
    * @param format
    * @param <T>
    * @return new object copied from the given object.
-   * @throws IOException
    */
-  public <T> T copyObject(T object, Class<T> format) throws IOException {
+  public <T> T copyObject(T object, Class<T> format) {
     if (object == null) {
       return null;
     }
-    Codec codec = getCodec(format);
-    return (T) codec.copyObject(object);
+    return getCodecFromClass(format).copyObject(object);
   }
 
   /**
@@ -90,47 +129,43 @@ public class CodecRegistry {
   }
 
   /**
-   * Get codec for the typed object including class and subclass.
-   * @param object typed object.
-   * @return Codec for the typed object.
-   * @throws IOException
-   */
-  private <T> Codec getCodec(T object) throws IOException {
-    Class<T> format = (Class<T>) object.getClass();
-    return getCodec(format);
-  }
-
-
-  /**
-   * Get codec for the typed object including class and subclass.
+   * Get a codec for the typed object
+   * including its class and the super classes/interfaces.
+   *
    * @param <T>    Type of the typed object.
-   * @return Codec for the typed object.
-   * @throws IOException
+   * @param <SUPER> A super class/interface type.
+   * @param object typed object.
+   * @return Codec for the given object.
    */
-  private <T> Codec getCodec(Class<T> format) throws IOException {
-    Codec<T> codec;
-    final List<Class<?>> classes = new ArrayList<>();
-    classes.add(format);
-    classes.addAll(ClassUtils.getAllSuperclasses(format));
-    classes.addAll(ClassUtils.getAllInterfaces(format));
-    for (Class<?> clazz : classes) {
-      if (valueCodecs.containsKey(clazz)) {
-        return (Codec<T>) valueCodecs.get(clazz);
-      }
+  public <SUPER, T extends SUPER> Codec<SUPER> getCodec(T object) {
+    final Class<T> clazz = (Class<T>) object.getClass();
+    Codec<?> codec = valueCodecs.get(clazz);
+    if (codec == null) {
+      codec = valueCodecs.get(ClassUtils.getAllSuperclasses(clazz));
+    }
+    if (codec == null) {
+      codec = valueCodecs.get(ClassUtils.getAllInterfaces(clazz));
+    }
+    if (codec != null) {
+      return (Codec<SUPER>) codec;
     }
     throw new IllegalStateException(
-        "Codec is not registered for type: " + format);
+        "Codec is not registered for type: " + clazz);
   }
 
   /**
-   * Addds codec to the internal collection.
+   * Get a codec for the given class
+   * including its super classes/interfaces.
    *
-   * @param type  Type of the codec source/destination object.
-   * @param codec The codec itself.
-   * @param <T>   The type of the codec
+   * @param <T>    Type of the typed object.
+   * @return Codec for the given class.
    */
-  public <T> void addCodec(Class<T> type, Codec<T> codec) {
-    valueCodecs.put(type, codec);
+  <T> Codec<T> getCodecFromClass(Class<T> clazz) {
+    final Codec<?> codec = valueCodecs.get(clazz);
+    if (codec != null) {
+      return (Codec<T>) codec;
+    }
+    throw new IllegalStateException(
+        "Codec is not registered for type: " + clazz);
   }
-
 }

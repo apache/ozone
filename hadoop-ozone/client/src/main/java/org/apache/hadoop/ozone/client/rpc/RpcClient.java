@@ -491,7 +491,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setVolumeQuota(String volumeName, long quotaInNamespace,
       long quotaInBytes) throws IOException {
-    HddsClientUtils.verifyResourceName(volumeName);
+    verifyVolumeName(volumeName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
     // If the volume is old, we need to remind the user on the client side
@@ -708,7 +708,7 @@ public class RpcClient implements ClientProtocol {
 
   private static void verifyVolumeName(String volumeName) throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(volumeName);
+      HddsClientUtils.verifyResourceName(volumeName, false);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_VOLUME_NAME);
@@ -717,7 +717,7 @@ public class RpcClient implements ClientProtocol {
 
   private static void verifyBucketName(String bucketName) throws OMException {
     try {
-      HddsClientUtils.verifyResourceName(bucketName);
+      HddsClientUtils.verifyResourceName(bucketName, false);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_BUCKET_NAME);
@@ -984,14 +984,15 @@ public class RpcClient implements ClientProtocol {
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
-                                           int pageSize)
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, token, pageSize);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
   }
 
   /**
@@ -1106,8 +1107,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setBucketQuota(String volumeName, String bucketName,
       long quotaInNamespace, long quotaInBytes) throws IOException {
-    HddsClientUtils.verifyResourceName(bucketName);
-    HddsClientUtils.verifyResourceName(volumeName);
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     verifyCountsQuota(quotaInNamespace);
     verifySpaceQuota(quotaInBytes);
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
@@ -1478,7 +1479,8 @@ public class RpcClient implements ClientProtocol {
   public void deleteKeys(
           String volumeName, String bucketName, List<String> keyNameList)
           throws IOException {
-    HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
     Preconditions.checkNotNull(keyNameList);
     OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
         keyNameList);
@@ -1792,7 +1794,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(
@@ -2183,7 +2185,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(clientConfig)
+            .setConfig(conf.getObject(OzoneClientConfig.class))
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
@@ -2253,7 +2255,7 @@ public class RpcClient implements ClientProtocol {
         .setOmClient(ozoneManagerClient)
         .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(clientConfig)
+        .setConfig(conf.getObject(OzoneClientConfig.class))
         .setClientMetrics(clientMetrics);
   }
 

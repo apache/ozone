@@ -97,15 +97,17 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
 
   @Override
   public void flush() throws IOException {
-    if (dbStore != null) {
-      rwLock.writeLock().lock();
-      try {
+    rwLock.writeLock().lock();
+    try {
+      if (dbStore != null) {
         dbStore.commitBatchOperation(getCurrentBatchOperation());
+      }
+      if (currentBatchOperation != null) {
         currentBatchOperation.close();
         currentBatchOperation = null;
-      } finally {
-        rwLock.writeLock().unlock();
       }
+    } finally {
+      rwLock.writeLock().unlock();
     }
   }
 

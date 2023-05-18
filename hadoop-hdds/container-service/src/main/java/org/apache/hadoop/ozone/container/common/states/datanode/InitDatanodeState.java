@@ -127,7 +127,7 @@ public class InitDatanodeState implements DatanodeState,
         .getDatanodeDetails();
     if (datanodeDetails != null) {
       try {
-        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
       } catch (IOException ex) {
         // As writing DatanodeDetails in to datanodeid file failed, which is
         // a critical thing, so shutting down the state machine.

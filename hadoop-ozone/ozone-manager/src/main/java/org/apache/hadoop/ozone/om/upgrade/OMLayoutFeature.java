@@ -38,7 +38,9 @@ public enum OMLayoutFeature implements LayoutFeature {
       "layouts and introducing the FILE_SYSTEM_OPTIMIZED and OBJECT_STORE " +
       "bucket layout types."),
 
-  MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema");
+  MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema"),
+
+  HSYNC(4, "Support hsync");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

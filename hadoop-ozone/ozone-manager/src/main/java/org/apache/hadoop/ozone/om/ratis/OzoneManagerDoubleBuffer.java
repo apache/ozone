@@ -30,8 +30,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -104,6 +107,7 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
+  private final FlushNotifier flushNotifier;
 
   /**
    * function which will get term associated with the transaction index.
@@ -120,6 +124,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
+    private FlushNotifier flushNotifier;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -152,6 +157,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setFlushNotifier(FlushNotifier flushNotifier) {
+      this.flushNotifier = flushNotifier;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
@@ -162,15 +172,21 @@ public final class OzoneManagerDoubleBuffer {
             "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
       }
+      if (flushNotifier == null) {
+        flushNotifier = new FlushNotifier();
+      }
+
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
+          flushNotifier);
     }
   }
 
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions) {
+      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
+      FlushNotifier flushNotifier) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -185,6 +201,7 @@ public final class OzoneManagerDoubleBuffer {
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
     this.indexToTerm = indexToTerm;
+    this.flushNotifier = flushNotifier;
 
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
@@ -254,7 +271,8 @@ public final class OzoneManagerDoubleBuffer {
    * Runs in a background thread and batches the transaction in currentBuffer
    * and commit to DB.
    */
-  private void flushTransactions() {
+  @VisibleForTesting
+  void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
     }
@@ -295,6 +313,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       clearReadyBuffer();
+      flushNotifier.notifyFlush();
     } catch (IOException ex) {
       terminate(ex, 1);
     } catch (Throwable t) {
@@ -611,10 +630,14 @@ public final class OzoneManagerDoubleBuffer {
   private synchronized boolean canFlush() {
     try {
       while (currentBuffer.size() == 0) {
-        wait(Long.MAX_VALUE);
+        // canFlush() only gets called when the readyBuffer is empty.
+        // Since both buffers are empty, notify once for each.
+        flushNotifier.notifyFlush();
+        flushNotifier.notifyFlush();
+        wait(1000L);
       }
       return true;
-    }  catch (InterruptedException ex) {
+    } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       if (isRunning.get()) {
         final String message = "OMDoubleBuffer flush thread " +
@@ -648,5 +671,46 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public OzoneManagerDoubleBufferMetrics getOzoneManagerDoubleBufferMetrics() {
     return ozoneManagerDoubleBufferMetrics;
+  }
+
+  @VisibleForTesting
+  int getCurrentBufferSize() {
+    return currentBuffer.size();
+  }
+
+  @VisibleForTesting
+  int getReadyBufferSize() {
+    return readyBuffer.size();
+  }
+
+  @VisibleForTesting
+  void resume() {
+    isRunning.set(true);
+  }
+
+  void awaitFlush() throws InterruptedException {
+    flushNotifier.await();
+  }
+
+  static class FlushNotifier {
+    private final Set<CountDownLatch> flushLatches =
+        ConcurrentHashMap.newKeySet();
+
+    void await() throws InterruptedException {
+
+      // Wait until both the current and ready buffers are flushed.
+      CountDownLatch latch = new CountDownLatch(2);
+      flushLatches.add(latch);
+      latch.await();
+      flushLatches.remove(latch);
+    }
+
+    int notifyFlush() {
+      int retval = flushLatches.size();
+      for (CountDownLatch l : flushLatches) {
+        l.countDown();
+      }
+      return retval;
+    }
   }
 }

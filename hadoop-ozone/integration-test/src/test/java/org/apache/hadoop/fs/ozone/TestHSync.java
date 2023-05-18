@@ -23,6 +23,9 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoCodec;
@@ -39,16 +42,18 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,6 +87,7 @@ public class TestHSync {
   private static OzoneBucket bucket;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static OzoneClient client;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -93,6 +99,7 @@ public class TestHSync {
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -106,20 +113,21 @@ public class TestHSync {
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, layout);
+    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
   }
 
   @AfterAll
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testO3fsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
@@ -135,7 +143,6 @@ public class TestHSync {
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testOfsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
@@ -221,6 +228,81 @@ public class TestHSync {
     assertEquals(data.length, offset);
   }
 
+  private void runConcurrentWriteHSync(Path file,
+      final FSDataOutputStream out, int initialDataSize)
+      throws InterruptedException, IOException {
+    final byte[] data = new byte[initialDataSize];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    AtomicReference<IOException> writerException = new AtomicReference<>();
+    AtomicReference<IOException> syncerException = new AtomicReference<>();
+
+    LOG.info("runConcurrentWriteHSync {} with size {}",
+        file, initialDataSize);
+
+    final long start = Time.monotonicNow();
+    // two threads: write and hsync
+    Runnable writer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.write(data);
+        } catch (IOException e) {
+          writerException.set(e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Runnable syncer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.hsync();
+        } catch (IOException e) {
+          syncerException.set(e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Thread writerThread = new Thread(writer);
+    writerThread.start();
+    Thread syncThread = new Thread(syncer);
+    syncThread.start();
+    writerThread.join();
+    syncThread.join();
+
+    if (writerException.get() != null) {
+      throw writerException.get();
+    }
+    if (syncerException.get() != null) {
+      throw syncerException.get();
+    }
+  }
+
+  @Test
+  public void testConcurrentWriteHSync()
+      throws IOException, InterruptedException {
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path(dir, "file" + i);
+        try (FSDataOutputStream out =
+            fs.create(file, true)) {
+          int initialDataSize = 1 << i;
+          runConcurrentWriteHSync(file, out, initialDataSize);
+        }
+
+        fs.delete(file, false);
+      }
+    }
+  }
+
   @Test
   public void testStreamCapability() throws Exception {
     final String rootPath = String.format("%s://%s/",
@@ -252,10 +334,10 @@ public class TestHSync {
     builder.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(
-                3, 2, ECReplicationConfig.EcCodec.RS, 1024)));
+                3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB)));
     BucketArgs omBucketArgs = builder.build();
     String ecBucket = UUID.randomUUID().toString();
-    TestDataUtil.createBucket(cluster, bucket.getVolumeName(), omBucketArgs,
+    TestDataUtil.createBucket(client, bucket.getVolumeName(), omBucketArgs,
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
@@ -295,12 +377,16 @@ public class TestHSync {
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
 
     try (CapableOzoneFSOutputStream cofsos =
-        new CapableOzoneFSOutputStream(ofso)) {
+        new CapableOzoneFSOutputStream(ofso, true)) {
       if (isEC) {
         assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
       } else {
         assertTrue(cofsos.hasCapability(StreamCapabilities.HFLUSH));
       }
+    }
+    try (CapableOzoneFSOutputStream cofsos =
+        new CapableOzoneFSOutputStream(ofso, false)) {
+      assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
     }
   }
 }

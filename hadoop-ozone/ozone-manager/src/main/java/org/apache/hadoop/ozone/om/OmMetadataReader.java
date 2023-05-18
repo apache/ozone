@@ -44,6 +44,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -114,8 +115,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(
-            new OzoneAdmins(ozoneManager.getOmAdminUsernames()));
+        authorizer.setOzoneAdmins(ozoneManager.getOmAdmins());
+        authorizer.setOzoneReadOnlyAdmins(getOmReadOnlyAdmins(configuration));
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;
@@ -483,10 +484,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    *                     and throwOnPermissionDenied set to true.
    */
   public boolean checkAcls(OzoneObj obj, RequestContext context,
-                           boolean throwIfPermissionDenied)
-      throws OMException {
+      boolean throwIfPermissionDenied) throws OMException {
 
-    if (!accessAuthorizer.checkAccess(obj, context)) {
+    if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -495,9 +496,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getUserName(), context.getAclRights(),
+            context.getClientUgi().getShortUserName(), context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
-        throw new OMException("User " + context.getClientUgi().getUserName() +
+        throw new OMException(
+            "User " + context.getClientUgi().getShortUserName() +
             " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
@@ -579,5 +581,15 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ResourceType.KEY;
   }
 
-  
+  private OzoneAdmins getOmReadOnlyAdmins(OzoneConfiguration configuration) {
+    // Get read only admin list
+    Collection<String> omReadOnlyAdmins =
+        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(
+            configuration);
+    Collection<String> omReadOnlyAdminsGroups =
+        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(
+            configuration);
+    return new OzoneAdmins(omReadOnlyAdmins,
+        omReadOnlyAdminsGroups);
+  }
 }

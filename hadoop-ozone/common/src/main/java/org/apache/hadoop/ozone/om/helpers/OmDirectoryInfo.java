@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,7 +34,7 @@ import java.util.Objects;
  * in the user given path and a pointer to its parent directory element in the
  * path. Also, it stores directory node related metdata details.
  */
-public class OmDirectoryInfo extends WithParentObjectId {
+public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
   private String name; // directory name
 
   private long creationTime;
@@ -265,5 +266,27 @@ public class OmDirectoryInfo extends WithParentObjectId {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  @Override
+  public Object clone() throws CloneNotSupportedException {
+    OmDirectoryInfo omDirectoryInfo = (OmDirectoryInfo) super.clone();
+
+    omDirectoryInfo.metadata = new HashMap<>();
+    omDirectoryInfo.acls = new ArrayList<>();
+
+    acls.stream().filter(acl -> acl != null).forEach(acl ->
+            omDirectoryInfo.acls.add(new OzoneAcl(acl.getType(),
+                    acl.getName(), (BitSet) acl.getAclBitSet().clone(),
+                    acl.getAclScope())));
+
+    if (metadata != null) {
+      metadata.forEach((k, v) -> omDirectoryInfo.metadata.put(k, v));
+    }
+
+    return omDirectoryInfo;
   }
 }

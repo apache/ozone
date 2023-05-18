@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -132,7 +131,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(dbBucketKey),
-            new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, omBucketInfo));
       }
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);

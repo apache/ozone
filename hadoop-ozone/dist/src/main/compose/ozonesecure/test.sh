@@ -38,14 +38,6 @@ execute_robot_test scm basic
 execute_robot_test scm security
 
 execute_robot_test scm -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
-
-exclude=""
-for bucket in encrypted link generated; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
-done
 
 #expects 4 pipelines, should be run before
 #admincli which creates STANDALONE pipeline

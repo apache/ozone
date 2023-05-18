@@ -58,6 +58,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
@@ -123,6 +124,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     }
   }
 
+  @Test
+  public void preExecuteRejectsInvalidReplication() {
+    ECReplicationConfig invalidReplication = new ECReplicationConfig(1, 2);
+    OMException e = assertThrows(OMException.class,
+        () -> preExecuteTest(false, 0, invalidReplication));
+
+    Assert.assertEquals(OMException.ResultCodes.INVALID_REQUEST,
+        e.getResult());
+  }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {

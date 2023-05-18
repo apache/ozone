@@ -20,6 +20,7 @@ package org.apache.hadoop.util;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 /**
  * Encloses helpers to deal with metrics.
@@ -47,6 +48,17 @@ public final class MetricUtil {
       block.run();
     } finally {
       metric.add(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  public static <T, E extends IOException> T captureLatencyNs(
+      Consumer<Long> latencySetter,
+      CheckedSupplier<T, E> block) throws E {
+    long start = Time.monotonicNowNanos();
+    try {
+      return block.get();
+    } finally {
+      latencySetter.accept(Time.monotonicNowNanos() - start);
     }
   }
 }

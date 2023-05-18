@@ -151,7 +151,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
    */
   @AfterEach
   public void shutdown() {
-    IOUtils.close(null, client);
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -255,6 +255,7 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
   }
 
   @Test
+  @Flaky("HDDS-6113")
   public void testWatchForCommitDatanodeFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);

@@ -79,6 +79,7 @@ import java.util.stream.Stream;
         ListSubcommand.class,
         InfoSubcommand.class,
         ExportSubcommand.class,
+        InspectSubcommand.class
     })
 @MetaInfServices(SubcommandWithParent.class)
 public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
@@ -105,6 +106,10 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return OzoneDebug.class;
+  }
+
+  OzoneConfiguration getOzoneConf() {
+    return parent.getOzoneConf();
   }
 
   public void loadContainersFromVolumes() throws IOException {

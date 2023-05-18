@@ -134,8 +134,9 @@ public class TestOzoneBlockTokenSecretManager {
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws IOException {
     secretManager = null;
+    client.close();
   }
 
   @Test

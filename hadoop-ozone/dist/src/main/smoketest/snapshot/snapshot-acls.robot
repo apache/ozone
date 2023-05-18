@@ -30,7 +30,7 @@ ${SECOND_SNAPSHOT}
 *** Keywords ***
 Add ACL
     [arguments]         ${object}   ${user}     ${objectName}
-    ${result} =         Execute     ozone sh ${object} addacl -a user:${user}/scm@EXAMPLE.COM:a ${objectName}
+    ${result} =         Execute     ozone sh ${object} addacl -a user:${user}:a ${objectName}
     Should not contain  ${result}   PERMISSION_DENIED
 
 Add ACLs

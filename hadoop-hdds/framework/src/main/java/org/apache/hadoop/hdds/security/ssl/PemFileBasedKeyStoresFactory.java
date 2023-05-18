@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +32,6 @@ import javax.net.ssl.TrustManager;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.util.Timer;
 
 /**
  * {@link KeyStoresFactory} implementation that reads the certificates from
@@ -44,16 +44,11 @@ import java.util.Timer;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
+public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
+    CertificateNotification {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PemFileBasedKeyStoresFactory.class);
-
-  /**
-   * The name of the timer thread monitoring file changes.
-   */
-  public static final String SSL_MONITORING_THREAD_NAME =
-      "SSL Certificates Store Monitor";
 
   /**
    * Default format of the keystore files.
@@ -62,68 +57,32 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
 
   private KeyManager[] keyManagers;
   private TrustManager[] trustManagers;
-  private Timer monitoringTimer;
   private final CertificateClient caClient;
-  private final SecurityConfig secConfig;
 
   public PemFileBasedKeyStoresFactory(SecurityConfig securityConfig,
       CertificateClient client) {
     this.caClient = client;
-    this.secConfig = securityConfig;
   }
 
   /**
    * Implements logic of initializing the TrustManagers with the options
    * to reload truststore.
-   * @param mode client or server
    */
-  private void createTrustManagers(Mode mode) throws
+  private void createTrustManagers() throws
       GeneralSecurityException, IOException {
-    long truststoreReloadInterval = secConfig.getSslTruststoreReloadInterval();
-    LOG.info(mode.toString() + " TrustStore reloading at " +
-        truststoreReloadInterval + " millis.");
-
     ReloadingX509TrustManager trustManager = new ReloadingX509TrustManager(
         DEFAULT_KEYSTORE_TYPE, caClient);
-
-    if (truststoreReloadInterval > 0) {
-      monitoringTimer.schedule(
-          new MonitoringTimerTask(caClient,
-              p -> trustManager.loadFrom(caClient),
-              exception -> LOG.error(
-                  ReloadingX509TrustManager.RELOAD_ERROR_MESSAGE, exception)),
-          truststoreReloadInterval,
-          truststoreReloadInterval);
-    }
-
     trustManagers = new TrustManager[] {trustManager};
   }
 
   /**
    * Implements logic of initializing the KeyManagers with the options
    * to reload keystores.
-   * @param mode client or server
    */
-  private void createKeyManagers(Mode mode) throws
+  private void createKeyManagers() throws
       GeneralSecurityException, IOException {
-    long keystoreReloadInterval = secConfig.getSslKeystoreReloadInterval();
-    LOG.info(mode.toString() + " KeyStore reloading at " +
-        keystoreReloadInterval + " millis.");
-
     ReloadingX509KeyManager keystoreManager =
         new ReloadingX509KeyManager(DEFAULT_KEYSTORE_TYPE, caClient);
-
-    if (keystoreReloadInterval > 0) {
-      monitoringTimer.schedule(
-          new MonitoringTimerTask(caClient,
-              p -> keystoreManager.loadFrom(caClient),
-              exception ->
-                  LOG.error(ReloadingX509KeyManager.RELOAD_ERROR_MESSAGE,
-                      exception)),
-          keystoreReloadInterval,
-          keystoreReloadInterval);
-    }
-
     keyManagers = new KeyManager[] {keystoreManager};
   }
 
@@ -141,12 +100,9 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   public synchronized void init(Mode mode, boolean requireClientAuth)
       throws IOException, GeneralSecurityException {
 
-    monitoringTimer = new Timer(caClient.getComponentName() + "-" + mode + "-"
-        + SSL_MONITORING_THREAD_NAME, true);
-
     // key manager
     if (requireClientAuth || mode == Mode.SERVER) {
-      createKeyManagers(mode);
+      createKeyManagers();
     } else {
       KeyStore keystore = KeyStore.getInstance(DEFAULT_KEYSTORE_TYPE);
       keystore.load(null, null);
@@ -158,7 +114,8 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
     }
 
     // trust manager
-    createTrustManagers(mode);
+    createTrustManagers();
+    caClient.registerNotificationReceiver(this);
   }
 
   /**
@@ -166,10 +123,6 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
    */
   @Override
   public synchronized void destroy() {
-    if (monitoringTimer != null) {
-      monitoringTimer.cancel();
-    }
-
     if (keyManagers != null) {
       keyManagers = null;
     }
@@ -195,5 +148,26 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory {
   @Override
   public synchronized TrustManager[] getTrustManagers() {
     return trustManagers;
+  }
+
+  @Override
+  public synchronized void notifyCertificateRenewed(
+      CertificateClient certClient, String oldCertId, String newCertId) {
+    LOG.info("{} notify certificate renewed", certClient.getComponentName());
+    if (keyManagers != null) {
+      for (KeyManager km: keyManagers) {
+        if (km instanceof ReloadingX509KeyManager) {
+          ((ReloadingX509KeyManager) km).loadFrom(certClient);
+        }
+      }
+    }
+
+    if (trustManagers != null) {
+      for (TrustManager tm: trustManagers) {
+        if (tm instanceof ReloadingX509TrustManager) {
+          ((ReloadingX509TrustManager) tm).loadFrom(certClient);
+        }
+      }
+    }
   }
 }

@@ -143,6 +143,11 @@ public class TestAuthorizationV4HeaderParser {
     String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
     LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> testRequestWithSpecificDate(dateStr3));
+
+    // Case 4: Invalid date format
+    String dateStr4 = now.toString();
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+        () -> testRequestWithSpecificDate(dateStr4));
   }
 
   private void testRequestWithSpecificDate(String dateStr)
@@ -240,6 +245,16 @@ public class TestAuthorizationV4HeaderParser {
     LambdaTestUtils.intercept(MalformedResourceException.class, "",
         () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
             .parseSignature());
+
+    String auth4 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/invalid_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+            () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+                .parseSignature());
   }
 
   @Test
@@ -347,6 +362,15 @@ public class TestAuthorizationV4HeaderParser {
             + "=fe5f80f77d5fa3beca038a248ff027";
     Assert.assertNull(new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
         .parseSignature());
+
+    // Invalid algorithm
+    String auth4 = "AWS4-ZAVC-HJUA123 " +
+        "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
+        "SignedHeaders=host;range;x-amz-date, " +
+        "Signature=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+        () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+            .parseSignature());
   }
 
   @Test

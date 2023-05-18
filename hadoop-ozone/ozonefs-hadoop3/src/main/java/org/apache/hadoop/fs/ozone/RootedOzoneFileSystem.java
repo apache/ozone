@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -103,6 +104,19 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   @Override
   protected OutputStream createFSOutputStream(
       OzoneFSOutputStream outputStream) {
-    return new CapableOzoneFSOutputStream(outputStream);
+    return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
+  }
+
+  @Override
+  public boolean hasPathCapability(final Path path, final String capability)
+      throws IOException {
+    // qualify the path to make sure that it refers to the current FS.
+    final Path p = makeQualified(path);
+    boolean cap =
+        OzonePathCapabilities.hasPathCapability(p, capability);
+    if (cap) {
+      return cap;
+    }
+    return super.hasPathCapability(p, capability);
   }
 }

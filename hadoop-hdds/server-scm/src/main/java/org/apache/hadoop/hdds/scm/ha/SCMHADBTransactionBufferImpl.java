@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -134,6 +135,8 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
     rwLock.writeLock().lock();
     try {
+      IOUtils.closeQuietly(currentBatchOperation);
+
       // initialize a batch operation during construction time
       currentBatchOperation = this.metadataStore.getStore().
           initBatchOperation();

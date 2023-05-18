@@ -196,6 +196,10 @@ public class ContainerController {
     return containerSet.getContainerIterator();
   }
 
+  public Iterable<Container<?>> getContainerSet() {
+    return containerSet;
+  }
+
   /**
    * Return an iterator of containers which are associated with the specified
    * <code>volume</code>.

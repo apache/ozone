@@ -63,6 +63,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
+  private @Metric MutableCounterLong numKeyHSyncs;
   private @Metric MutableCounterLong numBlockAllocations;
   private @Metric MutableCounterLong numGetServiceLists;
   private @Metric MutableCounterLong numBucketS3Lists;
@@ -81,6 +82,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequests;
   private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
   private @Metric MutableCounterLong numOpenKeysDeleted;
+  private @Metric MutableCounterLong numOpenKeysCleaned;
+  private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
 
   private @Metric MutableCounterLong numAddAcl;
   private @Metric MutableCounterLong numSetAcl;
@@ -155,12 +158,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   // Metric for list users in tenant operation
   private @Metric MutableCounterLong numTenantTenantUserLists;
 
+  private @Metric MutableCounterLong numRecoverLease;
+
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
   private @Metric MutableCounterLong getNumGetKeyInfoFails;
+
+  private @Metric MutableCounterLong numRecoverLeaseFails;
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
@@ -746,6 +753,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numKeyCommits.incr();
   }
 
+  public void incNumKeyHSyncs() {
+    numKeyOps.incr();
+    numKeyHSyncs.incr();
+  }
+
   public void incNumKeyCommitFails() {
     numKeyCommitFails.incr();
   }
@@ -789,6 +801,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumOpenKeysDeleted() {
     numOpenKeysDeleted.incr();
+  }
+
+  public void incNumOpenKeysCleaned(int delta) {
+    numOpenKeysCleaned.incr(delta);
+  }
+
+  public void incNumOpenKeysHSyncCleaned() {
+    numOpenKeysHSyncCleaned.incr();
   }
 
   public void incNumOpenKeyDeleteRequestFails() {
@@ -1029,6 +1049,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyHSyncs() {
+    return numKeyHSyncs.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyCommitFails() {
     return numKeyCommitFails.value();
   }
@@ -1089,6 +1114,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumOpenKeysDeleted() {
     return numOpenKeysDeleted.value();
+  }
+
+  public long getNumOpenKeysCleaned() {
+    return numOpenKeysCleaned.value();
+  }
+
+  public long getNumOpenKeysHSyncCleaned() {
+    return numOpenKeysHSyncCleaned.value();
   }
 
   public long getNumOpenKeyDeleteRequestFails() {
@@ -1306,6 +1339,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incEcBucketCreateFailsTotal() {
     ecBucketCreateFailsTotal.incr();
+  }
+
+  public void incNumRecoverLease() {
+    numKeyOps.incr();
+    numFSOps.incr();
+    numRecoverLease.incr();
+  }
+
+  public void incNumRecoverLeaseFails() {
+    numRecoverLeaseFails.incr();
   }
 
   public void unRegister() {

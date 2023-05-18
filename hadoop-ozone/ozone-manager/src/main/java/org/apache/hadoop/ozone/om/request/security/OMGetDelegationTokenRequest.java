@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -185,7 +184,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
      // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
           new CacheKey<>(ozoneTokenIdentifier),
-          new CacheValue<>(Optional.of(renewTime), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, renewTime));
 
       omClientResponse =
           new OMGetDelegationTokenResponse(ozoneTokenIdentifier, renewTime,

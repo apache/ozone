@@ -116,7 +116,7 @@ Test Volume Acls
     ${result} =     Execute             ozone sh volume removeacl ${protocol}${server}/${volume} -a user:superuser1:xy
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
-    ${result} =     Execute             ozone sh volume setacl ${protocol}${server}/${volume} -al user:superuser1:rwxy[DEFAULT],group:superuser1:a,user:testuser/scm@EXAMPLE.COM:rwxyc,group:superuser1:a[DEFAULT]
+    ${result} =     Execute             ozone sh volume setacl ${protocol}${server}/${volume} -al user:superuser1:rwxy[DEFAULT],group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
@@ -132,7 +132,7 @@ Test Bucket Acls
     ${result} =     Execute             ozone sh bucket removeacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:xy
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh bucket setacl ${protocol}${server}/${volume}/bb1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser/scm@EXAMPLE.COM:rwxyc,group:superuser1:a[DEFAULT]
+    ${result} =     Execute             ozone sh bucket setacl ${protocol}${server}/${volume}/bb1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
@@ -151,13 +151,13 @@ Test key handling
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_RATIS
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1_RATIS | jq -r '. | select(.name=="key1_RATIS")'
                     Should contain      ${result}       RATIS
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
+                    Execute             ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bb1/key1_RATIS
 
                     Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
                     Execute             rm -f /tmp/key1-copy
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1-copy
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1-copy
+                    Execute             ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bb1/key1-copy
 
     ${result} =     Execute And Ignore Error    ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Contain      ${result}       NOTICE.txt.1 exists
@@ -170,7 +170,7 @@ Test key handling
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.[].name'
                     Should Be Equal     ${result}       key2
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key2
+                    Execute             ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bb1/key2
 
 Test key Acls
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -183,7 +183,7 @@ Test key Acls
     ${result} =     Execute             ozone sh key removeacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:xy
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh key setacl ${protocol}${server}/${volume}/bb1/key2 -al user:superuser1:rwxy,group:superuser1:a,user:testuser/scm@EXAMPLE.COM:rwxyc
+    ${result} =     Execute             ozone sh key setacl ${protocol}${server}/${volume}/bb1/key2 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
@@ -196,7 +196,7 @@ Test prefix Acls
     ${result} =     Execute             ozone sh prefix removeacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:xy
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
-    ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser/scm@EXAMPLE.COM:rwxyc
+    ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser:rwxyc
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
@@ -204,3 +204,22 @@ Test prefix Acls
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+
+Test Delete key with and without Trash
+    [arguments]    ${protocol}         ${server}       ${volume}
+                   Execute               ozone sh volume create ${protocol}${server}/${volume}
+                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
+                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key1 /opt/hadoop/NOTICE.txt
+                   Execute               ozone sh key delete --skipTrash ${protocol}${server}/${volume}/bfso/key1
+    ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
+                   Should not contain    ${result}     key1
+                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
+                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
+                   Execute               ozone sh key delete ${protocol}${server}/${volume}/obsbkt/key2
+    ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/obsbkt
+                   Should not contain    ${result}     key2
+                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
+                   Execute               ozone sh key delete ${protocol}${server}/${volume}/bfso/key3
+    ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
+                   Should Contain Any    ${result}     .Trash/hadoop    .Trash/testuser    .Trash/root
+                   Should contain        ${result}     key3

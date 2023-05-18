@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -64,10 +63,6 @@ public class TestPemFileBasedKeyStoresFactory {
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
     caClient = new CertificateClientTestImpl(conf);
     secConf = new SecurityConfig(conf);
   }

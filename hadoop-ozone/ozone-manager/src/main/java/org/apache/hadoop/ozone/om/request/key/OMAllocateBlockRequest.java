@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -236,7 +235,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
-          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
+          CacheValue.get(trxnLogIndex, openKeyInfo));
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());

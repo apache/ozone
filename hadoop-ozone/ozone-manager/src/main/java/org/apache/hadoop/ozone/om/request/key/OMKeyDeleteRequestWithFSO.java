@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -145,12 +144,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         // Update dir cache.
         omMetadataManager.getDirectoryTable().addCacheEntry(
                 new CacheKey<>(ozonePathKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
+                CacheValue.get(trxnLogIndex));
       } else {
         // Update table cache.
         omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
                 new CacheKey<>(ozonePathKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
+                CacheValue.get(trxnLogIndex));
       }
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);

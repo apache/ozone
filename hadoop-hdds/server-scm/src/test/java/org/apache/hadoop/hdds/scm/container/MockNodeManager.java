@@ -633,6 +633,12 @@ public class MockNodeManager implements NodeManager {
     return 0;
   }
 
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
+  }
+
   /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
@@ -809,7 +815,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 

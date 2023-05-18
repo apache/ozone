@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
@@ -60,6 +61,12 @@ public class ClosingContainerHandler extends AbstractCheck {
 
     boolean forceClose = request.getContainerInfo().getReplicationConfig()
         .getReplicationType() != HddsProtos.ReplicationType.RATIS;
+
+    if (request.getContainerReplicas().size() == 0) {
+      request.getReport().incrementAndSample(
+          ReplicationManagerReport.HealthState.MISSING,
+          containerInfo.containerID());
+    }
 
     for (ContainerReplica replica : request.getContainerReplicas()) {
       if (replica.getState() != ContainerReplicaProto.State.UNHEALTHY) {

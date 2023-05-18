@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyRenameInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -34,13 +34,13 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.RENAMED_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_RENAMED_TABLE;
 
 /**
  * Response for RenameKey request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE,
-    RENAMED_KEY_TABLE})
+    SNAPSHOT_RENAMED_TABLE})
 public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
 
   private boolean isRenameDirectory;
@@ -91,19 +91,19 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
           .deleteWithBatch(batchOperation, getFromKeyName());
       omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, getToKeyName(), getRenameKeyInfo());
+    }
 
-      String renameDbKey = omMetadataManager.getRenameKey(
-          getRenameKeyInfo().getVolumeName(),
-          getRenameKeyInfo().getBucketName(),
-          getRenameKeyInfo().getObjectID());
-
-      OmKeyRenameInfo omKeyRenameInfo = omMetadataManager.getRenamedKeyTable()
-          .get(renameDbKey);
-      if (omKeyRenameInfo == null) {
-        omKeyRenameInfo = new OmKeyRenameInfo(getFromKeyName());
-        omMetadataManager.getRenamedKeyTable().putWithBatch(
-            batchOperation, renameDbKey, omKeyRenameInfo);
-      }
+    boolean isSnapshotBucket = OMClientRequestUtils.
+        isSnapshotBucket(omMetadataManager, getRenameKeyInfo());
+    String renameDbKey = omMetadataManager.getRenameKey(
+        getRenameKeyInfo().getVolumeName(),
+        getRenameKeyInfo().getBucketName(),
+        getRenameKeyInfo().getObjectID());
+    String renamedKey = omMetadataManager.getSnapshotRenamedTable()
+        .get(renameDbKey);
+    if (isSnapshotBucket && renamedKey == null) {
+      omMetadataManager.getSnapshotRenamedTable().putWithBatch(
+          batchOperation, renameDbKey, getFromKeyName());
     }
 
     if (fromKeyParent != null) {

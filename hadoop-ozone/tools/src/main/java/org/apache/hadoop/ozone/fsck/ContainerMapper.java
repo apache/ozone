@@ -45,14 +45,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 public class ContainerMapper {
 
-
-  private static Table getMetaTable(OzoneConfiguration configuration)
-      throws IOException {
-    OmMetadataManagerImpl metadataManager =
-        new OmMetadataManagerImpl(configuration);
-    return metadataManager.getKeyTable(getBucketLayout());
-  }
-
   public static void main(String[] args) throws IOException {
     String path = args[0];
     if (path == null) {
@@ -84,8 +76,12 @@ public class ContainerMapper {
     String path = configuration.get(OZONE_OM_DB_DIRS);
     if (path == null || path.isEmpty()) {
       throw new IOException(OZONE_OM_DB_DIRS + "should be set ");
-    } else {
-      Table keyTable = getMetaTable(configuration);
+    }
+    OmMetadataManagerImpl metadataManager =
+        new OmMetadataManagerImpl(configuration);
+    try {
+      Table<String, OmKeyInfo> keyTable =
+          metadataManager.getKeyTable(getBucketLayout());
       Map<Long, List<Map<Long, BlockIdDetails>>> dataMap = new HashMap<>();
 
       if (keyTable != null) {
@@ -131,6 +127,8 @@ public class ContainerMapper {
 
       return dataMap;
 
+    } finally {
+      metadataManager.stop();
     }
   }
 

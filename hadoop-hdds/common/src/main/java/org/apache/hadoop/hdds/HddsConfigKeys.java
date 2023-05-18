@@ -62,6 +62,14 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
+      "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
+      "5GB";
+
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
+      "hdds.datanode.volume.min.free.space.percent";
+
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for
@@ -235,19 +243,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_GRPC_TLS_TEST_CERT = "hdds.grpc.tls" +
       ".test.cert";
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
-
-  /**
-   * The default time interval used to check if either of the truststore or
-   * keystore certificates file has changed and needs reloading.
-   */
-  public static final String HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL =
-      "hdds.security.ssl.keystore.reload.interval";
-  public static final String HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL =
-      "hdds.security.ssl.truststore.reload.interval";
-  public static final String
-      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
-  public static final String
-      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
 
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol

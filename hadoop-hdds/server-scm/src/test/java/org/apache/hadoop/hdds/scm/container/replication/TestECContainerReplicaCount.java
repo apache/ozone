@@ -86,6 +86,15 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(1, rcnt.unavailableIndexes(true).size());
     Assertions.assertEquals(5,
         rcnt.unavailableIndexes(true).get(0).intValue());
+
+    // Add a pending add op for the missing replica and ensure it no longer
+    // appears missing
+    ContainerReplicaOp op = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, Long.MAX_VALUE);
+    rcnt.addPendingOp(op);
+    Assertions.assertTrue(rcnt.isSufficientlyReplicated(true));
+    Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
 
   @Test
@@ -201,6 +210,13 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(1, rcnt.overReplicatedIndexes(true).size());
     Assertions.assertTrue(rcnt.isOverReplicated(false));
     Assertions.assertEquals(2, rcnt.overReplicatedIndexes(false).size());
+
+    // Add a pending delete op for the excess replica and ensure it now reports
+    // as not over replicated.
+    rcnt.addPendingOp(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(), 2, Long.MAX_VALUE));
+    Assertions.assertFalse(rcnt.isOverReplicated(true));
   }
 
   @Test

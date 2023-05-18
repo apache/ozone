@@ -334,7 +334,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private boolean shouldRetryFailedRead(int failedIndex) {
+  protected boolean shouldRetryFailedRead(int failedIndex) {
     Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
     if (spareLocations != null && spareLocations.size() > 0) {
       failedLocations.add(dataLocations[failedIndex]);
@@ -470,7 +470,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     seeked = true;
   }
 
-  private void closeStream(int i) {
+  protected void closeStream(int i) {
     if (blockStreams[i] != null) {
       try {
         blockStreams[i].close();

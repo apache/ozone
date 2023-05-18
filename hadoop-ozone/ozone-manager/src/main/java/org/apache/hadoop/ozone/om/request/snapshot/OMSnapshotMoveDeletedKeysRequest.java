@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -43,6 +45,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
+ * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
@@ -57,8 +60,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager =
-        ozoneManager.getSnapshotChainManager();
+        omMetadataManager.getSnapshotChainManager();
 
     SnapshotMoveDeletedKeysRequest moveDeletedKeysRequest =
         getOmRequest().getSnapshotMoveDeletedKeysRequest();
@@ -85,6 +90,10 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           moveDeletedKeysRequest.getNextDBKeysList();
       List<SnapshotMoveKeyInfos> reclaimKeysList =
           moveDeletedKeysRequest.getReclaimKeysList();
+      List<HddsProtos.KeyValue> renamedKeysList =
+          moveDeletedKeysRequest.getRenamedKeysList();
+      List<String> movedDirs =
+          moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
       OmSnapshot omNextSnapshot = null;
 
@@ -97,7 +106,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), omFromSnapshot, omNextSnapshot,
-          nextDBKeysList, reclaimKeysList);
+          nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

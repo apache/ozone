@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -35,7 +37,6 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,17 +55,24 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private final AtomicLong totalTime = new AtomicLong(0);
   private final ExecutorService executor;
   private final Clock clock;
+  private int maxQueueSize;
 
-  public DeleteContainerCommandHandler(int threadPoolSize, Clock clock) {
-    this(clock, Executors.newFixedThreadPool(
-        threadPoolSize, new ThreadFactoryBuilder()
-            .setNameFormat("DeleteContainerThread-%d").build()));
+  public DeleteContainerCommandHandler(
+      int threadPoolSize, Clock clock, int queueSize) {
+    this(clock, new ThreadPoolExecutor(
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
+            .setNameFormat("DeleteContainerThread-%d").build()),
+        queueSize);
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
-      ExecutorService executor) {
+      ExecutorService executor, int queueSize) {
     this.executor = executor;
     this.clock = clock;
+    maxQueueSize = queueSize;
   }
   @Override
   public void handle(final SCMCommand command,
@@ -74,8 +82,14 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     final DeleteContainerCommand deleteContainerCommand =
         (DeleteContainerCommand) command;
     final ContainerController controller = ozoneContainer.getController();
-    executor.execute(() ->
-        handleInternal(command, context, deleteContainerCommand, controller));
+    try {
+      executor.execute(() ->
+          handleInternal(command, context, deleteContainerCommand, controller));
+    } catch (RejectedExecutionException ex) {
+      LOG.warn("Delete Container command is received for container {} "
+          + "is ignored as command queue reach max size {}.",
+          deleteContainerCommand.getContainerID(), maxQueueSize);
+    }
   }
 
   private void handleInternal(SCMCommand command, StateContext context,

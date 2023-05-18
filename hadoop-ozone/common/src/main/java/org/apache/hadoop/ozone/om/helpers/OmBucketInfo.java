@@ -743,7 +743,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         Objects.equals(metadata, that.metadata) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
-        Objects.equals(defaultReplicationConfig, this.defaultReplicationConfig);
+        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
   }
 
   @Override

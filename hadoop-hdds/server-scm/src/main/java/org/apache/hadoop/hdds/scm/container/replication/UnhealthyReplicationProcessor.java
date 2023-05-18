@@ -50,20 +50,31 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
   }
 
   /**
-   * Read messages from the respective queue from ReplicationManager
+   * Read messages from the respective replication queue
    * for processing the health result.
-   * @return next HealthResult from the replication manager
+   * @return next HealthResult from the replication queue
    */
   protected abstract HealthResult dequeueHealthResultFromQueue(
-          ReplicationManager rm);
+          ReplicationQueue queue);
 
   /**
    * Requeue HealthResult to ReplicationManager
    * for reprocessing the health result.
-   * @return next HealthResult from the replication manager
    */
-  protected abstract void requeueHealthResultFromQueue(
-          ReplicationManager rm, HealthResult healthResult);
+  protected abstract void requeueHealthResult(
+          ReplicationQueue queue, HealthResult healthResult);
+
+  /**
+   * Check if the pending operation limit is reached. For under replicated
+   * containers, this is the limit of inflight replicas which are scheduled
+   * to be created. For over replicated containers, which sends delete commands
+   * there is no limit.
+   * @param rm The ReplicationManager instance
+   * @param inflightLimit The limit of operations allowed
+   * @return True if the limit is reached, false otherwise.
+   */
+  protected abstract boolean inflightOperationLimitReached(
+      ReplicationManager rm, long inflightLimit);
 
   /**
    * Read messages from the ReplicationManager under replicated queue and,
@@ -74,18 +85,29 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
    * version will need to limit the amount of messages assigned to each
    * datanode, so they are not assigned too much work.
    */
-  public void processAll() {
+  public void processAll(ReplicationQueue queue) {
     int processed = 0;
     int failed = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
     List<HealthResult> failedOnes = new LinkedList<>();
+    // Getting the limit requires iterating over all nodes registered in
+    // NodeManager and counting the healthy ones. This is somewhat expensive
+    // so we get get the count once per iteration as it should not change too
+    // often.
+    long inflightLimit = replicationManager.getReplicationInFlightLimit();
     while (true) {
       if (!replicationManager.shouldRun()) {
         break;
       }
+      if (inflightLimit > 0 &&
+          inflightOperationLimitReached(replicationManager, inflightLimit)) {
+        LOG.info("The maximum number of pending replicas ({}) are scheduled. " +
+            "Ending the iteration.", inflightLimit);
+        break;
+      }
       HealthResult healthResult =
-              dequeueHealthResultFromQueue(replicationManager);
+              dequeueHealthResultFromQueue(queue);
       if (healthResult == null) {
         break;
       }
@@ -103,8 +125,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
       }
     }
 
-    failedOnes.forEach(result ->
-        requeueHealthResultFromQueue(replicationManager, result));
+    failedOnes.forEach(result -> requeueHealthResult(queue, result));
 
     if (processed > 0 || failed > 0) {
       LOG.info("Processed {} containers with health state counts {}, " +
@@ -133,7 +154,7 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     try {
       while (!Thread.currentThread().isInterrupted()) {
         if (replicationManager.shouldRun()) {
-          processAll();
+          processAll(replicationManager.getQueue());
         }
         synchronized (this) {
           if (!runImmediately) {

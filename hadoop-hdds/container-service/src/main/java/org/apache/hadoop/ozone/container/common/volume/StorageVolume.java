@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -105,7 +106,7 @@ public abstract class StorageVolume
 
   private final File storageDir;
 
-  private final VolumeInfo volumeInfo;
+  private final Optional<VolumeInfo> volumeInfo;
 
   private final VolumeSet volumeSet;
 
@@ -115,10 +116,11 @@ public abstract class StorageVolume
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(b.volumeRootStr);
       storageDir = new File(location.getUri().getPath(), b.storageDirStr);
-      this.volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
+      this.volumeInfo = Optional.of(
+              new VolumeInfo.Builder(b.volumeRootStr, b.conf)
           .storageType(b.storageType)
           .usageCheckFactory(b.usageCheckFactory)
-          .build();
+          .build());
       this.volumeSet = b.volumeSet;
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
@@ -126,7 +128,7 @@ public abstract class StorageVolume
       this.conf = b.conf;
     } else {
       storageDir = new File(b.volumeRootStr);
-      this.volumeInfo = null;
+      this.volumeInfo = Optional.empty();
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
@@ -369,19 +371,21 @@ public abstract class StorageVolume
   }
 
   public String getVolumeRootDir() {
-    return volumeInfo != null ? volumeInfo.getRootDir() : null;
+    return volumeInfo.map(VolumeInfo::getRootDir).orElse(null);
   }
 
   public long getCapacity() {
-    return volumeInfo != null ? volumeInfo.getCapacity() : 0;
+    return volumeInfo.map(VolumeInfo::getCapacity).orElse(0L);
   }
 
   public long getAvailable() {
-    return volumeInfo != null ? volumeInfo.getAvailable() : 0;
+    return volumeInfo.map(VolumeInfo::getAvailable).orElse(0L);
+
   }
 
   public long getUsedSpace() {
-    return volumeInfo != null ? volumeInfo.getScmUsed() : 0;
+    return volumeInfo.map(VolumeInfo::getScmUsed).orElse(0L);
+
   }
 
   public File getStorageDir() {
@@ -393,23 +397,21 @@ public abstract class StorageVolume
   }
 
   public void refreshVolumeInfo() {
-    volumeInfo.refreshNow();
+    volumeInfo.ifPresent(VolumeInfo::refreshNow);
   }
 
-  public VolumeInfo getVolumeInfo() {
+  public Optional<VolumeInfo> getVolumeInfo() {
     return this.volumeInfo;
   }
 
   public void incrementUsedSpace(long usedSpace) {
-    if (this.volumeInfo != null) {
-      this.volumeInfo.incrementUsedSpace(usedSpace);
-    }
+    volumeInfo.ifPresent(volInfo -> volInfo
+            .incrementUsedSpace(usedSpace));
   }
 
   public void decrementUsedSpace(long reclaimedSpace) {
-    if (this.volumeInfo != null) {
-      this.volumeInfo.decrementUsedSpace(reclaimedSpace);
-    }
+    volumeInfo.ifPresent(volInfo -> volInfo
+            .decrementUsedSpace(reclaimedSpace));
   }
 
   public VolumeSet getVolumeSet() {
@@ -417,10 +419,8 @@ public abstract class StorageVolume
   }
 
   public StorageType getStorageType() {
-    if (this.volumeInfo != null) {
-      return this.volumeInfo.getStorageType();
-    }
-    return StorageType.DEFAULT;
+    return volumeInfo.map(VolumeInfo::getStorageType)
+            .orElse(StorageType.DEFAULT);
   }
 
   public String getStorageID() {
@@ -461,16 +461,12 @@ public abstract class StorageVolume
 
   public void failVolume() {
     setState(VolumeState.FAILED);
-    if (volumeInfo != null) {
-      volumeInfo.shutdownUsageThread();
-    }
+    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
   }
 
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
-    if (volumeInfo != null) {
-      volumeInfo.shutdownUsageThread();
-    }
+    volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
   }
 
   /**

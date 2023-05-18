@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -72,6 +74,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -89,6 +92,7 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -112,6 +116,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -773,7 +778,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ScmInfo getScmInfo() throws IOException {
+  public ScmInfo getScmInfo() {
     boolean auditSuccess = true;
     try {
       ScmInfo.Builder builder =
@@ -833,8 +838,12 @@ public class SCMClientProtocolServer implements
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
+      final GrpcTlsConfig tlsConfig =
+          createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
+          scm.getScmCertificateClient());
+
       RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
-          targetPeerId);
+          targetPeerId, tlsConfig);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
@@ -1316,5 +1325,22 @@ public class SCMClientProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      String scmId) {
+    Builder decommissionScmResponseBuilder =
+        DecommissionScmResponseProto.newBuilder();
+
+    try {
+      decommissionScmResponseBuilder
+          .setSuccess(scm.removePeerFromHARing(scmId));
+    } catch (IOException ex) {
+      decommissionScmResponseBuilder
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage());
+    }
+    return decommissionScmResponseBuilder.build();
   }
 }

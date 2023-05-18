@@ -504,16 +504,6 @@ Copyright 2007 The Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-com.google.inject.extensions:guice-multibindings
-====================
-
-
-Google Guice - Extensions - MultiBindings
-Copyright 2006-2015 Google, Inc.
-
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).
-
 
 ====================
 ratis-thirdparty-misc is a shaded dependency which includes additional 3rd party dependencies in shaded form.

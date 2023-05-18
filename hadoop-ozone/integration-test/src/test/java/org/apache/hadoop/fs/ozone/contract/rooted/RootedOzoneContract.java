@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.junit.Assert;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+
 /**
  * The contract of Rooted Ozone FileSystem (OFS).
  */
@@ -73,6 +75,7 @@ class RootedOzoneContract extends AbstractFSContract {
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
+    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
 
     conf.addResource(CONTRACT_XML);
 
@@ -102,6 +105,7 @@ class RootedOzoneContract extends AbstractFSContract {
     // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    copyClusterConfigs(OZONE_FS_HSYNC_ENABLED);
     return FileSystem.get(getConf());
   }
 

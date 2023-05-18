@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
@@ -49,6 +50,8 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
+  private final ReentrantReadWriteLock globalLock =
+      new ReentrantReadWriteLock();
   private final ConcurrentHashMap<PendingOpType, AtomicLong>
       pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
@@ -59,8 +62,28 @@ public class ContainerReplicaPendingOps {
       Clock clock) {
     this.config = conf;
     this.clock = clock;
+    resetCounters();
+  }
+
+  private void resetCounters() {
     for (PendingOpType opType: PendingOpType.values()) {
       pendingOpCount.put(opType, new AtomicLong(0));
+    }
+  }
+
+  /**
+   * Clears all pendingOps and resets all the counters to zero.
+   */
+  public void clear() {
+    // We block all other concurrent access with the global lock to prevent
+    // the map and counters getting out of sync if there are concurrent updates
+    // happening when the class is cleared.
+    globalLock.writeLock().lock();
+    try {
+      pendingOps.clear();
+      resetCounters();
+    } finally {
+      globalLock.writeLock().unlock();
     }
   }
 
@@ -74,7 +97,7 @@ public class ContainerReplicaPendingOps {
    */
   public List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
     Lock lock = readLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.get(containerID);
       if (ops == null) {
@@ -82,7 +105,7 @@ public class ContainerReplicaPendingOps {
       }
       return new ArrayList<>(ops);
     } finally {
-      lock.unlock();
+      unlock(lock);
     }
   }
 
@@ -183,7 +206,7 @@ public class ContainerReplicaPendingOps {
       // iterator started. Once we lock on the ContainerID object, no other
       // changes can occur to the list of ops associated with it.
       Lock lock = writeLock(containerID);
-      lock.lock();
+      lock(lock);
       try {
         List<ContainerReplicaOp> ops = pendingOps.get(containerID);
         if (ops == null) {
@@ -205,7 +228,7 @@ public class ContainerReplicaPendingOps {
           pendingOps.remove(containerID);
         }
       } finally {
-        lock.unlock();
+        unlock(lock);
       }
 
       // notify if there are expired ops
@@ -235,7 +258,7 @@ public class ContainerReplicaPendingOps {
       ContainerID containerID, DatanodeDetails target, int replicaIndex,
       long deadlineEpochMillis) {
     Lock lock = writeLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
@@ -243,7 +266,7 @@ public class ContainerReplicaPendingOps {
           target, replicaIndex, deadlineEpochMillis));
       pendingOpCount.get(opType).incrementAndGet();
     } finally {
-      lock.unlock();
+      unlock(lock);
     }
   }
 
@@ -253,7 +276,7 @@ public class ContainerReplicaPendingOps {
     // List of completed ops that subscribers will be notified about
     List<ContainerReplicaOp> completedOps = new ArrayList<>();
     Lock lock = writeLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.get(containerID);
       if (ops != null) {
@@ -274,7 +297,7 @@ public class ContainerReplicaPendingOps {
         }
       }
     } finally {
-      lock.unlock();
+      unlock(lock);
     }
 
     if (found) {
@@ -316,6 +339,18 @@ public class ContainerReplicaPendingOps {
 
   private Lock readLock(ContainerID containerID) {
     return stripedLock.get(containerID).readLock();
+  }
+
+  private void lock(Lock lock) {
+    // We always take the global lock in shared / read mode as the only time it
+    // will block is when the class is getting cleared to remove all operations.
+    globalLock.readLock().lock();
+    lock.lock();
+  }
+
+  private void unlock(Lock lock) {
+    globalLock.readLock().unlock();
+    lock.unlock();
   }
 
   private boolean isMetricsNotNull() {

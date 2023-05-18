@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
@@ -196,7 +197,10 @@ public class OpenKeyCleanupService extends BackgroundService {
         // delete non-hsync'ed keys
         final OMRequest omRequest = createDeleteOpenKeysRequest(
             openKeyBuckets.stream());
-        submitRequest(omRequest);
+        final OMResponse response = submitRequest(omRequest);
+        if (response != null && response.getSuccess()) {
+          ozoneManager.getMetrics().incNumOpenKeysCleaned(numOpenKeys);
+        }
       }
 
       final List<CommitKeyRequest.Builder> hsyncKeys
@@ -204,7 +208,12 @@ public class OpenKeyCleanupService extends BackgroundService {
       final int numHsyncKeys = hsyncKeys.size();
       if (!hsyncKeys.isEmpty()) {
         // commit hsync'ed keys
-        hsyncKeys.forEach(b -> submitRequest(createCommitKeyRequest(b)));
+        hsyncKeys.forEach(b -> {
+          final OMResponse response = submitRequest(createCommitKeyRequest(b));
+          if (response != null && response.getSuccess()) {
+            ozoneManager.getMetrics().incNumOpenKeysHSyncCleaned();
+          }
+        });
       }
 
       if (LOG.isDebugEnabled()) {
@@ -242,7 +251,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       return omRequest;
     }
 
-    private void submitRequest(OMRequest omRequest) {
+    private OMResponse submitRequest(OMRequest omRequest) {
       try {
         if (isRatisEnabled()) {
           OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
@@ -257,14 +266,16 @@ public class OpenKeyCleanupService extends BackgroundService {
               .setType(RaftClientRequest.writeRequestType())
               .build();
 
-          server.submitRequest(omRequest, raftClientRequest);
+          return server.submitRequest(omRequest, raftClientRequest);
         } else {
-          ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
+          return ozoneManager.getOmServerProtocol().submitRequest(
+              null, omRequest);
         }
       } catch (ServiceException e) {
         LOG.error("Open key " + omRequest.getCmdType()
             + " request failed. Will retry at next run.", e);
       }
+      return null;
     }
   }
 }

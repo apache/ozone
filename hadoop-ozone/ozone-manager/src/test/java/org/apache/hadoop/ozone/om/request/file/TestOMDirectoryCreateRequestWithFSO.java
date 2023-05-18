@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -430,7 +429,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneFileName),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout())
         .put(ozoneFileName, omKeyInfo);
 
@@ -509,7 +508,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     ++txnID;
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.of(omKeyInfo), txnID));
+            CacheValue.get(txnID, omKeyInfo));
     omMetadataManager.getKeyTable(getBucketLayout()).put(ozoneKey, omKeyInfo);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,

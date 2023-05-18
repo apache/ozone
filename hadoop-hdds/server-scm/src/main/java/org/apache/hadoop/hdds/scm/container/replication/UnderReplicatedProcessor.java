@@ -34,15 +34,20 @@ public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
 
   @Override
   protected ContainerHealthResult.UnderReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueUnderReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueUnderReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
-    replicationManager.requeueUnderReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
+  }
+
+  @Override
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    return rm.getInflightReplicationCount() >= pendingOpLimit;
   }
 
   @Override

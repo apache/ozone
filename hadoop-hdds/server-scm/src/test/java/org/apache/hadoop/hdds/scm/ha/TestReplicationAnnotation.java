@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -89,6 +90,11 @@ public class TestReplicationAnnotation {
       @Override
       public boolean addSCM(AddSCMRequest request)
           throws IOException {
+        return false;
+      }
+
+      @Override
+      public boolean removeSCM(RemoveSCMRequest request) throws IOException {
         return false;
       }
 

@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -88,17 +89,17 @@ public final class OzoneAclUtil {
     return retList;
   }
 
-  private static boolean checkAccessInAcl(OzoneAcl a, String[] groups,
-      String username, ACLType aclToCheck) {
+  private static boolean checkAccessInAcl(OzoneAcl a, UserGroupInformation ugi,
+      ACLType aclToCheck) {
     BitSet rights = a.getAclBitSet();
     switch (a.getType()) {
     case USER:
-      if (a.getName().equals(username)) {
+      if (a.getName().equals(ugi.getShortUserName())) {
         return checkIfAclBitIsSet(aclToCheck, rights);
       }
       break;
     case GROUP:
-      for (String grp : groups) {
+      for (String grp : ugi.getGroupNames()) {
         if (a.getName().equals(grp)) {
           return checkIfAclBitIsSet(aclToCheck, rights);
         }
@@ -125,11 +126,10 @@ public final class OzoneAclUtil {
    * */
   public static boolean checkAclRights(List<OzoneAcl> acls,
       RequestContext context) throws OMException {
-    String[] userGroups = context.getClientUgi().getGroupNames();
-    String userName = context.getClientUgi().getUserName();
+    UserGroupInformation clientUgi = context.getClientUgi();
     ACLType aclToCheck = context.getAclRights();
     for (OzoneAcl acl : acls) {
-      if (checkAccessInAcl(acl, userGroups, userName, aclToCheck)) {
+      if (checkAccessInAcl(acl, clientUgi, aclToCheck)) {
         return true;
       }
     }

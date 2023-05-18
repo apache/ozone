@@ -174,6 +174,7 @@ public class ReconServer extends GenericCli {
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       LOG.info("Re-initialize certificate client.");
+      certClient.close();
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
       certClient = new ReconCertificateClient(new SecurityConfig(configuration),
@@ -278,6 +279,13 @@ public class ReconServer extends GenericCli {
         } catch (Exception ex) {
           LOG.error("Recon Container Key DB close failed", ex);
         }
+      }
+    }
+    if (certClient != null) {
+      try {
+        certClient.close();
+      } catch (IOException ioe) {
+        LOG.error("Failed to close certificate client.", ioe);
       }
     }
   }

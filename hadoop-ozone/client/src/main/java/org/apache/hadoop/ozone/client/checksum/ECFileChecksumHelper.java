@@ -73,7 +73,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
             "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode : {}" + getCombineMode());
+                + ", checksum combine mode: " + getCombineMode());
       }
 
       currentLength += keyLocationInfo.getLength();
@@ -173,6 +173,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         nodes.add(dn);
       }
     }
+
     pipeline = Pipeline.newBuilder(pipeline)
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE))

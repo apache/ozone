@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -178,6 +179,10 @@ public class TestDeleteWithSlowFollower {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
+    if (xceiverClientManager != null) {
+      xceiverClientManager.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -240,8 +245,6 @@ public class TestDeleteWithSlowFollower {
     key.close();
 
     // now move the container to the closed on the datanode.
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
     ContainerProtos.ContainerCommandRequestProto.Builder request =
         ContainerProtos.ContainerCommandRequestProto.newBuilder();
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
@@ -249,22 +252,24 @@ public class TestDeleteWithSlowFollower {
     request.setContainerID(containerID);
     request.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    xceiverClient.sendCommand(request.build());
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
+    try {
+      xceiverClient.sendCommand(request.build());
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
+    }
 
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) RatisTestHelper
             .getStateMachine(leader, pipeline);
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
-        setBucketName(bucketName)
-        .setReplicationConfig(
-            RatisReplicationConfig
-                .getInstance(THREE))
-        .setKeyName(keyName)
-        .build();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setKeyName(keyName).build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
-    BlockID blockID =
-        info.getKeyLocationVersions().get(0).getLocationList().get(0)
-            .getBlockID();
+    BlockID blockID = info.getKeyLocationVersions().get(0)
+        .getLocationList().get(0).getBlockID();
     OzoneContainer ozoneContainer;
     final DatanodeStateMachine dnStateMachine =
         leader.getDatanodeStateMachine();

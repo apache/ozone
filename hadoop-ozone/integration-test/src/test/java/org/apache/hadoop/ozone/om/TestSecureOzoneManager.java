@@ -129,6 +129,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 2: If key pair already exist than response should be RECOVER.
     client =
@@ -137,6 +138,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 3: When public key as well as certificate is missing.
     client =
@@ -147,6 +149,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 4: When private key and certificate is missing.
     client =
@@ -159,6 +162,7 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 5: When only certificate is present.
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
@@ -177,6 +181,7 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
 
     // Case 6: When private key and certificate is present.
     client =
@@ -188,6 +193,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
 
     // Case 7 When keypair and certificate is present.
     client =
@@ -196,6 +202,7 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
   }
 
   /**

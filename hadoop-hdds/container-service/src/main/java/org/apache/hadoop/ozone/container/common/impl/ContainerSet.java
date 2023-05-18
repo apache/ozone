@@ -48,7 +48,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 /**
  * Class that manages Containers created on the datanode.
  */
-public class ContainerSet {
+public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
@@ -201,6 +201,11 @@ public class ContainerSet {
    * @return {@literal Iterator<Container<?>>}
    */
   public Iterator<Container<?>> getContainerIterator() {
+    return iterator();
+  }
+
+  @Override
+  public Iterator<Container<?>> iterator() {
     return containerMap.values().iterator();
   }
 

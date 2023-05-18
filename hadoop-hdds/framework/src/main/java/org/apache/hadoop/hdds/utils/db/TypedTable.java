@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -50,7 +49,7 @@ import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_
  */
 public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
-  private final Table<byte[], byte[]> rawTable;
+  private final RDBTable rawTable;
 
   private final CodecRegistry codecRegistry;
 
@@ -70,8 +69,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param keyType
    * @param valueType
    */
-  public TypedTable(
-      Table<byte[], byte[]> rawTable,
+  public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType) throws IOException {
     this(rawTable, codecRegistry, keyType, valueType,
@@ -87,8 +85,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param cacheType
    * @throws IOException
    */
-  public TypedTable(
-      Table<byte[], byte[]> rawTable,
+  public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType,
       CacheType cacheType) throws IOException {
@@ -110,7 +107,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           // NEVER. Setting epoch value -1, so that when it is marked for
           // delete, this will be considered for cleanup.
           cache.loadInitial(new CacheKey<>(kv.getKey()),
-              new CacheValue<>(Optional.of(kv.getValue()), EPOCH_DEFAULT));
+              CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
     } else {
@@ -120,6 +117,16 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void put(KEY key, VALUE value) throws IOException {
+    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
+    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
+    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+      try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
+           CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
+        rawTable.put(k.asReadOnlyByteBuffer(), v.asReadOnlyByteBuffer());
+      }
+      return;
+    }
+
     byte[] keyData = codecRegistry.asRawData(key);
     byte[] valueData = codecRegistry.asRawData(value);
     rawTable.put(keyData, valueData);
@@ -128,6 +135,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value)
       throws IOException {
+    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
+    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
+    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+      // The buffers will be released after commit.
+      rawTable.putWithBatch(batch,
+          keyCodec.toDirectCodecBuffer(key),
+          valueCodec.toDirectCodecBuffer(value));
+    }
+
     byte[] keyData = codecRegistry.asRawData(key);
     byte[] valueData = codecRegistry.asRawData(value);
     rawTable.putWithBatch(batch, keyData, valueData);

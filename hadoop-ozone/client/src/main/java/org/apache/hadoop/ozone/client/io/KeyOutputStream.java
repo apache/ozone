@@ -179,13 +179,13 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @param openVersion the version corresponding to the pre-allocation.
    * @throws IOException
    */
-  public void addPreallocateBlocks(OmKeyLocationInfoGroup version,
+  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version,
       long openVersion) throws IOException {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public void write(int b) throws IOException {
+  public synchronized void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -204,7 +204,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @throws IOException
    */
   @Override
-  public void write(byte[] b, int off, int len)
+  public synchronized void write(byte[] b, int off, int len)
       throws IOException {
     checkNotClosed();
     if (b == null) {
@@ -444,7 +444,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   }
 
   @Override
-  public void flush() throws IOException {
+  public synchronized void flush() throws IOException {
     checkNotClosed();
     handleFlushOrClose(StreamAction.FLUSH);
   }
@@ -455,7 +455,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   }
 
   @Override
-  public void hsync() throws IOException {
+  public synchronized void hsync() throws IOException {
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -546,7 +546,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
    * @throws IOException
    */
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     if (closed) {
       return;
     }
@@ -562,7 +562,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     }
   }
 
-  public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
+  public synchronized OmMultipartCommitUploadPartInfo
+      getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
 

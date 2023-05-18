@@ -379,6 +379,25 @@ public class TestHddsVolume {
     assertEquals(0, DatanodeStoreCache.getInstance().size());
   }
 
+  @Test
+  public void testFailedVolumeSpace() throws IOException {
+    // Build failed volume
+    HddsVolume volume = volumeBuilder.failedVolume(true).build();
+    VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
+
+    try {
+      // In case of failed volume all stats should return 0.
+      assertEquals(0, volumeInfoMetrics.getUsed());
+      assertEquals(0, volumeInfoMetrics.getAvailable());
+      assertEquals(0, volumeInfoMetrics.getCapacity());
+      assertEquals(0, volumeInfoMetrics.getReserved());
+      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
+    } finally {
+      // Shutdown the volume.
+      volume.shutdown();
+    }
+  }
+
   private MutableVolumeSet createDbVolumeSet() throws IOException {
     File dbVolumeDir = folder.newFolder();
     CONF.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,

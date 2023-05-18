@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -312,7 +311,7 @@ public class TestOzoneNativeAuthorizer {
     omVolumeArgs.setAcls(ozoneAcls);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private void setBucketAcl(List<OzoneAcl> ozoneAcls) throws IOException {
@@ -322,7 +321,7 @@ public class TestOzoneNativeAuthorizer {
     omBucketInfo.setAcls(ozoneAcls);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private void addVolumeAcl(OzoneAcl ozoneAcl) throws IOException {
@@ -333,7 +332,7 @@ public class TestOzoneNativeAuthorizer {
     omVolumeArgs.addAcl(ozoneAcl);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private void addBucketAcl(OzoneAcl ozoneAcl) throws IOException {
@@ -343,7 +342,7 @@ public class TestOzoneNativeAuthorizer {
     omBucketInfo.addAcl(ozoneAcl);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private void resetAclsAndValidateAccess(OzoneObj obj,
