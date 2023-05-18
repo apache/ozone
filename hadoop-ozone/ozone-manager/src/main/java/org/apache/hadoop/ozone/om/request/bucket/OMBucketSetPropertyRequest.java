@@ -327,7 +327,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
-        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
       if (omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
         continue;

@@ -388,7 +388,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), false));
+          java.util.Optional.of(Boolean.TRUE), false, false));
       initializeOmTables(false);
     } catch (IOException e) {
       stop();
@@ -530,7 +530,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
     return loadDB(configuration, metaDir, OM_DB_NAME, false,
-            java.util.Optional.empty(), true);
+            java.util.Optional.empty(), true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
@@ -539,13 +539,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                        disableAutoCompaction)
           throws IOException {
     return loadDB(configuration, metaDir, dbName, readOnly,
-        disableAutoCompaction, true);
+        disableAutoCompaction, true, true);
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
                                    disableAutoCompaction,
+                               boolean enableCompactionDag,
                                boolean createCheckpointDirs)
       throws IOException {
     final int maxFSSnapshots = configuration.getInt(
@@ -557,7 +558,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setOpenReadOnly(readOnly)
         .setPath(Paths.get(metaDir.getPath()))
         .setMaxFSSnapshots(maxFSSnapshots)
-        .setEnableCompactionLog(true)
+        .setEnableCompactionDag(enableCompactionDag)
         .setCreateCheckpointDirs(createCheckpointDirs);
     disableAutoCompaction.ifPresent(
             dbStoreBuilder::disableDefaultCFAutoCompaction);
@@ -1058,8 +1059,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   @Override
   public List<OmBucketInfo> listBuckets(final String volumeName,
-      final String startBucket, final String bucketPrefix,
-      final int maxNumOfBuckets) throws IOException {
+                                        final String startBucket,
+                                        final String bucketPrefix,
+                                        final int maxNumOfBuckets,
+                                        boolean hasSnapshot)
+      throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.",
@@ -1119,8 +1123,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         // We should return only the keys, whose keys match with prefix and
         // the keys after the startBucket.
         if (key.startsWith(seekPrefix) && key.compareTo(startKey) >= 0) {
-          result.add(omBucketInfo);
-          currentCount++;
+          if (!hasSnapshot) {
+            // Snapshot filter off
+            result.add(omBucketInfo);
+            currentCount++;
+          } else if (
+              StringUtils.isNotEmpty(
+                  snapshotChainManager.getLatestPathSnapshot(volumeName +
+                      OM_KEY_PREFIX + omBucketInfo.getBucketName()))) {
+            // Snapshot filter on.
+            // Add to result list only when the bucket has at least one snapshot
+            result.add(omBucketInfo);
+            currentCount++;
+          }
         }
       }
     }

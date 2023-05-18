@@ -143,7 +143,7 @@ public class TestS3MultipartResponse {
 
   public void addPart(int partNumber, PartKeyInfo partKeyInfo,
       OmMultipartKeyInfo omMultipartKeyInfo) {
-    omMultipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(partKeyInfo);
   }
 
   public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
