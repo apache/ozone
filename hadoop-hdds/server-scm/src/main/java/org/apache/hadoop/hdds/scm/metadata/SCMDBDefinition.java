@@ -98,7 +98,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
           new PipelineCodec());
 
