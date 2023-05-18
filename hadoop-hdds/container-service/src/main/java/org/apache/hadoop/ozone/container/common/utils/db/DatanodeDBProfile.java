@@ -121,8 +121,19 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      cfOptions.updateAndGet(op -> op != null ? op :
-          createColumnFamilyOptions(config));
+      ManagedColumnFamilyOptions existing = cfOptions.get();
+      if (existing != null) {
+        return existing;
+      }
+
+      ManagedColumnFamilyOptions newOne = createColumnFamilyOptions(config);
+
+      if (cfOptions.compareAndSet(null, newOne)) {
+        newOne.setReused(true);
+      } else {
+        ManagedColumnFamilyOptions.closeDeeply(newOne);
+      }
+
       return cfOptions.get();
     }
 
@@ -130,7 +141,6 @@ public abstract class DatanodeDBProfile {
         ConfigurationSource config) {
       ManagedColumnFamilyOptions options =
           baseProfile.getColumnFamilyOptions();
-      options.setReused(true);
       return options.closeAndSetTableFormatConfig(
           getBlockBasedTableConfig(config));
     }
