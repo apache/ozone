@@ -442,6 +442,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
+        ts.setState(state);
       }
       cdbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
     } catch (IOException e) {
