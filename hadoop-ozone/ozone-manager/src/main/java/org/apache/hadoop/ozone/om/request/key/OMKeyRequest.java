@@ -311,6 +311,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return acls;
   }
 
+  protected static List<OzoneAcl> inheritDefaultAcls(KeyArgs keyArgs,
+      List<OzoneAcl> parentAcls) {
+    List<OzoneAcl> inheritAcls = new ArrayList<>();
+    inheritAcls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    OzoneAclUtil.inheritDefaultAcls(inheritAcls, parentAcls);
+    return inheritAcls;
+  }
+
   /**
    * Check Acls for the ozone bucket.
    * @param ozoneManager

@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -172,7 +171,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLeafNodeName(),
             keyArgs, omPathInfo.getLeafNodeObjectId(),
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+            inheritDefaultAcls(keyArgs, omBucketInfo.getAcls()));
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
@@ -273,7 +272,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     long lastKnownParentId = pathInfo.getLastKnownParentId();
     List<String> missingParents = pathInfo.getMissingParents();
-    List<OzoneAcl> inheritAcls = pathInfo.getAcls();
+    List<OzoneAcl> inheritAcls =
+        inheritDefaultAcls(keyArgs, pathInfo.getAcls());
     for (String missingKey : missingParents) {
       long nextObjId = baseObjId + objectCount;
       if (nextObjId > maxObjId) {
