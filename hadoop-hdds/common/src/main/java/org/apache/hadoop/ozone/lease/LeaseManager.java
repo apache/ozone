@@ -25,6 +25,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
+
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +48,8 @@ public class LeaseManager<T> {
 
   private final String name;
   private final long defaultTimeout;
-  private final Object monitor = new Object();
   private Map<T, Lease<T>> activeLeases;
+  private Semaphore semaphore = new Semaphore(0);
   private LeaseMonitor leaseMonitor;
   private Thread leaseMonitorThread;
   private boolean isRunning;
@@ -120,9 +123,7 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    semaphore.release();
     return lease;
   }
 
@@ -151,9 +152,7 @@ public class LeaseManager<T> {
     Lease<T> lease = new Lease<>(resource, timeout);
     lease.registerCallBack(callback);
     activeLeases.put(resource, lease);
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    semaphore.release();
     return lease;
   }
 
@@ -204,9 +203,11 @@ public class LeaseManager<T> {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
-    synchronized (monitor) {
-      monitor.notifyAll();
-    }
+    // added extra release for case when interrupt is called
+    // before going to semaphore's tryAcquire. This will ensure release
+    //  of wait and exit of while loop as leaseMonitor.disable() is done.
+    semaphore.release();
+    leaseMonitorThread.interrupt();
     for (T resource : activeLeases.keySet()) {
       try {
         release(resource);
@@ -265,11 +266,9 @@ public class LeaseManager<T> {
         }
 
         try {
-          synchronized (monitor) {
-            monitor.wait(sleepTime);
-          }
+          // ignore return value, just used for wait
+          boolean b = semaphore.tryAcquire(sleepTime, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-          // This means a new lease is added to activeLeases.
           LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
         }

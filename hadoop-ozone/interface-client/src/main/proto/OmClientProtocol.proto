@@ -1687,6 +1687,7 @@ message CreateSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
+  optional uint64 creationTime = 5;
 }
 
 message ListSnapshotRequest {
