@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,13 +61,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests Snapshot Restore function.
  */
 @Timeout(value = 300)
-@Flaky("HDDS-7889")
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneCluster cluster;
@@ -233,13 +232,7 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return 5 == keyCount(buck, keyPrefix);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 1000, 10000);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix));
   }
 
   @ParameterizedTest
@@ -293,13 +286,7 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return 5 == keyCount(buck2, keyPrefix);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 1000, 10000);
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
   }
 
   @ParameterizedTest
@@ -342,9 +329,17 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
+  }
+
+  /**
+   * Waits for key count to be equal to expected number of keys.
+   */
+  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix)
+      throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       try {
-        return 5 == keyCount(buck2, keyPrefix);
+        return 5 == keyCount(bucket, keyPrefix);
       } catch (IOException e) {
         return false;
       }
