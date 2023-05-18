@@ -69,16 +69,15 @@ public class HeatMapServiceImpl extends HeatMapService {
     if (StringUtils.isEmpty(heatMapProviderCls)) {
       heatMapProvider = new HeatMapProviderImpl();
     } else {
-      IHeatMapProvider iHeatMapProvider = null;
       try {
-        iHeatMapProvider = heatMapUtil.loadHeatMapProvider(heatMapProviderCls);
+        heatMapProvider = heatMapUtil.loadHeatMapProvider(heatMapProviderCls);
       } catch (Exception e) {
         LOG.error("Loading HeatMapProvider fails!!! : {}", e);
         return;
       }
-      if (null != iHeatMapProvider) {
+      if (null != heatMapProvider) {
         try {
-          iHeatMapProvider.init(ozoneConfiguration, omMetadataManager,
+          heatMapProvider.init(ozoneConfiguration, omMetadataManager,
               reconNamespaceSummaryManager, reconSCM);
         } catch (Exception e) {
           LOG.error("Initializing HeatMapProvider fails!!! : {}", e);

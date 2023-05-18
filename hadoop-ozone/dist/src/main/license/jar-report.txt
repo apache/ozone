@@ -250,7 +250,6 @@ share/ozone/lib/slf4j-api.jar
 share/ozone/lib/slf4j-reload4j.jar
 share/ozone/lib/snakeyaml.jar
 share/ozone/lib/snappy-java.jar
-share/ozone/lib/solr-solrj.jar
 share/ozone/lib/spring-beans.jar
 share/ozone/lib/spring-core.jar
 share/ozone/lib/spring-jdbc.jar

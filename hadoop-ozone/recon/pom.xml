@@ -25,7 +25,6 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <pnpm.version>5.18.9</pnpm.version>
-    <solr.version>8.4.1</solr.version>
   </properties>
   <build>
     <resources>
