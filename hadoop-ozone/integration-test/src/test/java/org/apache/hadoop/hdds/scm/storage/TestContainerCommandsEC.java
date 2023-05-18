@@ -341,9 +341,6 @@ public class TestContainerCommandsEC {
       }, 500, 30000);
     }
 
-    ECReconstructionCoordinator coordinator = new ECReconstructionCoordinator(
-        config, certClient, null, ECReconstructionMetrics.create());
-
     // Create a reconstruction command to create a new copy of indexes 4 and 5
     // which means 1 to 3 must be available. However we know the block
     // information is missing for index 2. As all containers in the stripe must
@@ -367,10 +364,15 @@ public class TestContainerCommandsEC {
       targetNodeMap.put(EC_DATA + j + 1, targets.get(j));
     }
 
-    // Attempt to reconstruct the container.
-    coordinator.reconstructECContainerGroup(orphanContainerID,
-        (ECReplicationConfig) repConfig,
-        sourceNodeMap, targetNodeMap);
+    try (ECReconstructionCoordinator coordinator =
+        new ECReconstructionCoordinator(config, certClient, null,
+            ECReconstructionMetrics.create())) {
+
+      // Attempt to reconstruct the container.
+      coordinator.reconstructECContainerGroup(orphanContainerID,
+          (ECReplicationConfig) repConfig,
+          sourceNodeMap, targetNodeMap);
+    }
 
     // Check the block listing for the recovered containers 4 or 5 and they
     // should be present but with no blocks as the only block in the container
