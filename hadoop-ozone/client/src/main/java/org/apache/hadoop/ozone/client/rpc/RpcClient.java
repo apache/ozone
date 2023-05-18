@@ -23,6 +23,7 @@ import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
@@ -35,7 +36,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -49,6 +49,7 @@ import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -1246,7 +1247,6 @@ public class RpcClient implements ClientProtocol {
               this.conf.getObject(ReplicationConfigValidator.class);
       validator.validate(replicationConfig);
     }
-    String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1259,7 +1259,7 @@ public class RpcClient implements ClientProtocol {
         .setLatestVersionLocation(getLatestVersionLocation);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createOutputStream(openKey, requestId);
+    return createOutputStream(openKey);
   }
 
   @Override
@@ -1274,7 +1274,6 @@ public class RpcClient implements ClientProtocol {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, replicationConfig);
-    String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1286,7 +1285,7 @@ public class RpcClient implements ClientProtocol {
         .setAcls(getAclList());
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createDataStreamOutput(openKey, requestId);
+    return createDataStreamOutput(openKey);
   }
 
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
@@ -1665,7 +1664,6 @@ public class RpcClient implements ClientProtocol {
         "number should be greater than zero and less than or equal to 10000");
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
-    String requestId = UUID.randomUUID().toString();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1678,7 +1676,7 @@ public class RpcClient implements ClientProtocol {
         .build();
 
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
-    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey, requestId)
+    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
         .setIsMultipartKey(true)
@@ -1718,7 +1716,6 @@ public class RpcClient implements ClientProtocol {
         "number should be greater than zero and less than or equal to 10000");
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
-    String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1738,7 +1735,6 @@ public class RpcClient implements ClientProtocol {
             .setHandler(openKey)
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
-            .setRequestID(requestId)
             .setReplicationConfig(openKey.getKeyInfo().getReplicationConfig())
             .setMultipartNumber(partNumber)
             .setMultipartUploadID(uploadID)
@@ -1960,7 +1956,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
-    return createOutputStream(keySession, UUID.randomUUID().toString());
+    return createOutputStream(keySession);
   }
 
   private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
@@ -1990,7 +1986,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
-    return createDataStreamOutput(keySession, UUID.randomUUID().toString());
+    return createDataStreamOutput(keySession);
   }
 
   @Override
@@ -2141,8 +2137,8 @@ public class RpcClient implements ClientProtocol {
           new MultipartInputStream(keyInfo.getKeyName(), cryptoInputStreams));
     }
   }
-  private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey,
-      String requestId) throws IOException {
+  private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey)
+      throws IOException {
     final ReplicationConfig replicationConfig
         = openKey.getKeyInfo().getReplicationConfig();
     KeyDataStreamOutput keyOutputStream =
@@ -2150,7 +2146,6 @@ public class RpcClient implements ClientProtocol {
             .setHandler(openKey)
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
-            .setRequestID(requestId)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(conf.getObject(OzoneClientConfig.class))
@@ -2158,18 +2153,26 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-    return new OzoneDataStreamOutput(keyOutputStream);
+    final OzoneOutputStream out = createSecureOutputStream(
+        openKey, keyOutputStream, null);
+    return new OzoneDataStreamOutput(out != null? out: keyOutputStream);
   }
 
-  private OzoneOutputStream createOutputStream(OpenKeySession openKey,
-      String requestId) throws IOException {
+  private OzoneOutputStream createOutputStream(OpenKeySession openKey)
+      throws IOException {
 
-    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey, requestId)
+    KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .build();
-
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
+    final OzoneOutputStream out = createSecureOutputStream(
+        openKey, keyOutputStream, keyOutputStream);
+    return out != null? out: new OzoneOutputStream(keyOutputStream);
+  }
+
+  private OzoneOutputStream createSecureOutputStream(OpenKeySession openKey,
+      OutputStream keyOutputStream, Syncable syncable) throws IOException {
     final FileEncryptionInfo feInfo =
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
@@ -2185,19 +2188,17 @@ public class RpcClient implements ClientProtocol {
             openKey.getKeyInfo().getMetadata(), Cipher.ENCRYPT_MODE);
         if (gk != null) {
           return new OzoneOutputStream(
-              new CipherOutputStream(keyOutputStream, gk.getCipher()),
-              keyOutputStream);
+              new CipherOutputStream(keyOutputStream, gk.getCipher()), syncable);
         }
       }  catch (Exception ex) {
         throw new IOException(ex);
       }
-
-      return new OzoneOutputStream(keyOutputStream);
+      return null;
     }
   }
 
-  private KeyOutputStream.Builder createKeyOutputStream(OpenKeySession openKey,
-      String requestId) {
+  private KeyOutputStream.Builder createKeyOutputStream(
+      OpenKeySession openKey) {
     KeyOutputStream.Builder builder;
 
     ReplicationConfig replicationConfig =
@@ -2215,7 +2216,6 @@ public class RpcClient implements ClientProtocol {
     return builder.setHandler(openKey)
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
-        .setRequestID(requestId)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
         .setClientMetrics(clientMetrics);
