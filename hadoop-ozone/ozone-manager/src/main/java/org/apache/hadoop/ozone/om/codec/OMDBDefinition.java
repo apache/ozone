@@ -129,7 +129,7 @@ public class OMDBDefinition implements DBDefinition {
                     OzoneTokenIdentifier.class,
                     new TokenIdentifierCodec(),
                     Long.class,
-                    new LongCodec());
+                    LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, S3SecretValue>
             S3_SECRET_TABLE =

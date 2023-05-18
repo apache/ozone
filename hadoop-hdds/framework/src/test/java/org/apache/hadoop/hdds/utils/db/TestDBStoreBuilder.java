@@ -176,7 +176,7 @@ public class TestDBStoreBuilder {
 
       private final DBColumnFamilyDefinition<String, Long> sampleTable =
           new DBColumnFamilyDefinition<>(sampleTableName,
-              String.class, new StringCodec(), Long.class, new LongCodec());
+              String.class, new StringCodec(), Long.class, LongCodec.get());
       {
         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
@@ -253,7 +253,7 @@ public class TestDBStoreBuilder {
 
       private final DBColumnFamilyDefinition<String, Long> sampleTable =
               new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-                      new StringCodec(), Long.class, new LongCodec());
+                      new StringCodec(), Long.class, LongCodec.get());
 
 
       @Override
