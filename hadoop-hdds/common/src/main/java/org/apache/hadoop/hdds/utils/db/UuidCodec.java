@@ -39,6 +39,8 @@ public final class UuidCodec implements Codec<UUID> {
     return SERIALIZED_SIZE;
   }
 
+  private UuidCodec() { }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

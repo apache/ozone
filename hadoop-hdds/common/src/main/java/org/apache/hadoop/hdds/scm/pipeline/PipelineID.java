@@ -28,6 +28,8 @@ import java.util.UUID;
 
 /**
  * ID for the pipeline, the ID is based on UUID.
+ * <p>
+ * This class is immutable.
  */
 public final class PipelineID {
   private static final Codec<PipelineID> CODEC = new DelegatedCodec<>(

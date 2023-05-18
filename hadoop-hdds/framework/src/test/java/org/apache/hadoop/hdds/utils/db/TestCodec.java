@@ -71,7 +71,7 @@ public final class TestCodec {
 
   @Test
   public void testLongCodec() throws Exception {
-    final LongCodec codec = new LongCodec();
+    final LongCodec codec = LongCodec.get();
     runTest(codec, 0L, Long.BYTES);
     runTest(codec, 1L, Long.BYTES);
     runTest(codec, -1L, Long.BYTES);

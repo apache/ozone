@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -30,6 +31,9 @@ import java.util.UUID;
  * Testing serialization of PipelineID objects to/from RocksDB.
  */
 public class TestPipelineIDCodec {
+  private final OldPipelineIDCodecForTesting oldCodec
+      = new OldPipelineIDCodecForTesting();
+  private final Codec<PipelineID> newCodec = PipelineID.getCodec();
 
   @Test
   public void testPersistingZeroAsUUID() throws Exception {
@@ -112,18 +116,16 @@ public class TestPipelineIDCodec {
     assertUuid(uuid);
   }
 
-  static void assertUuid(UUID uuid) throws Exception {
+  void assertUuid(UUID uuid) throws Exception {
     PipelineID pid = PipelineID.valueOf(uuid);
 
-    final byte[] expected = new OldPipelineIDCodecForTesting()
-        .toPersistedFormat(pid);
-    final byte[] computed = PipelineID.getCodec().toPersistedFormat(pid);
+
+    final byte[] expected = oldCodec.toPersistedFormat(pid);
+    final byte[] computed = newCodec.toPersistedFormat(pid);
     assertArrayEquals(expected, computed);
 
-    final PipelineID decoded = new OldPipelineIDCodecForTesting()
-        .fromPersistedFormat(expected);
-    assertEquals(pid, decoded);
-    assertEquals(pid, PipelineID.getCodec().fromPersistedFormat(expected));
+    assertEquals(pid, oldCodec.fromPersistedFormat(expected));
+    assertEquals(pid, newCodec.fromPersistedFormat(expected));
   }
 
   private void checkPersisting(
@@ -132,10 +134,10 @@ public class TestPipelineIDCodec {
     UUID uuid = new UUID(mostSigBits, leastSigBits);
     PipelineID pid = PipelineID.valueOf(uuid);
 
-    byte[] encoded = new OldPipelineIDCodecForTesting().toPersistedFormat(pid);
+    final byte[] encoded = oldCodec.toPersistedFormat(pid);
     assertArrayEquals(expected, encoded);
 
-    final byte[] computed = PipelineID.getCodec().toPersistedFormat(pid);
+    final byte[] computed = newCodec.toPersistedFormat(pid);
     assertArrayEquals(expected, computed);
   }
 

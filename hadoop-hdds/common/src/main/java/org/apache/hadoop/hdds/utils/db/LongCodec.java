@@ -33,6 +33,8 @@ public final class LongCodec implements Codec<Long> {
     return CODEC;
   }
 
+  private LongCodec() { }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

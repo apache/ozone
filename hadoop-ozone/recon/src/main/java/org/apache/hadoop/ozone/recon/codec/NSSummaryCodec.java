@@ -41,7 +41,7 @@ public class NSSummaryCodec implements Codec<NSSummary> {
 
   private final Codec<Integer> integerCodec = new IntegerCodec();
   private final Codec<Short> shortCodec = new ShortCodec();
-  private final Codec<Long> longCodec = new LongCodec();
+  private final Codec<Long> longCodec = LongCodec.get();
   private final Codec<String> stringCodec = new StringCodec();
   // 1 int fields + 41-length int array
   // + 2 dummy field to track list size/dirName length
