@@ -120,7 +120,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (shouldRun()) {
         getRunCount().incrementAndGet();
 
-        // Acquire active DB deletedTable write lock
+        // Acquire active DB deletedTable write lock because of the
+        // deletedTable read-write here to avoid interleaving with
+        // the table range delete operation in createOmSnapshotCheckpoint()
+        // that is called from OMSnapshotCreateResponse#addToDBBatch.
         manager.getMetadataManager().getTableLock(
             OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
 

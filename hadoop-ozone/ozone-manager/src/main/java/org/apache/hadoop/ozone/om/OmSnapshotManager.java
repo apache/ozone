@@ -380,10 +380,11 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire active DB deletedDirectoryTable write lock
+    // Acquire active DB deletedDirectoryTable write lock to block
+    // DirDeletingTask
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
         .writeLock().lock();
-    // Acquire active DB deletedTable write lock
+    // Acquire active DB deletedTable write lock to block KeyDeletingTask
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
 
