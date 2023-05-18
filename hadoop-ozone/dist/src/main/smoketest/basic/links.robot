@@ -105,7 +105,7 @@ Key list passthrough
                         Should Contain              ${source_list}    key2
 
 Key delete passthrough
-                        Execute                     ozone sh key delete ${target}/link1/key2
+                        Execute                     ozone sh key delete --skipTrash ${target}/link1/key2
     ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[].name'
                         Should Not Contain          ${source_list}    key2
 
