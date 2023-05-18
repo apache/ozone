@@ -26,7 +26,7 @@ public interface BootstrapStateHandler {
 
   /** Bootstrap state handler lock implementation. */
   class Lock implements AutoCloseable {
-    private Semaphore semaphore = new Semaphore(1);
+    private final Semaphore semaphore = new Semaphore(1);
     public Lock lock() throws InterruptedException {
       semaphore.acquire();
       return this;

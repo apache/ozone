@@ -115,8 +115,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
-    lock = new Lock(om);
 
+    lock = new Lock(om);
   }
 
   @Override

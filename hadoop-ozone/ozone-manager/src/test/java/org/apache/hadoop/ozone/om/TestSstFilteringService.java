@@ -242,8 +242,6 @@ public class TestSstFilteringService {
     GenericTestUtils.waitFor(
         () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
         1000, 10000);
-
-
   }
 
   @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
