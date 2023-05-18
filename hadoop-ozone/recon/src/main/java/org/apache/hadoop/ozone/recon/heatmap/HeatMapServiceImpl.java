@@ -81,6 +81,7 @@ public class HeatMapServiceImpl extends HeatMapService {
               reconNamespaceSummaryManager, reconSCM);
         } catch (Exception e) {
           LOG.error("Initializing HeatMapProvider fails!!! : {}", e);
+          heatMapProvider = null;
         }
       } else {
         LOG.error("Loading HeatMapProvider fails!!!");

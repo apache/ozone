@@ -1,7 +1,6 @@
 lockfileVersion: 5.4
 
 specifiers:
-  '@ant-design/icons': ^5.0.1
   '@babel/core': ^7.0.0
   '@fontsource/roboto': ^4.5.8
   '@types/classnames': ^2.2.10
@@ -14,8 +13,6 @@ specifiers:
   '@types/react-select': ^3.0.13
   '@typescript-eslint/eslint-plugin': ^2.31.0
   '@typescript-eslint/parser': ^2.31.0
-  ag-charts-community: ^7.2.0
-  ag-charts-react: ^7.2.0
   antd: ^3.26.9
   axios: ^0.21.4
   babel-jest: ^24.9.0
@@ -49,7 +46,6 @@ specifiers:
   xo: ^0.30.0
 
 dependencies:
-  '@ant-design/icons': 5.0.1_5owmthsvj5ictknaj3ev736ofq
   '@babel/core': 7.10.2
   '@fontsource/roboto': 4.5.8
   '@types/classnames': 2.2.10
@@ -58,8 +54,6 @@ dependencies:
   '@types/react': 16.8.15
   '@types/react-dom': 16.8.4
   '@types/react-router-dom': 4.3.5
-  ag-charts-community: 7.3.0
-  ag-charts-react: 7.3.0_f63rgqzwzldix4i5qrfnzwypk4
   antd: 3.26.17_5owmthsvj5ictknaj3ev736ofq
   axios: 0.21.4
   babel-jest: 24.9.0_@babel+core@7.10.2
@@ -114,12 +108,6 @@ packages:
       tinycolor2: 1.4.1
     dev: false
 
-  /@ant-design/colors/7.0.0:
-    resolution: {integrity: sha512-iVm/9PfGCbC0dSMBrz7oiEXZaaGH7ceU40OJEfKmyuzR9R5CRimJYPlRiFtMQGQcbNMea/ePcoIebi4ASGYXtg==}
-    dependencies:
-      '@ctrl/tinycolor': 3.6.0
-    dev: false
-
   /@ant-design/create-react-context/0.2.5_ydh6x54hr2ucleptjfgjlyuzmm:
     resolution: {integrity: sha512-1rMAa4qgP2lfl/QBH9i78+Gjxtj9FTMpMyDGZsEBW5Kih72EuUo9958mV8PgpRkh4uwPSQ7vVZWXeyNZXVAFDg==}
     peerDependencies:
@@ -148,28 +136,8 @@ packages:
       react: 16.13.1
     dev: false
 
-  /@ant-design/icons-svg/4.2.1:
-    resolution: {integrity: sha512-EB0iwlKDGpG93hW8f85CTJTs4SvMX7tt5ceupvhALp1IF44SeUFOMhKUOYqpsoYWQKAOuTRDMqn75rEaKDp0Xw==}
-    dev: false
-
   /@ant-design/icons/2.1.1:
     resolution: {integrity: sha512-jCH+k2Vjlno4YWl6g535nHR09PwCEmTBKAG6VqF+rhkrSPRLfgpU2maagwbZPLjaHuU5Jd1DFQ2KJpQuI6uG8w==}
-    dev: false
-
-  /@ant-design/icons/5.0.1_5owmthsvj5ictknaj3ev736ofq:
-    resolution: {integrity: sha512-ZyF4ksXCcdtwA/1PLlnFLcF/q8/MhwxXhKHh4oCHDA4Ip+ZzAHoICtyp4wZWfiCVDP0yuz3HsjyvuldHFb3wjA==}
-    engines: {node: '>=8'}
-    peerDependencies:
-      react: '>=16.0.0'
-      react-dom: '>=16.0.0'
-    dependencies:
-      '@ant-design/colors': 7.0.0
-      '@ant-design/icons-svg': 4.2.1
-      '@babel/runtime': 7.21.5
-      classnames: 2.2.6
-      rc-util: 5.30.0_5owmthsvj5ictknaj3ev736ofq
-      react: 16.13.1
-      react-dom: 16.13.1_react@16.13.1
     dev: false
 
   /@babel/code-frame/7.10.1:
@@ -2071,11 +2039,6 @@ packages:
     resolution: {integrity: sha512-ij4wRiunFfaJxjB0BdrYHIH8FxBJpOwNPhhAcunlmPdXudL1WQV1qoP9un6JsEBAgQH+7UXyyjh0g7jTxXK6tg==}
     dev: false
 
-  /@ctrl/tinycolor/3.6.0:
-    resolution: {integrity: sha512-/Z3l6pXthq0JvMYdUFyX9j0MaCltlIn6mfh9jLyQwg5aPKxkyNa0PTHtU1AlFXLNk55ZuAeJRcpvq+tmLfKmaQ==}
-    engines: {node: '>=10'}
-    dev: false
-
   /@emotion/cache/10.0.29:
     resolution: {integrity: sha512-fU2VtSVlHiF27empSbxi1O2JFdNWZO+2NFHfwO0pxgTep6Xa3uGb+3pVKfLww2l/IBGLNEZl5Xf/++A4wAYDYQ==}
     dependencies:
@@ -3104,23 +3067,6 @@ packages:
     resolution: {integrity: sha1-dj/x040GPOt+Jy8X7k17vK+QXF0=}
     dependencies:
       robust-orientation: 1.1.3
-    dev: false
-
-  /ag-charts-community/7.3.0:
-    resolution: {integrity: sha512-118U6YsCMia6iZHaN06zT19rr2SYa92WB73pMVCKQlp2H3c19uKQ6Y6DfKG/nIfNUzFXZLHBwKIdZXsMWJdZww==}
-    dev: false
-
-  /ag-charts-react/7.3.0_f63rgqzwzldix4i5qrfnzwypk4:
-    resolution: {integrity: sha512-DR8l8IQbRJeutTslqJ8muwsMPdFyJAn/rq17NhQYZ9F4wx0suIAgaUG/We8KEO94qASLX/nhKuvbI/d7M4kJRw==}
-    peerDependencies:
-      ag-charts-community: ~7.3.0
-      react: ^16.3.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^16.3.0 || ^17.0.0 || ^18.0.0
-    dependencies:
-      ag-charts-community: 7.3.0
-      prop-types: 15.7.2
-      react: 16.13.1
-      react-dom: 16.13.1_react@16.13.1
     dev: false
 
   /aggregate-error/3.0.1:

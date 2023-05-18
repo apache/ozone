@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon.api.types;
+package org.apache.hadoop.ozone.recon.heatmap;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 
 import java.util.Arrays;
 
