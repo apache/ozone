@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -206,7 +207,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // add key to cache
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(
-        volumeName, bucketName, snapshotName, null);
+        volumeName, bucketName, snapshotName, null, Time.now());
     Assert.assertEquals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE,
         snapshotInfo.getSnapshotStatus());
     omMetadataManager.getSnapshotInfoTable().addCacheEntry(

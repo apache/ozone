@@ -35,6 +35,7 @@ public class ContainerChunkInfo {
   private HashSet<String> files;
   private UUID pipelineID;
   private Pipeline pipeline;
+  private ChunkType chunkType;
 
   public void setFiles(HashSet<String> files) {
     this.files = files;
@@ -60,6 +61,9 @@ public class ContainerChunkInfo {
     this.chunkInfos = chunkInfos;
   }
 
+  public void setChunkType(ChunkType chunkType) {
+    this.chunkType = chunkType;
+  }
 
   @Override
   public String toString() {
@@ -75,6 +79,8 @@ public class ContainerChunkInfo {
             + "files="
             + files
             + "PipelineID="
-            + pipelineID;
+            + pipelineID
+            + "ChunkType="
+            + chunkType;
   }
 }
