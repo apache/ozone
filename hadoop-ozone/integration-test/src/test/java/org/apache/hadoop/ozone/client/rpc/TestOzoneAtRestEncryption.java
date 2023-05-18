@@ -232,7 +232,8 @@ public class TestOzoneAtRestEncryption {
     createAndVerifyStreamKeyData(linkBucket);
   }
 
-  private void createAndVerifyStreamKeyData(OzoneBucket bucket) throws Exception {
+  static void createAndVerifyStreamKeyData(OzoneBucket bucket)
+      throws Exception {
     Instant testStartTime = Instant.now();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
@@ -245,14 +246,14 @@ public class TestOzoneAtRestEncryption {
     verifyKeyData(bucket, keyName, value, testStartTime);
   }
 
-  private void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
+  static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
     Instant testStartTime = Instant.now();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>())) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
     verifyKeyData(bucket, keyName, value, testStartTime);
@@ -343,8 +344,8 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, keyMetadata)) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -383,6 +384,7 @@ public class TestOzoneAtRestEncryption {
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
         getMatchedKeyInfo(keyName, omMetadataManager);
+    Assert.assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
     Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
@@ -480,8 +482,8 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
-        ONE);
+    String uploadID = initiateMultipartUpload(bucket, keyName,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
 
     // Upload Parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -567,10 +569,10 @@ public class TestOzoneAtRestEncryption {
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
-      ReplicationType replicationType, ReplicationFactor replicationFactor)
+      ReplicationConfig replicationConfig)
       throws Exception {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationType, replicationFactor);
+        replicationConfig);
 
     String uploadID = multipartInfo.getUploadID();
     Assert.assertNotNull(uploadID);

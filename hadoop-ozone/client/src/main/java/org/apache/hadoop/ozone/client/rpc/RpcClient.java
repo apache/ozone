@@ -2155,7 +2155,7 @@ public class RpcClient implements ClientProtocol {
             openKey.getOpenVersion());
     final OzoneOutputStream out = createSecureOutputStream(
         openKey, keyOutputStream, null);
-    return new OzoneDataStreamOutput(out != null? out: keyOutputStream);
+    return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey)
@@ -2168,7 +2168,7 @@ public class RpcClient implements ClientProtocol {
             openKey.getOpenVersion());
     final OzoneOutputStream out = createSecureOutputStream(
         openKey, keyOutputStream, keyOutputStream);
-    return out != null? out: new OzoneOutputStream(keyOutputStream);
+    return out != null ? out : new OzoneOutputStream(keyOutputStream);
   }
 
   private OzoneOutputStream createSecureOutputStream(OpenKeySession openKey,
@@ -2187,8 +2187,8 @@ public class RpcClient implements ClientProtocol {
         final GDPRSymmetricKey gk = getGDPRSymmetricKey(
             openKey.getKeyInfo().getMetadata(), Cipher.ENCRYPT_MODE);
         if (gk != null) {
-          return new OzoneOutputStream(
-              new CipherOutputStream(keyOutputStream, gk.getCipher()), syncable);
+          return new OzoneOutputStream(new CipherOutputStream(
+              keyOutputStream, gk.getCipher()), syncable);
         }
       }  catch (Exception ex) {
         throw new IOException(ex);
