@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
-import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -57,14 +56,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -193,11 +190,9 @@ public class RpcClient implements ClientProtocol {
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
-  private final int chunkSize;
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
-  private final long blockSize;
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -287,22 +282,6 @@ public class RpcClient implements ClientProtocol {
 
     this.xceiverClientManager =
         createXceiverClientFactory(x509Certificates);
-
-    int configuredChunkSize = (int) conf
-        .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
-            ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-    if (configuredChunkSize > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
-      LOG.warn("The chunk size ({}) is not allowed to be more than"
-              + " the maximum size ({}),"
-              + " resetting to the maximum size.",
-          configuredChunkSize, OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
-      chunkSize = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
-    } else {
-      chunkSize = configuredChunkSize;
-    }
-
-    blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
-        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     unsafeByteBufferConversion = conf.getBoolean(
         OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
@@ -1275,23 +1254,9 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
-        .addAllMetadata(metadata)
+        .addAllMetadataGdpr(metadata)
         .setAcls(getAclList())
         .setLatestVersionLocation(getLatestVersionLocation);
-    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-      try {
-        GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
-        builder.addAllMetadata(gKey.getKeyDetails());
-      } catch (Exception e) {
-        if (e instanceof InvalidKeyException &&
-            e.getMessage().contains("Illegal key size or default parameters")) {
-          LOG.error("Missing Unlimited Strength Policy jars. Please install " +
-              "Java Cryptography Extension (JCE) Unlimited Strength " +
-              "Jurisdiction Policy Files");
-        }
-        throw new IOException(e);
-      }
-    }
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createOutputStream(openKey, requestId);
@@ -1317,26 +1282,11 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setReplicationConfig(replicationConfig)
-        .addAllMetadata(metadata)
+        .addAllMetadataGdpr(metadata)
         .setAcls(getAclList());
 
-    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-      try {
-        GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
-        builder.addAllMetadata(gKey.getKeyDetails());
-      } catch (Exception e) {
-        if (e instanceof InvalidKeyException &&
-            e.getMessage().contains("Illegal key size or default parameters")) {
-          LOG.error("Missing Unlimited Strength Policy jars. Please install " +
-              "Java Cryptography Extension (JCE) Unlimited Strength " +
-              "Jurisdiction Policy Files");
-        }
-        throw new IOException(e);
-      }
-    }
-
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createDataStreamOutput(openKey, requestId, replicationConfig);
+    return createDataStreamOutput(openKey, requestId);
   }
 
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
@@ -2040,8 +1990,7 @@ public class RpcClient implements ClientProtocol {
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
-    return createDataStreamOutput(keySession, UUID.randomUUID().toString(),
-        replicationConfig);
+    return createDataStreamOutput(keySession, UUID.randomUUID().toString());
   }
 
   @Override
@@ -2113,6 +2062,28 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getAcl(obj);
   }
 
+  static GDPRSymmetricKey getGDPRSymmetricKey(Map<String, String> metadata,
+      int mode) throws Exception {
+    if (!Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+      return null;
+    }
+
+    final GDPRSymmetricKey gk = new GDPRSymmetricKey(
+        metadata.get(OzoneConsts.GDPR_SECRET),
+        metadata.get(OzoneConsts.GDPR_ALGORITHM));
+    try {
+      gk.getCipher().init(mode, gk.getSecretKey());
+    } catch (InvalidKeyException e) {
+      if (e.getMessage().contains("Illegal key size or default parameters")) {
+        LOG.error("Missing Unlimited Strength Policy jars. Please install "
+            + "Java Cryptography Extension (JCE) Unlimited Strength "
+            + "Jurisdiction Policy Files");
+      }
+      throw e;
+    }
+    return gk;
+  }
+
   private OzoneInputStream createInputStream(
       OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
       throws IOException {
@@ -2126,13 +2097,9 @@ public class RpcClient implements ClientProtocol {
               clientConfig.isChecksumVerify(), retryFunction,
               blockInputStreamFactory);
       try {
-        Map< String, String > keyInfoMetadata = keyInfo.getMetadata();
-        if (Boolean.valueOf(keyInfoMetadata.get(OzoneConsts.GDPR_FLAG))) {
-          GDPRSymmetricKey gk = new GDPRSymmetricKey(
-              keyInfoMetadata.get(OzoneConsts.GDPR_SECRET),
-              keyInfoMetadata.get(OzoneConsts.GDPR_ALGORITHM)
-          );
-          gk.getCipher().init(Cipher.DECRYPT_MODE, gk.getSecretKey());
+        final GDPRSymmetricKey gk = getGDPRSymmetricKey(
+            keyInfo.getMetadata(), Cipher.DECRYPT_MODE);
+        if (gk != null) {
           return new OzoneInputStream(
               new CipherInputStream(lengthInputStream, gk.getCipher()));
         }
@@ -2175,8 +2142,9 @@ public class RpcClient implements ClientProtocol {
     }
   }
   private OzoneDataStreamOutput createDataStreamOutput(OpenKeySession openKey,
-      String requestId, ReplicationConfig replicationConfig)
-      throws IOException {
+      String requestId) throws IOException {
+    final ReplicationConfig replicationConfig
+        = openKey.getKeyInfo().getReplicationConfig();
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
             .setHandler(openKey)
@@ -2213,15 +2181,9 @@ public class RpcClient implements ClientProtocol {
       return new OzoneOutputStream(cryptoOut);
     } else {
       try {
-        GDPRSymmetricKey gk;
-        Map<String, String> openKeyMetadata =
-            openKey.getKeyInfo().getMetadata();
-        if (Boolean.valueOf(openKeyMetadata.get(OzoneConsts.GDPR_FLAG))) {
-          gk = new GDPRSymmetricKey(
-              openKeyMetadata.get(OzoneConsts.GDPR_SECRET),
-              openKeyMetadata.get(OzoneConsts.GDPR_ALGORITHM)
-          );
-          gk.getCipher().init(Cipher.ENCRYPT_MODE, gk.getSecretKey());
+        final GDPRSymmetricKey gk = getGDPRSymmetricKey(
+            openKey.getKeyInfo().getMetadata(), Cipher.ENCRYPT_MODE);
+        if (gk != null) {
           return new OzoneOutputStream(
               new CipherOutputStream(keyOutputStream, gk.getCipher()),
               keyOutputStream);
