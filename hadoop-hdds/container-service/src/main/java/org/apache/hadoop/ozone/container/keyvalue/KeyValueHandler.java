@@ -1298,12 +1298,15 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (!container.getContainerData().isEmpty()) {
-          metrics.incContainerDeleteFailedBlockCountNotZero();
+        if (!container.isEmpty(false)) {
+          metrics.incContainerDeleteFailedNonEmptyBlocksDB();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty with blockCount {}",
               container.getContainerData().getContainerID(),
               container.getContainerData().getBlockCount());
+          // blocks table for future debugging.
+          // List blocks
+          logBlocksIfNonZero(container);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
@@ -1329,28 +1332,13 @@ public class KeyValueHandler extends Handler {
         // First check if any files are in the chunks folder. If there are
         // to help with debugging also dump the blocks table data.
         if (checkIfNoBlockFiles) {
-          if (!container.isEmpty()) {
+          if (!container.isEmpty(true)) {
             metrics.incContainerDeleteFailedNonEmpty();
             logBlocksFoundOnDisk(container);
             logBlocksIfNonZero(container);
             // List Blocks from Blocks Table
             throw new StorageContainerException("Non-force deletion of " +
                 "non-empty container dir:" +
-                container.getContainerData().getContainerID() +
-                " is not allowed.",
-                DELETE_ON_NON_EMPTY_CONTAINER);
-          }
-
-          // The chunks folder is empty, not check if the blocks table has any
-          // blocks still referenced. This will avoid cleaning up the
-          // blocks table for future debugging.
-          // List rocks
-          if (logBlocksIfNonZero(container)) {
-            LOG.error("Non-empty blocks table for container {}",
-                container.getContainerData().getContainerID());
-            metrics.incContainerDeleteFailedNonEmptyBlocksDB();
-            throw new StorageContainerException("Non-force deletion of " +
-                "non-empty container block table:" +
                 container.getContainerData().getContainerID() +
                 " is not allowed.",
                 DELETE_ON_NON_EMPTY_CONTAINER);

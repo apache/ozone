@@ -159,18 +159,12 @@ public class AbstractContainerReportHandler {
         getOtherReplicas(containerInfo.containerID(), newSource);
     long usedBytes = newReplica.getUsed();
     long keyCount = newReplica.getKeyCount();
-    boolean bAllReplicaEmpty = newReplica.getIsEmpty();
 
     for (ContainerReplica r : otherReplicas) {
       usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
       keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
-      if (!r.isEmpty()) {
-        // If any replica is not empty
-        bAllReplicaEmpty = false;
-      }
     }
     updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
-    containerInfo.setIsAllReplicaEmpty(bAllReplicaEmpty);
   }
 
   private void updateECContainerStats(ContainerInfo containerInfo,
@@ -189,7 +183,6 @@ public class AbstractContainerReportHandler {
           getOtherReplicas(containerInfo.containerID(), newSource);
       long usedBytes = newReplica.getUsed();
       long keyCount = newReplica.getKeyCount();
-      boolean bAllReplicaEmpty = newReplica.getIsEmpty();
       for (ContainerReplica r : otherReplicas) {
         if (r.getReplicaIndex() > 1 && r.getReplicaIndex() <= dataNum) {
           // Ignore all data replicas except the first for stats
@@ -197,13 +190,8 @@ public class AbstractContainerReportHandler {
         }
         usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
         keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
-        if (!r.isEmpty()) {
-          // If any replica is not empty
-          bAllReplicaEmpty = false;
-        }
       }
       updateContainerUsedAndKeys(containerInfo, usedBytes, keyCount);
-      containerInfo.setIsAllReplicaEmpty(bAllReplicaEmpty);
     }
   }
 
@@ -374,33 +362,13 @@ public class AbstractContainerReportHandler {
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
-        .setEmpty(fillEmpty(replicaProto))
+        .setEmpty(replicaProto.getIsEmpty())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {
       containerManager.removeContainerReplica(containerId, replica);
     } else {
       containerManager.updateContainerReplica(containerId, replica);
-    }
-  }
-
-  /**
-   * Determines whether container replica is empty or not.
-   *
-   * @param replicaProto container replica details.
-   * @return true if container replica is empty else false
-   */
-  private boolean fillEmpty(final ContainerReplicaProto replicaProto) {
-    if (replicaProto.hasIsEmpty()) {
-      return replicaProto.getIsEmpty();
-    } else {
-      // Handled when DN version is old then there will not be isEmpty field.
-      // In this case judge container empty based on keyCount
-      // and bytesUsed field.
-      if (replicaProto.getKeyCount() == 0 && replicaProto.getUsed() == 0) {
-        return true;
-      }
-      return false;
     }
   }
 

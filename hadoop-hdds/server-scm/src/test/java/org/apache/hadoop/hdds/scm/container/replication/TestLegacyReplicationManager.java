@@ -556,8 +556,7 @@ public class TestLegacyReplicationManager {
             throws IOException, TimeoutException {
       createContainer(LifeCycleState.CLOSED);
       assertReplicaScheduled(0);
-      assertUnderReplicatedCount(1);
-      assertMissingCount(1);
+      assertEmptyReplicatedCount(1);
     }
 
     /**
@@ -2556,7 +2555,6 @@ public class TestLegacyReplicationManager {
     final ContainerInfo container = getContainer(containerState);
     container.setUsedBytes(usedBytes);
     container.setNumberOfKeys(numKeys);
-    container.setIsAllReplicaEmpty(numKeys == 0);
     containerStateManager.addContainer(container.getProtobuf());
     return container;
   }
@@ -2670,6 +2668,12 @@ public class TestLegacyReplicationManager {
     ReplicationManagerReport report = replicationManager.getContainerReport();
     Assertions.assertEquals(count, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  private void assertEmptyReplicatedCount(int count) {
+    ReplicationManagerReport report = replicationManager.getContainerReport();
+    Assertions.assertEquals(count, report.getStat(
+        ReplicationManagerReport.HealthState.EMPTY));
   }
 
   private static class DatanodeCommandHandler implements

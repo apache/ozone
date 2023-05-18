@@ -311,8 +311,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean isEmpty() throws IOException {
-    return KeyValueContainerUtil.noBlocksInContainer(containerData);
+  public boolean isEmpty(boolean bCheckChunksFilePath) throws IOException {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      return KeyValueContainerUtil.noBlocksInContainer(db.getStore(),
+          containerData, bCheckChunksFilePath);
+    }
   }
 
   @Override

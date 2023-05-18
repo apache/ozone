@@ -180,22 +180,38 @@ public final class KeyValueContainerUtil {
 
   /**
    * Returns if there are no blocks in the container.
+   * @param store DBStore
    * @param containerData Container to check
-   * @param conf configuration
+   * @param bCheckChunksFilePath Whether to check chunksfilepath has any blocks
    * @return true if the directory containing blocks is empty
    * @throws IOException
    */
-  public static boolean noBlocksInContainer(KeyValueContainerData
-                                                containerData)
+  public static boolean noBlocksInContainer(DatanodeStore store,
+                                            KeyValueContainerData
+                                            containerData,
+                                            boolean bCheckChunksFilePath)
       throws IOException {
+    Preconditions.checkNotNull(store);
     Preconditions.checkNotNull(containerData);
-    File chunksPath = new File(containerData.getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
-
-    try (DirectoryStream<Path> dir
-             = Files.newDirectoryStream(chunksPath.toPath())) {
-      return !dir.iterator().hasNext();
+    if (containerData.isOpen()) {
+      return false;
     }
+    try (BlockIterator<BlockData> blockIterator =
+             store.getBlockIterator(containerData.getContainerID())) {
+      if (blockIterator.hasNext()) {
+        return false;
+      }
+    }
+    if (bCheckChunksFilePath) {
+      File chunksPath = new File(containerData.getChunksPath());
+      Preconditions.checkArgument(chunksPath.isDirectory());
+      try (DirectoryStream<Path> dir
+               = Files.newDirectoryStream(chunksPath.toPath())) {
+        return !dir.iterator().hasNext();
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -343,7 +359,7 @@ public final class KeyValueContainerUtil {
       Files.createDirectories(chunksDir.toPath());
     }
 
-    if (isEmpty(store, kvContainerData)) {
+    if (noBlocksInContainer(store, kvContainerData, false)) {
       kvContainerData.markAsEmpty();
     }
 

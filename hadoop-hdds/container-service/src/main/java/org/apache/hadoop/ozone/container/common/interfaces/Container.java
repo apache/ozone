@@ -59,10 +59,11 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
 
   /**
    * Returns true if container is empty.
+   * @param bCheckChunksFilePath whether to check chunk path
    * @return true of container is empty
    * @throws IOException if was unable to check container status.
    */
-  boolean isEmpty() throws IOException;
+  boolean isEmpty(boolean bCheckChunksFilePath) throws IOException;
 
   /**
    * Update the container.

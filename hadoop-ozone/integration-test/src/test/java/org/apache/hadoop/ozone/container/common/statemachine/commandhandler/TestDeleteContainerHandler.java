@@ -321,12 +321,8 @@ public class TestDeleteContainerHandler {
     Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
-    // Set container as empty to mock it is empty
-    getContainerfromDN(hddsDatanodeService, containerId.getId())
-        .getContainerData().markAsEmpty();
-
-    long containerDeleteFailedNonEmptyBefore =
-        metrics.getContainerDeleteFailedNonEmptyDir();
+    long containerDeleteFailedNonEmptyBlockDB =
+        metrics.getContainerDeleteFailedNonEmptyBlockDB();
     // send delete container to the datanode
     command = new DeleteContainerCommand(containerId.getId(), false);
 
@@ -343,15 +339,15 @@ public class TestDeleteContainerHandler {
             LoggerFactory.getLogger(KeyValueHandler.class));
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
-                contains("Files still part of the container on delete"),
+                contains("the container is not empty with blockCount"),
         500,
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertTrue(containerDeleteFailedNonEmptyBefore <
-        metrics.getContainerDeleteFailedNonEmptyDir());
+    Assert.assertTrue(containerDeleteFailedNonEmptyBlockDB <
+        metrics.getContainerDeleteFailedNonEmptyBlockDB());
 
-    // Now empty the container Dir and try with a non empty block table
+    // Now empty the container Dir and try with a non-empty block table
     Container containerToDelete = getContainerfromDN(
         hddsDatanodeService, containerId.getId());
     File chunkDir = new File(containerToDelete.
@@ -364,22 +360,18 @@ public class TestDeleteContainerHandler {
     }
     command = new DeleteContainerCommand(containerId.getId(), false);
 
-    // Send the delete command. It should fail as even though block count
-    // is zero there is a lingering block on disk.
+    // Send the delete command.It should fail as still block table is non-empty
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
-
-    // Check the log for the error message when deleting non-empty containers
     GenericTestUtils.waitFor(() ->
-            logCapturer.getOutput().
-                contains("Non-empty blocks table for container"),
+            metrics.getContainerDeleteFailedNonEmptyBlockDB() == 2,
         500,
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertEquals(1,
+    Assert.assertEquals(2,
         metrics.getContainerDeleteFailedNonEmptyBlockDB());
     // Send the delete command. It should pass with force flag.
     long beforeForceCount = metrics.getContainerForceDelete();
@@ -445,9 +437,6 @@ public class TestDeleteContainerHandler {
     clearBlocksTable(getContainerfromDN(hddsDatanodeService,
         containerId.getId()));
 
-    // Mark isEmpty to true
-    getContainerfromDN(hddsDatanodeService, containerId.getId())
-        .getContainerData().markAsEmpty();
 
     // Now empty the container Dir
     Container containerToDelete = getContainerfromDN(
@@ -563,13 +552,13 @@ public class TestDeleteContainerHandler {
         GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(DeleteContainerCommandHandler.class));
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Non" +
-        "-force deletion of non-empty container is not allowed"), 500,
+            "-force deletion of non-empty container is not allowed"), 500,
         5 * 1000);
     ContainerMetrics metrics =
         hddsDatanodeService
             .getDatanodeStateMachine().getContainer().getMetrics();
     Assert.assertEquals(1,
-        metrics.getContainerDeleteFailedBlockCountNotZero());
+        metrics.getContainerDeleteFailedNonEmptyBlockDB());
 
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)

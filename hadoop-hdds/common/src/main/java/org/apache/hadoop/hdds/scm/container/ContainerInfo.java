@@ -60,7 +60,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   */
   private volatile long usedBytes;
   private long numberOfKeys;
-  private boolean isAllReplicaEmpty;
   private Instant lastUsed;
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
@@ -99,8 +98,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationConfig repConfig,
-      boolean isAllReplicaEmpty) {
+      ReplicationConfig repConfig) {
     this.containerID = ContainerID.valueOf(containerID);
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
@@ -112,7 +110,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
     this.replicationConfig = repConfig;
-    this.isAllReplicaEmpty = isAllReplicaEmpty;
   }
 
   /**
@@ -135,7 +132,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
         .setSequenceId(info.getSequenceId())
-        .setIsAllReplicaEmpty(info.getIsAllReplicaEmpty())
         .build();
 
     if (info.hasPipelineID()) {
@@ -256,14 +252,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     lastUsed = Instant.ofEpochMilli(Time.now());
   }
 
-  public boolean getIsAllReplicaEmpty() {
-    return isAllReplicaEmpty;
-  }
-
-  public void setIsAllReplicaEmpty(boolean empty) {
-    isAllReplicaEmpty = empty;
-  }
-
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -276,8 +264,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
         .setSequenceId(getSequenceId())
-        .setReplicationType(getReplicationType())
-        .setIsAllReplicaEmpty(getIsAllReplicaEmpty());
+        .setReplicationType(getReplicationType());
 
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
@@ -449,7 +436,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
-    private boolean isAllReplicaEmpty = true;
     private long stateEnterTime;
     private String owner;
     private long containerID;
@@ -509,15 +495,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setIsAllReplicaEmpty(boolean empty) {
-      this.isAllReplicaEmpty = empty;
-      return this;
-    }
-
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationConfig, isAllReplicaEmpty);
+          sequenceId, replicationConfig);
     }
   }
 
