@@ -44,7 +44,7 @@ public class CRLDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "pendingCrls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
           new CRLInfoCodec());
 
@@ -55,7 +55,7 @@ public class CRLDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   @Override
   public String getName() {

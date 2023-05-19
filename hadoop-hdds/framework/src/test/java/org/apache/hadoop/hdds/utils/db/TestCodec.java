@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -70,7 +71,7 @@ public final class TestCodec {
 
   @Test
   public void testLongCodec() throws Exception {
-    final LongCodec codec = new LongCodec();
+    final LongCodec codec = LongCodec.get();
     runTest(codec, 0L, Long.BYTES);
     runTest(codec, 1L, Long.BYTES);
     runTest(codec, -1L, Long.BYTES);
@@ -92,6 +93,20 @@ public final class TestCodec {
     for (int i = 0; i < NUM_LOOPS; i++) {
       final String original = "test" + ThreadLocalRandom.current().nextLong();
       runTest(codec, original, original.length());
+    }
+    gc();
+  }
+
+  @Test
+  public void testUuidCodec() throws Exception {
+    final int size = UuidCodec.getSerializedSize();
+    final UuidCodec codec = UuidCodec.get();
+    runTest(codec, new UUID(0L, 0L), size);
+    runTest(codec, new UUID(-1L, -1L), size);
+
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final UUID original = UUID.randomUUID();
+      runTest(codec, original, size);
     }
     gc();
   }

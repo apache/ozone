@@ -601,22 +601,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * List buckets in a volume.
-   *
-   * @param volumeName
-   * @param startKey
-   * @param prefix
-   * @param count
-   * @return
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startKey, String prefix, int count) throws IOException {
+                                        String startKey, String prefix,
+                                        int count, boolean hasSnapshot)
+      throws IOException {
     List<OmBucketInfo> buckets = new ArrayList<>();
     ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setCount(count);
+    reqBuilder.setHasSnapshot(hasSnapshot);
     if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }

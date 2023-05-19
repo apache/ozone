@@ -42,7 +42,7 @@ public class DatanodeSchemaTwoDBDefinition extends
                   String.class,
                   new StringCodec(),
                   BlockData.class,
-                  new BlockDataCodec());
+                  BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
@@ -51,7 +51,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
           DELETED_BLOCKS =
@@ -60,14 +60,14 @@ public class DatanodeSchemaTwoDBDefinition extends
                   String.class,
                   new StringCodec(),
                   ChunkInfoList.class,
-                  new ChunkInfoListCodec());
+                  ChunkInfoList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "delete_txns",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 

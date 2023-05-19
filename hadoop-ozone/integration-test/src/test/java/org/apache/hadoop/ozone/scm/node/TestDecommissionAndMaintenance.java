@@ -140,7 +140,6 @@ public class TestDecommissionAndMaintenance {
     replicationConf.setInterval(Duration.ofSeconds(1));
     replicationConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
     replicationConf.setOverReplicatedInterval(Duration.ofSeconds(1));
-    replicationConf.setEnableLegacy(true); // disable as part of HDDS-8459
     conf.setFromObject(replicationConf);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)

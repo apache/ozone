@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -43,21 +37,26 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.test.TestGenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases for mini ozone cluster.
@@ -160,18 +159,18 @@ public class TestMiniOzoneCluster {
       for (DatanodeStateMachine dsm : stateMachines) {
         int readPort = dsm.getContainer().getReadChannel().getIPCPort();
 
-        assertNotEquals("Port number of the service is not updated", 0,
-            readPort);
+        assertNotEquals(0, readPort,
+            "Port number of the service is not updated");
 
-        assertTrue("Port of datanode service is conflicted with other server.",
-            ports.add(readPort));
+        assertTrue(ports.add(readPort),
+            "Port of datanode service is conflicted with other server.");
 
         int writePort = dsm.getContainer().getWriteChannel().getIPCPort();
 
-        assertNotEquals("Port number of the service is not updated", 0,
-            writePort);
-        assertTrue("Port of datanode service is conflicted with other server.",
-            ports.add(writePort));
+        assertNotEquals(0, writePort,
+            "Port number of the service is not updated");
+        assertTrue(ports.add(writePort),
+            "Port of datanode service is conflicted with other server.");
       }
 
     } finally {
@@ -243,7 +242,7 @@ public class TestMiniOzoneCluster {
     for (int i = 0; i < 20; i++) {
       for (EndpointStateMachine endpoint :
           dnStateMachine.getConnectionManager().getValues()) {
-        Assert.assertEquals(
+        assertEquals(
             EndpointStateMachine.EndPointStates.GETVERSION,
             endpoint.getState());
       }
@@ -258,7 +257,7 @@ public class TestMiniOzoneCluster {
     // DN should be in HEARTBEAT state after registering with the SCM
     for (EndpointStateMachine endpoint :
         dnStateMachine.getConnectionManager().getValues()) {
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+      assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
   }
@@ -278,13 +277,21 @@ public class TestMiniOzoneCluster {
         .build();
     cluster.waitForClusterToBeReady();
 
+    final String name = MiniOzoneClusterImpl.class.getSimpleName()
+        + "-" + cluster.getClusterId();
+    assertEquals(name, cluster.getName());
+
+    final String baseDir = GenericTestUtils.getTempPath(name);
+    assertEquals(baseDir, cluster.getBaseDir());
+
+
     List<StorageVolume> volumeList = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getVolumeSet()
         .getVolumesList();
 
-    Assert.assertEquals(3, volumeList.size());
+    assertEquals(3, volumeList.size());
 
-    volumeList.forEach(storageVolume -> Assert.assertEquals(
+    volumeList.forEach(storageVolume -> assertEquals(
             (long) StorageSize.parse(reservedSpace).getValue(),
             storageVolume.getVolumeInfo().get().getReservedInBytes()));
   }

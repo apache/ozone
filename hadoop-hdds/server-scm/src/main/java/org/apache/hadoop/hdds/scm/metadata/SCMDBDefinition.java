@@ -49,7 +49,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "deletedBlocks",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
@@ -98,7 +98,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
           new PipelineCodec());
 
@@ -107,7 +107,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           ContainerInfo.class,
           new ContainerInfoCodec());
 
@@ -124,7 +124,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "crls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
           new CRLInfoCodec());
 
@@ -135,7 +135,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
@@ -144,7 +144,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
       MoveDataNodePair>
@@ -152,7 +152,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "move",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           MoveDataNodePair.class,
           new MoveDataNodePairCodec());
 

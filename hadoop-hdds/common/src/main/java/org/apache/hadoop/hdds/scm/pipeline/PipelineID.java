@@ -20,15 +20,26 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.UuidCodec;
 
 import java.util.UUID;
 
 /**
  * ID for the pipeline, the ID is based on UUID.
+ * <p>
+ * This class is immutable.
  */
 public final class PipelineID {
+  private static final Codec<PipelineID> CODEC = new DelegatedCodec<>(
+      UuidCodec.get(), PipelineID::valueOf, c -> c.id, true);
 
-  private UUID id;
+  public static Codec<PipelineID> getCodec() {
+    return CODEC;
+  }
+
+  private final UUID id;
 
   private PipelineID(UUID id) {
     this.id = id;

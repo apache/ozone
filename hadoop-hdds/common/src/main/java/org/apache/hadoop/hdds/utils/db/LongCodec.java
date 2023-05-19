@@ -24,9 +24,17 @@ import javax.annotation.Nonnull;
 import java.util.function.IntFunction;
 
 /**
- * Codec to convert Long to/from byte array.
+ * Codec to serialize/deserialize {@link Long}.
  */
 public final class LongCodec implements Codec<Long> {
+  private static final LongCodec CODEC = new LongCodec();
+
+  public static LongCodec get() {
+    return CODEC;
+  }
+
+  private LongCodec() { }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -69,7 +68,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
 
   // how much of data is actually written yet to underlying stream
   private long offset;
@@ -127,7 +125,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
     this.writeOffset = 0;
     this.clientID = handler.getId();
   }
@@ -395,10 +392,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
-  }
-
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
   }
 
   @VisibleForTesting
