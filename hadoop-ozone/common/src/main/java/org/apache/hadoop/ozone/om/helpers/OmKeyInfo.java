@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * datanode. Also, this is the metadata written to om.db on server side.
  */
 public final class OmKeyInfo extends WithParentObjectId
-    implements ICopyObjectInfo {
+    implements ICopyObject {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
   private final String volumeName;
   private final String bucketName;

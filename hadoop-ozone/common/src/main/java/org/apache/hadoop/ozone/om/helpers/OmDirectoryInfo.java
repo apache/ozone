@@ -34,7 +34,7 @@ import java.util.Objects;
  * path. Also, it stores directory node related metdata details.
  */
 public class OmDirectoryInfo extends WithParentObjectId
-    implements ICopyObjectInfo {
+    implements ICopyObject {
   private String name; // directory name
 
   private long creationTime;
