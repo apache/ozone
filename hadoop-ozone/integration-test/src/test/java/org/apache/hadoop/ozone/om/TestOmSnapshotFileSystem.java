@@ -450,8 +450,8 @@ public class TestOmSnapshotFileSystem {
     fileStatuses = o3fs.listStatus(snapshotRoot);
     assertEquals(1, fileStatuses.length,
         "Should have created parent");
-    assertEquals(fileStatuses[0].getPath().toUri().getPath(), snapshotParent.toString(),
-        "Parent path doesn't match");
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(),
+        snapshotParent.toString(), "Parent path doesn't match");
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
