@@ -67,7 +67,6 @@ final class ReconfigureSubCommandUtil {
             successCount.incrementAndGet();
           } catch (Exception e) {
             failCount.incrementAndGet();
-            System.out.println("An error occurred");
             e.printStackTrace(System.out);
           }
         });
@@ -83,7 +82,7 @@ final class ReconfigureSubCommandUtil {
         Thread.currentThread().interrupt();
         System.out.println("Executor termination interrupted");
       } finally {
-        System.out.printf("Reconfig started on %d nodes, failed on %d nodes.%n",
+        System.out.printf("Reconfig successfully %d nodes, failure %d nodes.%n",
             successCount.get(), failCount.get());
       }
     }
@@ -99,6 +98,9 @@ final class ReconfigureSubCommandUtil {
     for (HddsProtos.Node node : nodes) {
       DatanodeDetails details =
           DatanodeDetails.getFromProtoBuf(node.getNodeID());
+      if (node.getNodeStates(0).equals(HddsProtos.NodeState.DEAD)) {
+        continue;
+      }
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
         addresses.add(details.getIpAddress() + ":" + port.getValue());

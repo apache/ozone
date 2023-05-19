@@ -24,8 +24,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-abstract class AbstractReconfigureSubCommand implements Callable<Void> {
-  private static final String BULK_OPERATION_IDENTIFIER = "inservernodes";
+/**
+ * An abstract Class use to ReconfigureSubCommand.
+ */
+public abstract class AbstractReconfigureSubCommand implements Callable<Void> {
+  public static final String BULK_OPERATION_IDENTIFIER = "inservicenodes";
 
   @CommandLine.ParentCommand
   private ReconfigureCommands parent;

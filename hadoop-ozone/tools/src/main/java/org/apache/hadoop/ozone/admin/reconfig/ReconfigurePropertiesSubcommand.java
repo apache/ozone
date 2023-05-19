@@ -49,7 +49,7 @@ public class ReconfigurePropertiesSubcommand
     } catch (IOException e) {
       System.out.println("An error occurred while executing the command for :"
           + address);
-      e.printStackTrace(System.out);
+      throw new RuntimeException(e);
     }
   }
 

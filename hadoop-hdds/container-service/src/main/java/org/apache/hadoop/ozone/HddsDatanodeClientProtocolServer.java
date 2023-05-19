@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -44,6 +45,7 @@ import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_RPC;
@@ -56,7 +58,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
   private static final Logger LOG =
       LoggerFactory.getLogger(HddsDatanodeClientProtocolServer.class);
   private final RPC.Server rpcServer;
-  private final InetSocketAddress clientRpcAddress;
+  private InetSocketAddress clientRpcAddress;
   private final DatanodeDetails datanodeDetails;
   private final HddsDatanodeService service;
   private final OzoneConfiguration conf;
@@ -69,8 +71,10 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
     this.service = service;
     this.conf = conf;
 
-    clientRpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
     rpcServer = getRpcServer(conf);
+    clientRpcAddress = ServerUtils.updateRPCListenAddress(this.conf,
+        HDDS_DATANODE_CLIENT_ADDRESS_KEY,
+        HddsUtils.getDatanodeRpcAddress(conf), rpcServer);
     this.datanodeDetails.setPort(CLIENT_RPC, clientRpcAddress.getPort());
   }
 
@@ -145,6 +149,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
    */
   private RPC.Server getRpcServer(OzoneConfiguration configuration)
       throws IOException {
+    InetSocketAddress rpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
     // Add reconfigureProtocolService.
     RPC.setProtocolEngine(
         configuration, ReconfigureProtocolPB.class, ProtobufRpcEngine.class);
@@ -157,7 +162,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(configuration, getClientRpcAddress(),
+    return startRpcServer(configuration, rpcAddress,
         ReconfigureProtocolPB.class, reconfigureService, handlerCount);
   }
 
@@ -192,7 +197,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
     return rpcServer;
   }
 
-  private InetSocketAddress getClientRpcAddress() {
+  public InetSocketAddress getClientRpcAddress() {
     return clientRpcAddress;
   }
 

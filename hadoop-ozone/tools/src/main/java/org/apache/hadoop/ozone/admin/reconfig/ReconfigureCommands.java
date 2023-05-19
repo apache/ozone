@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import static org.apache.hadoop.ozone.admin.reconfig.AbstractReconfigureSubCommand.BULK_OPERATION_IDENTIFIER;
+
 /**
  * Subcommand to group reconfigure OM related operations.
  */
@@ -57,12 +59,17 @@ public class ReconfigureCommands implements Callable<Void>,
   private CommandSpec spec;
 
   @CommandLine.Option(names = {"--address"},
-      description = "node address: <ip:port> or <hostname:port>",
+      description = "node address: <ip:port> or <hostname:port>. For Datanode" +
+          " the parameter '" + BULK_OPERATION_IDENTIFIER + "' is supported. " +
+          "This will send reconfiguration requests to all available DataNodes" +
+          " in the IN_SERVICE operational state.",
       required = true)
+
   private String address;
 
   @CommandLine.Option(names = {"--type", "-t"},
-      description = "The type of server",
+      description = "Specifies the type of the server. Currently, only " +
+          "'datanode' is supported.",
       required = false)
   private String type;
 
@@ -88,7 +95,7 @@ public class ReconfigureCommands implements Callable<Void>,
   public List<String> getAllOperableNodesClientRpcAddress() {
     List<String> nodes;
     try (ScmClient scmClient = new ContainerOperationClient(
-        parent.createOzoneConfiguration())) {
+        parent.getOzoneConf())) {
       nodes = ReconfigureSubCommandUtil
           .getAllOperableNodesClientRpcAddress(scmClient);
     } catch (IOException e) {

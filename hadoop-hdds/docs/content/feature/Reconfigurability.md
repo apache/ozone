@@ -81,3 +81,41 @@ To: "hadoop,bigdata"
 > $ `ozone admin reconfig -address=hadoop1:9860 properties`<br>
 SCM: Node [hadoop1:9860] Reconfigurable properties:<br>
 ozone.administrators
+
+## Datanode Reconfigurability
+
+**Reconfigurable properties**
+key | description
+-----------------------------------|-----------------------------------------
+
+>For example, modify `ozone.example.config` in ozone-site.xml and execute:
+>
+> $ `ozone admin reconfig --address=hadoop1:9864 start`<br>
+Datanode: Started reconfiguration task on node [hadoop1:9864].
+>
+>$ `ozone admin reconfig --address=hadoop1:9864 status`<br>
+Datanode: Reconfiguring status for node [hadoop1:9864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
+SUCCESS: Changed property ozone.example.config<br>
+From: "old"<br>
+To: "new"
+>
+> $ `ozone admin reconfig -address=hadoop1:9864 properties`<br>
+Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+ozone.example.config
+
+### Batch operation
+If you want to perform a batch operations on the Datanode, you can set `--address` to `inservicenodes`.<br>
+This will send reconfiguration requests to all available DataNodes in the `IN_SERVICE`operational state.<br>
+When you perform a batch operation, you must use `-t/--type` to specify the type of 
+node to operate on. Currently, only Datanode supports batch operations<br>
+
+
+>For example, to list the reconfigurable properties of all Datanodes:<br>
+> $ `ozone admin reconfig -t datanode --address=inservicenodes properties`<br>
+Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
+ozone.example.config<br>
+Datanode: Node [hadoop2:9864] Reconfigurable properties:<br>
+ozone.example.config<br>
+Datanode: Node [hadoop3:9864] Reconfigurable properties:<br>
+ozone.example.config<br>
+Reconfig successfully 3 nodes, failure 0 nodes.<br>
