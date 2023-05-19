@@ -1135,7 +1135,7 @@ public class ReplicationManager implements SCMService {
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = Duration.ofMinutes(30).toMillis();
+    private long eventTimeout = Duration.ofMinutes(10).toMillis();
     public void setInterval(Duration interval) {
       this.interval = interval.toMillis();
     }
