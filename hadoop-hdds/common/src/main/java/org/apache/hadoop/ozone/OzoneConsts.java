@@ -325,6 +325,7 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";

@@ -217,6 +217,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     final String snapshotPath = snapshotInfo.getSnapshotPath();
     if (exception == null) {
+      omMetrics.decNumSnapshotActive();
       LOG.info("Deleted snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
     } else {

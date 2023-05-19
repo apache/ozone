@@ -2751,8 +2751,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * {@inheritDoc}
    */
   @Override
-  public List<OmBucketInfo> listBuckets(String volumeName,
-      String startKey, String prefix, int maxNumOfBuckets)
+  public List<OmBucketInfo> listBuckets(String volumeName, String startKey,
+                                        String prefix, int maxNumOfBuckets,
+                                        boolean hasSnapshot)
       throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
@@ -2760,6 +2761,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.PREFIX, prefix);
     auditMap.put(OzoneConsts.MAX_NUM_OF_BUCKETS,
         String.valueOf(maxNumOfBuckets));
+    auditMap.put(OzoneConsts.HAS_SNAPSHOT, String.valueOf(hasSnapshot));
+
     try {
       if (isAclEnabled) {
         omMetadataReader.checkAcls(ResourceType.VOLUME,
@@ -2768,7 +2771,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketLists();
       return bucketManager.listBuckets(volumeName,
-          startKey, prefix, maxNumOfBuckets);
+          startKey, prefix, maxNumOfBuckets, hasSnapshot);
     } catch (IOException ex) {
       metrics.incNumBucketListFails();
       auditSuccess = false;

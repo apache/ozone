@@ -50,11 +50,14 @@ public interface BucketManager extends IOzoneAcl {
    * @param maxNumOfBuckets
    *   The maximum number of buckets to return. It ensures
    *   the size of the result will not exceed this limit.
+   * @param hasSnapshot
+   *   Set the flag to list buckets which have snapshots.
    * @return a list of buckets.
    * @throws IOException
    */
-  List<OmBucketInfo> listBuckets(String volumeName,
-      String startBucket, String bucketPrefix, int maxNumOfBuckets)
+  List<OmBucketInfo> listBuckets(String volumeName, String startBucket,
+                                 String bucketPrefix, int maxNumOfBuckets,
+                                 boolean hasSnapshot)
       throws IOException;
 
 }

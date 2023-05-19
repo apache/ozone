@@ -120,7 +120,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
-    omMetrics.incNumSnapshotActive();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
@@ -228,6 +227,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Created snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
+      omMetrics.incNumSnapshotActive();
     } else {
       omMetrics.incNumSnapshotCreateFails();
       LOG.error("Failed to create snapshot '{}' under path '{}'",
