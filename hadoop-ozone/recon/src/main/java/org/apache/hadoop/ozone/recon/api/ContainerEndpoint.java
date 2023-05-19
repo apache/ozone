@@ -145,7 +145,7 @@ public class ContainerEndpoint {
     List<ContainerMetadata> containerMetaDataList =
         // Get the containers starting from the prevKey+1 which will skip the
         // container having prevKey ID
-        containerManager.getContainers(ContainerID.valueOf(prevKey+1), limit)
+        containerManager.getContainers(ContainerID.valueOf(prevKey + 1), limit)
             .stream()
             .map(container -> {
               ContainerMetadata containerMetadata =
