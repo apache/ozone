@@ -58,6 +58,8 @@ public final class S3GatewayMetrics implements MetricsSource {
   private @Metric MutableCounterLong putAclFailure;
   private @Metric MutableCounterLong listMultipartUploadsSuccess;
   private @Metric MutableCounterLong listMultipartUploadsFailure;
+  private @Metric MutableCounterLong listKeyCount;
+
 
   // RootEndpoint
   private @Metric MutableCounterLong listS3BucketsSuccess;
@@ -84,6 +86,13 @@ public final class S3GatewayMetrics implements MetricsSource {
   private @Metric MutableCounterLong abortMultipartUploadFailure;
   private @Metric MutableCounterLong deleteKeySuccess;
   private @Metric MutableCounterLong deleteKeyFailure;
+  private @Metric MutableCounterLong copyObjectSuccessLength;
+  private @Metric MutableCounterLong putKeySuccessLength;
+  private @Metric MutableCounterLong getKeySuccessLength;
+
+  // S3Gateway
+  private @Metric MutableCounterLong request;
+  private @Metric MutableCounterLong requestReject;
 
   // S3 Gateway Latency Metrics
   // BucketEndpoint
@@ -226,6 +235,15 @@ public final class S3GatewayMetrics implements MetricsSource {
   @Metric(about = "Latency for failing to delete an S3 object in nanoseconds")
   private MutableRate deleteKeyFailureLatencyNs;
 
+  @Metric(about = "Latency for put metadata of an key in nanoseconds")
+  private MutableRate putKeyMetadataLatencyNs;
+
+  @Metric(about = "Latency for get metadata of an key in nanoseconds")
+  private MutableRate getKeyMetadataLatencyNs;
+
+  @Metric(about = "Latency for copy metadata of an key in nanoseconds")
+  private MutableRate copyKeyMetadataLatencyNs;
+
   /**
    * Private constructor.
    */
@@ -260,6 +278,9 @@ public final class S3GatewayMetrics implements MetricsSource {
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
+    ///Request Count
+    request.snapshot(recordBuilder, true);
+    requestReject.snapshot(recordBuilder, true);
 
     // BucketEndpoint
     getBucketSuccess.snapshot(recordBuilder, true);
@@ -336,6 +357,22 @@ public final class S3GatewayMetrics implements MetricsSource {
     deleteKeySuccessLatencyNs.snapshot(recordBuilder, true);
     deleteKeyFailure.snapshot(recordBuilder, true);
     deleteKeyFailureLatencyNs.snapshot(recordBuilder, true);
+    putKeyMetadataLatencyNs.snapshot(recordBuilder, true);
+    getKeyMetadataLatencyNs.snapshot(recordBuilder, true);
+    copyKeyMetadataLatencyNs.snapshot(recordBuilder, true);
+    copyObjectSuccessLength.snapshot(recordBuilder, true);
+    putKeySuccessLength.snapshot(recordBuilder, true);
+    getKeySuccessLength.snapshot(recordBuilder, true);
+    listKeyCount.snapshot(recordBuilder, true);
+  }
+
+  // S3 Gateway
+  public void incRequest() {
+    request.incr();
+  }
+
+  public void incRequestReject() {
+    requestReject.incr();
   }
 
   // INC and UPDATE
@@ -394,6 +431,10 @@ public final class S3GatewayMetrics implements MetricsSource {
   public void updatePutAclFailureStats(long startNanos) {
     putAclFailure.incr();
     putAclFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void incListKeyCount(int count) {
+    listKeyCount.incr(count);
   }
 
   public void updateListMultipartUploadsSuccessStats(long startNanos) {
@@ -528,6 +569,30 @@ public final class S3GatewayMetrics implements MetricsSource {
   public void updateDeleteKeyFailureStats(long startNanos) {
     deleteKeyFailure.incr();
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateGetKeyMetadataStats(long startNanos) {
+    getKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateCopyKeyMetadataStats(long startNanos) {
+    copyKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updatePutKeyMetadataStats(long startNanos) {
+    putKeyMetadataLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void incCopyObjectSuccessLength(long bytes) {
+    copyObjectSuccessLength.incr(bytes);
+  }
+
+  public void incPutKeySuccessLength(long bytes) {
+    putKeySuccessLength.incr(bytes);
+  }
+
+  public void incGetKeySuccessLength(long bytes) {
+    getKeySuccessLength.incr(bytes);
   }
 
   // GET

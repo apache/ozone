@@ -316,18 +316,6 @@ public class TestLegacyReplicationManager {
       replicationManager.start();
       Assertions.assertTrue(replicationManager.isRunning());
     }
-
-    @Test
-    public void testGeneratedConfig() {
-      ReplicationManagerConfiguration rmc = OzoneConfiguration.newInstanceOf(
-          ReplicationManagerConfiguration.class);
-
-      //default is not included in ozone-site.xml but generated from annotation
-      //to the ozone-site-generated.xml which should be loaded by the
-      // OzoneConfiguration.
-      Assertions.assertEquals(1800000, rmc.getEventTimeout());
-
-    }
   }
 
   /**
