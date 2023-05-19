@@ -1492,7 +1492,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // Get volume name and bucket name
           String[] keySplit = kv.getKey().split(OM_KEY_PREFIX);
           // Get the latest snapshot in snapshot path.
-          OmSnapshot latestSnapshot = getLatestSnapshot(keySplit[1],
+          OmSnapshot latestSnapshot = getLatestActiveSnapshot(keySplit[1],
               keySplit[2], omSnapshotManager);
           String bucketKey = getBucketKey(keySplit[1], keySplit[2]);
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
@@ -1592,8 +1592,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  public OmSnapshot getLatestSnapshot(String volumeName, String bucketName,
-                                      OmSnapshotManager snapshotManager)
+  public OmSnapshot getLatestActiveSnapshot(String volumeName,
+                                            String bucketName,
+                                            OmSnapshotManager snapshotManager)
       throws IOException {
 
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;

@@ -99,10 +99,10 @@ public final class SnapshotUtils {
   }
 
   public static void checkSnapshotActive(SnapshotInfo snapInfo,
-                                         boolean override)
+                                         boolean skipCheck)
       throws OMException {
 
-    if (!override &&
+    if (!skipCheck &&
         snapInfo.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + snapInfo.getTableKey() +

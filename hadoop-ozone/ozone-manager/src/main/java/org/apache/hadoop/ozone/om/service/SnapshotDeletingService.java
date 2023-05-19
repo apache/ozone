@@ -179,7 +179,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               .getBucketKey(Long.toString(volumeId),
                   Long.toString(bucketInfo.getObjectID())) + OM_KEY_PREFIX;
 
-          if (checkSnapshotReclaimable(snapshotDeletedTable,
+          if (isSnapshotReclaimable(snapshotDeletedTable,
               snapshotDeletedDirTable, snapshotBucketKey, dbBucketKeyForDir)) {
             purgeSnapshotKeys.add(snapInfo.getTableKey());
             continue;
@@ -301,7 +301,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private boolean checkSnapshotReclaimable(
+    private boolean isSnapshotReclaimable(
         Table<String, RepeatedOmKeyInfo> snapshotDeletedTable,
         Table<String, OmKeyInfo> snapshotDeletedDirTable,
         String snapshotBucketKey, String dbBucketKeyForDir) throws IOException {
@@ -357,7 +357,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           Table.KeyValue<String, OmKeyInfo> deletedDir =
               deletedDirIterator.next();
 
-          if (checkDirReclaimable(deletedDir, previousDirTable,
+          if (isDirReclaimable(deletedDir, previousDirTable,
               renamedTable, renamedList)) {
             // Reclaim here
             PurgePathRequest request = prepareDeleteDirRequest(
@@ -415,7 +415,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         Table<String, String> renamedTable,
         OmBucketInfo bucketInfo, long volumeId) throws IOException {
 
-      if (checkKeyReclaimable(previousKeyTable, renamedTable,
+      if (isKeyReclaimable(previousKeyTable, renamedTable,
           keyInfo, bucketInfo, volumeId, renamedKey)) {
         // Update in current db's deletedKeyTable
         toReclaim.addKeyInfos(keyInfo
@@ -453,7 +453,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       submitRequest(omRequest);
     }
 
-    private boolean checkDirReclaimable(
+    private boolean isDirReclaimable(
         Table.KeyValue<String, OmKeyInfo> deletedDir,
         Table<String, OmDirectoryInfo> previousDirTable,
         Table<String, String> renamedTable,
@@ -499,7 +499,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
     }
 
-    private boolean checkKeyReclaimable(
+    private boolean isKeyReclaimable(
         Table<String, OmKeyInfo> previousKeyTable,
         Table<String, String> renamedTable,
         OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,

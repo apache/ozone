@@ -198,9 +198,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      OmSnapshot latestSnapshot =
-          metadataManager.getLatestSnapshot(deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(), omSnapshotManager);
+      OmSnapshot latestSnapshot = metadataManager.getLatestActiveSnapshot(
+              deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName(),
+              omSnapshotManager);
 
       if (latestSnapshot != null) {
         String dbRenameKey = metadataManager

@@ -586,7 +586,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public IOmMetadataReader checkForSnapshot(String volumeName,
                                             String bucketName,
                                             String keyname,
-                                            boolean override)
+                                            boolean skipActiveCheck)
       throws IOException {
     if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
@@ -604,7 +604,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName, snapshotName);
 
       // Block FS API reads when snapshot is not active.
-      if (!override) {
+      if (!skipActiveCheck) {
         checkSnapshotActive(ozoneManager, snapshotTableKey);
       }
 
