@@ -635,7 +635,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
     metrics = OMMetrics.create();
-    perfMetrics = OMPerformanceMetrics.register();
     // Get admin list
     omStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     Collection<String> omAdminUsernames =
@@ -808,6 +807,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     prefixManager = new PrefixManagerImpl(metadataManager, isRatisEnabled);
+    perfMetrics = OMPerformanceMetrics.register();
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
