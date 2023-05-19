@@ -1130,7 +1130,7 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "30m",
+        defaultValue = "10m",
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
