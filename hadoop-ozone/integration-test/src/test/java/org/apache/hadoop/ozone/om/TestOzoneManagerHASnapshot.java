@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -79,6 +80,13 @@ public class TestOzoneManagerHASnapshot {
     ozoneBucket = TestDataUtil.createVolumeAndBucket(client);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
+  }
+
+  @AfterAll
+  public static void cleanUp() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   /**
