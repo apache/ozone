@@ -1034,8 +1034,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                           Table<String, T> table)
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, T>>
-             keyIter = table.iterator()) {
-      KeyValue<String, T> kv = keyIter.seek(keyPrefix);
+                 keyIter = table.iterator(keyPrefix)) {
+      KeyValue<String, T> kv = null;
+      if (keyIter.hasNext()) {
+        kv = keyIter.next();
+      }
 
       // Iterate through all the entries in the table which start with
       // the current bucket's prefix.

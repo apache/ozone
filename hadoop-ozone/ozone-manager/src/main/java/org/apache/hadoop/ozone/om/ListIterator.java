@@ -123,7 +123,6 @@ public class ListIterator {
                 String prefixKey, String startKey) throws IOException {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
-      this.tableIterator = table.iterator(prefixKey);
       this.currentKey = null;
 
       // only seek for the start key if the start key is lexicographically
@@ -136,7 +135,9 @@ public class ListIterator {
       // then seek for the start key
       if (!StringUtils.isBlank(startKey) &&
           startKey.compareTo(prefixKey) > 0) {
-        tableIterator.seek(startKey);
+        this.tableIterator = table.iterator(startKey);
+      } else {
+        this.tableIterator = table.iterator(prefixKey);
       }
     }
 

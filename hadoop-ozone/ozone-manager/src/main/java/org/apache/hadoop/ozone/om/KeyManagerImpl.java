@@ -1684,9 +1684,7 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
         cacheIter = keyTable.cacheIterator();
-    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+    String startCacheKey = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
 
     // First, find key in TableCache
     listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
@@ -1703,9 +1701,7 @@ public class KeyManagerImpl implements KeyManager {
       TableIterator<String,
           ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
       throws IOException {
-    // Then, find key in DB
-    String seekKeyInDb =
-        metadataManager.getOzoneKey(volumeName, bucketName, startKey);
+    String seekKeyInDb = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
     Table.KeyValue<String, OmKeyInfo> entry = iterator.seek(seekKeyInDb);
     int countEntries = 0;
     if (iterator.hasNext()) {
@@ -1999,9 +1995,9 @@ public class KeyManagerImpl implements KeyManager {
 
     Table fileTable = metadataManager.getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator()) {
+        iterator = fileTable.iterator(seekFileInDB)) {
 
-      iterator.seek(seekFileInDB);
+//      iterator.seek(seekFileInDB);
 
       while (iterator.hasNext() && numEntries - countEntries > 0) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
