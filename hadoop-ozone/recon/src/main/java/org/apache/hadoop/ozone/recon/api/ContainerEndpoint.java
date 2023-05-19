@@ -140,18 +140,13 @@ public class ContainerEndpoint {
       // Send back an empty response
       return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
-    if (prevKey > 0) {
-      // Increase the limit by 1 to fetch one additional container
-      // since we are excluding the container with the same ID as prevKey
-      limit = limit + 1;
-    }
 
     long containersCount;
     List<ContainerMetadata> containerMetaDataList =
-        containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
+        // Get the containers starting from the prevKey+1 which will skip the
+        // container having prevKey ID
+        containerManager.getContainers(ContainerID.valueOf(prevKey+1), limit)
             .stream()
-            // Exclude the container with the same ID as prevKey
-            .filter(container -> container.getContainerID() != prevKey)
             .map(container -> {
               ContainerMetadata containerMetadata =
                   new ContainerMetadata(container.getContainerID());
