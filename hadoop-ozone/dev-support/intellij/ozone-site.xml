@@ -16,6 +16,10 @@
 -->
 <configuration>
   <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>LEGACY</value>
+  </property>
+  <property>
     <name>hdds.profiler.endpoint.enabled</name>
     <value>true</value>
   </property>

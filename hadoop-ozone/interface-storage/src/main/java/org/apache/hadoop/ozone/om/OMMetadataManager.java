@@ -176,11 +176,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * this prefix will be included in the result.
    * @param maxNumOfBuckets the maximum number of buckets to return. It ensures
    * the size of the result will not exceed this limit.
+   * @param hasSnapshot set the flag to list buckets which have snapshot.
    * @return a list of buckets.
    * @throws IOException
    */
   List<OmBucketInfo> listBuckets(String volumeName, String startBucket,
-      String bucketPrefix, int maxNumOfBuckets)
+                                 String bucketPrefix, int maxNumOfBuckets,
+                                 boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -370,7 +372,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, SnapshotInfo> getSnapshotInfoTable();
 
-  Table<String, String> getSnapshotRenamedKeyTable();
+  Table<String, String> getSnapshotRenamedTable();
 
   /**
    * Gets the OM Meta table.
@@ -492,7 +494,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * Given a volume, bucket and a objectID, return the DB key name in
-   * snapshotRenamedKeyTable.
+   * snapshotRenamedTable.
    *
    * @param volume   - volume name
    * @param bucket   - bucket name

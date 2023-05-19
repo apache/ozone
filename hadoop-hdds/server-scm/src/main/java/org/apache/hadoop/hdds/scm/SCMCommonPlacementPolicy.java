@@ -79,6 +79,17 @@ public abstract class SCMCommonPlacementPolicy implements
       = new ContainerPlacementStatusDefault(0, 1, 1);
 
   /**
+   * This is an empty list which is passed to the placement policy when the
+   * old interface is called that does not pass usedNodes. The sub-classes
+   * can then call usedNodesPassed to determine if the usedNodes list was passed
+   * or intentionally set to an empty list. There is logic in at least the
+   * RackAwarePlacementPolicy that needs to know if the old or new interface is
+   * used to be able to use the node lists correctly.
+   */
+  private static final List<DatanodeDetails> UNSET_USED_NODES
+      = Collections.unmodifiableList(new ArrayList<>());
+
+  /**
    * Constructor.
    *
    * @param nodeManager NodeManager
@@ -124,23 +135,34 @@ public abstract class SCMCommonPlacementPolicy implements
           List<DatanodeDetails> favoredNodes, int nodesRequired,
           long metadataSizeRequired,
           long dataSizeRequired) throws SCMException {
-    return this.chooseDatanodes(Collections.emptyList(), excludedNodes,
-            favoredNodes, nodesRequired, metadataSizeRequired,
-            dataSizeRequired);
+    return this.chooseDatanodes(UNSET_USED_NODES, excludedNodes,
+          favoredNodes, nodesRequired, metadataSizeRequired,
+          dataSizeRequired);
   }
 
   /**
-   * Null Check for List and returns empty list.
+   * For each node in the list, lookup the in memory object in node manager and
+   * if it exists, swap the passed node with the in memory node. Then return
+   * the list.
+   * When the object of the Class DataNodeDetails is built from protobuf
+   * only UUID of the datanode is added which is used for the hashcode.
+   * Thus, not passing any information about the topology.
    * @param dns
    * @return Non null List
    */
   private List<DatanodeDetails> validateDatanodes(List<DatanodeDetails> dns) {
-    return Objects.isNull(dns) ? Collections.emptyList() :
-            dns.stream().map(node -> {
-              DatanodeDetails datanodeDetails =
-                      nodeManager.getNodeByUuid(node.getUuidString());
-              return datanodeDetails != null ? datanodeDetails : node;
-            }).collect(Collectors.toList());
+    if (Objects.isNull(dns)) {
+      return Collections.emptyList();
+    }
+    for (int i = 0; i < dns.size(); i++) {
+      DatanodeDetails node = dns.get(i);
+      DatanodeDetails datanodeDetails =
+          nodeManager.getNodeByUuid(node.getUuidString());
+      if (datanodeDetails != null) {
+        dns.set(i, datanodeDetails);
+      }
+    }
+    return dns;
   }
 
   /**
@@ -231,6 +253,20 @@ public abstract class SCMCommonPlacementPolicy implements
 
     return filterNodesWithSpace(healthyNodes, nodesRequired,
         metadataSizeRequired, dataSizeRequired);
+  }
+
+  /**
+   * Give a List of DatanodeDetails representing the usedNodes, check if the
+   * list matches the UNSET_USED_NODES list. If it does, then the usedNodes are
+   * not passed by the caller, otherwise they were passed.
+   * @param list List of datanodeDetails to check
+   * @return true if the passed list is not the UNSET_USED_NODES list
+   */
+  protected boolean usedNodesPassed(List<DatanodeDetails> list) {
+    if (list == null) {
+      return true;
+    }
+    return list != UNSET_USED_NODES;
   }
 
   public List<DatanodeDetails> filterNodesWithSpace(List<DatanodeDetails> nodes,

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -48,7 +49,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "deletedBlocks",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
@@ -97,7 +98,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
           new PipelineCodec());
 
@@ -106,7 +107,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           ContainerInfo.class,
           new ContainerInfoCodec());
 
@@ -123,7 +124,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "crls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
           new CRLInfoCodec());
 
@@ -134,7 +135,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
@@ -143,7 +144,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
       MoveDataNodePair>
@@ -151,7 +152,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "move",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           MoveDataNodePair.class,
           new MoveDataNodePairCodec());
 
@@ -174,7 +175,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           ByteString.class,
-          new ByteStringCodec());
+          ByteStringCodec.getInstance());
 
   @Override
   public String getName() {

@@ -72,6 +72,7 @@ import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.jooq.Configuration;
 import org.jooq.DAO;
 import org.slf4j.Logger;
@@ -140,7 +141,9 @@ public class ReconControllerModule extends AbstractModule {
             ReconTaskStatusDao.class,
             UnhealthyContainersDao.class,
             GlobalStatsDao.class,
-            ClusterGrowthDailyDao.class);
+            ClusterGrowthDailyDao.class,
+            ContainerCountBySizeDao.class
+        );
 
     @Override
     protected void configure() {

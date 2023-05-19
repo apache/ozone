@@ -33,16 +33,24 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RecoverLeaseRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.junit.Assert.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -63,6 +71,14 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRecoverHsyncFile() throws Exception {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    when(ozoneManager.getVolumeOwner(
+        anyString(),
+        any(IAccessAuthorizer.ACLType.class), any(
+        OzoneObj.ResourceType.class)))
+        .thenReturn("user");
+    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true);
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
@@ -138,7 +154,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
       String ozoneKey = addToFileTable(allocatedLocationList);
       omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .get(ozoneKey);
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     }
 
     if (addOpenKeyTable) {
@@ -146,7 +162,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
       omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(openKey);
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     }
   }
 
@@ -169,6 +185,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   private OMClientResponse validateAndUpdateCache() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRecoverLeaseRequest(
         volumeName, bucketName, keyName));
+    assertNotNull(modifiedOmRequest.getUserInfo());
 
     OMRecoverLeaseRequest omRecoverLeaseRequest = getOmRecoverLeaseRequest(
         modifiedOmRequest);
@@ -186,7 +203,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
         .get(ozoneKey);
     if (hasKey) {
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     } else {
       Assert.assertNull(omKeyInfo);
     }
@@ -195,7 +212,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(openKey);
     if (hasOpenKey) {
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     } else {
       Assert.assertNull(omKeyInfo);
     }

@@ -126,7 +126,7 @@ public class OMSetSecretRequest extends OMClientRequest {
               newS3SecretValue = new S3SecretValue(accessId, secretKey);
 
               s3SecretManager
-                  .updateCache(accessId, newS3SecretValue, transactionLogIndex);
+                  .updateCache(accessId, newS3SecretValue);
             } else {
               // If S3SecretTable is not updated,
               // throw ACCESS_ID_NOT_FOUND exception.

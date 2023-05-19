@@ -515,10 +515,10 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY should be 0 because it is counted as decommissioned
-    assertEquals(0, rcnt.getUnhealthyReplicaCount());
-    // 1 because the UNHEALTHY replica is on a decommissioned node
-    assertEquals(1, rcnt.getDecommissionCount());
+    // UNHEALTHY decommissioned is counted, too
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=false
+    assertEquals(0, rcnt.getDecommissionCount());
 
     // Now, test by considering UNHEALTHY replicas
     rcnt = new RatisContainerReplicaCount(container, replicas,
@@ -533,8 +533,9 @@ class TestRatisContainerReplicaCount {
     assertEquals(1, rcnt.getMisMatchedReplicaCount());
     // CLOSED + CLOSED = 2
     assertEquals(2, rcnt.getMatchingReplicaCount());
-    // UNHEALTHY should be 0 because it is counted as decommissioned
-    assertEquals(0, rcnt.getUnhealthyReplicaCount());
+    // UNHEALTHY decommissioned is counted as unhealthy
+    assertEquals(1, rcnt.getUnhealthyReplicaCount());
+    // due to considerUnhealthy=true
     assertEquals(1, rcnt.getDecommissionCount());
   }
 
@@ -570,6 +571,29 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, true);
     validate(withUnhealthy, true, 0, false);
+  }
+
+  /**
+   * Scenario: A CLOSED RATIS container with 2 CLOSED and 1 UNHEALTHY replicas.
+   * Expectation: If considerUnhealthy is false, this container is not
+   * sufficiently replicated and replicaDelta is 1.
+   */
+  @Test
+  public void testUnderReplicationBecauseOfUnhealthyReplica() {
+    ContainerInfo container =
+        createContainerInfo(RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE), 1L,
+            HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(), CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica = createContainerReplica(
+        ContainerID.valueOf(1L), 0, IN_SERVICE, UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    RatisContainerReplicaCount withoutUnhealthy =
+        new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2,
+            false);
+    validate(withoutUnhealthy, false, 1, false);
   }
 
   @Test

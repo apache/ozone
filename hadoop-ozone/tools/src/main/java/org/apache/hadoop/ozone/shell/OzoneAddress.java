@@ -146,7 +146,7 @@ public class OzoneAddress {
                   + ozoneURI.getHost() + "' is a logical (HA) OzoneManager "
                   + "and does not use port information.");
         }
-        client = createRpcClient(conf);
+        client = createRpcClientFromServiceId(ozoneURI.getHost(), conf);
       } else if (ozoneURI.getPort() == -1) {
         client = createRpcClientFromHostPort(ozoneURI.getHost(),
             OmUtils.getOmRpcPort(conf), conf);

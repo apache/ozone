@@ -85,7 +85,8 @@ public class TestPipelinePlacementFactory {
     conf = new OzoneConfiguration();
   }
 
-  private void setupRacks(int datanodeCount, int nodesPerRack)
+  private void setupRacks(int datanodeCount, int nodesPerRack,
+                          boolean firstRackLessNode)
       throws Exception {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
@@ -100,7 +101,8 @@ public class TestPipelinePlacementFactory {
     for (int i = 0; i < datanodeCount; i++) {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-              hostname + i, rack + (i / nodesPerRack));
+              hostname + i, firstRackLessNode ?
+                  rack + ((i + 1) / nodesPerRack) : rack + (i / nodesPerRack));
 
       datanodes.add(datanodeDetails);
       cluster.add(datanodeDetails);
@@ -159,7 +161,7 @@ public class TestPipelinePlacementFactory {
         SCMContainerPlacementRackScatter.class.getCanonicalName());
     // for this test, rack setup does not matter, just
     // need a non-null NetworkTopologyMap within the nodeManager
-    setupRacks(6, 3);
+    setupRacks(6, 3, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
     Assertions.assertSame(SCMContainerPlacementRackScatter.class,
@@ -171,7 +173,7 @@ public class TestPipelinePlacementFactory {
   // on separate rack
   @Test
   public void testDefaultPipelineProviderRackPlacement() throws Exception {
-    setupRacks(6, 2);
+    setupRacks(6, 2, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
 
@@ -194,7 +196,7 @@ public class TestPipelinePlacementFactory {
     conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackScatter.class.getCanonicalName());
 
-    setupRacks(6, 2);
+    setupRacks(6, 2, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
 
@@ -212,4 +214,33 @@ public class TestPipelinePlacementFactory {
     Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
   }
+
+  @Test
+  public void testPipelineProviderRackPlacementAnchorChange()
+      throws Exception {
+    // rack0: Node0
+    // rack1: Node1, Node2
+    // rack2: Node3, Node4
+    // rack3: Node5
+    setupRacks(6, 2, true);
+
+    PlacementPolicy policy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
+
+    int nodeNum = 3;
+    List<DatanodeDetails> datanodeDetails =
+        policy.chooseDatanodes(null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // First anchor will be Node0, Since there is no more node available
+    // on rack0, Anchor will change to Node1 and then Node2 will be selected
+    // which is same rack as Node1.
+    Assertions.assertTrue(cluster.isSameParent(datanodeDetails.get(1),
+        datanodeDetails.get(2)));
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+        datanodeDetails.get(1)));
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+        datanodeDetails.get(2)));
+  }
+
 }

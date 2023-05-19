@@ -30,8 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import java.util.concurrent.TimeUnit;
-
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
@@ -44,6 +43,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -78,26 +78,16 @@ public class RDBStore implements DBStore {
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
-
-  @VisibleForTesting
-  public RDBStore(File dbFile, ManagedDBOptions options,
-                  Set<TableConfig> families, long maxDbUpdatesSizeThreshold)
-      throws IOException {
-    this(dbFile, options, new ManagedWriteOptions(), families,
-        new CodecRegistry(), false, 1000, null, false,
-        TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1),
-        maxDbUpdatesSizeThreshold, true);
-  }
+  private final ManagedDBOptions dbOptions;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName, boolean enableCompactionLog,
-                  long maxTimeAllowedForSnapshotInDag,
-                  long compactionDagDaemonInterval,
+                  String dbJmxBeanNameName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
-                  boolean createCheckpointDirs)
+                  boolean createCheckpointDirs,
+                  ConfigurationSource configuration)
 
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
@@ -108,14 +98,14 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
         dbJmxBeanNameName;
+    this.dbOptions = dbOptions;
 
     try {
-      if (enableCompactionLog) {
-        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
-            dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
+      if (enableCompactionDag) {
+        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
+            getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(),
-            maxTimeAllowedForSnapshotInDag, compactionDagDaemonInterval);
+            dbLocation.toString(), configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -136,26 +126,23 @@ public class RDBStore implements DBStore {
             "db path :{}", dbJmxBeanName);
       }
 
-      //create checkpoints directory if not exists.
+      // Create checkpoints and snapshot directories if not exists.
       if (!createCheckpointDirs) {
         checkpointsParentDir = null;
+        snapshotsParentDir = null;
       } else {
         Path checkpointsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_CHECKPOINT_DIR);
         checkpointsParentDir = checkpointsParentDirPath.toString();
         Files.createDirectories(checkpointsParentDirPath);
-      }
-      //create snapshot checkpoint directory if does not exist.
-      if (!createCheckpointDirs) {
-        snapshotsParentDir = null;
-      } else {
+
         Path snapshotsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
         Files.createDirectories(snapshotsParentDirPath);
       }
 
-      if (enableCompactionLog) {
+      if (enableCompactionDag) {
         ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
         Preconditions.checkNotNull(ssInfoTableCF,
             "SnapshotInfoTable column family handle should not be null");
@@ -174,7 +161,9 @@ public class RDBStore implements DBStore {
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
-    } catch (IOException | RocksDBException e) {
+    } catch (Exception e) {
+      // Close DB and other things if got initialized.
+      close();
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
           + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
@@ -192,12 +181,24 @@ public class RDBStore implements DBStore {
     }
   }
 
+  public String getSnapshotMetadataDir() {
+    return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
+  }
+
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
 
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
+  }
+
+
+  /**
+   * Returns the RocksDB's DBOptions.
+   */
+  public ManagedDBOptions getDbOptions() {
+    return dbOptions;
   }
 
   @Override
@@ -216,9 +217,9 @@ public class RDBStore implements DBStore {
     }
 
     RDBMetrics.unRegister();
-    checkPointManager.close();
+    IOUtils.closeQuietly(checkPointManager);
     IOUtils.closeQuietly(rocksDBCheckpointDiffer);
-    db.close();
+    IOUtils.closeQuietly(db);
   }
 
   @Override
@@ -267,7 +268,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public Table<byte[], byte[]> getTable(String name) throws IOException {
+  public RDBTable getTable(String name) throws IOException {
     final ColumnFamily handle = db.getColumnFamily(name);
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);

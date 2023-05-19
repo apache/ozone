@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -54,6 +55,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
@@ -157,6 +159,11 @@ public class TestKeyValueContainer {
         datanodeId.toString());
 
     keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+  }
+
+  @After
+  public void after() {
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test

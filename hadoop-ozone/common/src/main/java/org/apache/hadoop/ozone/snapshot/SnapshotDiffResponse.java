@@ -43,11 +43,11 @@ public class SnapshotDiffResponse {
     }
   }
 
-  private final SnapshotDiffReport snapshotDiffReport;
+  private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
 
-  public SnapshotDiffResponse(final SnapshotDiffReport snapshotDiffReport,
+  public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
                               final long waitTimeInMs) {
     this.snapshotDiffReport = snapshotDiffReport;
@@ -55,7 +55,7 @@ public class SnapshotDiffResponse {
     this.waitTimeInMs = waitTimeInMs;
   }
 
-  public SnapshotDiffReport getSnapshotDiffReport() {
+  public SnapshotDiffReportOzone getSnapshotDiffReport() {
     return snapshotDiffReport;
   }
 

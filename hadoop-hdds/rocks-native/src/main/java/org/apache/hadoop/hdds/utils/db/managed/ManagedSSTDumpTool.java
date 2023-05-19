@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
+import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -35,35 +36,36 @@ public class ManagedSSTDumpTool {
 
   static {
     NativeLibraryLoader.getInstance()
-            .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
   }
+
   private int bufferCapacity;
   private ExecutorService executorService;
 
   public ManagedSSTDumpTool(ExecutorService executorService,
                             int bufferCapacity)
-          throws NativeLibraryNotLoadedException {
+      throws NativeLibraryNotLoadedException {
     if (!NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
       throw new NativeLibraryNotLoadedException(
-              ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+          ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     }
     this.bufferCapacity = bufferCapacity;
     this.executorService = executorService;
   }
 
   public SSTDumpToolTask run(String[] args, ManagedOptions options)
-          throws NativeLibraryNotLoadedException {
+      throws NativeLibraryNotLoadedException {
     PipeInputStream pipeInputStream = new PipeInputStream(bufferCapacity);
     return new SSTDumpToolTask(this.executorService.submit(() ->
-            this.runInternal(args, options.getNativeHandle(),
+        this.runInternal(args, options.getNativeHandle(),
             pipeInputStream.getNativeHandle())), pipeInputStream);
   }
 
   public SSTDumpToolTask run(Map<String, String> args, ManagedOptions options)
-          throws NativeLibraryNotLoadedException {
+      throws NativeLibraryNotLoadedException {
     return this.run(args.entrySet().stream().map(e -> "--"
-            + (e.getValue() == null || e.getValue().isEmpty() ? e.getKey() :
-            e.getKey() + "=" + e.getValue())).toArray(String[]::new), options);
+        + (e.getValue() == null || e.getValue().isEmpty() ? e.getKey() :
+        e.getKey() + "=" + e.getValue())).toArray(String[]::new), options);
   }
 
   private native int runInternal(String[] args, long optionsHandle,
@@ -74,9 +76,9 @@ public class ManagedSSTDumpTool {
    */
   static class SSTDumpToolTask {
     private Future<Integer> future;
-    private PipeInputStream pipedOutput;
+    private InputStream pipedOutput;
 
-    SSTDumpToolTask(Future<Integer> future, PipeInputStream pipedOutput) {
+    SSTDumpToolTask(Future<Integer> future, InputStream pipedOutput) {
       this.future = future;
       this.pipedOutput = pipedOutput;
     }
@@ -85,7 +87,7 @@ public class ManagedSSTDumpTool {
       return future;
     }
 
-    public PipeInputStream getPipedOutput() {
+    public InputStream getPipedOutput() {
       return pipedOutput;
     }
 

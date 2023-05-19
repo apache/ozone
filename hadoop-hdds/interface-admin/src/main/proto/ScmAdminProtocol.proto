@@ -80,6 +80,7 @@ message ScmContainerLocationRequest {
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
   optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
+  optional DecommissionScmRequestProto decommissionScmRequest = 44;
 }
 
 message ScmContainerLocationResponse {
@@ -131,6 +132,7 @@ message ScmContainerLocationResponse {
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
   optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
+  optional DecommissionScmResponseProto decommissionScmResponse = 44;
 
   enum Status {
     OK = 1;
@@ -181,6 +183,7 @@ enum Type {
   GetClosedContainerCount = 37;
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
+  DecommissionScm = 40;
 }
 
 /**
@@ -571,6 +574,15 @@ message ContainerBalancerStatusRequestProto {
 
 message ContainerBalancerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message DecommissionScmRequestProto {
+  required string scmId = 1;
+}
+
+message DecommissionScmResponseProto {
+  required bool success = 1;
+  optional string errorMsg = 2;
 }
 
 /**
