@@ -116,7 +116,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
         authorizer.setOzoneAdmins(ozoneManager.getOmAdmins());
-        authorizer.setOzoneReadOnlyAdmins(getOmReadOnlyAdmins(configuration));
+        authorizer.setOzoneReadOnlyAdmins(ozoneManager.getReadOnlyAdmins());
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;
@@ -581,15 +581,4 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ResourceType.KEY;
   }
 
-  private OzoneAdmins getOmReadOnlyAdmins(OzoneConfiguration configuration) {
-    // Get read only admin list
-    Collection<String> omReadOnlyAdmins =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(
-            configuration);
-    Collection<String> omReadOnlyAdminsGroups =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(
-            configuration);
-    return new OzoneAdmins(omReadOnlyAdmins,
-        omReadOnlyAdminsGroups);
-  }
 }

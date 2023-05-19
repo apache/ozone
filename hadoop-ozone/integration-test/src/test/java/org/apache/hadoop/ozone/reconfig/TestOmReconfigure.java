@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.reconfig;
  */
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import java.util.UUID;
@@ -97,4 +98,23 @@ public class TestOmReconfigure {
         ozoneManager.getOmAdminUsernames().contains(userB));
   }
 
+  /**
+   * Test reconfigure om "ozone.readonly.administrators"
+   */
+  @Test
+  public void testOmReadOnlyUSersReconfigure() throws Exception {
+    String userA = "mockUserA";
+    String userB = "mockUserB";
+    conf.set(OZONE_READONLY_ADMINISTRATORS, userA);
+    ozoneManager.reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS, userA);
+    assertTrue(userA + " should be an readOnly admin user",
+        ozoneManager.getOmReadOnlyUsernames().contains(userA));
+
+    conf.set(OZONE_READONLY_ADMINISTRATORS, userB);
+    ozoneManager.reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS, userB);
+    assertFalse(userA + " should NOT be an admin user",
+        ozoneManager.getOmReadOnlyUsernames().contains(userA));
+    assertTrue(userB + " should be an admin user",
+        ozoneManager.getOmReadOnlyUsernames().contains(userB));
+  }
 }
