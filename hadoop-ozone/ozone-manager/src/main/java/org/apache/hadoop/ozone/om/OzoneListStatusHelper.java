@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -32,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ICopyObjectInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeMap;
@@ -442,10 +443,19 @@ public class OzoneListStatusHelper {
         }
 
         // Copy cache value to local copy and work on it
-        Value copyOmInfo = ObjectUtils.clone(cacheOmInfo);
+        Value copyOmInfo = null;
+        try {
+          if (cacheOmInfo instanceof ICopyObjectInfo) {
+            Method m = cacheOmInfo.getClass().getMethod("copyObject");
+            copyOmInfo = (Value) m.invoke(cacheOmInfo);
+          }
+        } catch (Exception e) {
+          LOG.debug("No such method, use same cache copy");
+        }
         if (copyOmInfo != null) {
           cacheOmInfo = copyOmInfo;
         }
+
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"
           if (cacheKey.startsWith(prefixKey)) {
