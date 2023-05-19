@@ -119,7 +119,7 @@ public class TestBucketManagerImpl {
   }
 
   @Test
-  public void testCreateBucket() throws Exception {
+  public void testCreateEncryptedBucket() throws Exception {
     createSampleVol();
     KeyProviderCryptoExtension kmsProvider = omTestManagers.kmsProviderInit();
 
@@ -152,7 +152,7 @@ public class TestBucketManagerImpl {
 
 
   @Test
-  public void testCreateEncryptedBucket() throws Exception {
+  public void testCreateBucket() throws Exception {
     createSampleVol();
 
     BucketManager bucketManager = omTestManagers.getBucketManager();
