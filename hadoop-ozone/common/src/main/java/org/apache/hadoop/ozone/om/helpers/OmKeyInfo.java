@@ -59,9 +59,16 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
 
   private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
-    return new DelegatedCodec<>(Proto2Codec.get(KeyInfo.class),
+    return new DelegatedCodec<OmKeyInfo, KeyInfo>(
+        Proto2Codec.get(KeyInfo.class),
         OmKeyInfo::getFromProtobuf,
-        key -> key.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION)) {
+      @Override
+      public OmKeyInfo copyObject(OmKeyInfo message) {
+        return message.copyObject();
+      }
+    };
+
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {

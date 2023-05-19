@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
@@ -77,7 +76,7 @@ public final class Proto2Codec<M extends MessageLite>
   private CheckedFunction<OutputStream, Integer, IOException> writeTo(
       M message, int size) {
     return out -> {
-      message.writeTo(CodedOutputStream.newInstance(out));
+      message.writeTo(out);
       return size;
     };
   }
