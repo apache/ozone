@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -44,7 +43,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
