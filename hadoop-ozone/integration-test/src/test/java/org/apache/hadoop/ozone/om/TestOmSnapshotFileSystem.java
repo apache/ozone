@@ -46,14 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,15 +57,14 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -82,14 +73,23 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
 
 /**
  * OmSnapshot file system tests.
  */
-@RunWith(Parameterized.class)
+@Timeout(120)
 public class TestOmSnapshotFileSystem {
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
@@ -108,27 +108,19 @@ public class TestOmSnapshotFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
-  @Rule
-  public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{BucketLayout.FILE_SYSTEM_OPTIMIZED, false},
-        new Object[]{BucketLayout.LEGACY, true});
+  public static Stream<Arguments> bucketLayoutType() {
+    return Stream.of(
+        Arguments.of(BucketLayout.FILE_SYSTEM_OPTIMIZED, false),
+        Arguments.of(BucketLayout.LEGACY, true)
+    );
   }
 
-  public TestOmSnapshotFileSystem(BucketLayout newBucketLayout,
+  private void setup(BucketLayout layoutType,
       boolean newEnableFileSystemPaths) throws Exception {
-    // Checking whether 'newBucketLayout' and
-    // 'newEnableFileSystemPaths' flags represents next parameter
-    // index values. This is to ensure that initialize init() function
-    // will be invoked only at the beginning of every new set of
-    // Parameterized.Parameters.
     if (TestOmSnapshotFileSystem.enabledFileSystemPaths !=
         newEnableFileSystemPaths ||
-        TestOmSnapshotFileSystem.bucketLayout != newBucketLayout) {
-      setConfig(newBucketLayout, newEnableFileSystemPaths);
+        TestOmSnapshotFileSystem.bucketLayout != layoutType) {
+      setConfig(layoutType, newEnableFileSystemPaths);
       tearDown();
       init();
     }
@@ -189,13 +181,16 @@ public class TestOmSnapshotFileSystem {
     IOUtils.closeQuietly(fs);
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
   // based on TestObjectStoreWithFSO:testListKeysAtDifferentLevels
-  public void testListKeysAtDifferentLevels() throws Exception {
+  public void testListKeysAtDifferentLevels(BucketLayout layoutType,
+      boolean newEnableFileSystemPaths) throws Exception {
+    setup(layoutType, newEnableFileSystemPaths);
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(ozoneVolume.getName(), volumeName);
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(ozoneBucket.getName(), bucketName);
 
     String keyc1 = "/a/b1/c1/c1.tx";
     String keyc2 = "/a/b1/c2/c2.tx";
@@ -318,7 +313,7 @@ public class TestOmSnapshotFileSystem {
       }
       outputKeys.add(keyName);
     }
-    Assert.assertEquals(keys, outputKeys);
+    assertEquals(keys, outputKeys);
   }
 
   private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
@@ -348,7 +343,7 @@ public class TestOmSnapshotFileSystem {
     ozoneInputStream.close();
 
     String inputString = new String(input, StandardCharsets.UTF_8);
-    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
@@ -360,15 +355,18 @@ public class TestOmSnapshotFileSystem {
     fsDataInputStream.read(read, 0, length);
     fsDataInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
+    assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
 
   private static void setKeyPrefix(String s) {
     keyPrefix = s;
   }
 
-  @Test
-  public void testBlockSnapshotFSAccessAfterDeletion() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
+  public void testBlockSnapshotFSAccessAfterDeletion(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     Path root = new Path("/");
     Path dir = new Path(root, "/testListKeysBeforeAfterSnapshotDeletion");
     Path key1 = new Path(dir, "key1");
@@ -387,22 +385,22 @@ public class TestOmSnapshotFileSystem {
     Path snapshotParent = new Path(snapshotKeyPrefix + dir);
     // Check dir in snapshot
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
-    Assertions.assertEquals(1, fileStatuses.length);
+    assertEquals(1, fileStatuses.length);
     // List keys in dir in snapshot
     fileStatuses = o3fs.listStatus(snapshotParent);
-    Assertions.assertEquals(2, fileStatuses.length);
+    assertEquals(2, fileStatuses.length);
 
     // Check key metadata
     Path snapshotKey1 = new Path(snapshotKeyPrefix + key1);
     FileStatus fsActiveKey = o3fs.getFileStatus(key1);
     FileStatus fsSnapshotKey = o3fs.getFileStatus(snapshotKey1);
-    Assert.assertEquals(fsActiveKey.getModificationTime(),
+    assertEquals(fsActiveKey.getModificationTime(),
         fsSnapshotKey.getModificationTime());
 
     Path snapshotKey2 = new Path(snapshotKeyPrefix + key2);
     fsActiveKey = o3fs.getFileStatus(key2);
     fsSnapshotKey = o3fs.getFileStatus(snapshotKey2);
-    Assert.assertEquals(fsActiveKey.getModificationTime(),
+    assertEquals(fsActiveKey.getModificationTime(),
         fsSnapshotKey.getModificationTime());
 
     // Delete the snapshot
@@ -425,9 +423,14 @@ public class TestOmSnapshotFileSystem {
         () -> o3fs.getFileStatus(snapshotKey2));
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
+
   // based on TestOzoneFileSystem:testListStatus
-  public void testListStatus() throws Exception {
+  public void testListStatus(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
+
     Path root = new Path("/");
     Path parent = new Path(root, "/testListStatus");
     Path file1 = new Path(parent, "key1");
@@ -436,7 +439,7 @@ public class TestOmSnapshotFileSystem {
     String snapshotKeyPrefix = createSnapshot();
     Path snapshotRoot = new Path(snapshotKeyPrefix + root);
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
-    Assert.assertEquals("Should be empty", 0, fileStatuses.length);
+    assertEquals(0, fileStatuses.length, "Should be empty");
 
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
@@ -445,17 +448,16 @@ public class TestOmSnapshotFileSystem {
     snapshotRoot = new Path(snapshotKeyPrefix + root);
     Path snapshotParent = new Path(snapshotKeyPrefix + parent);
     fileStatuses = o3fs.listStatus(snapshotRoot);
-    Assert.assertEquals("Should have created parent",
-            1, fileStatuses.length);
-    Assert.assertEquals("Parent path doesn't match",
-            fileStatuses[0].getPath().toUri().getPath(),
-            snapshotParent.toString());
+    assertEquals(1, fileStatuses.length,
+        "Should have created parent");
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), snapshotParent.toString(),
+        "Parent path doesn't match");
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
     fileStatuses = o3fs.listStatus(snapshotParent);
-    assertEquals("FileStatus did not return all children of the directory",
-        2, fileStatuses.length);
+    assertEquals(2, fileStatuses.length,
+        "FileStatus did not return all children of the directory");
 
     // ListStatus should return only the immediate children of a directory.
     Path file3 = new Path(parent, "dir1/key3");
@@ -466,13 +468,17 @@ public class TestOmSnapshotFileSystem {
     snapshotParent = new Path(snapshotKeyPrefix + parent);
     deleteRootDir();
     fileStatuses = o3fs.listStatus(snapshotParent);
-    assertEquals("FileStatus did not return all children of the directory",
-        3, fileStatuses.length);
+    assertEquals(3, fileStatuses.length,
+        "FileStatus did not return all children of the directory");
   }
 
-  @Test
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
+
   // based on TestOzoneFileSystem:testListStatusWithIntermediateDir
-  public void testListStatusWithIntermediateDir() throws Exception {
+  public void testListStatusWithIntermediateDir(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     String keyName = "object-dir/object-name";
     createAndCommitKey(keyName);
 
@@ -485,7 +491,7 @@ public class TestOmSnapshotFileSystem {
           return fs.listStatus(parent).length != 0;
         } catch (IOException e) {
           LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
+          fail("listStatus() Failed");
           return false;
         }
       }, 1000, 120000);
@@ -497,11 +503,14 @@ public class TestOmSnapshotFileSystem {
     FileStatus[] fileStatuses = fs.listStatus(snapshotParent);
 
     // the number of immediate children of root is 1
-    Assert.assertEquals(1, fileStatuses.length);
+    assertEquals(1, fileStatuses.length);
   }
 
-  @Test
-  public void testGetFileStatus() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
+  public void testGetFileStatus(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     String dir = "dir";
     String keyName = dir + "/" + "key";
     createAndCommitKey(keyName);
@@ -515,7 +524,7 @@ public class TestOmSnapshotFileSystem {
           return fs.listStatus(parent).length != 0;
         } catch (IOException e) {
           LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
+          fail("listStatus() Failed");
           return false;
         }
       }, 1000, 120000);
@@ -526,14 +535,17 @@ public class TestOmSnapshotFileSystem {
     Path dirInSnapshot = new Path(snapshotKeyPrefix + parent + dir);
     Path keyInSnapshot = new Path(snapshotKeyPrefix + parent + keyName);
 
-    Assert.assertEquals(1, fs.listStatus(snapshotParent).length);
-    Assert.assertFalse(fs.getFileStatus(dirInSnapshot).isFile());
-    Assert.assertTrue(fs.getFileStatus(keyInSnapshot).isFile());
+    assertEquals(1, fs.listStatus(snapshotParent).length);
+    assertFalse(fs.getFileStatus(dirInSnapshot).isFile());
+    assertTrue(fs.getFileStatus(keyInSnapshot).isFile());
     deleteRootDir();
   }
 
-  @Test
-  public void testReadFileFromSnapshot() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
+  public void testReadFileFromSnapshot(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     String keyName = "dir/file";
     byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
     Path parent = new Path("/");
@@ -550,7 +562,7 @@ public class TestOmSnapshotFileSystem {
           return fs.listStatus(parent).length != 0;
         } catch (IOException e) {
           LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
+          fail("listStatus() Failed");
           return false;
         }
       }, 1000, 120000);
@@ -564,9 +576,9 @@ public class TestOmSnapshotFileSystem {
       inputStream.read(buffer);
       byte[] readBytes = new byte[strBytes.length];
       System.arraycopy(buffer.array(), 0, readBytes, 0, strBytes.length);
-      Assert.assertArrayEquals(strBytes, readBytes);
+      assertArrayEquals(strBytes, readBytes);
     } catch (Exception e) {
-      Assert.fail("Failed to read file , Exception : " + e.toString());
+      fail("Failed to read file, Exception : " + e.toString());
     }
     deleteRootDir();
   }
@@ -585,9 +597,12 @@ public class TestOmSnapshotFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  @Test
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
   // based on TestOzoneFileSystem:testListStatusOnRoot
-  public void testListStatusOnRoot() throws Exception {
+  public void testListStatusOnRoot(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     Path root = new Path("/");
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -602,8 +617,8 @@ public class TestOmSnapshotFileSystem {
     deleteRootDir();
     Path snapshotRoot = new Path(snapshotKeyPrefix + root);
     FileStatus[] fileStatuses = o3fs.listStatus(snapshotRoot);
-    assertEquals("FileStatus should return only the immediate children",
-        2, fileStatuses.length);
+    assertEquals(2, fileStatuses.length,
+        "FileStatus should return only the immediate children");
 
     // Verify that dir12 is not included in the result of the listStatus on root
     String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
@@ -615,9 +630,12 @@ public class TestOmSnapshotFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  @Test
+  @ParameterizedTest
+  @MethodSource("bucketLayoutType")
   // based on TestOzoneFileSystem:testListStatusOnLargeDirectory
-  public void testListStatusOnLargeDirectory() throws Exception {
+  public void testListStatusOnLargeDirectory(BucketLayout layoutType,
+      boolean enableFileSystemPaths) throws Exception {
+    setup(layoutType, enableFileSystemPaths);
     Path root = new Path("/");
     deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
@@ -655,8 +673,8 @@ public class TestOmSnapshotFileSystem {
       }
     }
     assertEquals(
-        "Total directories listed do not match the existing directories",
-        numDirs, fileStatuses.length);
+        numDirs, fileStatuses.length,
+        "Total directories listed do not match the existing directories");
 
     for (int i = 0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
@@ -668,7 +686,7 @@ public class TestOmSnapshotFileSystem {
    *
    * @throws IOException DB failure
    */
-  @After
+  @AfterEach
   public void deleteRootDir()
       throws IOException, InterruptedException, TimeoutException {
     Path root = new Path("/");
