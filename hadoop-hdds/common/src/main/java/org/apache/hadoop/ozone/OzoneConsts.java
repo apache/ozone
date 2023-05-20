@@ -292,7 +292,7 @@ public final class OzoneConsts {
   public static final String SCHEMA_V3 = "3";
 
   public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
+      new String[] {null, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
 
   // Supported store types.
   public static final String OZONE = "ozone";
