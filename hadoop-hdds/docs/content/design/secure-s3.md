@@ -27,7 +27,7 @@ There are problems related to the current S3 keys management:
 
 We intend to extend Ozone S3 secret key management:
 * Support centralized remote S3 secret storage.
-* Implement S3 gateway endpoint to provide get s3 secret and secret renewal.
+* Implement S3 gateway endpoint for getting, renewing and revoking secrets.
 * Add TTL to secrets.
 
 This document proposes solutions to the above issues.
