@@ -23,10 +23,15 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
 
+# This is for testing operations on LEGACY buckets that need
+# `ozone.om.enable.filesystem.paths` flag enabled.
+
+export COMPOSE_FILE=docker-compose.yaml:legacy-bucket.yaml
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env 5
+start_docker_env 3
 
 execute_robot_test scm -v BUCKET_LAYOUT:LEGACY recon/recon-nssummary.robot
 
