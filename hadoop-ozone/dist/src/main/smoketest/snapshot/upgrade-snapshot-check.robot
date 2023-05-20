@@ -42,8 +42,8 @@ Attempt to create snapshot when snapshot feature is disabled
                         Should not contain     ${output}       Failed
     ${output} =         Execute And Ignore Error    ozone sh bucket create /snapvolume-2/snapbucket-1     
                         Should not contain     ${output}       Failed
-                        Execute and checkrc         ozone sh snapshot create /snapvolume-2/snapbucket-1 snapshot1    255
-
+    ${output} =         Execute and checkrc         ozone sh snapshot create /snapvolume-2/snapbucket-1 snapshot1    255
+                        Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
 List snapshot
     [Tags]     post-finalized-snapshot-tests
@@ -54,8 +54,8 @@ List snapshot
 
 Attempt to list snapshot when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests
-                        Execute and checkrc         ozone sh snapshot ls /snapvolume-2/snapbucket-1    255
-
+    ${output} =         Execute and checkrc         ozone sh snapshot ls /snapvolume-2/snapbucket-1    255
+                        Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
 Snapshot Diff
     [Tags]     post-finalized-snapshot-tests
@@ -66,8 +66,8 @@ Snapshot Diff
 
 Attempt to snapshotDiff when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests
-                        Execute and checkrc         ozone sh snapshot snapshotDiff /snapvolume-2/snapbucket-1 snapshot1 snapshot2    255
-
+    ${output} =         Execute and checkrc         ozone sh snapshot snapshotDiff /snapvolume-2/snapbucket-1 snapshot1 snapshot2    255
+                        Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
 Delete snapshot
     [Tags]     post-finalized-snapshot-tests
@@ -78,5 +78,5 @@ Delete snapshot
 
 Attempt to delete when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests
-                        Execute and checkrc         ozone sh snapshot delete /snapvolume-2/snapbucket-1 snapshot1    255
-
+    ${output} =         Execute and checkrc         ozone sh snapshot delete /snapvolume-2/snapbucket-1 snapshot1    255
+                        Should contain    ${output}   NOT_SUPPORTED_OPERATION
