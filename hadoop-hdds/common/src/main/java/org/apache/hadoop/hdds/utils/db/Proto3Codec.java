@@ -47,10 +47,10 @@ public final class Proto3Codec<M extends MessageLite>
     return (Codec<T>) codec;
   }
 
-  private static <M extends MessageLite> Parser<M> getParser(Class<M> clazz) {
+  private static <T extends MessageLite> Parser<T> getParser(Class<T> clazz) {
     final String name = "PARSER";
     try {
-      return (Parser<M>) clazz.getField(name).get(null);
+      return (Parser<T>) clazz.getField(name).get(null);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Failed to get " + name + " field from " + clazz, e);

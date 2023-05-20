@@ -215,5 +215,4 @@ public final class CodecBuffer implements AutoCloseable {
     buf.setIndex(buf.readerIndex(), w + size);
     return this;
   }
-
 }

@@ -35,23 +35,25 @@ import java.util.function.IntFunction;
  */
 public final class Proto2Codec<M extends MessageLite>
     implements Codec<M> {
-  private static final ConcurrentMap<Class<?>, Codec<?>> CACHE
+  private static final ConcurrentMap<Class<? extends MessageLite>,
+                                     Codec<? extends MessageLite>> CODECS
       = new ConcurrentHashMap<>();
 
-  /** @return the {@link Codec} for the given class. */
+  /**
+   * @return the {@link Codec} for the given class.
+   */
   public static <T extends MessageLite> Codec<T> get(Class<T> clazz) {
-    final Codec<?> codec = CACHE.computeIfAbsent(
-        clazz, c -> new Proto2Codec<>(clazz));
+    final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto2Codec::new);
     return (Codec<T>) codec;
   }
 
-  private static <M extends MessageLite> Parser<M> getParser(Class<M> clazz) {
+  private static <T extends MessageLite> Parser<T> getParser(Class<T> clazz) {
     final String name = "PARSER";
     try {
-      return (Parser<M>) clazz.getField(name).get(null);
+      return (Parser<T>) clazz.getField(name).get(null);
     } catch (Exception e) {
       throw new IllegalStateException(
-          "Failed to get " + name + " from " + clazz, e);
+          "Failed to get " + name + " field from " + clazz, e);
     }
   }
 

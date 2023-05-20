@@ -68,7 +68,6 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
         return message.copyObject();
       }
     };
-
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
