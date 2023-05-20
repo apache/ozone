@@ -43,12 +43,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +113,10 @@ public class BasicOzoneFileSystem extends FileSystem {
       OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 
   private boolean hsyncEnabled = OZONE_FS_HSYNC_ENABLED_DEFAULT;
+  private boolean streamingEnabled
+      = OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT;
+  private int streamingAutoThreshold
+      = OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
 
   private static final Pattern URL_SCHEMA_PATTERN =
       Pattern.compile("([^\\.]+)\\.([^\\.]+)\\.{0,1}(.*)");
@@ -131,6 +137,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     listingPageSize = OzoneClientUtils.limitValue(listingPageSize,
         OZONE_FS_LISTING_PAGE_SIZE,
         OZONE_FS_MAX_LISTING_PAGE_SIZE);
+    streamingEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
+    streamingAutoThreshold = conf.getInt(
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT);
     hsyncEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
         OZONE_FS_HSYNC_ENABLED_DEFAULT);
@@ -281,21 +293,32 @@ public class BasicOzoneFileSystem extends FileSystem {
         replication, flags.contains(CreateFlag.OVERWRITE), false);
   }
 
-  private FSDataOutputStream createOutputStream(String key, short replication,
-      boolean overwrite, boolean recursive) throws IOException {
-    boolean isRatisStreamingEnabled = getConf().getBoolean(
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
-    if (isRatisStreamingEnabled) {
-      return new FSDataOutputStream(adapter.createStreamFile(key,
-          replication, overwrite, recursive), statistics);
+  private FSDataOutputStream createOutputStream(
+      String key, short replication, boolean overwrite, boolean recursive)
+      throws IOException {
+    if (!streamingEnabled) {
+      return new FSDataOutputStream(wrapFSOutputStream(adapter.createFile(
+          key, replication, overwrite, recursive)), statistics);
     }
-    return new FSDataOutputStream(createFSOutputStream(
-            adapter.createFile(key,
-        replication, overwrite, recursive)), statistics);
+
+    // select OutputStream type based on byteWritten
+    final CheckedFunction<Integer, OutputStream, IOException> selector
+        = byteWritten -> selectOutputStream(
+            key, replication, overwrite, recursive, byteWritten);
+    return new FSDataOutputStream(new SelectorOutputStream<>(
+        streamingAutoThreshold, selector), statistics);
   }
 
-  protected OutputStream createFSOutputStream(
+  private OutputStream selectOutputStream(String key, short replication,
+      boolean overwrite, boolean recursive, int byteWritten)
+      throws IOException {
+    return streamingEnabled && byteWritten > streamingAutoThreshold ?
+        adapter.createStreamFile(key, replication, overwrite, recursive)
+        : wrapFSOutputStream(adapter.createFile(
+            key, replication, overwrite, recursive));
+  }
+
+  protected OzoneFSOutputStream wrapFSOutputStream(
       OzoneFSOutputStream outputStream) {
     return outputStream;
   }

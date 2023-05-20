@@ -104,6 +104,14 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * Flag to enable ratis streaming on filesystem writes.
+   */
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD
+      = "ozone.fs.datastream.auto.threshold";
+  public static final int OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT
+      = 4 << 20;
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
