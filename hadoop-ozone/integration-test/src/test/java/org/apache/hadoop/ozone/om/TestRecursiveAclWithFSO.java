@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -134,7 +135,7 @@ public class TestRecursiveAclWithFSO {
        *     Try deleting b2
        *
        *     Test case 2:
-       *     Remove delete acl fro dir c2
+       *     Remove delete acl from dir c2
        *     Try deleting b1
        *
        *     Test case 3
@@ -199,8 +200,14 @@ public class TestRecursiveAclWithFSO {
       // Remove acl from directory c2, delete/rename a/b1 should throw
       // permission denied since c2 is a subdirectory
 
-      UserGroupInformation.setLoginUser(user1);
-      removeAclsFromKey(objectStore, ozoneBucket, "a/b1/c2");
+      user1.doAs((PrivilegedExceptionAction<Void>) () -> {
+        try (OzoneClient c = cluster.newClient()) {
+          ObjectStore o = c.getObjectStore();
+          OzoneBucket b = o.getVolume("volume1").getBucket("bucket1");
+          removeAclsFromKey(o, b, "a/b1/c2");
+        }
+        return null;
+      });
 
       UserGroupInformation.setLoginUser(user2);
       // perform  delete
@@ -224,9 +231,15 @@ public class TestRecursiveAclWithFSO {
       }
 
       // Test case 3
-      // delete b3 and this shouldn't throw exception because acls have not
-      // been removed from subpaths.
-      ozoneBucket.deleteDirectory("a/b3", true);
+      // delete b3 and this should throw exception because user2 has no acls
+      try {
+        ozoneBucket.deleteDirectory("a/b3", true);
+        fail("Should throw permission denied !");
+      } catch (OMException ome) {
+        // expect permission error
+        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+            ome.getResult(), "Permission check failed");
+      }
     }
   }
 
@@ -237,7 +250,7 @@ public class TestRecursiveAclWithFSO {
         .setVolumeName(ozoneBucket.getVolumeName())
         .setStoreType(OzoneObj.StoreType.OZONE)
         .setResType(OzoneObj.ResourceType.KEY).build();
-    List<OzoneAcl> aclList1 = objectStore.getAcl(ozoneObj);
+    List<OzoneAcl> aclList1 = objectStore.getAcl(ozoneObj); //
     for (OzoneAcl acl : aclList1) {
       objectStore.removeAcl(ozoneObj, acl);
     }

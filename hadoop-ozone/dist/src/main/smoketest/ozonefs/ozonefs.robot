@@ -163,6 +163,18 @@ Get file
                    Execute               ozone fs -get ${BASE_URL}${SCHEME}.txt /tmp/GET.txt
                    File Should Exist     /tmp/GET.txt
 
+Inherit Acls
+                   Execute               ozone sh bucket addacl -a=user:user1:rlw[DEFAULT] ${VOLUME}/${BUCKET}
+                   Execute               ozone fs -mkdir -p ${BASE_URL}dir1/dir2
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/        USER   user1   READ WRITE LIST
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir2/   USER   user1   READ WRITE LIST
+
+                   Execute               ozone sh key addacl -a=user:user2:rw[DEFAULT] ${VOLUME}/${BUCKET}/dir1/
+                   Execute               ozone fs -mkdir ${BASE_URL}dir1/dir3
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/   USER   user1   ${EMPTY}
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/   USER   user2   READ WRITE
+
+
 *** Keywords ***
 
 Setup localdir1
