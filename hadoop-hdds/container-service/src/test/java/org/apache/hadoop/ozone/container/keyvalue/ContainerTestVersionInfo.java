@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
@@ -35,6 +34,13 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
  * - ChunkLayOutVersion: data layout version
  */
 public class ContainerTestVersionInfo {
+  private static final String[] SCHEMA_VERSIONS = new String[] {
+      null,
+      OzoneConsts.SCHEMA_V1,
+      OzoneConsts.SCHEMA_V2,
+      OzoneConsts.SCHEMA_V3,
+  };
+
   private final String schemaVersion;
   private final ContainerLayoutVersion layout;
 
