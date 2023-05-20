@@ -572,7 +572,7 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     Assert.assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
@@ -644,7 +644,7 @@ public class TestBlockDeletingService {
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
     // from received TNXs will be deleted, not in BlockDeletingService
-    Assume.assumeFalse(Objects.equals(schemaVersion, SCHEMA_V1));
+    Assume.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
 
     int numOfContainers = 2;
     int numOfChunksPerBlock = 1;
@@ -674,7 +674,7 @@ public class TestBlockDeletingService {
     Assert.assertEquals(2, containerData.size());
     KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
     KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         ctr1.getDeletingBlockKeyFilter() : ctr1.getUnprefixedKeyFilter();
 
     // Have two unrecorded blocks onDisk and another two not to simulate the

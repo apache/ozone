@@ -270,7 +270,7 @@ public class TestContainerPersistence {
   public void testAddingBlockToDeletedContainer() throws Exception {
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
-    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
+    assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
 
     long testContainerID = getTestContainerID();
     Thread.sleep(100);
@@ -380,7 +380,7 @@ public class TestContainerPersistence {
       throws Exception {
     HddsVolume hddsVolume;
     // If !SchemaV3, build hddsVolume
-    if (!schemaVersion.contains(OzoneConsts.SCHEMA_V3)) {
+    if (!isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       Files.createDirectories(Paths.get(hddsPath));
 
       HddsVolume.Builder volumeBuilder =
