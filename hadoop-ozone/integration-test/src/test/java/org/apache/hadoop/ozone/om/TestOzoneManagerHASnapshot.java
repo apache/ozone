@@ -155,9 +155,6 @@ public class TestOzoneManagerHASnapshot {
 
   @Test
   public void testSnapshotIdConsistency() throws Exception {
-    String volumeName = ozoneBucket.getVolumeName();
-    String bucketName = ozoneBucket.getName();
-
     createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(5));
 
     String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
