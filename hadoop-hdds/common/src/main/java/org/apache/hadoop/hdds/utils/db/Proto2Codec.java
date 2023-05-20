@@ -17,23 +17,23 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.ratis.thirdparty.com.google.protobuf.CodedOutputStream;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
-import org.apache.ratis.thirdparty.com.google.protobuf.Parser;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.MessageLite;
+import com.google.protobuf.Parser;
+import org.apache.ratis.util.function.CheckedFunction;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.IntFunction;
-import java.util.function.ToIntFunction;
 
 /**
- * Codecs to serialize/deserialize Protobuf v3 messages.
+ * Codecs to serialize/deserialize Protobuf v2 messages.
  */
-public final class Proto3Codec<M extends MessageLite>
+public final class Proto2Codec<M extends MessageLite>
     implements Codec<M> {
   private static final ConcurrentMap<Class<? extends MessageLite>,
                                      Codec<? extends MessageLite>> CODECS
@@ -43,7 +43,7 @@ public final class Proto3Codec<M extends MessageLite>
    * @return the {@link Codec} for the given class.
    */
   public static <T extends MessageLite> Codec<T> get(Class<T> clazz) {
-    final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto3Codec::new);
+    final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto2Codec::new);
     return (Codec<T>) codec;
   }
 
@@ -59,7 +59,7 @@ public final class Proto3Codec<M extends MessageLite>
 
   private final Parser<M> parser;
 
-  private Proto3Codec(Class<M> clazz) {
+  private Proto2Codec(Class<M> clazz) {
     this.parser = getParser(clazz);
   }
 
@@ -68,29 +68,27 @@ public final class Proto3Codec<M extends MessageLite>
     return true;
   }
 
-  private ToIntFunction<ByteBuffer> writeTo(M message, int size) {
-    return buffer -> {
-      try {
-        message.writeTo(CodedOutputStream.newInstance(buffer));
-      } catch (IOException e) {
-        throw new IllegalStateException(
-            "Failed to writeTo: message=" + message, e);
-      }
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull M message,
+      IntFunction<CodecBuffer> allocator) throws IOException {
+    final int size = message.getSerializedSize();
+    return allocator.apply(size).put(writeTo(message, size));
+  }
+
+  private CheckedFunction<OutputStream, Integer, IOException> writeTo(
+      M message, int size) {
+    return out -> {
+      message.writeTo(out);
       return size;
     };
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) {
-    final int size = message.getSerializedSize();
-    return allocator.apply(size).put(writeTo(message, size));
-  }
-
-  @Override
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws InvalidProtocolBufferException {
-    return parser.parseFrom(buffer.asReadOnlyByteBuffer());
+      throws IOException {
+    try (InputStream in = buffer.getInputStream()) {
+      return parser.parseFrom(in);
+    }
   }
 
   @Override

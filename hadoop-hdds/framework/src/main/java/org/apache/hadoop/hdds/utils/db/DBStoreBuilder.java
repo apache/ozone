@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import com.google.protobuf.MessageLite;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -244,6 +245,10 @@ public final class DBStoreBuilder {
   public <T> DBStoreBuilder addCodec(Class<T> type, Codec<T> codec) {
     registry.addCodec(type, codec);
     return this;
+  }
+
+  public <T extends MessageLite> DBStoreBuilder addProto2Codec(Class<T> type) {
+    return addCodec(type, Proto2Codec.get(type));
   }
 
   public DBStoreBuilder setDBOptions(ManagedDBOptions option) {
