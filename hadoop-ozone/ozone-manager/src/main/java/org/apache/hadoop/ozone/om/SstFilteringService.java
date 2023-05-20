@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
@@ -66,7 +67,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
  * all the irrelevant and safe to delete sst files that don't correspond
  * to the bucket on which the snapshot was taken.
  */
-public class SstFilteringService extends BackgroundService {
+public class SstFilteringService extends BackgroundService
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SstFilteringService.class);
@@ -101,6 +103,9 @@ public class SstFilteringService extends BackgroundService {
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
   }
+
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
 
   private class SstFilteringTask implements BackgroundTask {
 
@@ -152,7 +157,10 @@ public class SstFilteringService extends BackgroundService {
                       new File(snapshotCheckpointDir),
                       dbName, true, Optional.of(Boolean.TRUE), false, false)) {
             RocksDatabase db = rdbStore.getDb();
-            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            try (BootstrapStateHandler.Lock lock =
+                getBootstrapStateLock().lock()) {
+              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            }
           }
 
           // mark the snapshot as filtered by writing to the file
@@ -215,4 +223,8 @@ public class SstFilteringService extends BackgroundService {
     return snapshotFilteredCount;
   }
 
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
 }

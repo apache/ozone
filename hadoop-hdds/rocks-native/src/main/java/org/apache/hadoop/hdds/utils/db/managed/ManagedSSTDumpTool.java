@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 
+import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -75,9 +76,9 @@ public class ManagedSSTDumpTool {
    */
   static class SSTDumpToolTask {
     private Future<Integer> future;
-    private PipeInputStream pipedOutput;
+    private InputStream pipedOutput;
 
-    SSTDumpToolTask(Future<Integer> future, PipeInputStream pipedOutput) {
+    SSTDumpToolTask(Future<Integer> future, InputStream pipedOutput) {
       this.future = future;
       this.pipedOutput = pipedOutput;
     }
@@ -86,7 +87,7 @@ public class ManagedSSTDumpTool {
       return future;
     }
 
-    public PipeInputStream getPipedOutput() {
+    public InputStream getPipedOutput() {
       return pipedOutput;
     }
 

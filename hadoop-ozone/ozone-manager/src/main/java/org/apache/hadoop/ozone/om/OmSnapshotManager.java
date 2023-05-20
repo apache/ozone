@@ -380,10 +380,14 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire deletedTable write lock
+    // Acquire active DB deletedDirectoryTable write lock to block
+    // DirDeletingTask
+    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
+        .writeLock().lock();
+    // Acquire active DB deletedTable write lock to block KeyDeletingTask
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
-    // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
+
     try {
       // Create DB checkpoint for snapshot
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
@@ -395,9 +399,11 @@ public final class OmSnapshotManager implements AutoCloseable {
       deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
     } finally {
-      // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
+          .writeLock().unlock();
+      // Release deletedDirectoryTable write lock
+      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
           .writeLock().unlock();
     }
 

@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -64,6 +65,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Test SST Filtering Service.
@@ -136,7 +139,7 @@ public class TestSstFilteringService {
     final int keyCount = 100;
     createKeys(keyManager, "vol1", "buck1", keyCount / 2, 1);
     SstFilteringService sstFilteringService =
-        (SstFilteringService) keyManager.getSnapshotSstFilteringService();
+        keyManager.getSnapshotSstFilteringService();
 
     String rocksDbDir = om.getRocksDbDirectory();
 
@@ -222,6 +225,23 @@ public class TestSstFilteringService {
     Assert.assertTrue(
         processedSnapshotIds.contains(snapshotInfo.getSnapshotID()));
 
+    long count;
+    // Prevent the new snapshot from being filtered
+    try (BootstrapStateHandler.Lock lock =
+             sstFilteringService.getBootstrapStateLock().lock()) {
+      count = sstFilteringService.getSnapshotFilteredCount().get();
+      writeClient.createSnapshot("vol1", "buck2", "snapshot2");
+
+      // Confirm that it is not filtered
+      assertThrows(TimeoutException.class, () -> GenericTestUtils.waitFor(
+          () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
+          1000, 10000));
+      assertEquals(count, sstFilteringService.getSnapshotFilteredCount().get());
+    }
+    // Now allow filtering
+    GenericTestUtils.waitFor(
+        () -> sstFilteringService.getSnapshotFilteredCount().get() > count,
+        1000, 10000);
   }
 
   @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")

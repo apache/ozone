@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,7 +63,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -70,7 +72,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -79,7 +81,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 2, false);
+    validate(rcnt, false, 2, false, false);
   }
 
   @Test
@@ -89,7 +91,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   /**
@@ -104,7 +106,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
@@ -118,7 +120,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   /**
@@ -132,7 +134,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 1, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   @Test
@@ -142,7 +144,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, -1, true);
+    validate(rcnt, true, -1, true, false);
   }
 
   @Test
@@ -152,7 +154,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -162,7 +164,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 2, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -171,7 +173,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -180,7 +182,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 1, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, false);
   }
 
   @Test
@@ -189,7 +191,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 2, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, false);
   }
 
   /**
@@ -203,17 +205,18 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
-  @Test
-  void testOneDecommissionedReplica() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
+  void testOneDecommissionReplica(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONING);
+        registerNodes(IN_SERVICE, IN_SERVICE, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -223,17 +226,18 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
-  @Test
-  void testAllDecommissioned() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
+  void testAllDecommissioned(HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(DECOMMISSIONED, DECOMMISSIONED, DECOMMISSIONED);
+        registerNodes(state, state, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 3, false);
+    validate(rcnt, false, 3, false, true);
   }
 
   @Test
@@ -242,7 +246,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
 
   }
 
@@ -252,7 +256,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -261,21 +265,23 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
    * Maintenance tests from here.
    */
 
-  @Test
-  void testOneHealthyTwoMaintenanceMinRepOfTwo() {
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#maintenanceStates")
+  void testOneHealthyTwoMaintenanceMinRepOfTwo(
+      HddsProtos.NodeOperationalState state) {
     Set<ContainerReplica> replica =
-        registerNodes(IN_SERVICE, IN_MAINTENANCE, IN_MAINTENANCE);
+        registerNodes(IN_SERVICE, state, state);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -285,7 +291,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -295,7 +301,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 1);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -305,7 +311,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -315,7 +321,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, false, 2, false);
+    validate(rcnt, false, 2, false, true);
   }
 
   /**
@@ -330,7 +336,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   /**
@@ -346,7 +352,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 3, 2);
-    validate(rcnt, true, -1, true);
+    validate(rcnt, true, -1, true, false);
     assertTrue(rcnt.isSafelyOverReplicated());
   }
 
@@ -356,7 +362,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -365,7 +371,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 1, 2);
-    validate(rcnt, false, 0, false);
+    validate(rcnt, false, 0, false, true);
   }
 
   @Test
@@ -374,7 +380,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 0, 0, 1, 2);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -385,7 +391,7 @@ class TestRatisContainerReplicaCount {
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replica, 1, 0, 3, 2);
-    validate(rcnt, false, 1, false);
+    validate(rcnt, false, 1, false, true);
   }
 
   @Test
@@ -436,7 +442,7 @@ class TestRatisContainerReplicaCount {
     RatisContainerReplicaCount rcnt =
         new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false);
-    validate(rcnt, true, 0, false);
+    validate(rcnt, true, 0, false, false);
   }
 
   @Test
@@ -566,11 +572,11 @@ class TestRatisContainerReplicaCount {
         unhealthyReplica.getDatanodeDetails(), 0));
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
-    validate(withoutUnhealthy, true, 0, false);
+    validate(withoutUnhealthy, true, 0, false, false);
 
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, true);
-    validate(withUnhealthy, true, 0, false);
+    validate(withUnhealthy, true, 0, false, false);
   }
 
   /**
@@ -593,7 +599,7 @@ class TestRatisContainerReplicaCount {
         new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2,
             false);
-    validate(withoutUnhealthy, false, 1, false);
+    validate(withoutUnhealthy, false, 1, false, false);
   }
 
   @Test
@@ -657,12 +663,12 @@ class TestRatisContainerReplicaCount {
 
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
-    validate(withoutUnhealthy, true, 0, false);
+    validate(withoutUnhealthy, true, 0, false, false);
     assertFalse(withoutUnhealthy.isSafelyOverReplicated());
 
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, true);
-    validate(withUnhealthy, true, -1, true);
+    validate(withUnhealthy, true, -1, true, false);
     assertFalse(withUnhealthy.isSafelyOverReplicated());
 
     /*
@@ -684,14 +690,14 @@ class TestRatisContainerReplicaCount {
         new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2,
             false);
-    validate(withoutUnhealthy, true, 0, false);
+    validate(withoutUnhealthy, true, 0, false, false);
     assertFalse(withoutUnhealthy.isSafelyOverReplicated());
 
     withUnhealthy =
         new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2,
             true);
-    validate(withUnhealthy, true, -1, true);
+    validate(withUnhealthy, true, -1, true, false);
     // Violates rule 2
     assertFalse(withUnhealthy.isSafelyOverReplicated());
     // now check by adding a CLOSED replica
@@ -701,7 +707,7 @@ class TestRatisContainerReplicaCount {
         new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2,
             true);
-    validate(withUnhealthy, true, -2, true);
+    validate(withUnhealthy, true, -2, true, false);
     assertTrue(withUnhealthy.isSafelyOverReplicated());
   }
 
@@ -750,10 +756,12 @@ class TestRatisContainerReplicaCount {
 
   private void validate(RatisContainerReplicaCount rcnt,
       boolean sufficientlyReplicated, int replicaDelta,
-      boolean overReplicated) {
+      boolean overReplicated, boolean insufficientDueToOutOfService) {
     assertEquals(sufficientlyReplicated, rcnt.isSufficientlyReplicated());
     assertEquals(overReplicated, rcnt.isOverReplicated());
     assertEquals(replicaDelta, rcnt.additionalReplicaNeeded());
+    assertEquals(insufficientDueToOutOfService,
+        rcnt.insufficientDueToOutOfService());
   }
 
   private Set<ContainerReplica> registerNodes(

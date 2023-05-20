@@ -37,9 +37,10 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Ov
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -58,6 +59,9 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the RatisReplicationCheckHandler class.
@@ -72,7 +76,7 @@ public class TestRatisReplicationCheckHandler {
   private ReplicationManagerReport report;
   private int maintenanceRedundancy = 2;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
     Mockito.when(containerPlacementPolicy.validateContainerPlacement(
@@ -100,9 +104,9 @@ public class TestRatisReplicationCheckHandler {
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -114,11 +118,11 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     ContainerHealthResult result =
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+    assertEquals(HealthState.HEALTHY, result.getHealthState());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -130,15 +134,15 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -155,15 +159,15 @@ public class TestRatisReplicationCheckHandler {
         .setPendingOps(pending);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -180,22 +184,22 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertTrue(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertTrue(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertTrue(healthCheck.handle(requestBuilder.build()));
     // Fixed with pending, so nothing added to the queue
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommission() {
+  public void testUnderReplicatedDueToOutOfService() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 0), Pair.of(DECOMMISSIONING, 0),
@@ -205,26 +209,27 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(2, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertTrue(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(2, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertTrue(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
-  @Test
-  public void testUnderReplicatedDueToAllDecommissioning() {
-    Pair<HddsProtos.NodeOperationalState, Integer> state =
-        Pair.of(DECOMMISSIONING, 0);
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
+  void testUnderReplicatedDueToAllOutOfService(
+      HddsProtos.NodeOperationalState state) {
+    Pair<HddsProtos.NodeOperationalState, Integer> pair = Pair.of(state, 0);
 
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        state, state, state);
+        pair, pair, pair);
 
     ContainerCheckRequest checkRequest = requestBuilder
         .setContainerReplicas(replicas)
@@ -232,26 +237,24 @@ public class TestRatisReplicationCheckHandler {
         .build();
 
     ContainerHealthResult healthResult = healthCheck.checkHealth(checkRequest);
-    Assert.assertEquals(HealthState.UNDER_REPLICATED,
-        healthResult.getHealthState());
-    Assert.assertEquals(UnderReplicatedHealthResult.class,
-        healthResult.getClass());
+    assertEquals(HealthState.UNDER_REPLICATED, healthResult.getHealthState());
+    assertEquals(UnderReplicatedHealthResult.class, healthResult.getClass());
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthResult;
 
-    Assert.assertEquals(2, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertTrue(result.underReplicatedDueToDecommission());
+    assertEquals(2, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertTrue(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(checkRequest));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(checkRequest));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionFixedWithPending() {
+  public void testUnderReplicatedDueToOutOfServiceFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
@@ -265,22 +268,22 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(2, result.getRemainingRedundancy());
-    Assert.assertTrue(result.isReplicatedOkAfterPending());
-    Assert.assertTrue(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(2, result.getRemainingRedundancy());
+    assertTrue(result.isReplicatedOkAfterPending());
+    assertTrue(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertTrue(healthCheck.handle(requestBuilder.build()));
     // Nothing queued as inflight replicas will fix it.
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated in the report until pending complete
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test
-  public void testUnderReplicatedDueToDecommissionAndMissing() {
+  public void testUnderReplicatedDueToOutOfServiceAndMissing() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 0), Pair.of(DECOMMISSIONED, 0));
@@ -293,40 +296,39 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
   @Test
   public void testUnderReplicatedAndUnrecoverable() {
     ContainerInfo container = createContainerInfo(repConfig);
-    Set<ContainerReplica> replicas = Collections.EMPTY_SET;
 
-    requestBuilder.setContainerReplicas(replicas)
+    requestBuilder.setContainerReplicas(Collections.emptySet())
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(0, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
-    Assert.assertTrue(result.isUnrecoverable());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(0, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
+    assertTrue(result.isUnrecoverable());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertTrue(healthCheck.handle(requestBuilder.build()));
     // Unrecoverable, so not added to the queue.
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
   }
 
@@ -348,15 +350,15 @@ public class TestRatisReplicationCheckHandler {
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
 
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -370,11 +372,11 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     ContainerHealthResult result =
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+    assertEquals(HealthState.HEALTHY, result.getHealthState());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
   @Test
@@ -392,15 +394,15 @@ public class TestRatisReplicationCheckHandler {
     healthy replicas. This handler cannot make a decision about
     replication/deleting replicas when all of them are unhealthy.
      */
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(0, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(0, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
 
     /*
@@ -414,15 +416,15 @@ public class TestRatisReplicationCheckHandler {
     result = (UnderReplicatedHealthResult) healthCheck.checkHealth(
         requestBuilder.build());
 
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(0, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(0, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -446,14 +448,14 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     OverReplicatedHealthResult result = (OverReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(4, result.getExcessRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(4, result.getExcessRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
@@ -470,19 +472,19 @@ public class TestRatisReplicationCheckHandler {
 
     OverReplicatedHealthResult result = (OverReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getExcessRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getExcessRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
     /*
     We have an excess replica, but we hold off on adding to the over
     replication queue until all the mismatched replicas match the container
     state.
      */
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
@@ -512,21 +514,21 @@ public class TestRatisReplicationCheckHandler {
         healthCheck.checkHealth(requestBuilder.build());
 
     // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     OverReplicatedHealthResult overRepResult =
         (OverReplicatedHealthResult) result;
-    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
-    Assert.assertTrue(overRepResult.hasMismatchedReplicas());
-    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
+    assertEquals(3, overRepResult.getExcessRedundancy());
+    assertTrue(overRepResult.hasMismatchedReplicas());
+    assertFalse(overRepResult.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
     // it should not be queued for over replication because there's a mis
     // matched replica
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -550,19 +552,19 @@ public class TestRatisReplicationCheckHandler {
         healthCheck.checkHealth(requestBuilder.build());
 
     // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     OverReplicatedHealthResult overRepResult =
         (OverReplicatedHealthResult) result;
-    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
-    Assert.assertFalse(overRepResult.hasMismatchedReplicas());
-    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
+    assertEquals(3, overRepResult.getExcessRedundancy());
+    assertFalse(overRepResult.hasMismatchedReplicas());
+    assertFalse(overRepResult.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
 
   }
@@ -583,16 +585,16 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     OverReplicatedHealthResult result = (OverReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getExcessRedundancy());
-    Assert.assertTrue(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getExcessRedundancy());
+    assertTrue(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
     // Fixed by pending so nothing queued.
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still over replicated, so the report should contain it
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
@@ -608,14 +610,14 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     OverReplicatedHealthResult result = (OverReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getExcessRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getExcessRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
@@ -631,14 +633,14 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     ContainerHealthResult result =
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.HEALTHY, result.getHealthState());
+    assertEquals(HealthState.HEALTHY, result.getHealthState());
 
-    Assert.assertFalse(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
   }
 
@@ -666,21 +668,21 @@ public class TestRatisReplicationCheckHandler {
         healthCheck.checkHealth(requestBuilder.build());
 
     // there's an excess of 3 UNHEALTHY replicas, so it's over replicated
-    Assert.assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
     OverReplicatedHealthResult overRepResult =
         (OverReplicatedHealthResult) result;
-    Assert.assertEquals(3, overRepResult.getExcessRedundancy());
-    Assert.assertFalse(overRepResult.hasMismatchedReplicas());
-    Assert.assertFalse(overRepResult.isReplicatedOkAfterPending());
+    assertEquals(3, overRepResult.getExcessRedundancy());
+    assertFalse(overRepResult.hasMismatchedReplicas());
+    assertFalse(overRepResult.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(1, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
@@ -699,17 +701,17 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
@@ -743,17 +745,17 @@ public class TestRatisReplicationCheckHandler {
         .setPendingOps(pending);
     UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
-    Assert.assertEquals(1, result.getRemainingRedundancy());
-    Assert.assertTrue(result.isReplicatedOkAfterPending());
-    Assert.assertFalse(result.underReplicatedDueToDecommission());
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(1, result.getRemainingRedundancy());
+    assertTrue(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(1, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(0, report.getStat(
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
@@ -772,15 +774,15 @@ public class TestRatisReplicationCheckHandler {
         .setContainerInfo(container);
     MisReplicatedHealthResult result = (MisReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
-    Assert.assertFalse(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
+    assertFalse(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
@@ -814,15 +816,15 @@ public class TestRatisReplicationCheckHandler {
         .setPendingOps(pending);
     MisReplicatedHealthResult result = (MisReplicatedHealthResult)
         healthCheck.checkHealth(requestBuilder.build());
-    Assert.assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
-    Assert.assertTrue(result.isReplicatedOkAfterPending());
+    assertEquals(HealthState.MIS_REPLICATED, result.getHealthState());
+    assertTrue(result.isReplicatedOkAfterPending());
 
-    Assert.assertTrue(healthCheck.handle(requestBuilder.build()));
-    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
-    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
-    Assert.assertEquals(0, report.getStat(
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    Assert.assertEquals(1, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
