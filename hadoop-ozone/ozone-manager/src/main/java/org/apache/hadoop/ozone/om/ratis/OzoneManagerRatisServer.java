@@ -877,7 +877,7 @@ public final class OzoneManagerRatisServer {
 
   private static Parameters createServerTlsParameters(SecurityConfig conf,
       CertificateClient caClient) throws IOException {
-    GrpcTlsConfig config = createServerTlsConfig(conf, caClient, true);
+    GrpcTlsConfig config = createServerTlsConfig(conf, caClient);
     return config == null ? null : RatisHelper.setServerTlsConf(config);
   }
 }

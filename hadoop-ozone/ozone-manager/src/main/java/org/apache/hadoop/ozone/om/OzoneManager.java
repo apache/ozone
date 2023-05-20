@@ -3080,8 +3080,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       final GrpcTlsConfig tlsConfig =
-          OzoneManagerRatisUtils.createServerTlsConfig(
-              secConfig, certClient, true);
+          OzoneManagerRatisUtils.createServerTlsConfig(secConfig, certClient);
 
       RatisHelper.transferRatisLeadership(configuration, division.getGroup(),
           targetPeerId, tlsConfig);
