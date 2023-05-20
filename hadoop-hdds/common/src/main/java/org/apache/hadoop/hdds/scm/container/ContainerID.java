@@ -37,7 +37,8 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
  */
 public final class ContainerID implements Comparable<ContainerID> {
   private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
-      LongCodec.get(), ContainerID::valueOf, c -> c.id, true);
+      LongCodec.get(), ContainerID::valueOf, c -> c.id,
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<ContainerID> getCodec() {
     return CODEC;

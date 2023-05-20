@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -69,7 +70,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           Long.class,
           LongCodec.get(),
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {

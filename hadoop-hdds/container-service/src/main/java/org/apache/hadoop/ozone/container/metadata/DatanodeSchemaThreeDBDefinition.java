@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -86,7 +87,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   private static String separator = "";
 

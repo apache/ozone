@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
@@ -49,7 +50,7 @@ public class SCMDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_CERTS =
@@ -98,7 +99,7 @@ public class SCMDBDefinition implements DBDefinition {
           PipelineID.class,
           PipelineID.getCodec(),
           Pipeline.class,
-          new PipelineCodec());
+          Pipeline.getCodec());
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
@@ -107,7 +108,7 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerID.class,
           ContainerID.getCodec(),
           ContainerInfo.class,
-          new ContainerInfoCodec());
+          ContainerInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
@@ -152,7 +153,7 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerID.class,
           ContainerID.getCodec(),
           MoveDataNodePair.class,
-          new MoveDataNodePairCodec());
+          MoveDataNodePair.getCodec());
 
   /**
    * Stores miscellaneous SCM metadata, including upgrade finalization status
