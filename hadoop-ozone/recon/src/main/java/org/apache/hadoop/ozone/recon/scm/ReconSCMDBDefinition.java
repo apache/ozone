@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
-import org.apache.hadoop.ozone.recon.codec.DatanodeDetailsCodec;
 import org.apache.hadoop.ozone.recon.codec.ReconNodeDBKeyCodec;
 
 /**
@@ -42,7 +41,7 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
           UUID.class,
           new ReconNodeDBKeyCodec(),
           DatanodeDetails.class,
-          new DatanodeDetailsCodec());
+          DatanodeDetails.getCodec());
 
   @Override
   public String getName() {

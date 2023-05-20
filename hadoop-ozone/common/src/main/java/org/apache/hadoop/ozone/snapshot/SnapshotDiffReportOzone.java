@@ -21,8 +21,12 @@ package org.apache.hadoop.ozone.snapshot;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 
 import java.nio.charset.StandardCharsets;
@@ -36,6 +40,16 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
+
+  private static final Codec<DiffReportEntry> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(DiffReportEntryProto.class),
+      SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
+      SnapshotDiffReportOzone::toProtobufDiffReportEntry,
+      true);
+
+  public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
+    return CODEC;
+  }
 
   private static final String LINE_SEPARATOR = System.getProperty(
       "line.separator", "\n");

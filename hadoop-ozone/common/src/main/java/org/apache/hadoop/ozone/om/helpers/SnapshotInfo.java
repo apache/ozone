@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -48,6 +51,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * for the snapshot path & global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable {
+  private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
+      SnapshotInfo::getFromProtobuf,
+      SnapshotInfo::getProtobuf);
+
+  public static Codec<SnapshotInfo> getCodec() {
+    return CODEC;
+  }
 
   /**
    * SnapshotStatus enum composed of
