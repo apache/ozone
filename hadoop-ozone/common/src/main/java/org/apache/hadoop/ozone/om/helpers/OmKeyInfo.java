@@ -48,7 +48,8 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
+public final class OmKeyInfo extends WithParentObjectId
+    implements ICopyObject {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
   private final String volumeName;
   private final String bucketName;
@@ -752,6 +753,7 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
   /**
    * Return a new copy of the object.
    */
+  @Override
   public OmKeyInfo copyObject() {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
@@ -787,36 +789,6 @@ public final class OmKeyInfo extends WithParentObjectId implements Cloneable {
     }
 
     return builder.build();
-  }
-
-  /**
-   * Return a new copy of the object.
-   */
-  @Override
-  public Object clone() throws CloneNotSupportedException {
-    OmKeyInfo omKeyInfo = (OmKeyInfo) super.clone();
-
-    omKeyInfo.metadata = new HashMap<>();
-    omKeyInfo.keyLocationVersions = new ArrayList<>();
-    omKeyInfo.acls = new ArrayList<>();
-
-    keyLocationVersions.stream().filter(keyLocationVersion ->
-            keyLocationVersion != null).forEach(keyLocationVersion ->
-            omKeyInfo.keyLocationVersions.add(
-                    new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                            keyLocationVersion.getLocationList(),
-                            keyLocationVersion.isMultipartKey())));
-
-    acls.stream().filter(acl -> acl != null).forEach(acl ->
-            omKeyInfo.acls.add(new OzoneAcl(acl.getType(),
-                    acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-                    acl.getAclScope())));
-
-    if (metadata != null) {
-      metadata.forEach((k, v) -> omKeyInfo.metadata.put(k, v));
-    }
-
-    return omKeyInfo;
   }
 
   /**
