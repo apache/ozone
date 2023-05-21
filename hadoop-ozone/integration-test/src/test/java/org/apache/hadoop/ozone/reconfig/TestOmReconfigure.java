@@ -99,7 +99,7 @@ public class TestOmReconfigure {
   }
 
   /**
-   * Test reconfigure om "ozone.readonly.administrators."
+   * Test reconfigure om "ozone.readonly.administrators".
    */
   @Test
   public void testOmReadOnlyUsersReconfigure() throws Exception {
