@@ -239,6 +239,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
@@ -357,6 +358,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private final String omStarterUser;
   private final OzoneAdmins omAdmins;
+  private final OzoneAdmins readOnlyAdmins;
   private final OzoneAdmins s3OzoneAdmins;
 
   private final OMMetrics metrics;
@@ -471,7 +473,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /** A list of property that are reconfigurable at runtime. */
   private final SortedSet<String> reconfigurableProperties =
       ImmutableSortedSet.of(
-          OZONE_ADMINISTRATORS
+          OZONE_ADMINISTRATORS,
+          OZONE_READONLY_ADMINISTRATORS
       );
 
   @SuppressWarnings("methodlength")
@@ -644,6 +647,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigUtil.getOzoneAdminsGroupsFromConfig(configuration);
     LOG.info("OM start with adminUsers: {}", omAdminUsernames);
     omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
+
+    // Get read only admin list
+    Collection<String> omReadOnlyAdmins =
+        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(
+            configuration);
+    Collection<String> omReadOnlyAdminsGroups =
+        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(
+            configuration);
+
+    readOnlyAdmins = new OzoneAdmins(omReadOnlyAdmins,
+        omReadOnlyAdminsGroups);
 
     Collection<String> s3AdminUsernames =
             OzoneConfigUtil.getS3AdminsFromConfig(configuration);
@@ -4070,6 +4084,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omAdmins.getAdminUsernames();
   }
 
+  public Collection<String> getOmReadOnlyAdminUsernames() {
+    return readOnlyAdmins.getAdminUsernames();
+  }
+
   public Collection<String> getOmAdminGroups() {
     return omAdmins.getAdminGroups();
   }
@@ -4079,6 +4097,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OzoneAdmins getOmAdmins() {
     return omAdmins;
+  }
+
+  public OzoneAdmins getReadOnlyAdmins() {
+    return readOnlyAdmins;
   }
 
   /**
@@ -4615,6 +4637,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws ReconfigurationException {
     if (property.equals(OZONE_ADMINISTRATORS)) {
       return reconfOzoneAdmins(newVal);
+    } else if (property.equals(OZONE_READONLY_ADMINISTRATORS)) {
+      return reconfOzoneReadOnlyAdmins(newVal);
     } else {
       throw new ReconfigurationException(property, newVal,
           getConfiguration().get(property));
@@ -4629,6 +4653,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneReadOnlyAdmins(String newVal) {
+    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
+    Collection<String> pReadOnlyAdmins =
+        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(getConfiguration());
+    readOnlyAdmins.setAdminUsernames(pReadOnlyAdmins);
+    LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
+        OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
     return String.valueOf(newVal);
   }
 
