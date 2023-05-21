@@ -4081,7 +4081,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omAdmins.getAdminUsernames();
   }
 
-  public Collection<String> getOmReadOnlyUsernames() {
+  public Collection<String> getOmReadOnlyAdminUsernames() {
     return readOnlyAdmins.getAdminUsernames();
   }
 
