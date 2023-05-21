@@ -51,17 +51,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * for the snapshot path & global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable {
-  private static final Codec<SnapshotInfo> CODEC
-      = new DelegatedCodec<SnapshotInfo,
-                           OzoneManagerProtocolProtos.SnapshotInfo>(
+  private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
       SnapshotInfo::getFromProtobuf,
-      SnapshotInfo::getProtobuf) {
-        @Override
-        public SnapshotInfo copyObject(SnapshotInfo info) {
-          return info;
-        }
-      };
+      SnapshotInfo::getProtobuf,
+      true);
 
   public static Codec<SnapshotInfo> getCodec() {
     return CODEC;
