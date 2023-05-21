@@ -988,7 +988,6 @@ public class ObjectEndpoint extends EndpointBase {
           volume.getName(), destBucket, destkey);
 
       getMetrics().updateCopyObjectSuccessStats(startNanos);
-      getMetrics().incCopyObjectSuccessLength(copyLength);
 
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
