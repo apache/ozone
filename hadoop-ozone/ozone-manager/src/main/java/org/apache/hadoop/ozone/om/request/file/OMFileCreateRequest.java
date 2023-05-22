@@ -96,12 +96,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
     // Verify key name
-    if (keyArgs.getKeyName()
-        .startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
-      throw new OMException("Cannot create key under path reserved for "
-          + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
-          OMException.ResultCodes.INVALID_KEY_NAME);
-    }
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);

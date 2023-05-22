@@ -46,6 +46,9 @@ import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+
 /**
  * Utility methods for Ozone and Container Clients.
  *
@@ -222,6 +225,11 @@ public final class HddsClientUtils {
   public static void verifyKeyName(String keyName) {
     if (keyName == null) {
       throw new IllegalArgumentException("Key name is null");
+    }
+    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new IllegalArgumentException(
+          "Cannot create key under path reserved for "
+          + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
     }
     if (!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
             .matcher(keyName).matches()) {
