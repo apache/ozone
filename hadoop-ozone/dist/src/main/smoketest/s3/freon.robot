@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ./commonawslib.robot
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
@@ -26,8 +27,6 @@ ${ENDPOINT_URL}         http://s3g:9878
 *** Keywords ***
 #   Export access key and secret to the environment
 Setup aws credentials
-    ${accessKey} =      Execute     aws configure get aws_access_key_id
-    Run Keyword if      '${accessKey}' == '${EMPTY}'        Setup v4 headers
     ${accessKey} =      Execute     aws configure get aws_access_key_id
     ${secret} =         Execute     aws configure get aws_secret_access_key
     Set Environment Variable        AWS_SECRET_ACCESS_KEY  ${secret}

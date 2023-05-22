@@ -23,18 +23,18 @@ Test Timeout        2 minutes
 
 *** Keywords ***
 GetSecret success
-    ${output}=             Execute             ozone s3 getsecret
+    ${output}=             Execute             ozone s3 getsecret -u testuser2
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
 
 GetSecret failure
-    ${output2}=            Execute and Ignore Error    ozone s3 getsecret
+    ${output2}=            Execute and Ignore Error    ozone s3 getsecret -u testuser2
     Should not contain     ${output2}           awsAccessKey
     Should not contain     ${output2}           awsSecret
     Should contain         ${output2}           S3_SECRET_ALREADY_EXISTS
 
 Revoke Secrets
-    ${output}=       Execute and Ignore Error      ozone s3 revokesecret -y
+    ${output}=       Execute and Ignore Error      ozone s3 revokesecret -y -u testuser2
 
 *** Test Cases ***
 Get S3 secret twice
