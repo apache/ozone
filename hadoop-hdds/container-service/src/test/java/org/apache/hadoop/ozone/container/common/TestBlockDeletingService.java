@@ -87,7 +87,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -104,6 +103,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -208,11 +208,11 @@ public class TestBlockDeletingService {
     data = (KeyValueContainerData) containerSet.getContainer(
         containerID).getContainerData();
     data.setSchemaVersion(schemaVersion);
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       createPendingDeleteBlocksSchema1(numOfBlocksPerContainer, data,
           containerID, numOfChunksPerBlock, buffer, chunkManager, container);
-    } else if (schemaVersion.equals(SCHEMA_V2)
-        || schemaVersion.equals(SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, SCHEMA_V2)
+        || isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       createPendingDeleteBlocksViaTxn(numOfBlocksPerContainer, txnID,
           containerID, numOfChunksPerBlock, buffer, chunkManager,
           container, data);
@@ -297,7 +297,7 @@ public class TestBlockDeletingService {
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
 
-        if (schemaVersion.equals(SCHEMA_V3)) {
+        if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
           DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
               (DatanodeStoreSchemaThreeImpl) ds;
           dnStoreThreeImpl.getDeleteTransactionTable()
@@ -383,12 +383,12 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(DBHandle meta,
       KeyValueContainerData data) throws IOException {
-    if (data.getSchemaVersion().equals(SCHEMA_V1)) {
+    if (data.hasSchema(SCHEMA_V1)) {
       return meta.getStore().getBlockDataTable()
           .getRangeKVs(null, 100, data.containerPrefix(),
               data.getDeletingBlockKeyFilter())
           .size();
-    } else if (data.getSchemaVersion().equals(SCHEMA_V2)) {
+    } else if (data.hasSchema(SCHEMA_V2)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
@@ -404,7 +404,7 @@ public class TestBlockDeletingService {
         }
       }
       return pendingBlocks;
-    } else if (data.getSchemaVersion().equals(SCHEMA_V3)) {
+    } else if (data.hasSchema(SCHEMA_V3)) {
       int pendingBlocks = 0;
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
@@ -437,7 +437,7 @@ public class TestBlockDeletingService {
   @Test
   public void testPendingDeleteBlockReset() throws Exception {
     // This test is not relevant for schema V1.
-    if (schemaVersion.equals(SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V1)) {
       return;
     }
 
@@ -571,7 +571,7 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     Assert.assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
@@ -643,7 +643,7 @@ public class TestBlockDeletingService {
   public void testWithUnrecordedBlocks() throws Exception {
     // Skip schemaV1, when markBlocksForDeletionSchemaV1, the unrecorded blocks
     // from received TNXs will be deleted, not in BlockDeletingService
-    Assume.assumeFalse(Objects.equals(schemaVersion, SCHEMA_V1));
+    Assume.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
 
     int numOfContainers = 2;
     int numOfChunksPerBlock = 1;
@@ -673,7 +673,7 @@ public class TestBlockDeletingService {
     Assert.assertEquals(2, containerData.size());
     KeyValueContainerData ctr1 = (KeyValueContainerData) containerData.get(0);
     KeyValueContainerData ctr2 = (KeyValueContainerData) containerData.get(1);
-    KeyPrefixFilter filter = Objects.equals(schemaVersion, SCHEMA_V1) ?
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
         ctr1.getDeletingBlockKeyFilter() : ctr1.getUnprefixedKeyFilter();
 
     // Have two unrecorded blocks onDisk and another two not to simulate the
