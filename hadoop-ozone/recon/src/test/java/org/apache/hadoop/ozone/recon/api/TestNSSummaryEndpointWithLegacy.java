@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,18 +34,18 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -66,23 +63,24 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
-
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -129,10 +127,12 @@ public class TestNSSummaryEndpointWithLegacy {
   // Object names
   private static final String VOL = "vol";
   private static final String VOL_TWO = "vol2";
+  private static final String VOL_THREE = "vol3";
   private static final String BUCKET_ONE = "bucket1";
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -189,6 +189,8 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long VOL_THREE_OBJECT_ID = 22L;
+  private static final long BUCKET_FIVE_OBJECT_ID = 23L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -314,10 +316,12 @@ public class TestNSSummaryEndpointWithLegacy {
   private static final long ROOT_QUOTA = 2 * (2 * OzoneConsts.MB);
   private static final long VOL_QUOTA = 2 * OzoneConsts.MB;
   private static final long VOL_TWO_QUOTA = 2 * OzoneConsts.MB;
+  private static final long VOL_THREE_QUOTA = 2 * OzoneConsts.MB;
   private static final long BUCKET_ONE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -451,7 +455,7 @@ public class TestNSSummaryEndpointWithLegacy {
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
-    Assert.assertEquals(2, duRootRes.getCount());
+    Assert.assertEquals(3, duRootRes.getCount());
     List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
     // sort based on subpath
     Collections.sort(duRootData,
@@ -898,8 +902,19 @@ public class TestNSSummaryEndpointWithLegacy {
             .setQuotaInBytes(VOL_TWO_QUOTA)
             .build();
 
+    String volume3Key = omMetadataManager.getVolumeKey(VOL_THREE);
+    OmVolumeArgs args3 =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOL_THREE_OBJECT_ID)
+            .setVolume(VOL_THREE)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .setQuotaInBytes(VOL_THREE_QUOTA)
+            .build();
+
     omMetadataManager.getVolumeTable().put(volumeKey, args);
     omMetadataManager.getVolumeTable().put(volume2Key, args2);
+    omMetadataManager.getVolumeTable().put(volume3Key, args3);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(VOL)
@@ -933,6 +948,14 @@ public class TestNSSummaryEndpointWithLegacy {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_THREE)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
         bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -941,11 +964,14 @@ public class TestNSSummaryEndpointWithLegacy {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }

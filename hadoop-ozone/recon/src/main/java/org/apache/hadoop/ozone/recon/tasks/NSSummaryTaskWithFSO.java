@@ -197,21 +197,6 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  private void verifyIfKeyParentIsBucketObject(
-      Map<Long, OrphanKeyMetaData> orphanKeysMetaDataSetMap,
-      OmKeyInfo updatedKeyInfo) throws IOException {
-    OmBucketInfo bucketInfo =
-        getBucketInfo(updatedKeyInfo.getVolumeName(),
-            updatedKeyInfo.getBucketName(), reconOMMetadataManager);
-    if (null != bucketInfo) {
-      if (orphanKeysMetaDataSetMap.containsKey(
-          bucketInfo.getObjectID())) {
-        orphanKeysMetaDataSetMap.remove(
-            updatedKeyInfo.getParentObjectID());
-      }
-    }
-  }
-
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
     Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap = new HashMap<>();

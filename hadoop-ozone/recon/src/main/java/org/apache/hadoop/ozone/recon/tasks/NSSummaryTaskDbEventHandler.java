@@ -218,9 +218,11 @@ public class NSSummaryTaskDbEventHandler {
   private <T extends WithParentObjectId> void removeFromOrphanIfExists(
       T fileDirInfo,
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
-    long objectID = fileDirInfo.getObjectID();
-    orphanKeyMetaDataMap.remove(objectID);
-    reconNamespaceSummaryManager.deleteOrphanKeyMetaDataSet(objectID);
+    if (null != orphanKeyMetaDataMap) {
+      long objectID = fileDirInfo.getObjectID();
+      orphanKeyMetaDataMap.remove(objectID);
+      reconNamespaceSummaryManager.deleteOrphanKeyMetaDataSet(objectID);
+    }
   }
 
   protected void handleDeleteKeyEvent(
@@ -256,7 +258,28 @@ public class NSSummaryTaskDbEventHandler {
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
-    addOrphanCandidate(keyInfo, orphanKeyMetaDataMap, status, true);
+    removeOrphanChild(keyInfo, orphanKeyMetaDataMap);
+  }
+
+  private <T extends WithParentObjectId> void removeOrphanChild(
+      T fileDirObjInfo,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
+    if (null != orphanKeyMetaDataMap) {
+      long objectID = fileDirObjInfo.getObjectID();
+      long parentObjectID = fileDirObjInfo.getParentObjectID();
+      OrphanKeyMetaData orphanKeyMetaData =
+          orphanKeyMetaDataMap.get(parentObjectID);
+      if (null == orphanKeyMetaData) {
+        orphanKeyMetaData =
+            reconNamespaceSummaryManager.getOrphanKeyMetaData(
+                parentObjectID);
+      }
+      if (null != orphanKeyMetaData) {
+        Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
+        objectIds.remove(objectID);
+        orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
+      }
+    }
   }
 
   protected void handleDeleteDirEvent(
@@ -282,7 +305,7 @@ public class NSSummaryTaskDbEventHandler {
 
     nsSummary.removeChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
-    addOrphanCandidate(directoryInfo, orphanKeyMetaDataMap, status, true);
+    removeOrphanChild(directoryInfo, orphanKeyMetaDataMap);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
@@ -382,27 +405,29 @@ public class NSSummaryTaskDbEventHandler {
       long status,
       boolean parentExist)
       throws IOException {
-    long objectID = fileDirObjInfo.getObjectID();
-    long parentObjectID = fileDirObjInfo.getParentObjectID();
-    if (parentExist) {
-      OrphanKeyMetaData orphanKeyMetaData =
-          orphanKeyMetaDataMap.get(parentObjectID);
-      if (null == orphanKeyMetaData) {
-        orphanKeyMetaData =
-            reconNamespaceSummaryManager.getOrphanKeyMetaData(
-                parentObjectID);
-      }
-      if (null != orphanKeyMetaData) {
-        Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
+    if (null != orphanKeyMetaDataMap) {
+      long objectID = fileDirObjInfo.getObjectID();
+      long parentObjectID = fileDirObjInfo.getParentObjectID();
+      if (parentExist) {
+        OrphanKeyMetaData orphanKeyMetaData =
+            orphanKeyMetaDataMap.get(parentObjectID);
+        if (null == orphanKeyMetaData) {
+          orphanKeyMetaData =
+              reconNamespaceSummaryManager.getOrphanKeyMetaData(
+                  parentObjectID);
+        }
+        if (null != orphanKeyMetaData) {
+          Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
+          objectIds.add(objectID);
+          orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
+        }
+      } else {
+        Set<Long> objectIds = new HashSet<>();
         objectIds.add(objectID);
+        OrphanKeyMetaData orphanKeyMetaData =
+            new OrphanKeyMetaData(objectIds, status);
         orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
       }
-    } else {
-      Set<Long> objectIds = new HashSet<>();
-      objectIds.add(objectID);
-      OrphanKeyMetaData orphanKeyMetaData =
-          new OrphanKeyMetaData(objectIds, status);
-      orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
     }
   }
 

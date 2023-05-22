@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
@@ -70,8 +71,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
@@ -85,6 +88,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.ORPHAN_KEYS_METADATA;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +126,8 @@ public class TestNSSummaryEndpointWithFSO {
   private CommonUtils commonUtils;
   private ReconDBProvider reconDBProvider;
   private Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
+
+  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -410,7 +417,7 @@ public class TestNSSummaryEndpointWithFSO {
             .addBinding(NSSummaryEndpoint.class)
             .addBinding(ReconDBProvider.class)
             .build();
-    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+    reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     nsSummaryEndpoint = reconTestInjector.getInstance(NSSummaryEndpoint.class);
     reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
@@ -430,9 +437,9 @@ public class TestNSSummaryEndpointWithFSO {
     String[] names = EntityHandler.parseRequestPath(TEST_PATH_UTILITY);
     Assert.assertArrayEquals(TEST_NAMES, names);
     String keyName = BucketHandler.getKeyName(names);
-    Assert.assertEquals(TEST_KEY_NAMES, keyName);
+    assertEquals(TEST_KEY_NAMES, keyName);
     String subpath = BucketHandler.buildSubpath(PARENT_DIR, "file1.txt");
-    Assert.assertEquals(TEST_PATH_UTILITY, subpath);
+    assertEquals(TEST_PATH_UTILITY, subpath);
   }
 
   @Test
@@ -488,17 +495,17 @@ public class TestNSSummaryEndpointWithFSO {
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
-    Assert.assertEquals(2, duRootRes.getCount());
+    assertEquals(3, duRootRes.getCount());
     List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
     // sort based on subpath
     Collections.sort(duRootData,
         Comparator.comparing(DUResponse.DiskUsage::getSubpath));
     DUResponse.DiskUsage duVol1 = duRootData.get(0);
     DUResponse.DiskUsage duVol2 = duRootData.get(1);
-    Assert.assertEquals(VOL_PATH, duVol1.getSubpath());
-    Assert.assertEquals(VOL_TWO_PATH, duVol2.getSubpath());
-    Assert.assertEquals(VOL_DATA_SIZE, duVol1.getSize());
-    Assert.assertEquals(VOL_TWO_DATA_SIZE, duVol2.getSize());
+    assertEquals(VOL_PATH, duVol1.getSubpath());
+    assertEquals(VOL_TWO_PATH, duVol2.getSubpath());
+    assertEquals(VOL_DATA_SIZE, duVol1.getSize());
+    assertEquals(VOL_TWO_DATA_SIZE, duVol2.getSize());
   }
   @Test
   public void testDiskUsageVolume() throws Exception {
@@ -506,17 +513,17 @@ public class TestNSSummaryEndpointWithFSO {
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
             false, false);
     DUResponse duVolRes = (DUResponse) volResponse.getEntity();
-    Assert.assertEquals(2, duVolRes.getCount());
+    assertEquals(2, duVolRes.getCount());
     List<DUResponse.DiskUsage> duData = duVolRes.getDuData();
     // sort based on subpath
     Collections.sort(duData,
             Comparator.comparing(DUResponse.DiskUsage::getSubpath));
     DUResponse.DiskUsage duBucket1 = duData.get(0);
     DUResponse.DiskUsage duBucket2 = duData.get(1);
-    Assert.assertEquals(BUCKET_ONE_PATH, duBucket1.getSubpath());
-    Assert.assertEquals(BUCKET_TWO_PATH, duBucket2.getSubpath());
-    Assert.assertEquals(BUCKET_ONE_DATA_SIZE, duBucket1.getSize());
-    Assert.assertEquals(BUCKET_TWO_DATA_SIZE, duBucket2.getSize());
+    assertEquals(BUCKET_ONE_PATH, duBucket1.getSubpath());
+    assertEquals(BUCKET_TWO_PATH, duBucket2.getSubpath());
+    assertEquals(BUCKET_ONE_DATA_SIZE, duBucket1.getSize());
+    assertEquals(BUCKET_TWO_DATA_SIZE, duBucket2.getSize());
 
   }
   @Test
@@ -525,10 +532,10 @@ public class TestNSSummaryEndpointWithFSO {
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
             false, false);
     DUResponse duBucketResponse = (DUResponse) bucketResponse.getEntity();
-    Assert.assertEquals(1, duBucketResponse.getCount());
+    assertEquals(1, duBucketResponse.getCount());
     DUResponse.DiskUsage duDir1 = duBucketResponse.getDuData().get(0);
-    Assert.assertEquals(DIR_ONE_PATH, duDir1.getSubpath());
-    Assert.assertEquals(DIR_ONE_DATA_SIZE, duDir1.getSize());
+    assertEquals(DIR_ONE_PATH, duDir1.getSubpath());
+    assertEquals(DIR_ONE_DATA_SIZE, duDir1.getSize());
 
   }
   @Test
@@ -537,21 +544,21 @@ public class TestNSSummaryEndpointWithFSO {
     Response dirResponse = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
             false, false);
     DUResponse duDirReponse = (DUResponse) dirResponse.getEntity();
-    Assert.assertEquals(3, duDirReponse.getCount());
+    assertEquals(3, duDirReponse.getCount());
     List<DUResponse.DiskUsage> duSubDir = duDirReponse.getDuData();
     Collections.sort(duSubDir,
             Comparator.comparing(DUResponse.DiskUsage::getSubpath));
     DUResponse.DiskUsage duDir2 = duSubDir.get(0);
     DUResponse.DiskUsage duDir3 = duSubDir.get(1);
     DUResponse.DiskUsage duDir4 = duSubDir.get(2);
-    Assert.assertEquals(DIR_TWO_PATH, duDir2.getSubpath());
-    Assert.assertEquals(KEY_TWO_SIZE, duDir2.getSize());
+    assertEquals(DIR_TWO_PATH, duDir2.getSubpath());
+    assertEquals(KEY_TWO_SIZE, duDir2.getSize());
 
-    Assert.assertEquals(DIR_THREE_PATH, duDir3.getSubpath());
-    Assert.assertEquals(KEY_THREE_SIZE, duDir3.getSize());
+    assertEquals(DIR_THREE_PATH, duDir3.getSubpath());
+    assertEquals(KEY_THREE_SIZE, duDir3.getSize());
 
-    Assert.assertEquals(DIR_FOUR_PATH, duDir4.getSubpath());
-    Assert.assertEquals(KEY_SIX_SIZE, duDir4.getSize());
+    assertEquals(DIR_FOUR_PATH, duDir4.getSubpath());
+    assertEquals(KEY_SIX_SIZE, duDir4.getSize());
 
   }
   @Test
@@ -560,8 +567,8 @@ public class TestNSSummaryEndpointWithFSO {
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
             false, false);
     DUResponse keyObj = (DUResponse) keyResponse.getEntity();
-    Assert.assertEquals(0, keyObj.getCount());
-    Assert.assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
+    assertEquals(0, keyObj.getCount());
+    assertEquals(KEY_FOUR_SIZE, keyObj.getSize());
 
   }
   @Test
@@ -570,7 +577,7 @@ public class TestNSSummaryEndpointWithFSO {
     Response invalidResponse = nsSummaryEndpoint.getDiskUsage(INVALID_PATH,
             false, false);
     DUResponse invalidObj = (DUResponse) invalidResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
+    assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidObj.getStatus());
   }
 
@@ -580,8 +587,8 @@ public class TestNSSummaryEndpointWithFSO {
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(MULTI_BLOCK_KEY_PATH,
             false, true);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_KEY_SIZE_WITH_REPLICA,
             replicaDUResponse.getSizeWithReplica());
   }
 
@@ -592,10 +599,10 @@ public class TestNSSummaryEndpointWithFSO {
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) rootResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_ROOT,
         replicaDUResponse.getSizeWithReplica());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
         replicaDUResponse.getDuData().get(0).getSizeWithReplica());
 
   }
@@ -606,10 +613,10 @@ public class TestNSSummaryEndpointWithFSO {
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) volResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL,
         replicaDUResponse.getSizeWithReplica());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
         replicaDUResponse.getDuData().get(0).getSizeWithReplica());
   }
 
@@ -619,10 +626,10 @@ public class TestNSSummaryEndpointWithFSO {
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_BUCKET1,
         replicaDUResponse.getSizeWithReplica());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR1,
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR1,
         replicaDUResponse.getDuData().get(0).getSizeWithReplica());
   }
 
@@ -638,10 +645,10 @@ public class TestNSSummaryEndpointWithFSO {
     Response dir1Response = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) dir1Response.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR1,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR1,
         replicaDUResponse.getSizeWithReplica());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR2,
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_DIR2,
         replicaDUResponse.getDuData().get(0).getSizeWithReplica());
   }
 
@@ -651,8 +658,8 @@ public class TestNSSummaryEndpointWithFSO {
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
         false, true);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
-    Assert.assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY,
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_KEY,
         replicaDUResponse.getSizeWithReplica());
   }
 
@@ -662,45 +669,45 @@ public class TestNSSummaryEndpointWithFSO {
     Response rootResponse = nsSummaryEndpoint.getQuotaUsage(ROOT_PATH);
     QuotaUsageResponse quRootRes =
         (QuotaUsageResponse) rootResponse.getEntity();
-    Assert.assertEquals(ROOT_QUOTA, quRootRes.getQuota());
-    Assert.assertEquals(ROOT_DATA_SIZE, quRootRes.getQuotaUsed());
+    assertEquals(ROOT_QUOTA, quRootRes.getQuota());
+    assertEquals(ROOT_DATA_SIZE, quRootRes.getQuotaUsed());
 
     // volume level quota usage
     Response volResponse = nsSummaryEndpoint.getQuotaUsage(VOL_PATH);
     QuotaUsageResponse quVolRes = (QuotaUsageResponse) volResponse.getEntity();
-    Assert.assertEquals(VOL_QUOTA, quVolRes.getQuota());
-    Assert.assertEquals(VOL_DATA_SIZE, quVolRes.getQuotaUsed());
+    assertEquals(VOL_QUOTA, quVolRes.getQuota());
+    assertEquals(VOL_DATA_SIZE, quVolRes.getQuotaUsed());
 
     // bucket level quota usage
     Response bucketRes = nsSummaryEndpoint.getQuotaUsage(BUCKET_ONE_PATH);
     QuotaUsageResponse quBucketRes = (QuotaUsageResponse) bucketRes.getEntity();
-    Assert.assertEquals(BUCKET_ONE_QUOTA, quBucketRes.getQuota());
-    Assert.assertEquals(BUCKET_ONE_DATA_SIZE, quBucketRes.getQuotaUsed());
+    assertEquals(BUCKET_ONE_QUOTA, quBucketRes.getQuota());
+    assertEquals(BUCKET_ONE_DATA_SIZE, quBucketRes.getQuotaUsed());
 
     Response bucketRes2 = nsSummaryEndpoint.getQuotaUsage(BUCKET_TWO_PATH);
     QuotaUsageResponse quBucketRes2 =
             (QuotaUsageResponse) bucketRes2.getEntity();
-    Assert.assertEquals(BUCKET_TWO_QUOTA, quBucketRes2.getQuota());
-    Assert.assertEquals(BUCKET_TWO_DATA_SIZE, quBucketRes2.getQuotaUsed());
+    assertEquals(BUCKET_TWO_QUOTA, quBucketRes2.getQuota());
+    assertEquals(BUCKET_TWO_DATA_SIZE, quBucketRes2.getQuotaUsed());
 
     // other level not applicable
     Response naResponse1 = nsSummaryEndpoint.getQuotaUsage(DIR_ONE_PATH);
     QuotaUsageResponse quotaUsageResponse1 =
             (QuotaUsageResponse) naResponse1.getEntity();
-    Assert.assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
+    assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
             quotaUsageResponse1.getResponseCode());
 
     Response naResponse2 = nsSummaryEndpoint.getQuotaUsage(KEY_PATH);
     QuotaUsageResponse quotaUsageResponse2 =
             (QuotaUsageResponse) naResponse2.getEntity();
-    Assert.assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
+    assertEquals(ResponseStatus.TYPE_NOT_APPLICABLE,
             quotaUsageResponse2.getResponseCode());
 
     // invalid path request
     Response invalidRes = nsSummaryEndpoint.getQuotaUsage(INVALID_PATH);
     QuotaUsageResponse invalidResObj =
             (QuotaUsageResponse) invalidRes.getEntity();
-    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
+    assertEquals(ResponseStatus.PATH_NOT_FOUND,
             invalidResObj.getResponseCode());
   }
 
@@ -719,12 +726,12 @@ public class TestNSSummaryEndpointWithFSO {
     FileSizeDistributionResponse fileSizeDistResObj =
             (FileSizeDistributionResponse) res.getEntity();
     int[] fileSizeDist = fileSizeDistResObj.getFileSizeDist();
-    Assert.assertEquals(bin0, fileSizeDist[0]);
-    Assert.assertEquals(bin1, fileSizeDist[1]);
-    Assert.assertEquals(bin2, fileSizeDist[2]);
-    Assert.assertEquals(bin3, fileSizeDist[3]);
+    assertEquals(bin0, fileSizeDist[0]);
+    assertEquals(bin1, fileSizeDist[1]);
+    assertEquals(bin2, fileSizeDist[2]);
+    assertEquals(bin3, fileSizeDist[3]);
     for (int i = 4; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-      Assert.assertEquals(0, fileSizeDist[i]);
+      assertEquals(0, fileSizeDist[i]);
     }
   }
 
@@ -1371,13 +1378,27 @@ public class TestNSSummaryEndpointWithFSO {
   public void testOrphanKeys() throws IOException {
     try (TableIterator<Long, ? extends Table.KeyValue<Long, OrphanKeyMetaData>>
         orphanTableIter = this.orphanKeysMetaDataTable.iterator()) {
+      Map<Long, Set<Long>> parentToOrphanChildsMap = new HashMap();
       while (orphanTableIter.hasNext()) {
         Table.KeyValue<Long, OrphanKeyMetaData> keyValue =
             orphanTableIter.next();
         Long key = keyValue.getKey();
         OrphanKeyMetaData value = keyValue.getValue();
         Set<Long> objectIds = value.getObjectIds();
+        parentToOrphanChildsMap.put(key, objectIds);
       }
+      assertTrue(parentToOrphanChildsMap.containsKey(22L));
+      assertEquals(parentToOrphanChildsMap.get(22L).size(), 1);
+      assertEquals(
+          parentToOrphanChildsMap.get(22L).stream().findFirst()
+              .get().longValue(), 23L);
+      NSSummary dirNSSummary = reconNamespaceSummaryManager.getNSSummary(23L);
+      assertEquals(dirNSSummary.getSizeOfFiles(), 3074);
+      assertEquals(dirNSSummary.getDirName(), "dir7");
+      assertEquals(dirNSSummary.getNumOfFiles(), 2);
+      assertEquals(dirNSSummary.getChildDir().stream()
+          .findFirst().get().longValue(), 24L);
+
     }
   }
 }

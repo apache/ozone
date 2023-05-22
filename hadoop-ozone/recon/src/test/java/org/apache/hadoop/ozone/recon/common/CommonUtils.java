@@ -83,8 +83,8 @@ public class CommonUtils {
     NamespaceSummaryResponse rootResponseObj =
         (NamespaceSummaryResponse) rootResponse.getEntity();
     Assert.assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
-    Assert.assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    Assert.assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
+    Assert.assertEquals(3, rootResponseObj.getCountStats().getNumVolume());
+    Assert.assertEquals(5, rootResponseObj.getCountStats().getNumBucket());
     Assert.assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
     Assert.assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
     Assert.assertEquals(IAccessAuthorizer.ACLIdentityType.USER,
