@@ -78,6 +78,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
   private final Set<DatanodeDetails> unhealthyReplicaDNs;
+  private final Set<ContainerReplica> unhealthyReplicas;
   private final List<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
@@ -99,9 +100,11 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
 
     unhealthyReplicaDNs = new HashSet<>();
+    unhealthyReplicas = new HashSet<>();
     for (ContainerReplica r : replicas) {
       if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
         unhealthyReplicaDNs.add(r.getDatanodeDetails());
+        unhealthyReplicas.add(r);
       }
     }
 
@@ -170,6 +173,10 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public int getMaintenanceCount() {
     return maintenanceIndexes.size();
+  }
+
+  Set<ContainerReplica> getUnhealthyReplicas() {
+    return unhealthyReplicas;
   }
 
   /**
@@ -520,6 +527,8 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   public boolean isSufficientlyReplicated() {
     return isSufficientlyReplicated(false);
   }
+
+
 
   @Override
   public String toString() {
