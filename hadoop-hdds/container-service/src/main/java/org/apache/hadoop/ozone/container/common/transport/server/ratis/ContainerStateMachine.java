@@ -540,7 +540,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               write.getChunkData().getChunkName());
         }
         raftFuture.complete(r::toByteString);
-        metrics.recordWriteStateMachineCompletion(
+        metrics.recordWriteStateMachineCompletionNs(
             Time.monotonicNowNanos() - startTime);
       }
 
@@ -914,7 +914,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         if (trx.getServerRole() == RaftPeerRole.LEADER
             && trx.getStateMachineContext() != null) {
           long startTime = (long) trx.getStateMachineContext();
-          metrics.incPipelineLatency(cmdType,
+          metrics.incPipelineLatencyMs(cmdType,
               (Time.monotonicNowNanos() - startTime) / 1000000L);
         }
         // ignore close container exception while marking the stateMachine
@@ -966,7 +966,7 @@ public class ContainerStateMachine extends BaseStateMachine {
               + "{} exception {}", gid, requestProto.getCmdType(), index, t);
         }
         applyTransactionSemaphore.release();
-        metrics.recordApplyTransactionCompletion(
+        metrics.recordApplyTransactionCompletionNs(
             Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -79,12 +79,15 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     if (nextSnapshot != null) {
-      DBStore nextSnapshotStore = nextSnapshot.getMetadataManager().getStore();
+      RDBStore nextSnapshotStore =
+          (RDBStore) nextSnapshot.getMetadataManager().getStore();
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
         processKeys(writeBatch, nextSnapshot.getMetadataManager());
         processDirs(writeBatch, nextSnapshot.getMetadataManager());
         nextSnapshotStore.commitBatchOperation(writeBatch);
+        nextSnapshotStore.getDb().flushWal(true);
+        nextSnapshotStore.getDb().flush();
       }
     } else {
       // Handle the case where there is no next Snapshot.
@@ -93,13 +96,16 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     // Update From Snapshot Deleted Table.
-    DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
+    RDBStore fromSnapshotStore =
+        (RDBStore) fromSnapshot.getMetadataManager().getStore();
     try (BatchOperation fromSnapshotBatchOp =
              fromSnapshotStore.initBatchOperation()) {
       processReclaimKeys(fromSnapshotBatchOp,
           fromSnapshot.getMetadataManager());
       deleteDirsFromSnapshot(fromSnapshotBatchOp);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
+      fromSnapshotStore.getDb().flushWal(true);
+      fromSnapshotStore.getDb().flush();
     }
   }
 
