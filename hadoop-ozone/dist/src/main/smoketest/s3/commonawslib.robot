@@ -73,7 +73,6 @@ Setup v4 headers
 
 Setup secure v4 headers
     ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
-    Log To Console      result of getsecret : ${result}
     ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
     Return From Keyword if      ${output}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
