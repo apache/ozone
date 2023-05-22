@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509;
+package org.apache.hadoop.hdds.security;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
