@@ -24,12 +24,10 @@ import java.nio.file.Paths;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
 
@@ -517,16 +515,6 @@ public class SecurityConfig {
       LOG.error("Security Provider:{} is unknown", provider);
       throw new SecurityException("Unknown security provider:" + provider);
     }
-  }
-
-  /**
-   * Returns max date for which S3 auth info objects will be valid.
-   */
-  public long getS3AuthInfoMaxDate() {
-    return getConfiguration().getTimeDuration(
-        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
-        TimeUnit.MICROSECONDS);
   }
 
   public boolean isTokenEnabled() {
