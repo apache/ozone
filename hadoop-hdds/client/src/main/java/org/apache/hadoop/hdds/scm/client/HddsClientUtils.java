@@ -226,11 +226,6 @@ public final class HddsClientUtils {
     if (keyName == null) {
       throw new IllegalArgumentException("Key name is null");
     }
-    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
-      throw new IllegalArgumentException(
-          "Cannot create key under path reserved for "
-          + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-    }
     if (!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
             .matcher(keyName).matches()) {
       throw new IllegalArgumentException("Invalid key name: " + keyName);

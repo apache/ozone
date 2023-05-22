@@ -351,15 +351,16 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    String[] invalidKeyNames = {OM_SNAPSHOT_INDICATOR + "/" + keyName,
+    String[] invalidKeyNames = {
+        OM_SNAPSHOT_INDICATOR + "/" + keyName,
         OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName};
+        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName
+    };
 
     for (String invalidKeyName : invalidKeyNames) {
       OMRequest omRequest = createFileRequest(volumeName, bucketName,
-          OM_SNAPSHOT_INDICATOR + invalidKeyName,
-          HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
-          false, false);
+          invalidKeyName, HddsProtos.ReplicationFactor.ONE,
+          HddsProtos.ReplicationType.RATIS, false, false);
 
       OMFileCreateRequest omFileCreateRequest =
           getOMFileCreateRequest(omRequest);

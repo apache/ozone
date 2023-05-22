@@ -129,9 +129,6 @@ public class TestOMKeyRequest {
         folder.newFolder().getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
-    ozoneConfiguration.set(
-        OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-        "true");
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
