@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.junit.Assert;
@@ -41,19 +42,22 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
         omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
 
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
-
-    // As we added manually to key table.
-    Assert.assertNotNull(omKeyInfo);
-
     long mtime = 2000;
-    long atime = 1000;
+    long keyMtime = executeAndReturn(ozoneKey, mtime);
+    Assert.assertEquals(mtime, keyMtime);
 
+    long newMtime = -1;
+    keyMtime = executeAndReturn(ozoneKey, newMtime);
+    Assert.assertEquals(mtime, keyMtime);
+  }
+
+  long executeAndReturn(String ozoneKey, long mtime) throws IOException {
+    long atime = 1000;
     OMRequest setTimesRequest = createSetTimesKeyRequest(mtime, atime);
     OMKeySetTimesRequest omKeySetTimesRequest =
         getOmKeySetTimesRequest(setTimesRequest);
     OMRequest preExecuteRequest = omKeySetTimesRequest.preExecute(ozoneManager);
+    omKeySetTimesRequest = getOmKeySetTimesRequest(preExecuteRequest);
 
     OMClientResponse omClientResponse = omKeySetTimesRequest
         .validateAndUpdateCache(ozoneManager, 100L,
@@ -67,25 +71,18 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     long keyMtime =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
-
-    long newMtime = -1;
-    setTimesRequest = createSetTimesKeyRequest(newMtime, atime);
-    omKeySetTimesRequest =
-        getOmKeySetTimesRequest(setTimesRequest);
-    preExecuteRequest = omKeySetTimesRequest.preExecute(ozoneManager);
-    // Verify that mtime = -1 does not update modification time.
-    keyMtime =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
-            .getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
+    return keyMtime;
   }
 
-  protected OMRequest createSetTimesKeyRequest(long mtime, long atime) {
+  private OMRequest createSetTimesKeyRequest(long mtime, long atime) {
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+        OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .build();
     SetTimesRequest setTimesRequest = SetTimesRequest.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setKeyName(keyName)
+        .setKeyArgs(keyArgs)
         .setMtime(mtime)
         .setAtime(atime)
         .build();
@@ -107,6 +104,6 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
 
   protected OMKeySetTimesRequest getOmKeySetTimesRequest(
       OMRequest setTimesRequest) {
-    return new OMKeySetTimesRequest(setTimesRequest, BucketLayout.OBJECT_STORE);
+    return new OMKeySetTimesRequest(setTimesRequest, getBucketLayout());
   }
 }

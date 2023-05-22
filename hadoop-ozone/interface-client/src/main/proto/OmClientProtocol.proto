@@ -1882,11 +1882,9 @@ message RecoverLeaseResponse {
 }
 
 message SetTimesRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  required string keyName    = 3;
-  required uint64 mtime      = 4;
-  required uint64 atime      = 5;
+  required KeyArgs keyArgs = 1;
+  required uint64 mtime    = 2;
+  required uint64 atime    = 3;
 }
 
 message SetTimesResponse {

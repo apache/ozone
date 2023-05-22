@@ -1529,8 +1529,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public void setTimes(Path f, long mtime, long atime) throws IOException {
-    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
-    statistics.incrementReadOps(1);
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    statistics.incrementWriteOps(1);
     LOG.trace("setTimes() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);

@@ -893,10 +893,10 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Builder for OmBucketInfo.
    /**
-   * Adds ACLs to the Bucket.
-   * @param addAcl ACL to be added
-   * @return true - if acl is successfully added, false if acl already exists
-   * for the bucket.
+   * Set time to a key in this bucket.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
    * @throws IOException
    */
   public void setTimes(String keyName, long mtime, long atime)

@@ -172,7 +172,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBuck
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
@@ -2213,14 +2212,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void setTimes(String volumeName, String bucketName, String keyName,
-      long mtime, long atime)
+  public void setTimes(OmKeyArgs args, long mtime, long atime)
       throws IOException {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .setKeyName(args.getKeyName())
+        .build();
     SetTimesRequest setTimesRequest =
         SetTimesRequest.newBuilder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
+            .setKeyArgs(keyArgs)
             .setMtime(mtime)
             .setAtime(atime)
             .build();

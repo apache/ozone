@@ -316,8 +316,8 @@ public final class OzoneManagerRatisUtils {
       break;
     case SetTimes:
       //keyArgs = omRequest.getSetTimesRequest().getKeyArgs();
-      volumeName = omRequest.getSetTimesRequest().getVolumeName();
-      bucketName = omRequest.getSetTimesRequest().getBucketName();
+      volumeName = omRequest.getSetTimesRequest().getKeyArgs().getVolumeName();
+      bucketName = omRequest.getSetTimesRequest().getKeyArgs().getBucketName();
       break;
     default:
       throw new IllegalStateException("Unrecognized write command " +

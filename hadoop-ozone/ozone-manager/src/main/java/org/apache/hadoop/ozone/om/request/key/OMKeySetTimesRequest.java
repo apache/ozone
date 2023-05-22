@@ -61,17 +61,22 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
-    String keyPath = setTimesRequest.getKeyName();
+    String keyPath = setTimesRequest.getKeyArgs().getKeyName();
     String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
             keyPath, getBucketLayout());
 
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+        OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(getVolumeName())
+            .setBucketName(getBucketName())
+            .setKeyName(normalizedKeyPath)
+            .build();
+
     return request.toBuilder()
         .setSetTimesRequest(
             setTimesRequest.toBuilder()
-                .setVolumeName(getVolumeName())
-                .setBucketName(getBucketName())
-                .setKeyName(normalizedKeyPath)
+                .setKeyArgs(keyArgs)
                 .setMtime(getModificationTime()))
         .build();
   }
@@ -86,9 +91,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     super(omRequest, bucketLayout);
     OzoneManagerProtocolProtos.SetTimesRequest setTimesRequest =
         getOmRequest().getSetTimesRequest();
-    volumeName = setTimesRequest.getVolumeName();
-    bucketName = setTimesRequest.getBucketName();
-    keyName = setTimesRequest.getKeyName();
+    volumeName = setTimesRequest.getKeyArgs().getVolumeName();
+    bucketName = setTimesRequest.getKeyArgs().getBucketName();
+    keyName = setTimesRequest.getKeyArgs().getKeyName();
     // ignore accessTime
     modificationTime = setTimesRequest.getMtime();
   }

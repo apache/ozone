@@ -4498,8 +4498,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public void setTimes(String volumeName, String bucketName, String keyName,
-      long mtime, long atime)
+  public void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
       throws IOException {
   }
 

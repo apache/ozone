@@ -999,7 +999,14 @@ public interface OzoneManagerProtocol
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
 
-  void setTimes(String volumeName, String bucketName, String keyName,
-      long mtime, long atime)
+  /**
+   * Update modification time and access time of a file.
+   *
+   * @param keyArgs - The
+   * @param mtime
+   * @param atime
+   * @throws IOException
+   */
+  void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
       throws IOException;
 }

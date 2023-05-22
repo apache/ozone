@@ -2344,8 +2344,11 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException {
-    ozoneManagerClient.setTimes(obj.getVolumeName(), obj.getBucketName(),
-        keyName, mtime, atime);
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(obj.getVolumeName())
+        .setBucketName(obj.getBucketName())
+        .setKeyName(keyName);
+    ozoneManagerClient.setTimes(builder.build(), mtime, atime);
   }
 
   public ExecutorService getECReconstructExecutor() {
