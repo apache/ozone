@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
-import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -74,7 +73,7 @@ public class ReconDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, NSSummary>
       NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
@@ -92,7 +91,7 @@ public class ReconDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
 
   @Override
   public String getName() {
