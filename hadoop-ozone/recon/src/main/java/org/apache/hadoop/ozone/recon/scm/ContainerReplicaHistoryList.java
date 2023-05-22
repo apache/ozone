@@ -24,6 +24,9 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryListProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 
 /**
  * A list of ContainerReplicaHistory.
@@ -31,6 +34,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryP
  * For Recon DB table definition.
  */
 public class ContainerReplicaHistoryList {
+  private static final Codec<ContainerReplicaHistoryList> CODEC
+      = new DelegatedCodec<>(Proto2Codec.get(
+      ContainerReplicaHistoryListProto.class),
+      ContainerReplicaHistoryList::fromProto,
+      ContainerReplicaHistoryList::toProto);
+
+  public static Codec<ContainerReplicaHistoryList> getCodec() {
+    return CODEC;
+  }
 
   private List<ContainerReplicaHistory> replicaHistories;
 

@@ -33,7 +33,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   private final Codec<DELEGATE> delegate;
   private final CheckedFunction<DELEGATE, T, IOException> forward;
   private final CheckedFunction<T, DELEGATE, IOException> backward;
-  private final boolean immutable;
+  private final boolean shallowCopy;
 
   /**
    * Construct a {@link Codec} using the given delegate.
@@ -41,16 +41,17 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
    * @param delegate the delegate {@link Codec}
    * @param forward a function to convert {@link DELEGATE} to {@link T}.
    * @param backward a function to convert {@link T} back to {@link DELEGATE}.
-   * @param immutable are the objects in {@link T} immutable?
+   * @param shallowCopy Should it use shallow copy
+   *                    in {@link #copyObject(Object)}?
    */
   public DelegatedCodec(Codec<DELEGATE> delegate,
       CheckedFunction<DELEGATE, T, IOException> forward,
       CheckedFunction<T, DELEGATE, IOException> backward,
-      boolean immutable) {
+      boolean shallowCopy) {
     this.delegate = delegate;
     this.forward = forward;
     this.backward = backward;
-    this.immutable = immutable;
+    this.shallowCopy = shallowCopy;
   }
 
   /** The same as new DelegatedCodec(delegate, forward, backward, false). */
@@ -89,7 +90,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
 
   @Override
   public T copyObject(T message) {
-    if (immutable) {
+    if (shallowCopy) {
       return message;
     }
     try {

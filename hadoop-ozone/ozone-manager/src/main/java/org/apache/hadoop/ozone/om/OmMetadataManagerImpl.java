@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmDBSnapshotInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDBUserPrincipalInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmDirectoryInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
@@ -599,7 +598,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, new OmDBTenantStateCodec())
         .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
         .addCodec(OmDBUserPrincipalInfo.class, new OmDBUserPrincipalInfoCodec())
-        .addCodec(SnapshotInfo.class, new OmDBSnapshotInfoCodec());
+        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec());
   }
 
   /**

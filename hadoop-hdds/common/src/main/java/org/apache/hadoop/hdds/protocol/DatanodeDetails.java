@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,6 +38,9 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +65,15 @@ public class DatanodeDetails extends NodeImpl implements
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeDetails.class);
+
+  private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(HddsProtos.ExtendedDatanodeDetailsProto.class),
+      DatanodeDetails::getFromProtoBuf,
+      DatanodeDetails::getExtendedProtoBufMessage);
+
+  public static Codec<DatanodeDetails> getCodec() {
+    return CODEC;
+  }
 
   /**
    * DataNode's unique identifier in the cluster.

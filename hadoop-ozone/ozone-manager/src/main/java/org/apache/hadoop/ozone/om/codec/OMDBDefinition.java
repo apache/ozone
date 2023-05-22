@@ -228,7 +228,7 @@ public class OMDBDefinition implements DBDefinition {
           String.class,  // snapshot path
           new StringCodec(),
           SnapshotInfo.class,
-          new OmDBSnapshotInfoCodec());
+          SnapshotInfo.getCodec());
 
   /**
    * SnapshotRenamedTable that complements the keyTable (or fileTable)
