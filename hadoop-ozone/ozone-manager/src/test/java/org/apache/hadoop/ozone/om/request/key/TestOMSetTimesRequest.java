@@ -23,8 +23,6 @@ import java.util.UUID;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -36,6 +34,11 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
  * Test cases for OMSetTimesRequest.
  */
 public class TestOMSetTimesRequest extends TestOMKeyRequest {
+
+  /**
+   * Verify that setTimes() on key works as expected.
+   * @throws Exception
+   */
   @Test
   public void testKeySetTimesRequest() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -43,15 +46,23 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     String ozoneKey = addKeyToTable();
 
     long mtime = 2000;
-    long keyMtime = executeAndReturn(ozoneKey, mtime);
+    executeAndReturn(mtime);
+    // Verify result of setting times.
+    long keyMtime =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getModificationTime();
     Assert.assertEquals(mtime, keyMtime);
 
     long newMtime = -1;
-    keyMtime = executeAndReturn(ozoneKey, newMtime);
+    executeAndReturn(newMtime);
+    keyMtime =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
+            .getModificationTime();
     Assert.assertEquals(mtime, keyMtime);
   }
 
-  long executeAndReturn(String ozoneKey, long mtime) throws IOException {
+  protected void executeAndReturn(long mtime)
+      throws IOException {
     long atime = 1000;
     OMRequest setTimesRequest = createSetTimesKeyRequest(mtime, atime);
     OMKeySetTimesRequest omKeySetTimesRequest =
@@ -66,12 +77,6 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     Assert.assertNotNull(omSetTimesResponse.getSetTimesResponse());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omSetTimesResponse.getStatus());
-
-    // Verify result of setting times.
-    long keyMtime =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
-            .getModificationTime();
-    return keyMtime;
   }
 
   private OMRequest createSetTimesKeyRequest(long mtime, long atime) {

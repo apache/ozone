@@ -81,11 +81,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
         .build();
   }
 
-  private String volumeName;
-  private String bucketName;
-  private String keyName;
-  //private long creationTime;
-  private long modificationTime;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long modificationTime;
 
   public OMKeySetTimesRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -143,12 +142,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Set time: {} to path: {} success!", modificationTime,
+        LOG.debug("Set mtime: {} to path: {} success!", modificationTime,
             getKeyName());
       }
       break;
     case FAILURE:
-      LOG.error("Set time {} to path {} failed!", modificationTime,
+      LOG.error("Set mtime {} to path {} failed!", modificationTime,
           getKeyName(), exception);
       break;
     default:
@@ -177,7 +176,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     ozoneManager.getMetrics().incNumSetTime();
-    OmKeyInfo omKeyInfo = null;
+    OmKeyInfo omKeyInfo;
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
@@ -187,9 +186,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     boolean lockAcquired = false;
     String volume = null;
     String bucket = null;
-    String key = null;
+    String key;
     boolean operationResult = false;
-    Result result = null;
+    Result result;
     try {
       volume = getVolumeName();
       bucket = getBucketName();

@@ -1002,9 +1002,9 @@ public interface OzoneManagerProtocol
   /**
    * Update modification time and access time of a file.
    *
-   * @param keyArgs - The
-   * @param mtime
-   * @param atime
+   * @param keyArgs - The key argument.
+   * @param mtime - modification time.
+   * @param atime - access time. Ignored by Ozone Manager.
    * @throws IOException
    */
   void setTimes(OmKeyArgs keyArgs, long mtime, long atime)

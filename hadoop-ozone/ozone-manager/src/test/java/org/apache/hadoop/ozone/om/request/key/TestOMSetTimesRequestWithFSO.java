@@ -17,21 +17,57 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test cases for TestOMSetTimesRequestWithFSO.
  */
 public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
 
+  private final String parentDir = "c/d/e";
+  private final String fileName = "file1";
+
+  /**
+   * Verify that setTimes() on directory works as expected.
+   * @throws Exception
+   */
+  @Test
+  public void testDirSetTimesRequest() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    addKeyToTable();
+    keyName = parentDir;
+
+    long mtime = 2000;
+    executeAndReturn(mtime);
+    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0);
+    assertTrue(keyStatus.isDirectory());
+    long keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    Assert.assertEquals(mtime, keyMtime);
+
+    long newMtime = -1;
+    executeAndReturn(newMtime);
+    keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0);
+    assertTrue(keyStatus.isDirectory());
+    keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    Assert.assertEquals(mtime, keyMtime);
+  }
+
   protected String addKeyToTable() throws Exception {
-    String parentDir = "c/d/e";
-    String fileName = "file1";
     String key = parentDir + "/" + fileName;
     keyName = key; // updated key name
 
