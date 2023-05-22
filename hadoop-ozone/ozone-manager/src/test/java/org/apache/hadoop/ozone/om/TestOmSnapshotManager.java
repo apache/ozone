@@ -218,19 +218,15 @@ public class TestOmSnapshotManager {
     // Create dummy leader files to calculate links
     directoryData.leaderDir = new File(testDir.toString(),
         "leader");
-    directoryData.leaderDir.mkdirs();
+    Assert.assertTrue(directoryData.leaderDir.mkdirs());
     directoryData.pathSnap1 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1";
     directoryData.pathSnap2 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir2";
     directoryData.leaderSnapdir1 = new File(directoryData.leaderDir.toString(), directoryData.pathSnap1);
-    if (!directoryData.leaderSnapdir1.mkdirs()) {
-      throw new IOException("failed to make directory: " + directoryData.leaderSnapdir1);
-    }
+    Assert.assertTrue(directoryData.leaderSnapdir1.mkdirs());
     Files.write(Paths.get(directoryData.leaderSnapdir1.toString(), "s1.sst"), dummyData);
 
     directoryData.leaderSnapdir2 = new File(directoryData.leaderDir.toString(), directoryData.pathSnap2);
-    if (!directoryData.leaderSnapdir2.mkdirs()) {
-      throw new IOException("failed to make directory: " + directoryData.leaderSnapdir2);
-    }
+    Assert.assertTrue(directoryData.leaderSnapdir2.mkdirs());
     Files.write(Paths.get(directoryData.leaderSnapdir2.toString(), "noLink.sst"), dummyData);
     Files.write(Paths.get(directoryData.leaderSnapdir2.toString(), "nonSstFile"), dummyData);
 
@@ -246,7 +242,7 @@ public class TestOmSnapshotManager {
 
     directoryData.leaderCheckpointDir = new File(directoryData.leaderDir.toString(),
         OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
-    directoryData.leaderCheckpointDir.mkdirs();
+    Assert.assertTrue(directoryData.leaderCheckpointDir.mkdirs());
     Files.write(Paths.get(directoryData.leaderCheckpointDir.toString(), "f1.sst"), dummyData);
     directoryData.s1FileLink = new File(directoryData.followerSnapdir2, "s1.sst");
     directoryData.s1File = new File(directoryData.followerSnapdir1, "s1.sst");
@@ -320,12 +316,12 @@ public class TestOmSnapshotManager {
 
   @Test
   public void testProcessFile() {
-    Path copyFile = Paths.get("/dir1/copyfile.sst");
-    Path excludeFile = Paths.get("/dir1/excludefile.sst");
-    Path linkToExcludedFile = Paths.get("/dir2/excludefile.sst");
-    Path linkToCopiedFile = Paths.get("/dir2/copyfile.sst");
-    Path addToCopiedFiles = Paths.get("/dir1/copyfile2.sst");
-    Path addNonSstToCopiedFiles = Paths.get("/dir1/nonSst");
+    Path copyFile = Paths.get(testDir.toString(), "dir1/copyfile.sst");
+    Path excludeFile = Paths.get(testDir.toString(), "dir1/excludefile.sst");
+    Path linkToExcludedFile = Paths.get(testDir.toString(), "dir2/excludefile.sst");
+    Path linkToCopiedFile = Paths.get(testDir.toString(), "dir2/copyfile.sst");
+    Path addToCopiedFiles = Paths.get(testDir.toString(), "dir1/copyfile2.sst");
+    Path addNonSstToCopiedFiles = Paths.get(testDir.toString(), "dir1/nonSst");
 
     Set<Path> toExcludeFiles = new HashSet<>(
         Collections.singletonList(excludeFile));

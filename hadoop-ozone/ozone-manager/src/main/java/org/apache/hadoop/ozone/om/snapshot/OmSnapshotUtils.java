@@ -127,7 +127,7 @@ public final class OmSnapshotUtils {
   }
 
   /**
-   * Link each of the subfiles in oldDir to newDir.
+   * Link each of the files in oldDir to newDir.
    *
    * @param oldDir The dir to create links from.
    * @param newDir The dir to create links to.
@@ -149,10 +149,14 @@ public final class OmSnapshotUtils {
       File newFile = new File(newDir, s);
       File newParent = newFile.getParentFile();
       if (!newParent.exists()) {
-        newParent.mkdirs();
+        if (!newParent.mkdirs()) {
+          throw new IOException("Directory create fails: " + newParent);
+        }
       }
       if (oldFile.isDirectory()) {
-        newFile.mkdirs();
+        if (!newFile.mkdirs()) {
+          throw new IOException("Directory create fails: " + newFile);
+        }
       } else {
         Files.createLink(newFile.toPath(), oldFile.toPath());
       }
