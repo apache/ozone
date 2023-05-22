@@ -99,14 +99,14 @@ public class TestOzoneManagerHASnapshot {
   @Test
   public void testSnapshotDiffWhenOmLeaderRestart()
       throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(5);
-    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(10);
+    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(10);
 
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(5));
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
     store.createSnapshot(volumeName, bucketName, snapshot1);
 
     for (int i = 0; i < 100; i++) {
-      createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(5));
+      createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
     }
 
     store.createSnapshot(volumeName, bucketName, snapshot2);
@@ -155,9 +155,9 @@ public class TestOzoneManagerHASnapshot {
 
   @Test
   public void testSnapshotIdConsistency() throws Exception {
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(5));
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
 
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(10);
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
@@ -242,8 +242,8 @@ public class TestOzoneManagerHASnapshot {
     for (int i = 0; i < 100; i++) {
       int index = i % 10;
       createFileKey(ozoneBuckets.get(index),
-          "key-" + RandomStringUtils.randomNumeric(3));
-      String snapshot1 = "snapshot-" + RandomStringUtils.randomNumeric(5);
+          "key-" + RandomStringUtils.randomNumeric(10));
+      String snapshot1 = "snapshot-" + RandomStringUtils.randomNumeric(10);
       store.createSnapshot(volumeNames.get(index),
           bucketNames.get(index), snapshot1);
     }
