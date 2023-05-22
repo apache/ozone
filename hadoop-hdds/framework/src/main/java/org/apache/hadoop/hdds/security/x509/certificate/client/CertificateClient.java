@@ -119,7 +119,7 @@ public interface CertificateClient extends Closeable {
    */
   X509Certificate getLatestRootCACertificate();
 
-  Set<X509Certificate> getAllRootCaCerts();
+  Set<X509Certificate> getAllCaCerts();
 
   /**
    * Return the pem encoded CA certificate list.

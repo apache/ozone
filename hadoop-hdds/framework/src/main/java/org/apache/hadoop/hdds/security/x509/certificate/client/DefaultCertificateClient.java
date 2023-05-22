@@ -113,7 +113,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private PublicKey publicKey;
   private CertPath certPath;
   private Map<String, CertPath> certificateMap;
-  private Set<CertPath> rootCerts;
+  private Set<CertPath> caCertificates;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -141,7 +141,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
-    this.rootCerts = ConcurrentHashMap.newKeySet();
+    this.caCertificates = ConcurrentHashMap.newKeySet();
 
     updateCertSerialId(certSerialId);
   }
@@ -165,15 +165,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         for (File file : certFiles) {
           if (file.isFile()) {
             try {
-              CertPath allCertificates =
+              CertPath certificatesFromFile =
                   certificateCodec.getCertPath(file.getName());
-              X509Certificate cert = firstCertificateFrom(allCertificates);
+              X509Certificate cert = firstCertificateFrom(certificatesFromFile);
               if (cert != null && cert.getSerialNumber() != null) {
                 if (cert.getSerialNumber().toString().equals(certSerialId)) {
-                  this.certPath = allCertificates;
+                  this.certPath = certificatesFromFile;
                 }
                 certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
-                    allCertificates);
+                    certificatesFromFile);
                 if (file.getName().startsWith(
                     CAType.SUBORDINATE.getFileNamePrefix())) {
                   String certFileName = FilenameUtils.getBaseName(
@@ -181,6 +181,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.SUBORDINATE.getFileNamePrefix().length()));
+                  caCertificates.add(certificatesFromFile);
                   if (tmpCaCertSerailId > latestCaCertSerailId) {
                     latestCaCertSerailId = tmpCaCertSerailId;
                   }
@@ -193,7 +194,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.ROOT.getFileNamePrefix().length()));
-                  rootCerts.add(allCertificates);
+                  caCertificates.add(certificatesFromFile);
                   if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
                     latestRootCaCertSerialId = tmpRootCaCertSerailId;
                   }
@@ -870,8 +871,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public Set<X509Certificate> getAllRootCaCerts() {
-    return rootCerts.stream().
+  public Set<X509Certificate> getAllCaCerts() {
+    return caCertificates.stream().
         map(this::firstCertificateFrom)
         .collect(Collectors.toSet());
   }

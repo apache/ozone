@@ -280,7 +280,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public Set<X509Certificate> getAllRootCaCerts() {
+  public Set<X509Certificate> getAllCaCerts() {
     return rootCerts;
   }
 

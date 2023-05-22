@@ -138,7 +138,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    for (X509Certificate cert : caClient.getAllRootCaCerts()) {
+    for (X509Certificate cert : caClient.getAllCaCerts()) {
       String certId = cert.getSerialNumber().toString();
       ks.setCertificateEntry(certId, cert);
     }
