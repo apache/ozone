@@ -443,7 +443,7 @@ public class OzoneListStatusHelper {
 
         // Copy cache value to local copy and work on it
         if (cacheOmInfo instanceof CopyObject) {
-          cacheOmInfo = ((CopyObject) cacheOmInfo).copyObject();
+          cacheOmInfo = ((CopyObject<Value>) cacheOmInfo).copyObject();
         }
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"
