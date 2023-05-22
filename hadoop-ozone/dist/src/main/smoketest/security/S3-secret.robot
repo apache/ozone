@@ -43,5 +43,3 @@ Get S3 secret twice
     GetSecret success
     GetSecret failure
     Revoke Secrets
-    Execute       kdestroy
-
