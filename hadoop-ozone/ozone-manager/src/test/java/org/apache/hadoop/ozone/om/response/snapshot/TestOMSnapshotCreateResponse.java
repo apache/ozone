@@ -26,8 +26,11 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.junit.After;
@@ -47,6 +50,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 
 /**
@@ -60,6 +65,7 @@ public class TestOMSnapshotCreateResponse {
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
   private OzoneConfiguration ozoneConfiguration;
+
   @Before
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
@@ -93,9 +99,11 @@ public class TestOMSnapshotCreateResponse {
         omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
-    // Prepare for deletedTable clean up logic verification
-    Set<String> dtSentinelKeys = addTestKeysToDeletedTable(
-        volumeName, bucketName);
+    // Populate deletedTable and deletedDirectoryTable
+    Set<String> dtSentinelKeys =
+        addTestKeysToDeletedTable(volumeName, bucketName);
+    Set<String> ddtSentinelKeys =
+        addTestKeysToDeletedDirTable(volumeName, bucketName);
 
     // commit to table
     OMSnapshotCreateResponse omSnapshotCreateResponse =
@@ -124,8 +132,9 @@ public class TestOMSnapshotCreateResponse {
     Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
     Assert.assertEquals(snapshotInfo, storedInfo);
 
-    // Check deletedTable clean up works as expected
+    // Check deletedTable and deletedDirectoryTable clean up work as expected
     verifyEntriesLeftInDeletedTable(dtSentinelKeys);
+    verifyEntriesLeftInDeletedDirTable(ddtSentinelKeys);
   }
 
   private Set<String> addTestKeysToDeletedTable(
@@ -134,60 +143,131 @@ public class TestOMSnapshotCreateResponse {
     RepeatedOmKeyInfo dummyRepeatedKeyInfo = new RepeatedOmKeyInfo.Builder()
         .setOmKeyInfos(new ArrayList<>()).build();
 
-    // Add deletedTable key entries that surround the snapshot scope
-    Set<String> dtSentinelKeys = new HashSet<>();
+    // Add deletedTable key entries that "surround" the snapshot scope
+    Set<String> sentinelKeys = new HashSet<>();
     // Get a bucket name right before and after the bucketName
     // e.g. When bucketName is buck2, bucketNameBefore is buck1,
     // bucketNameAfter is buck3
     // This will not guarantee the bucket name is valid for Ozone but
     // this would be good enough for this unit test.
     char bucketNameLastChar = bucketName.charAt(bucketName.length() - 1);
+
     String bucketNameBefore = bucketName.substring(0, bucketName.length() - 1) +
-        Character.toString((char)(bucketNameLastChar - 1));
+        (char) (bucketNameLastChar - 1);
     for (int i = 0; i < 3; i++) {
       String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameBefore,
           "dtkey" + i);
       omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-      dtSentinelKeys.add(dtKey);
+      sentinelKeys.add(dtKey);
     }
+
     String bucketNameAfter = bucketName.substring(0, bucketName.length() - 1) +
-        Character.toString((char)(bucketNameLastChar + 1));
+        (char) (bucketNameLastChar + 1);
     for (int i = 0; i < 3; i++) {
       String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketNameAfter,
           "dtkey" + i);
       omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
-      dtSentinelKeys.add(dtKey);
+      sentinelKeys.add(dtKey);
     }
+
     // Add deletedTable key entries in the snapshot (bucket) scope
     for (int i = 0; i < 10; i++) {
       String dtKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           "dtkey" + i);
       omMetadataManager.getDeletedTable().put(dtKey, dummyRepeatedKeyInfo);
+      // These are the keys that should be deleted.
+      // Thus not added to sentinelKeys list.
     }
 
-    return dtSentinelKeys;
+    return sentinelKeys;
   }
 
-  private void verifyEntriesLeftInDeletedTable(Set<String> dtSentinelKeys)
-      throws IOException {
+  /**
+   * Populates deletedDirectoryTable for the test.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @return A set of DB keys
+   */
+  private Set<String> addTestKeysToDeletedDirTable(
+      String volumeName, String bucketName) throws IOException {
 
-    // Verify that only keys inside the snapshot scope are gone from
-    // deletedTable.
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-        keyIter = omMetadataManager.getDeletedTable().iterator()) {
+    OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
+        omMetadataManager, volumeName, bucketName);
+
+    final OmKeyInfo dummyOmKeyInfo = new OmKeyInfo.Builder()
+        .setBucketName(bucketName)
+        .setVolumeName(volumeName)
+        .setKeyName("dummyKey")
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .build();
+    // Add deletedDirectoryTable key entries that "surround" the snapshot scope
+    Set<String> sentinelKeys = new HashSet<>();
+
+    final String dbKeyPfx =
+        OmSnapshotManager.getOzonePathKeyWithVolumeBucketNames(
+            omMetadataManager, volumeName, bucketName);
+
+    // Calculate offset to bucketId's last character in dbKeyPfx.
+    // First -1 for offset, second -1 for second to last char (before '/')
+    final int offset = dbKeyPfx.length() - 1 - 1;
+
+    char bucketIdLastChar = dbKeyPfx.charAt(offset);
+
+    String dbKeyPfxBefore =  dbKeyPfx.substring(0, offset) +
+        (char) (bucketIdLastChar - 1) + dbKeyPfx.substring(offset);
+    for (int i = 0; i < 3; i++) {
+      String dtKey = dbKeyPfxBefore + "dir" + i;
+      omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
+      sentinelKeys.add(dtKey);
+    }
+
+    String dbKeyPfxAfter =  dbKeyPfx.substring(0, offset) +
+        (char) (bucketIdLastChar + 1) + dbKeyPfx.substring(offset);
+    for (int i = 0; i < 3; i++) {
+      String dtKey = dbKeyPfxAfter + "dir" + i;
+      omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
+      sentinelKeys.add(dtKey);
+    }
+
+    // Add key entries in the snapshot (bucket) scope
+    for (int i = 0; i < 10; i++) {
+      String dtKey = dbKeyPfx + "dir" + i;
+      omMetadataManager.getDeletedDirTable().put(dtKey, dummyOmKeyInfo);
+      // These are the keys that should be deleted.
+      // Thus not added to sentinelKeys list.
+    }
+
+    return sentinelKeys;
+  }
+
+  private void verifyEntriesLeftInDeletedTable(Set<String> expectedKeys)
+      throws IOException {
+    // Only keys inside the snapshot scope would be deleted from deletedTable.
+    verifyEntriesLeftInTable(omMetadataManager.getDeletedTable(), expectedKeys);
+  }
+
+  private void verifyEntriesLeftInDeletedDirTable(Set<String> expectedKeys)
+      throws IOException {
+    verifyEntriesLeftInTable(omMetadataManager.getDeletedDirTable(),
+        expectedKeys);
+  }
+
+  private void verifyEntriesLeftInTable(
+      Table<String, ?> table, Set<String> expectedKeys) throws IOException {
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, ?>>
+        keyIter = table.iterator()) {
       keyIter.seekToFirst();
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> entry = keyIter.next();
-        String dtKey = entry.getKey();
-        // deletedTable should not have bucketName keys
-        Assert.assertTrue("deletedTable should contain key",
-            dtSentinelKeys.contains(dtKey));
-        dtSentinelKeys.remove(dtKey);
+        Table.KeyValue<String, ?> entry = keyIter.next();
+        String dbKey = entry.getKey();
+        Assert.assertTrue(table.getName() + " should contain key",
+            expectedKeys.contains(dbKey));
+        expectedKeys.remove(dbKey);
       }
     }
 
-    Assert.assertTrue("deletedTable is missing keys that should be there",
-        dtSentinelKeys.isEmpty());
+    Assert.assertTrue(table.getName() + " is missing keys that should be there",
+        expectedKeys.isEmpty());
   }
 }

@@ -653,6 +653,68 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testLinkBucketOrphan() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf =
+        getClientConfForOFS(hostPrefix, cluster.getConf());
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    FileSystem fs = FileSystem.get(clientConf);
+
+    int res;
+    try {
+      // Test orphan link bucket when source volume removed
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
+          hostPrefix + "/vol1/bucket1"});
+      Assert.assertEquals(0, res);
+
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
+          hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+
+      String[] args =
+          new String[] {"bucket", "link", "/vol1/bucket1",
+              "/linkvol/linkbuck"};
+      execute(ozoneShell, args);
+      
+      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
+          "-skipTrash", hostPrefix + "/vol1"});
+      Assert.assertEquals(0, res);
+
+      res = ToolRunner.run(shell, new String[]{"-ls", "-R",
+          hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+
+      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
+          "-skipTrash", hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+
+      // Test orphan link bucket when only source bucket removed
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
+          hostPrefix + "/vol1/bucket1"});
+      Assert.assertEquals(0, res);
+
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
+          hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+
+      args = new String[]{"bucket", "link", "/vol1/bucket1",
+          "/linkvol/linkbuck"};
+      execute(ozoneShell, args);
+
+      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
+          "-skipTrash", hostPrefix + "/vol1/bucket1"});
+      Assert.assertEquals(0, res);
+
+      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
+          "-skipTrash", hostPrefix + "/linkvol"});
+      Assert.assertEquals(0, res);
+    } finally {
+      shell.close();
+      fs.close();
+    }
+  }
+
+  @Test
   public void testDeleteTrashNoSkipTrash() throws Exception {
 
     // Test delete from Trash directory removes item from filesystem

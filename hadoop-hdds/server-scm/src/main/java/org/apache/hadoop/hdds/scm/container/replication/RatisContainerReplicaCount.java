@@ -192,7 +192,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * state + Number of replicas that don't match the container's state but
    * their state is not UNHEALTHY (also called mismatched replicas).
    * For example, consider a CLOSED container with the following replicas:
-   * {CLOSED, CLOSING, OPEN, CLOSED, UNHEALTHY}
+   * {CLOSED, CLOSING, OPEN, UNHEALTHY}
    * In this case, healthy replica count equals 3. Calculation:
    * 1 CLOSED -> 1 matching replica.
    * 1 OPEN, 1 CLOSING -> 2 mismatched replicas.

@@ -47,7 +47,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -115,8 +117,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
-                                  OutputStream destination)
+                                  OutputStream destination,
+                                  List<String> toExcludeList,
+                                  List<String> excludedList)
       throws IOException, InterruptedException {
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
+
     // Map of inodes to path.
     Map<Object, Path> copyFiles = new HashMap<>();
     // Map of link to path.
@@ -125,13 +132,24 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
         includeSnapshotData(request));
 
+    // Exclude file
+    Map<Object, Path> finalCopyFiles = new HashMap<>();
+    copyFiles.forEach((o, path) -> {
+      String fName = path.getFileName().toString();
+      if (!toExcludeList.contains(fName)) {
+        finalCopyFiles.put(o, path);
+      } else {
+        excludedList.add(fName);
+      }
+    });
+
     try (TarArchiveOutputStream archiveOutputStream =
             new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
+      writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
     }
   }
 

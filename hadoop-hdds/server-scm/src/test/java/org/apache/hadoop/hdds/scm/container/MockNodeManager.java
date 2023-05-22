@@ -815,7 +815,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 

@@ -245,7 +245,7 @@ public class TestMoveManager {
           } else {
             // after move
             return new ContainerHealthResult.MisReplicatedHealthResult(
-                containerInfo, false);
+                containerInfo, false, null);
           }
         });
 
@@ -483,7 +483,7 @@ public class TestMoveManager {
 
     Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult
-            .MisReplicatedHealthResult(containerInfo, false));
+            .MisReplicatedHealthResult(containerInfo, false, null));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
         ADD, tgt, 0, clock.millis() + 1000);

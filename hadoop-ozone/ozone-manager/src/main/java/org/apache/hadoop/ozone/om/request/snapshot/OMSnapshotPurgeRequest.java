@@ -33,6 +33,7 @@ import java.util.List;
 
 /**
  * Handles OMSnapshotPurge Request.
+ * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotPurgeRequest extends OMClientRequest {
 

@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test base of common utilities for tests not only raw coders but also block
@@ -161,9 +161,7 @@ public abstract class TestCoderBase {
     byte[][] erased = toArrays(erasedChunks);
     byte[][] recovered = toArrays(recoveredChunks);
     boolean result = Arrays.deepEquals(erased, recovered);
-    if (!result) {
-      assertTrue("Decoding and comparing failed.", result);
-    }
+    assertTrue(result, "Decoding and comparing failed.");
   }
 
   /**

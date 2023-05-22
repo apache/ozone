@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,9 +66,23 @@ class RDBTable implements Table<byte[], byte[]> {
     return family;
   }
 
+  public void put(ByteBuffer key, ByteBuffer value) throws IOException {
+    db.put(family, key, value);
+  }
+
   @Override
   public void put(byte[] key, byte[] value) throws IOException {
     db.put(family, key, value);
+  }
+
+  public void putWithBatch(BatchOperation batch, CodecBuffer key,
+      CodecBuffer value) throws IOException {
+    if (batch instanceof RDBBatchOperation) {
+      ((RDBBatchOperation) batch).put(family, key, value);
+    } else {
+      throw new IllegalArgumentException("Unexpected batch class: "
+          + batch.getClass().getSimpleName());
+    }
   }
 
   @Override

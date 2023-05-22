@@ -130,7 +130,7 @@ public class TestOMBucketCreateRequestWithFSO
     return new OMBucketCreateRequest(modifiedRequest);
   }
 
-  private void doValidateAndUpdateCache(String volumeName, String bucketName,
+  protected void doValidateAndUpdateCache(String volumeName, String bucketName,
       OMRequest modifiedRequest) throws Exception {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 

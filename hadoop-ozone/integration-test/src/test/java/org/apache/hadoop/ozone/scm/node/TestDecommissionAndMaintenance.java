@@ -93,7 +93,7 @@ public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
 
-  private static int numOfDatanodes = 7;
+  private static final int DATANODE_COUNT = 7;
   private static String bucketName = "bucket1";
   private static String volName = "vol1";
   private static RatisReplicationConfig ratisRepConfig =
@@ -140,10 +140,11 @@ public class TestDecommissionAndMaintenance {
     replicationConf.setInterval(Duration.ofSeconds(1));
     replicationConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
     replicationConf.setOverReplicatedInterval(Duration.ofSeconds(1));
+    replicationConf.setEnableLegacy(true); // disable as part of HDDS-8459
     conf.setFromObject(replicationConf);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes);
+        .setNumDatanodes(DATANODE_COUNT);
 
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 7);
   }
@@ -586,8 +587,9 @@ public class TestDecommissionAndMaintenance {
     cluster.restartStorageContainerManager(false);
     setManagers();
 
-    GenericTestUtils.waitFor(()
-        -> nm.getNodeCount(IN_SERVICE, null) == 5, 200, 30000);
+    GenericTestUtils.waitFor(
+        () -> nm.getNodeCount(IN_SERVICE, null) == DATANODE_COUNT - 1,
+        200, 30000);
 
     // Ensure there are 3 replicas not including the dead node, indicating a new
     // replica was created

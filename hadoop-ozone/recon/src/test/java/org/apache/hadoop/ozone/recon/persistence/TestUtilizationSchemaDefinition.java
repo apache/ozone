@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_GROWTH_DAILY_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
+import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CONTAINER_COUNT_BY_SIZE_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
 import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -103,6 +104,29 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
         "Unexpected number of columns");
     assertEquals(expectedPairsFileCount, actualPairsFileCount,
         "Columns Do not Match ");
+
+
+    ResultSet resultSetContainerCount = metaData.getColumns(null, null,
+        CONTAINER_COUNT_BY_SIZE_TABLE_NAME, null);
+
+    List<Pair<String, Integer>> expectedPairsContainerCount = new ArrayList<>();
+    expectedPairsContainerCount.add(
+        new ImmutablePair<>("container_size", Types.BIGINT));
+    expectedPairsContainerCount.add(
+        new ImmutablePair<>("count", Types.BIGINT));
+
+    List<Pair<String, Integer>> actualPairsContainerCount = new ArrayList<>();
+    while (resultSetContainerCount.next()) {
+      actualPairsContainerCount.add(
+          new ImmutablePair<>(resultSetContainerCount.getString(
+          "COLUMN_NAME"), resultSetContainerCount.getInt(
+          "DATA_TYPE")));
+    }
+    assertEquals(2, actualPairsContainerCount.size(),
+        "Unexpected number of columns");
+    assertEquals(expectedPairsContainerCount, actualPairsContainerCount,
+        "Columns Do not Match ");
+
   }
 
   @Test

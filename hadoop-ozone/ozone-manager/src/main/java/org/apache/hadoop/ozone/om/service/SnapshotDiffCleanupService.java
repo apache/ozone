@@ -19,11 +19,6 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -38,6 +33,15 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
@@ -62,17 +66,15 @@ public class SnapshotDiffCleanupService extends BackgroundService {
   private final ColumnFamilyHandle snapDiffReportCfh;
   private final CodecRegistry codecRegistry;
 
-  // TODO: [SNAPSHOT] Move this to config.
   /**
    * Maximum numbers of snapDiff jobs to be purged per clean-up task run.
    */
-  private final long maxJobToPurgePerTask = 1000L;
+  private final long maxJobToPurgePerTask;
 
-  // TODO: [SNAPSHOT] Move this to config.
   /**
    * Maximum time a snapDiff job and corresponding report will be persisted.
    */
-  private final long maxAllowedTime = Duration.ofDays(7).toMillis();
+  private final long maxAllowedTime;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffCleanupService(long interval,
@@ -96,6 +98,14 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     this.snapDiffPurgedJobCfh = snapDiffPurgedJobCfh;
     this.snapDiffReportCfh = snapDiffReportCfh;
     this.codecRegistry = codecRegistry;
+    this.maxJobToPurgePerTask = ozoneManager.getConfiguration().getLong(
+        OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK,
+        OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT
+    );
+    this.maxAllowedTime = ozoneManager.getConfiguration().getTimeDuration(
+        OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME,
+        OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   @VisibleForTesting

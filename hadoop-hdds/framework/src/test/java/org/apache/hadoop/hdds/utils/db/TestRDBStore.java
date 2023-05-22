@@ -20,7 +20,10 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
@@ -35,6 +38,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,10 +48,21 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+
 /**
  * RDBStore Tests.
  */
 public class TestRDBStore {
+  public static RDBStore newRDBStore(File dbFile, ManagedDBOptions options,
+      Set<TableConfig> families,
+      long maxDbUpdatesSizeThreshold)
+      throws IOException {
+    return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
+        CodecRegistry.newBuilder().build(), false, 1000, null, false,
+        maxDbUpdatesSizeThreshold, true, null);
+  }
+
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -73,7 +88,7 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
@@ -82,10 +97,13 @@ public class TestRDBStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
-  private void insertRandomData(RDBStore dbStore, int familyIndex)
-      throws Exception {
-    try (Table firstTable = dbStore.getTable(families.get(familyIndex))) {
+
+  public void insertRandomData(RDBStore dbStore, int familyIndex)
+      throws IOException {
+    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
+        get(familyIndex))) {
       Assertions.assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
@@ -94,6 +112,8 @@ public class TestRDBStore {
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
+    } catch (Exception e) {
+      throw new IOException(e);
     }
   }
 
@@ -235,7 +255,7 @@ public class TestRDBStore {
     Assertions.assertNotNull(checkpoint);
 
     RDBStore restoredStoreFromCheckPoint =
-        new RDBStore(checkpoint.getCheckpointLocation().toFile(),
+        newRDBStore(checkpoint.getCheckpointLocation().toFile(),
             options, configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
 
     // Let us make sure that our estimate is not off by 10%
@@ -339,7 +359,7 @@ public class TestRDBStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet,
+    rdbStore = newRDBStore(rdbStore.getDbLocation(), options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
       try (Table table = rdbStore.getTable(family)) {
@@ -359,4 +379,60 @@ public class TestRDBStore {
     }
   }
 
+  @Test
+  public void testSstConsistency() throws IOException {
+    for (int i = 0; i < 10; i++) {
+      insertRandomData(rdbStore, 0);
+      insertRandomData(rdbStore, 1);
+      insertRandomData(rdbStore, 2);
+    }
+    DBCheckpoint dbCheckpoint1 = rdbStore.getCheckpoint(true);
+
+    for (int i = 0; i < 10; i++) {
+      insertRandomData(rdbStore, 0);
+      insertRandomData(rdbStore, 1);
+      insertRandomData(rdbStore, 2);
+    }
+    DBCheckpoint dbCheckpoint2 = rdbStore.getCheckpoint(true);
+    compareSstWithSameName(dbCheckpoint1.getCheckpointLocation().toFile(),
+        dbCheckpoint2.getCheckpointLocation().toFile());
+
+    for (int i = 0; i < 10; i++) {
+      insertRandomData(rdbStore, 0);
+      insertRandomData(rdbStore, 1);
+      insertRandomData(rdbStore, 2);
+    }
+    DBCheckpoint dbCheckpoint3 = rdbStore.getCheckpoint(true);
+    compareSstWithSameName(dbCheckpoint2.getCheckpointLocation().toFile(),
+        dbCheckpoint3.getCheckpointLocation().toFile());
+  }
+
+  private void compareSstWithSameName(File checkpoint1, File checkpoint2)
+      throws IOException {
+    FilenameFilter filter = (dir, name) -> name.endsWith(ROCKSDB_SST_SUFFIX);
+    String[] files1 = checkpoint1.list(filter);
+    String[] files2 = checkpoint1.list(filter);
+    assert files1 != null;
+    assert files2 != null;
+    // Get all file names in the both checkpoints
+    List<String> result = Arrays.asList(files1);
+    result.retainAll(Arrays.asList(files2));
+
+    for (String name: result) {
+      File fileInCk1 = new File(checkpoint1.getAbsoluteFile(), name);
+      File fileInCk2 = new File(checkpoint2.getAbsoluteFile(), name);
+      long length1 = fileInCk1.length();
+      long length2 = fileInCk2.length();
+      Assertions.assertEquals(length1, length2, name);
+
+      try (InputStream fileStream1 = new FileInputStream(fileInCk1);
+           InputStream fileStream2 = new FileInputStream(fileInCk2)) {
+        byte[] content1 = new byte[fileStream1.available()];
+        byte[] content2 = new byte[fileStream2.available()];
+        fileStream1.read(content1);
+        fileStream2.read(content2);
+        Assertions.assertArrayEquals(content1, content2);
+      }
+    }
+  }
 }

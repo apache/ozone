@@ -26,6 +26,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -193,7 +194,7 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -300,7 +301,7 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream);
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
     }
 
     // Untar the file into a temp folder to be examined.
@@ -380,7 +381,7 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream);
+          fileOutputStream, new ArrayList<>(), new ArrayList<>());
     }
 
     // Untar the file into a temp folder to be examined.
@@ -397,6 +398,49 @@ public class TestOMDbCheckpointServlet {
         testDirLength);
 
     Assert.assertEquals(initialCheckpointSet, finalCheckpointSet);
+  }
+
+  @Test
+  public void testWriteDbDataWithToExcludeFileList()
+      throws Exception {
+    prepSnapshotData();
+
+    File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
+        "dummy.sst");
+    try (OutputStreamWriter writer = new OutputStreamWriter(
+        new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
+      writer.write("Dummy data.");
+    }
+    Assert.assertTrue(dummyFile.exists());
+    List<String> toExcludeList = new ArrayList<>();
+    List<String> excludedList = new ArrayList<>();
+    toExcludeList.add(dummyFile.getName());
+
+    // Set http param to exclude snapshot data.
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
+        .thenReturn(null);
+
+    // Get the tarball.
+    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
+          fileOutputStream, toExcludeList, excludedList);
+    }
+
+    // Untar the file into a temp folder to be examined.
+    String testDirName = folder.newFolder().getAbsolutePath();
+    int testDirLength = testDirName.length() + 1;
+    FileUtil.unTar(tempFile, new File(testDirName));
+
+    // Confirm the checkpoint directories match.
+    Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
+    Set<String> initialCheckpointSet = getFiles(checkpointLocation,
+        checkpointLocation.toString().length() + 1);
+    Path finalCheckpointLocation = Paths.get(testDirName);
+    Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
+        testDirLength);
+
+    initialCheckpointSet.removeAll(finalCheckpointSet);
+    Assert.assertTrue(initialCheckpointSet.contains(dummyFile.getName()));
   }
 
   private void prepSnapshotData() throws Exception {

@@ -694,15 +694,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
       String fromSnapshot, String toSnapshot, String token)
       throws IOException, InterruptedException {
-    SnapshotDiffResponse snapshotDiffResponse = null;
-    do {
+    SnapshotDiffResponse snapshotDiffResponse;
+    while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume.getName(), bucket.getName(),
               fromSnapshot, toSnapshot, token, -1, false);
+      if (snapshotDiffResponse.getJobStatus() == DONE) {
+        break;
+      }
       Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
-    } while (snapshotDiffResponse.getJobStatus() != DONE);
-    SnapshotDiffReportOzone report =
-        snapshotDiffResponse.getSnapshotDiffReport();
-    return report;
+    }
+    return snapshotDiffResponse.getSnapshotDiffReport();
   }
 }

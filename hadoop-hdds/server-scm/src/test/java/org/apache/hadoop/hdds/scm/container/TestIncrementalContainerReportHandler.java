@@ -67,6 +67,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -191,6 +192,7 @@ public class TestIncrementalContainerReportHandler {
   @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
+    nodeManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
@@ -230,6 +232,126 @@ public class TestIncrementalContainerReportHandler {
     reportHandler.onMessage(icrFromDatanode, publisher);
     Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(container.containerID()).getState());
+  }
+
+  /**
+   * Tests that CLOSING to CLOSED transition for an EC container happens only
+   * when a CLOSED replica with first index or parity indexes is reported.
+   */
+  @Test
+  public void testClosingToClosedForECContainer()
+      throws NodeNotFoundException, IOException, TimeoutException {
+    // Create an EC 3-2 container
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo container = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    List<DatanodeDetails> dns = setupECContainerForTesting(container);
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
+    // index is 2; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
+    // index is 3; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
+    // index is 1; container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container.containerID()).getState());
+
+    // Test with an EC 6-3 container
+    replicationConfig = new ECReplicationConfig(6, 3);
+    final ContainerInfo container2 = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    dns = setupECContainerForTesting(container2);
+
+    createAndHandleICR(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
+    // index is 6, container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container2.containerID()).getState());
+
+    createAndHandleICR(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
+    // index is 9, container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container2.containerID()).getState());
+  }
+
+  /**
+   * Creates an ICR from the specified datanodeDetails for replica with the
+   * specified containerID. The replica's state is reported as the specified
+   * state. Then, creates an {@link IncrementalContainerReportHandler} and
+   * handles the ICR.
+   * @param containerID id of the replica
+   * @param state state of the replica to be reported
+   * @param datanodeDetails DN that hosts this replica
+   * @param replicaIndex index of the replica
+   */
+  private void createAndHandleICR(ContainerID containerID,
+                                  ContainerReplicaProto.State state,
+                                  DatanodeDetails datanodeDetails,
+                                  int replicaIndex) {
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(containerID, state,
+            datanodeDetails.getUuidString(), true, replicaIndex);
+    final IncrementalContainerReportFromDatanode icrFromDatanode =
+        new IncrementalContainerReportFromDatanode(datanodeDetails,
+            containerReport);
+
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+    reportHandler.onMessage(icrFromDatanode, publisher);
+  }
+
+  /**
+   * Creates the required number of DNs that will hold a replica each for the
+   * specified EC container. Registers these DNs with the NodeManager, adds
+   * this container and its replicas to ContainerStateManager etc.
+   * @param container must be an EC container
+   * @return List of datanodes that host replicas of this container
+   */
+  private List<DatanodeDetails> setupECContainerForTesting(
+      ContainerInfo container)
+      throws IOException, TimeoutException, NodeNotFoundException {
+    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
+        container.getReplicationType());
+    final int numDatanodes =
+        container.getReplicationConfig().getRequiredNodes();
+    // Register required number of datanodes with NodeManager
+    List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
+    for (int i = 0; i < numDatanodes; i++) {
+      dns.add(randomDatanodeDetails());
+      nodeManager.register(dns.get(i), null, null);
+    }
+
+    // Add this container to ContainerStateManager
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // Create its replicas and add them to ContainerStateManager
+    Set<ContainerReplica> replicas =
+        HddsTestUtils.getReplicasWithReplicaIndex(container.containerID(),
+            ContainerReplicaProto.State.CLOSING,
+            HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT,
+            HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT,
+            container.getSequenceId(),
+            dns.toArray(new DatanodeDetails[0]));
+    for (ContainerReplica r : replicas) {
+      containerStateManager.updateContainerReplica(container.containerID(), r);
+    }
+
+    // Tell NodeManager that each DN hosts a replica of this container
+    for (DatanodeDetails dn : dns) {
+      nodeManager.addContainer(dn, container.containerID());
+    }
+    return dns;
   }
 
   @Test

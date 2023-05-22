@@ -477,7 +477,8 @@ public class TestStateContext {
 
   @Test
   public void testIsThreadPoolAvailable() throws Exception {
-    StateContext stateContext = new StateContext(null, null, null);
+    StateContext stateContext = new StateContext(
+        new OzoneConfiguration(), null, null);
 
     int threadPoolSize = 2;
     ExecutorService executorService = Executors.newFixedThreadPool(

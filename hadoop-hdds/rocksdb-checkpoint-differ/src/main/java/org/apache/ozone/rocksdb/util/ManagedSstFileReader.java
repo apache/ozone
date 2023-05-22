@@ -49,6 +49,8 @@ public class ManagedSstFileReader {
 
   private final Collection<String> sstFiles;
 
+  private volatile long estimatedTotalKeys = -1;
+
   public ManagedSstFileReader(final Collection<String> sstFiles) {
     this.sstFiles = sstFiles;
   }
@@ -56,9 +58,31 @@ public class ManagedSstFileReader {
   public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
     final Spliterator<T> spliterator =
         Spliterators.spliteratorUnknownSize(itr, 0);
-    return StreamSupport.stream(spliterator, false).onClose(() -> {
-      itr.close();
-    });
+    return StreamSupport.stream(spliterator, false).onClose(itr::close);
+  }
+
+  public long getEstimatedTotalKeys() throws RocksDBException {
+    if (estimatedTotalKeys != -1) {
+      return estimatedTotalKeys;
+    }
+
+    long estimatedSize = 0;
+    synchronized (this) {
+      if (estimatedTotalKeys != -1) {
+        return estimatedTotalKeys;
+      }
+
+      try (ManagedOptions options = new ManagedOptions()) {
+        for (String sstFile : sstFiles) {
+          SstFileReader fileReader = new SstFileReader(options);
+          fileReader.open(sstFile);
+          estimatedSize += fileReader.getTableProperties().getNumEntries();
+        }
+      }
+      estimatedTotalKeys = estimatedSize;
+    }
+
+    return estimatedTotalKeys;
   }
 
   public Stream<String> getKeyStream() throws RocksDBException,

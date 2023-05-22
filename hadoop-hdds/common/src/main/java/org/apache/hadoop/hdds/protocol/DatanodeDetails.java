@@ -238,14 +238,27 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Checks if the OperationalState is Node is Decomissioned or Decomissioning.
-   * @return True if OperationalState is Decommissioned or Decomissioning.
+   * @return true if the node is or being decommissioned
    */
-  public boolean isDecomissioned() {
-    return this.getPersistedOpState() ==
-            HddsProtos.NodeOperationalState.DECOMMISSIONED ||
-            this.getPersistedOpState() ==
-            HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  public boolean isDecommissioned() {
+    return isDecommission(getPersistedOpState());
+  }
+
+  public static boolean isDecommission(HddsProtos.NodeOperationalState state) {
+    return state == HddsProtos.NodeOperationalState.DECOMMISSIONED ||
+        state == HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  }
+
+  /**
+   * @return true if node is in or entering maintenance
+   */
+  public boolean isMaintenance() {
+    return isMaintenance(getPersistedOpState());
+  }
+
+  public static boolean isMaintenance(HddsProtos.NodeOperationalState state) {
+    return state == HddsProtos.NodeOperationalState.IN_MAINTENANCE ||
+        state == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
   }
 
   /**

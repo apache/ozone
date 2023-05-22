@@ -896,8 +896,16 @@ public class BasicRootedOzoneClientAdapterImpl
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      List<OzoneFileStatus> statuses = bucket
-          .listStatus(keyName, recursive, startKey, numEntries);
+      List<OzoneFileStatus> statuses;
+      if (bucket.isSourcePathExist()) {
+        statuses = bucket
+            .listStatus(keyName, recursive, startKey, numEntries);
+      } else {
+        LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
+            "and returning empty list of files inside it", bucket.getName());
+        statuses = Collections.emptyList();
+      }
+      
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
@@ -1335,16 +1343,17 @@ public class BasicRootedOzoneClientAdapterImpl
   private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
       String fromSnapshot, String toSnapshot, String volume, String bucket,
       String token) throws IOException, InterruptedException {
-    SnapshotDiffResponse snapshotDiffResponse = null;
-    do {
+    SnapshotDiffResponse snapshotDiffResponse;
+    while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
               token, -1, false);
+      if (snapshotDiffResponse.getJobStatus() == DONE) {
+        break;
+      }
       Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
-    } while (snapshotDiffResponse.getJobStatus() != DONE);
-    SnapshotDiffReportOzone report =
-        snapshotDiffResponse.getSnapshotDiffReport();
-    return report;
+    }
+    return snapshotDiffResponse.getSnapshotDiffReport();
   }
 
   public boolean recoverLease(final Path f) throws IOException {
