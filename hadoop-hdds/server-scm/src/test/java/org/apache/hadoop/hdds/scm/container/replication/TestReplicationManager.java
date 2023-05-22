@@ -147,7 +147,6 @@ public class TestReplicationManager {
 
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
-
     replicationManager = createReplicationManager();
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
@@ -501,6 +500,34 @@ public class TestReplicationManager {
     Assert.assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.MISSING));
   }
+
+  @Test
+  public void testUnrecoverableAndEmpty()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+
+    ContainerReplica replica  = createContainerReplica(container.containerID(),
+        1, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
+        0, 0, MockDatanodeDetails.randomDatanodeDetails(), UUID.randomUUID());
+
+    storeContainerAndReplicas(container, Collections.singleton(replica));
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    // If it is unrecoverable, there is no point in putting it into the under
+    // replication list. It will be checked again on the next RM run.
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    // As it is marked empty in the report, it must have gone through the
+    // empty container handler, indicating is was handled as empty.
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.EMPTY));
+  }
+
 
   /**
    * A closed EC container with 3 closed and 2 unhealthy replicas is under

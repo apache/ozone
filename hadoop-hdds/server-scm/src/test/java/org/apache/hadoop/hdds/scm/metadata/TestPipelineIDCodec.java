@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -30,6 +31,9 @@ import java.util.UUID;
  * Testing serialization of PipelineID objects to/from RocksDB.
  */
 public class TestPipelineIDCodec {
+  private final OldPipelineIDCodecForTesting oldCodec
+      = new OldPipelineIDCodecForTesting();
+  private final Codec<PipelineID> newCodec = PipelineID.getCodec();
 
   @Test
   public void testPersistingZeroAsUUID() throws Exception {
@@ -95,12 +99,7 @@ public class TestPipelineIDCodec {
     long mostSigBits = 0x0000_0000_0000_0000L;
     long leastSigBits = 0x0000_0000_0000_0000L;
     UUID uuid = new UUID(mostSigBits, leastSigBits);
-    PipelineID pid = PipelineID.valueOf(uuid);
-
-    byte[] encoded = new PipelineIDCodec().toPersistedFormat(pid);
-    PipelineID decoded = new PipelineIDCodec().fromPersistedFormat(encoded);
-
-    assertEquals(pid, decoded);
+    assertUuid(uuid);
   }
 
   @Test
@@ -108,23 +107,25 @@ public class TestPipelineIDCodec {
     long mostSigBits = 0xFFFF_FFFF_FFFF_FFFFL;
     long leastSigBits = 0xFFFF_FFFF_FFFF_FFFFL;
     UUID uuid = new UUID(mostSigBits, leastSigBits);
-    PipelineID pid = PipelineID.valueOf(uuid);
-
-    byte[] encoded = new PipelineIDCodec().toPersistedFormat(pid);
-    PipelineID decoded = new PipelineIDCodec().fromPersistedFormat(encoded);
-
-    assertEquals(pid, decoded);
+    assertUuid(uuid);
   }
 
   @Test
   public void testConvertAndReadBackRandomUUID() throws Exception {
     UUID uuid = UUID.randomUUID();
+    assertUuid(uuid);
+  }
+
+  void assertUuid(UUID uuid) throws Exception {
     PipelineID pid = PipelineID.valueOf(uuid);
 
-    byte[] encoded = new PipelineIDCodec().toPersistedFormat(pid);
-    PipelineID decoded = new PipelineIDCodec().fromPersistedFormat(encoded);
 
-    assertEquals(pid, decoded);
+    final byte[] expected = oldCodec.toPersistedFormat(pid);
+    final byte[] computed = newCodec.toPersistedFormat(pid);
+    assertArrayEquals(expected, computed);
+
+    assertEquals(pid, oldCodec.fromPersistedFormat(expected));
+    assertEquals(pid, newCodec.fromPersistedFormat(expected));
   }
 
   private void checkPersisting(
@@ -133,9 +134,11 @@ public class TestPipelineIDCodec {
     UUID uuid = new UUID(mostSigBits, leastSigBits);
     PipelineID pid = PipelineID.valueOf(uuid);
 
-    byte[] encoded = new PipelineIDCodec().toPersistedFormat(pid);
-
+    final byte[] encoded = oldCodec.toPersistedFormat(pid);
     assertArrayEquals(expected, encoded);
+
+    final byte[] computed = newCodec.toPersistedFormat(pid);
+    assertArrayEquals(expected, computed);
   }
 
   private byte b(int i) {

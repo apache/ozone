@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -132,6 +133,7 @@ public class TestRDBSnapshotProvider {
     if (testDir.exists()) {
       FileUtil.fullyDelete(testDir);
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test

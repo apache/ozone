@@ -21,11 +21,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
@@ -92,6 +98,7 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   private final ReconContainerManager containerManager;
+  private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -105,6 +112,7 @@ public class ContainerEndpoint {
                ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
+    this.pipelineManager = reconSCM.getPipelineManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
@@ -481,4 +489,81 @@ public class ContainerEndpoint {
     return blockIds;
   }
 
+  @GET
+  @Path("/mismatch")
+  public Response getContainerMisMatchInsights() {
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(-1, -1);
+      List<Long> scmNonDeletedContainers =
+          containerManager.getContainers().stream()
+              .filter(containerInfo -> !(containerInfo.getState() ==
+                  HddsProtos.LifeCycleState.DELETED))
+              .map(containerInfo -> containerInfo.getContainerID()).collect(
+                  Collectors.toList());
+
+      // Filter list of container Ids which are present in OM but not in SCM.
+      List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
+          omContainers.entrySet().stream().filter(containerMetadataEntry ->
+                  !(scmNonDeletedContainers.contains(
+                      containerMetadataEntry.getKey())))
+              .collect(
+                  Collectors.toList());
+
+      notSCMContainers.forEach(nonSCMContainer -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonSCMContainer.getKey());
+        containerDiscrepancyInfo.setNumberOfKeys(
+            nonSCMContainer.getValue().getNumberOfKeys());
+        containerDiscrepancyInfo.setPipelines(nonSCMContainer.getValue()
+            .getPipelines());
+        containerDiscrepancyInfo.setExistsAt("OM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+
+      // Filter list of container Ids which are present in SCM but not in OM.
+      List<Long> nonOMContainers = scmNonDeletedContainers.stream()
+          .filter(containerId -> !omContainers.containsKey(containerId))
+          .collect(Collectors.toList());
+
+      List<Pipeline> pipelines = new ArrayList<>();
+      nonOMContainers.forEach(nonOMContainerId -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonOMContainerId);
+        containerDiscrepancyInfo.setNumberOfKeys(0);
+        PipelineID pipelineID = null;
+        try {
+          pipelineID = containerManager.getContainer(
+                  ContainerID.valueOf(nonOMContainerId))
+              .getPipelineID();
+
+          if (null != pipelineID) {
+            pipelines.add(pipelineManager.getPipeline(pipelineID));
+          }
+        } catch (ContainerNotFoundException e) {
+          LOG.warn("Container {} not found in SCM: {}", nonOMContainerId, e);
+        } catch (PipelineNotFoundException e) {
+          LOG.debug("Pipeline not found for container: {} and pipelineId: {}",
+              nonOMContainerId, pipelineID, e);
+        }
+        containerDiscrepancyInfo.setPipelines(pipelines);
+        containerDiscrepancyInfo.setExistsAt("SCM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(containerDiscrepancyInfoList).build();
+  }
 }

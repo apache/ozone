@@ -176,11 +176,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * this prefix will be included in the result.
    * @param maxNumOfBuckets the maximum number of buckets to return. It ensures
    * the size of the result will not exceed this limit.
+   * @param hasSnapshot set the flag to list buckets which have snapshot.
    * @return a list of buckets.
    * @throws IOException
    */
   List<OmBucketInfo> listBuckets(String volumeName, String startBucket,
-      String bucketPrefix, int maxNumOfBuckets)
+                                 String bucketPrefix, int maxNumOfBuckets,
+                                 boolean hasSnapshot)
       throws IOException;
 
   /**

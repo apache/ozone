@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -137,22 +138,23 @@ public abstract class MisReplicationHandler implements
               container.getContainerID());
       return 0;
     }
-
     Set<ContainerReplica> sources = filterSources(replicas);
     Set<ContainerReplica> replicasToBeReplicated = containerPlacement
             .replicasToCopyToFixMisreplication(replicas.stream()
             .collect(Collectors.toMap(Function.identity(), sources::contains)));
-    usedDns = replicas.stream().filter(r -> !replicasToBeReplicated.contains(r))
-            .map(ContainerReplica::getDatanodeDetails)
-            .collect(Collectors.toList());
-    List<DatanodeDetails> excludedDns = replicasToBeReplicated.stream()
-            .map(ContainerReplica::getDatanodeDetails)
-            .collect(Collectors.toList());
+
+    ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes
+        = ReplicationManagerUtil.getExcludedAndUsedNodes(
+            new ArrayList(replicas), replicasToBeReplicated,
+            Collections.emptyList(), replicationManager);
+
     int requiredNodes = replicasToBeReplicated.size();
 
     List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
-        .getTargetDatanodes(containerPlacement, requiredNodes, usedDns,
-            excludedDns, currentContainerSize, container);
+        .getTargetDatanodes(containerPlacement, requiredNodes,
+            excludedAndUsedNodes.getUsedNodes(),
+            excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
+            container);
     List<DatanodeDetails> availableSources = sources.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());

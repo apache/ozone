@@ -108,7 +108,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     @Override
-    public BackgroundTaskResult call() throws Exception {
+    public BackgroundTaskResult call() {
       if (shouldRun()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
@@ -121,6 +121,13 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
+
+        // Acquire active DB deletedDirectoryTable write lock because of the
+        // deletedDirTable read-write here to avoid interleaving with
+        // the table range delete operation in createOmSnapshotCheckpoint()
+        // that is called from OMSnapshotCreateResponse#addToDBBatch.
+        getOzoneManager().getMetadataManager().getTableLock(
+            OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().lock();
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
         try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -152,12 +159,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             subFileNum += request.getDeletedSubFilesCount();
           }
 
-          optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
-              subFileNum, allSubDirList, purgePathRequestList, null, startTime);
+          optimizeDirDeletesAndSubmitRequest(
+              remainNum, dirNum, subDirNum, subFileNum,
+              allSubDirList, purgePathRequestList, null, startTime);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
+        } finally {
+          // Release deletedDirectoryTable write lock
+          getOzoneManager().getMetadataManager().getTableLock(
+              OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().unlock();
         }
       }
 

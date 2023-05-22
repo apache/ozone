@@ -97,6 +97,7 @@ public class TestRDBStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)

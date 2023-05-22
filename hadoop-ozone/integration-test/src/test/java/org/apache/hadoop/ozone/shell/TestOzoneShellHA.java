@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -54,7 +55,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
@@ -68,6 +71,7 @@ import com.google.gson.internal.LinkedTreeMap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -332,13 +336,17 @@ public class TestOzoneShellHA {
   /**
    * Helper function to generate keys for testing shell command of keys.
    */
-  private void generateKeys(String volumeName, String bucketName) {
+  private void generateKeys(String volumeName, String bucketName,
+                            String bucketLayout) {
     String[] args = new String[] {
         "volume", "create", "o3://" + omServiceId + volumeName};
     execute(ozoneShell, args);
 
-    args = new String[] {
-        "bucket", "create", "o3://" + omServiceId + volumeName + bucketName};
+    args = (Strings.isNullOrEmpty(bucketLayout)) ?
+            new String[] {"bucket", "create", "o3://" + omServiceId +
+                    volumeName + bucketName } :
+            new String[] {"bucket", "create", "o3://" + omServiceId +
+                    volumeName + bucketName, "--layout", bucketLayout};
     execute(ozoneShell, args);
 
     String keyName = volumeName + bucketName + OZONE_URI_DELIMITER + "key";
@@ -464,7 +472,7 @@ public class TestOzoneShellHA {
   @Test
   public void testOzoneShCmdList() throws UnsupportedEncodingException {
     // Part of listing keys test.
-    generateKeys("/volume4", "/bucket");
+    generateKeys("/volume4", "/bucket", "");
     final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
 
     // Test case 1: test listing keys
@@ -516,7 +524,7 @@ public class TestOzoneShellHA {
   @Test
   public void testOzoneAdminCmdList() throws UnsupportedEncodingException {
     // Part of listing keys test.
-    generateKeys("/volume6", "/bucket");
+    generateKeys("/volume6", "/bucket", "");
     // Test case 1: list OPEN container
     String state = "--state=OPEN";
     String[] args = new String[] {"container", "list", "--scm",
@@ -1123,6 +1131,167 @@ public class TestOzoneShellHA {
           e.getCause().getMessage());
     }
   }
+
+
+  @Test
+  public void testKeyDeleteOrSkipTrashWhenTrashEnableFSO()
+      throws IOException {
+    // Create 100 keys
+    generateKeys("/volumefso1", "/bucket1",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Enable trash
+    String trashConfKey = generateSetConfString(
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, "1");
+    String[] args =
+        new String[] {trashConfKey, "key", "delete",
+            "/volumefso1/bucket1/key4"};
+
+    // Delete one key from FSO bucket
+    execute(ozoneShell, args);
+
+    // Get key list in .Trash path
+    String prefixKey = "--prefix=.Trash";
+    args = new String[] {"key", "list", prefixKey, "o3://" +
+          omServiceId + "/volumefso1/bucket1/"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // One key should be present in .Trash
+    Assert.assertEquals(1, getNumOfKeys());
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Total number of keys still 100.
+    Assert.assertEquals(100, getNumOfKeys());
+
+    // Skip Trash
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/key5", "--skipTrash"};
+    execute(ozoneShell, args);
+
+    // .Trash should still contain 1 key
+    prefixKey = "--prefix=.Trash";
+    args = new String[] {"key", "list", prefixKey, "o3://" +
+          omServiceId + "/volumefso1/bucket1/"};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(1, getNumOfKeys());
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+    // Total number of keys now will be 99 as
+    // 1 key deleted without trash
+    Assert.assertEquals(99, getNumOfKeys());
+
+    final String username =
+        UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path current = new Path("Current");
+    Path userTrashCurrent = new Path(userTrash, current);
+
+    // Try to delete from trash path
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
+          + "/key4"};
+
+    out.reset();
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Total number of keys still remain 99 as
+    // delete from trash not allowed without --skipTrash
+    Assert.assertEquals(99, getNumOfKeys());
+
+    // Now try to delete from trash path with --skipTrash option
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
+          + "/key4", "--skipTrash"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "list", "o3://" + omServiceId +
+          "/volumefso1/bucket1/", "-l ", "110"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Total number of keys now will be 98 as
+    // 1 key deleted without trash and 1 from the trash path
+    Assert.assertEquals(98, getNumOfKeys());
+  }
+
+  @Test
+  public void testKeyDeleteWhenTrashDisableFSO()
+      throws UnsupportedEncodingException {
+    // Create 100 keys
+    generateKeys("/volumefso2", "/bucket2",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+    // Disable trash
+    String trashConfKey = generateSetConfString(
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, "0");
+    String[] args =
+            new String[] {trashConfKey, "key",
+                "delete", "/volumefso2/bucket2/key4"};
+
+    execute(ozoneShell, args);
+
+    // Check in .Trash path number of keys
+    final String prefixKey = "--prefix=.Trash";
+    args = new String[] {"key", "list", prefixKey,
+        "o3://" + omServiceId + "/volumefso2/bucket2/"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // No key should be present in .Trash
+    Assert.assertEquals(0, getNumOfKeys());
+
+    args = new String[] {"key", "list", "o3://" +
+          omServiceId + "/volumefso2/bucket2/"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    // Number of keys remain as 99
+    Assert.assertEquals(99, getNumOfKeys());
+  }
+
+  @Test
+  public void testKeyDeleteWhenTrashEnableOBS()
+      throws UnsupportedEncodingException {
+    generateKeys("/volumeobs1", "/bucket1",
+        BucketLayout.OBJECT_STORE.toString());
+
+    String trashConfKey = generateSetConfString(
+        OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, "1");
+    String[] args =
+            new String[] {trashConfKey, "key",
+                "delete", "/volumeobs1/bucket1/key4"};
+    execute(ozoneShell, args);
+
+    final String prefixKey = "--prefix=.Trash";
+    args = new String[] {"key", "list", prefixKey, "o3://" +
+          omServiceId + "/volumeobs1/bucket1/"};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(0, getNumOfKeys());
+
+    args = new String[] {"key", "list", "o3://" +
+          omServiceId + "/volumeobs1/bucket1/"};
+    out.reset();
+    execute(ozoneShell, args);
+
+    Assert.assertEquals(99, getNumOfKeys());
+  }
+
 
   private void getVolume(String volumeName) {
     String[] args = new String[] {"volume", "create",

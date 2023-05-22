@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -101,7 +102,7 @@ public class TestOmKeyInfoCodec {
 
   public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
       throws IOException {
-    OmKeyInfoCodec codec = new OmKeyInfoCodec(true);
+    final Codec<OmKeyInfo> codec = OmKeyInfo.getCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     byte[] rawData = codec.toPersistedFormat(originKey);
     OmKeyInfo key = codec.fromPersistedFormat(rawData);
@@ -114,8 +115,8 @@ public class TestOmKeyInfoCodec {
   }
 
   public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
-    OmKeyInfoCodec codecWithoutPipeline = new OmKeyInfoCodec(true);
-    OmKeyInfoCodec codecWithPipeline = new OmKeyInfoCodec(false);
+    final Codec<OmKeyInfo> codecWithoutPipeline = OmKeyInfo.getCodec(true);
+    final Codec<OmKeyInfo> codecWithPipeline = OmKeyInfo.getCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     byte[] rawData = codecWithPipeline.toPersistedFormat(originKey);
     OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
