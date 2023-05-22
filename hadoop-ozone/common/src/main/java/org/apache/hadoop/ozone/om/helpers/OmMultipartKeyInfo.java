@@ -18,6 +18,9 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 
@@ -35,6 +38,15 @@ import java.util.TreeMap;
  * upload part information of the key.
  */
 public final class OmMultipartKeyInfo extends WithObjectID {
+  private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(MultipartKeyInfo.class),
+      OmMultipartKeyInfo::getFromProto,
+      OmMultipartKeyInfo::getProto);
+
+  public static Codec<OmMultipartKeyInfo> getCodec() {
+    return CODEC;
+  }
+
   /**
    * An unmodifiable Array wrapper providing PartKeyInfo sorted by partNumber,
    * Whenever a PartKeyInfo is added, it returns a new shallow copy of

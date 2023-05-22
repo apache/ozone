@@ -14,33 +14,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+package org.apache.hadoop.hdds.utils.db;
 
-package org.apache.hadoop.ozone.recon.codec;
-
-import java.io.IOException;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.db.Codec;
-
-/**
- * Codec for UUID.
- */
-public class ReconNodeDBKeyCodec implements Codec<UUID> {
-  @Override
-  public byte[] toPersistedFormat(UUID object) throws IOException {
-    return StringUtils.string2Bytes(object.toString());
-  }
-
-  @Override
-  public UUID fromPersistedFormat(byte[] rawData) throws IOException {
-    return UUID.fromString(StringUtils.bytes2String(rawData));
-  }
-
-  @Override
-  public UUID copyObject(UUID object) {
-    return null;
-  }
+/** Declare a single {@link #copyObject()} method. */
+@FunctionalInterface
+public interface CopyObject<T> {
+  /**
+   * Copy this object.
+   * When this object is immutable,
+   * the implementation of this method may safely return this object.
+   *
+   * @return a copy of this object.  When this object is immutable,
+   *         the returned object can possibly be the same as this object.
+   */
+  T copyObject();
 }

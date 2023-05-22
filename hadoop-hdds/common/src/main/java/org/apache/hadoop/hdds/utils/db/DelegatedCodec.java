@@ -92,6 +92,9 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   public T copyObject(T message) {
     if (shallowCopy) {
       return message;
+    } else if (message instanceof CopyObject) {
+      final CopyObject<T> casted = ((CopyObject<T>) message);
+      return casted.copyObject();
     }
     try {
       return forward.apply(delegate.copyObject(backward.apply(message)));

@@ -17,14 +17,29 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.Objects;
 
 /**
  * This class is used for storing Ozone tenant state info.
+ * <p>
+ * This class is immutable.
  */
 public final class OmDBTenantState implements Comparable<OmDBTenantState> {
+  private static final Codec<OmDBTenantState> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.TenantState.class),
+      OmDBTenantState::getFromProtobuf,
+      OmDBTenantState::getProtobuf,
+      true);
+
+  public static Codec<OmDBTenantState> getCodec() {
+    return CODEC;
+  }
+
   /**
    * Name of the tenant.
    */

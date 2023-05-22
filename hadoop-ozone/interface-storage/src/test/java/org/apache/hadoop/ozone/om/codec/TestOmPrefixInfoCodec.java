@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -46,12 +46,7 @@ public class TestOmPrefixInfoCodec {
   public ExpectedException thrown = ExpectedException.none();
 
 
-  private OmPrefixInfoCodec codec;
-
-  @Before
-  public void setUp() {
-    codec = new OmPrefixInfoCodec();
-  }
+  private final Codec<OmPrefixInfo> codec = OmPrefixInfo.getCodec();
 
   @Test
   public void testCodecWithIncorrectValues() throws Exception {

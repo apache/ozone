@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -93,7 +94,7 @@ public class TestRepeatedOmKeyInfoCodec {
   }
 
   public void testWithoutPipeline(int chunkNum) {
-    RepeatedOmKeyInfoCodec codec = new RepeatedOmKeyInfoCodec(true);
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
     try {
@@ -109,10 +110,10 @@ public class TestRepeatedOmKeyInfoCodec {
   }
 
   public void testCompatibility(int chunkNum) {
-    RepeatedOmKeyInfoCodec codecWithoutPipeline =
-        new RepeatedOmKeyInfoCodec(true);
-    RepeatedOmKeyInfoCodec codecWithPipeline =
-        new RepeatedOmKeyInfoCodec(false);
+    final Codec<RepeatedOmKeyInfo> codecWithoutPipeline
+        = RepeatedOmKeyInfo.getCodec(true);
+    final Codec<RepeatedOmKeyInfo> codecWithPipeline
+        = RepeatedOmKeyInfo.getCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
     try {
@@ -130,7 +131,7 @@ public class TestRepeatedOmKeyInfoCodec {
   public void threadSafety() throws InterruptedException {
     final OmKeyInfo key = getKeyInfo(1);
     final RepeatedOmKeyInfo subject = new RepeatedOmKeyInfo(key);
-    final RepeatedOmKeyInfoCodec codec = new RepeatedOmKeyInfoCodec(true);
+    final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
     final AtomicBoolean failed = new AtomicBoolean();
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
         .build();

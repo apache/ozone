@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.om.codec;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -40,12 +40,8 @@ public class TestS3SecretValueCodec {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  private S3SecretValueCodec codec;
+  private final Codec<S3SecretValue> codec = S3SecretValue.getCodec();
 
-  @Before
-  public void initialize() {
-    codec = new S3SecretValueCodec();
-  }
   @Test
   public void testCodecWithCorrectData() throws Exception {
 

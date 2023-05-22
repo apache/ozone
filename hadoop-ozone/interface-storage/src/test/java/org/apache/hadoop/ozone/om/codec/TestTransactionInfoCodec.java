@@ -18,10 +18,9 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -31,19 +30,14 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.Assert.fail;
 
 /**
- * Class to test {@link TransactionInfoCodec}.
+ * Class to test {@link TransactionInfo#getCodec()}.
  */
 public class TestTransactionInfoCodec {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
+  private final Codec<TransactionInfo> codec = TransactionInfo.getCodec();
 
-  private TransactionInfoCodec codec;
-
-  @Before
-  public void setUp() {
-    codec = new TransactionInfoCodec();
-  }
   @Test
   public void toAndFromPersistedFormat() throws Exception {
     TransactionInfo transactionInfo =

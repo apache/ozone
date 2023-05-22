@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -37,7 +38,7 @@ public class TestOmMultipartKeyInfoCodec {
 
   @Test
   public void testOmMultipartKeyInfoCodec() {
-    OmMultipartKeyInfoCodec codec = new OmMultipartKeyInfoCodec();
+    final Codec<OmMultipartKeyInfo> codec = OmMultipartKeyInfo.getCodec();
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
