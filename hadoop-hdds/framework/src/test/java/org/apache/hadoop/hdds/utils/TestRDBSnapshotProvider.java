@@ -46,6 +46,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -56,6 +58,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
+import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -235,5 +238,21 @@ public class TestRDBSnapshotProvider {
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  @Test
+  public void testCheckLeaderConsistent() throws IOException {
+    assertTrue(rdbSnapshotProvider.getInitCount() == 1);
+    File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
+        "file1.sst");
+    Files.write(dummyFile.toPath(),
+        "dummyData".getBytes(StandardCharsets.UTF_8));
+    rdbSnapshotProvider.checkLeaderConsistent("node1");
+    assertTrue(rdbSnapshotProvider.getInitCount() == 2);
+    assertFalse(dummyFile.exists());
+    rdbSnapshotProvider.checkLeaderConsistent("node1");
+    assertTrue(rdbSnapshotProvider.getInitCount() == 2);
+    rdbSnapshotProvider.checkLeaderConsistent("node2");
+    assertTrue(rdbSnapshotProvider.getInitCount() == 3);
   }
 }
