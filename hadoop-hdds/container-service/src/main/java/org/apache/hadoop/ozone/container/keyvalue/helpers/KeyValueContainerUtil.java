@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -210,7 +211,6 @@ public final class KeyValueContainerUtil {
         return !dir.iterator().hasNext();
       }
     }
-
     return true;
   }
 
@@ -246,9 +246,16 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
+    boolean bCheckChunksFilePath =
+        config.getBoolean(
+            DatanodeConfiguration.
+              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+            DatanodeConfiguration.
+              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
     if (kvContainerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
-        populateContainerMetadata(kvContainerData, db.getStore());
+        populateContainerMetadata(kvContainerData,
+            db.getStore(), bCheckChunksFilePath);
       }
       return;
     }
@@ -271,7 +278,7 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      populateContainerMetadata(kvContainerData, store);
+      populateContainerMetadata(kvContainerData, store, bCheckChunksFilePath);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -293,7 +300,8 @@ public final class KeyValueContainerUtil {
   }
 
   private static void populateContainerMetadata(
-      KeyValueContainerData kvContainerData, DatanodeStore store)
+      KeyValueContainerData kvContainerData, DatanodeStore store,
+      boolean bCheckChunksFilePath)
       throws IOException {
     boolean isBlockMetadataSet = false;
     Table<String, Long> metadataTable = store.getMetadataTable();
@@ -359,7 +367,7 @@ public final class KeyValueContainerUtil {
       Files.createDirectories(chunksDir.toPath());
     }
 
-    if (noBlocksInContainer(store, kvContainerData, false)) {
+    if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
       kvContainerData.markAsEmpty();
     }
 
@@ -411,24 +419,6 @@ public final class KeyValueContainerUtil {
     }
     kvData.setBytesUsed(usedBytes);
     kvData.setBlockCount(blockCount);
-  }
-
-  /**
-   * A container is empty if:
-   * - The container is closed
-   * - There are no blocks in its block table.
-   *
-   * Empty containers are eligible for deletion.
-   */
-  public static boolean isEmpty(DatanodeStore store,
-      KeyValueContainerData container) throws IOException {
-    if (container.isOpen()) {
-      return false;
-    }
-    try (BlockIterator<BlockData> blockIterator =
-             store.getBlockIterator(container.getContainerID())) {
-      return !blockIterator.hasNext();
-    }
   }
 
   public static long getBlockLength(BlockData block) throws IOException {

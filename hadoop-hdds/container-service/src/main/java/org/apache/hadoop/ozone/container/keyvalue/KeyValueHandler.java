@@ -1298,8 +1298,8 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (!container.isEmpty(false)) {
-          metrics.incContainerDeleteFailedNonEmptyBlocksDB();
+        if (!container.isEmpty()) {
+          metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty with blockCount {}",
               container.getContainerData().getContainerID(),
@@ -1307,42 +1307,11 @@ public class KeyValueHandler extends Handler {
           // blocks table for future debugging.
           // List blocks
           logBlocksIfNonZero(container);
+          // Log chunks
+          logBlocksFoundOnDisk(container);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
-        }
-
-        // This is a defensive check to make sure there is no data loss if
-        // 1. There are one or more blocks on the filesystem
-        // 2. There are one or more blocks in the block table
-        // This can lead to false positives as
-        // 1. Chunks written to disk that did not get recorded in RocksDB can
-        //    occur due to failures during write
-        // 2. Blocks that were deleted from blocks table but the deletion of
-        //    the underlying file could not be completed
-        // 3. Failures between files being deleted from disk but not being
-        //    cleaned up.
-        // 4. Bugs in the code.
-        // Blocks stored on disk represent data written by a client and should
-        // be treated with care at the expense of creating artifacts on disk
-        // that  might be unreferenced.
-        // https://issues.apache.org/jira/browse/HDDS-8138 will move the
-        // implementation to only depend on consistency of the chunks folder
-
-        // First check if any files are in the chunks folder. If there are
-        // to help with debugging also dump the blocks table data.
-        if (checkIfNoBlockFiles) {
-          if (!container.isEmpty(true)) {
-            metrics.incContainerDeleteFailedNonEmpty();
-            logBlocksFoundOnDisk(container);
-            logBlocksIfNonZero(container);
-            // List Blocks from Blocks Table
-            throw new StorageContainerException("Non-force deletion of " +
-                "non-empty container dir:" +
-                container.getContainerData().getContainerID() +
-                " is not allowed.",
-                DELETE_ON_NON_EMPTY_CONTAINER);
-          }
         }
       } else {
         metrics.incContainersForceDelete();

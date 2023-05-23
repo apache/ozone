@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -108,6 +109,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container are synchronous.
   private Set<Long> pendingPutBlockCache;
 
+  private final boolean bCheckChunksFilePath;
+
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
     Preconditions.checkNotNull(containerData,
@@ -123,6 +126,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
     }
+    bCheckChunksFilePath =
+        ozoneConfig.getBoolean(
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
   }
 
   @Override
@@ -311,7 +320,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean isEmpty(boolean bCheckChunksFilePath) throws IOException {
+  public boolean isEmpty() throws IOException {
     try (DBHandle db = BlockUtils.getDB(containerData, config)) {
       return KeyValueContainerUtil.noBlocksInContainer(db.getStore(),
           containerData, bCheckChunksFilePath);

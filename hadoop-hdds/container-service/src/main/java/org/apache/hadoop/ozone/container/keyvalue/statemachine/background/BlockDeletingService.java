@@ -392,7 +392,7 @@ public class BlockDeletingService extends BackgroundService {
           // Once DB update is persisted, check if there are any blocks
           // remaining in the DB. This will determine whether the container
           // can be deleted by SCM.
-          if (container.isEmpty(false)) {
+          if (container.isEmpty()) {
             containerData.markAsEmpty();
           }
 
@@ -532,7 +532,7 @@ public class BlockDeletingService extends BackgroundService {
           // Once DB update is persisted, check if there are any blocks
           // remaining in the DB. This will determine whether the container
           // can be deleted by SCM.
-          if (container.isEmpty(false)) {
+          if (container.isEmpty()) {
             containerData.markAsEmpty();
           }
 

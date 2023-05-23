@@ -236,8 +236,6 @@ public class TestDeleteContainerHandler {
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertEquals(1,
-        metrics.getContainerDeleteFailedNonEmptyDir());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
     // is true
@@ -322,7 +320,7 @@ public class TestDeleteContainerHandler {
         containerId.getId()));
 
     long containerDeleteFailedNonEmptyBlockDB =
-        metrics.getContainerDeleteFailedNonEmptyBlockDB();
+        metrics.getContainerDeleteFailedNonEmpty();
     // send delete container to the datanode
     command = new DeleteContainerCommand(containerId.getId(), false);
 
@@ -345,7 +343,7 @@ public class TestDeleteContainerHandler {
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
     Assert.assertTrue(containerDeleteFailedNonEmptyBlockDB <
-        metrics.getContainerDeleteFailedNonEmptyBlockDB());
+        metrics.getContainerDeleteFailedNonEmpty());
 
     // Now empty the container Dir and try with a non-empty block table
     Container containerToDelete = getContainerfromDN(
@@ -358,21 +356,16 @@ public class TestDeleteContainerHandler {
         FileUtils.delete(file);
       }
     }
+
     command = new DeleteContainerCommand(containerId.getId(), false);
 
     // Send the delete command.It should fail as still block table is non-empty
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
-
-    GenericTestUtils.waitFor(() ->
-            metrics.getContainerDeleteFailedNonEmptyBlockDB() == 2,
-        500,
-        5 * 2000);
+    Thread.sleep(5000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertEquals(2,
-        metrics.getContainerDeleteFailedNonEmptyBlockDB());
     // Send the delete command. It should pass with force flag.
     long beforeForceCount = metrics.getContainerForceDelete();
     command = new DeleteContainerCommand(containerId.getId(), true);
@@ -558,7 +551,7 @@ public class TestDeleteContainerHandler {
         hddsDatanodeService
             .getDatanodeStateMachine().getContainer().getMetrics();
     Assert.assertEquals(1,
-        metrics.getContainerDeleteFailedNonEmptyBlockDB());
+        metrics.getContainerDeleteFailedNonEmpty());
 
     // Delete key, which will make isEmpty flag to true in containerData
     objectStore.getVolume(volumeName)
