@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -82,6 +81,17 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
+
+  public OmRatisSnapshotProvider(File snapshotDir,
+      Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
+      boolean spnegoEnabled, URLConnectionFactory connectionFactory) {
+    super(snapshotDir, OM_DB_NAME);
+    this.peerNodesMap = new ConcurrentHashMap<>(peerNodesMap);
+    this.httpPolicy = httpPolicy;
+    this.spnegoEnabled = spnegoEnabled;
+    this.connectionFactory = connectionFactory;
+  }
+
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
@@ -137,7 +147,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         "URL: {}", leaderNodeID, omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
-          getConnectionFactory().openConnection(omCheckpointUrl, spnegoEnabled);
+          connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
 
       connection.setRequestMethod("POST");
       String contentTypeValue = "multipart/form-data; boundary=" +
@@ -219,8 +229,4 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     }
   }
 
-  @VisibleForTesting
-  public URLConnectionFactory getConnectionFactory() {
-    return connectionFactory;
-  }
 }

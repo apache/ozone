@@ -30,8 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
@@ -40,13 +39,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -56,7 +53,7 @@ import static org.mockito.Mockito.when;
 public class TestOmRatisSnapshotProvider {
 
   private OmRatisSnapshotProvider omRatisSnapshotProvider;
-  private OmRatisSnapshotProvider spyOmRatisSnapshotProvider;
+  private URLConnectionFactory connectionFactory;
   private OMNodeDetails leader;
   private String leaderNodeId;
   private static final String CR_NL = "\r\n";
@@ -72,20 +69,17 @@ public class TestOmRatisSnapshotProvider {
       @TempDir File downloadDir) throws IOException {
     targetFile = new File(downloadDir, "newfile");
 
-    MutableConfigurationSource conf =
-        mock(LegacyHadoopConfigurationSource.class);
-    when(conf.get(eq("ozone.http.policy"), any())).thenReturn("HTTP_ONLY");
-    when(conf.get("ozone.om.http.auth.type", "simple"))
-        .thenReturn("no-kerberos");
-
     Map<String, OMNodeDetails> peerNodesMap = new HashMap<>();
     leaderNodeId = "1";
     leader = mock(OMNodeDetails.class);
     peerNodesMap.put(leaderNodeId, leader);
 
+    HttpConfig.Policy httpPolicy = mock(HttpConfig.Policy.class);
+    connectionFactory = mock(URLConnectionFactory.class);
+
     omRatisSnapshotProvider =
-        new OmRatisSnapshotProvider(conf, snapshotDir, peerNodesMap);
-    spyOmRatisSnapshotProvider = Mockito.spy(omRatisSnapshotProvider);
+        new OmRatisSnapshotProvider(snapshotDir, peerNodesMap, httpPolicy,
+            false, connectionFactory);
 
     sb = new StringBuilder();
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + CR_NL);
@@ -99,11 +93,6 @@ public class TestOmRatisSnapshotProvider {
     when(leader.getOMDBCheckpointEndpointUrl(anyBoolean(), anyBoolean()))
         .thenReturn(omCheckpointUrl);
 
-    URLConnectionFactory connectionFactory =
-        mock(URLConnectionFactory.class);
-    when(spyOmRatisSnapshotProvider.getConnectionFactory())
-        .thenReturn(connectionFactory);
-
     HttpURLConnection connection = mock(HttpURLConnection.class);
     when(connectionFactory.openConnection(any(URL.class), anyBoolean()))
         .thenReturn(connection);
@@ -115,7 +104,7 @@ public class TestOmRatisSnapshotProvider {
         new ByteArrayInputStream(outputStream.toByteArray());
     when(connection.getInputStream()).thenReturn(inputStream);
 
-    spyOmRatisSnapshotProvider.downloadSnapshot(leaderNodeId, targetFile);
+    omRatisSnapshotProvider.downloadSnapshot(leaderNodeId, targetFile);
 
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
     Assertions.assertEquals(sb.toString(),
