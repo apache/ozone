@@ -37,6 +37,7 @@ public class SnapshotDiffJob {
   private String fromSnapshot;
   private String toSnapshot;
   private boolean forceFullDiff;
+  private boolean forceNonNativeDiff;
   private long totalDiffEntries;
 
   // Default constructor for Jackson Serializer.
@@ -53,6 +54,7 @@ public class SnapshotDiffJob {
                          String fromSnapshot,
                          String toSnapshot,
                          boolean forceFullDiff,
+                         boolean forceNonNativeDiff,
                          long totalDiffEntries) {
     this.creationTime = creationTime;
     this.jobId = jobId;
@@ -62,6 +64,7 @@ public class SnapshotDiffJob {
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.forceFullDiff = forceFullDiff;
+    this.forceNonNativeDiff = forceNonNativeDiff;
     this.totalDiffEntries = totalDiffEntries;
   }
 
@@ -137,6 +140,14 @@ public class SnapshotDiffJob {
     this.totalDiffEntries = totalDiffEntries;
   }
 
+  public boolean isForceNonNativeDiff() {
+    return forceNonNativeDiff;
+  }
+
+  public void setForceNonNativeDiff(boolean forceNonNativeDiff) {
+    this.forceNonNativeDiff = forceNonNativeDiff;
+  }
+
   @Override
   public String toString() {
     return "creationTime : " + creationTime +
@@ -147,6 +158,7 @@ public class SnapshotDiffJob {
         ", fromSnapshot: " + fromSnapshot +
         ", toSnapshot: " + toSnapshot +
         ", forceFullDiff: " + forceFullDiff +
+        ", forceNonNativeDiff: " + forceNonNativeDiff +
         ", totalDiffEntries: " + totalDiffEntries;
   }
 
@@ -166,7 +178,8 @@ public class SnapshotDiffJob {
           Objects.equals(this.fromSnapshot, otherJob.fromSnapshot) &&
           Objects.equals(this.toSnapshot, otherJob.toSnapshot) &&
           Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
-          Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries);
+          Objects.equals(this.forceNonNativeDiff, otherJob.forceNonNativeDiff)
+          && Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries);
     }
     return false;
   }

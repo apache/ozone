@@ -597,18 +597,23 @@ public class ObjectStore {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param forceNonNativeDiff request to force diff to not use native libs
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean forceNonNativeDiff)
       throws IOException {
-    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff);
+    SnapshotDiffResponse diffReport = proxy.snapshotDiff(volumeName, bucketName,
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+        forceNonNativeDiff);
+    return diffReport;
   }
 }

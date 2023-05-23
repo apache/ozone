@@ -471,7 +471,7 @@ public class TestSnapshotDiffManager {
           objectIdsToCheck, oldObjectIdKeyMap, newObjectIdKeyMap);
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           SnapshotDiffResponse.JobStatus.DONE, "vol", "buck", "fs", "ts",
-          true, diffMap.size());
+          true, true, diffMap.size());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
           "buck", "fs", "ts",

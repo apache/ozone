@@ -1704,6 +1704,7 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
+  optional bool forceNonNativeDiff = 8;
 }
 
 message DeleteSnapshotRequest {
