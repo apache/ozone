@@ -155,7 +155,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     }
   }
 
-  // format list from follower to match data on leader
+  // Format list from follower to match data on leader.
   @VisibleForTesting
   public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
       String checkpointLocation, String metaDirPath) {
