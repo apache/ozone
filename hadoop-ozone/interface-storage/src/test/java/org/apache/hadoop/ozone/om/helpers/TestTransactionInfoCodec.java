@@ -15,28 +15,28 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.fail;
 
 /**
- * Class to test {@link TransactionInfo#getCodec()}.
+ * Test {@link TransactionInfo#getCodec()}.
  */
-public class TestTransactionInfoCodec {
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  private final Codec<TransactionInfo> codec = TransactionInfo.getCodec();
+public class TestTransactionInfoCodec
+    extends Proto2CodecTestBase<TransactionInfo> {
+  @Override
+  public Codec<TransactionInfo> getCodec() {
+    return TransactionInfo.getCodec();
+  }
 
   @Test
   public void toAndFromPersistedFormat() throws Exception {
@@ -44,34 +44,21 @@ public class TestTransactionInfoCodec {
         new TransactionInfo.Builder().setTransactionIndex(100)
             .setCurrentTerm(11).build();
 
+    final Codec<TransactionInfo> codec = getCodec();
     TransactionInfo convertedTransactionInfo =
         codec.fromPersistedFormat(codec.toPersistedFormat(transactionInfo));
 
     Assert.assertEquals(transactionInfo, convertedTransactionInfo);
-
-  }
-  @Test
-  public void testCodecWithNullDataFromTable() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.fromPersistedFormat(null);
   }
 
-
   @Test
-  public void testCodecWithNullDataFromUser() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.toPersistedFormat(null);
-  }
-
-
-  @Test
-  public void testCodecWithIncorrectValues() throws Exception {
+  public void testInvalidProtocolBuffer() throws Exception {
     try {
-      codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testCodecWithIncorrectValues failed");
-    } catch (IllegalStateException ex) {
-      GenericTestUtils.assertExceptionContains("Incorrect TransactionInfo " +
-          "value", ex);
+      getCodec().fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
+      fail("testInvalidProtocolBuffer failed");
+    } catch (IllegalArgumentException e) {
+      GenericTestUtils.assertExceptionContains(
+          "Incorrect TransactionInfo value", e);
     }
   }
 }

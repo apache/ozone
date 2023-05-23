@@ -61,7 +61,7 @@ public final class TransactionInfo {
   private TransactionInfo(String transactionInfo) {
     String[] tInfo =
         transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
-    Preconditions.checkState(tInfo.length == 2,
+    Preconditions.checkArgument(tInfo.length == 2,
         "Incorrect TransactionInfo value");
 
     term = Long.parseLong(tInfo[0]);
