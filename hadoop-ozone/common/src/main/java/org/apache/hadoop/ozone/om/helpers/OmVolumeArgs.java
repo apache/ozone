@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -40,7 +41,8 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates the OmVolumeArgs Args.
  */
-public final class OmVolumeArgs extends WithObjectID implements Auditable {
+public final class OmVolumeArgs extends WithObjectID
+    implements CopyObject<OmVolumeArgs>, Auditable {
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(VolumeInfo.class),
       OmVolumeArgs::getFromProtobuf,
@@ -471,9 +473,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         '}';
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmVolumeArgs copyObject() {
     Map<String, String> cloneMetadata = new HashMap<>();
     if (metadata != null) {

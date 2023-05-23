@@ -120,6 +120,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     }
   }
 
+  @Override
   public RepeatedOmKeyInfo copyObject() {
     return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
   }
