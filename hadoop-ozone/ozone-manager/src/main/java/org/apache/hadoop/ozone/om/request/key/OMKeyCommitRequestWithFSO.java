@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -163,8 +164,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          locationInfoList, false);
+      List<OmKeyLocationInfo> uncommitted;
+      if (isHSync) {
+        uncommitted = new ArrayList<>();
+      } else {
+        uncommitted = omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      }
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

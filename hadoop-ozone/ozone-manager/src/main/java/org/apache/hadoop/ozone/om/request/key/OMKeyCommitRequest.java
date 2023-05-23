@@ -217,8 +217,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          locationInfoList, false);
+      List<OmKeyLocationInfo> uncommitted;
+      if (isHSync) {
+        uncommitted = new ArrayList<>();
+      } else {
+        uncommitted = omKeyInfo.updateLocationInfoList(locationInfoList, false);
+      }
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
