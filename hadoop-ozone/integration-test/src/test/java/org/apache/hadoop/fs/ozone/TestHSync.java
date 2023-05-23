@@ -160,6 +160,28 @@ public class TestHSync {
     }
   }
 
+  @Test
+  public void testUncommittedBlocks() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final byte[] data = new byte[1];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+        final Path file = new Path(dir, "file");
+        try (FSDataOutputStream outputStream = fs.create(file, true)) {
+          outputStream.hsync();
+          outputStream.write(data);
+          outputStream.hsync();
+        }
+    }
+  }
+
   static void runTestHSync(FileSystem fs, Path file, int initialDataSize)
       throws Exception {
     try (StreamWithLength out = new StreamWithLength(
