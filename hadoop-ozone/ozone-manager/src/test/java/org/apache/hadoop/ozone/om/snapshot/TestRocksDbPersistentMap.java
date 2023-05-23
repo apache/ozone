@@ -95,7 +95,7 @@ public class TestRocksDbPersistentMap {
   public void testRocksDBPersistentMap() throws IOException, RocksDBException {
     ColumnFamilyHandle columnFamily = null;
     try {
-      CodecRegistry codecRegistry = new CodecRegistry();
+      final CodecRegistry codecRegistry = CodecRegistry.newBuilder().build();
       columnFamily = db.get().createColumnFamily(new ColumnFamilyDescriptor(
           codecRegistry.asRawData("testMap"), columnFamilyOptions));
 

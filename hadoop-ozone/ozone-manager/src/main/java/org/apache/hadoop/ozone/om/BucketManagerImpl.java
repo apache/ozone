@@ -98,11 +98,14 @@ public class BucketManagerImpl implements BucketManager {
 
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startBucket, String bucketPrefix, int maxNumOfBuckets)
+                                        String startBucket,
+                                        String bucketPrefix,
+                                        int maxNumOfBuckets,
+                                        boolean hasSnapshot)
       throws IOException {
     Preconditions.checkNotNull(volumeName);
     return metadataManager.listBuckets(
-        volumeName, startBucket, bucketPrefix, maxNumOfBuckets);
+        volumeName, startBucket, bucketPrefix, maxNumOfBuckets, hasSnapshot);
 
   }
 

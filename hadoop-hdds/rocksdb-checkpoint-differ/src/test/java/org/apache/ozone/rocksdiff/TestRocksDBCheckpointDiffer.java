@@ -36,13 +36,20 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -78,6 +85,7 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -107,6 +115,7 @@ public class TestRocksDBCheckpointDiffer {
   private File compactionLogDir;
   private File sstBackUpDir;
   private ConfigurationSource config;
+  private ExecutorService executorService = Executors.newCachedThreadPool();
 
   @BeforeEach
   public void init() {
@@ -1064,7 +1073,8 @@ public class TestRocksDBCheckpointDiffer {
       List<String> compactionLogs,
       Set<String> expectedNodes,
       int expectedNumberOfLogFilesDeleted
-  ) throws IOException {
+  ) throws IOException, ExecutionException, InterruptedException,
+      TimeoutException {
     List<File> filesCreated = new ArrayList<>();
 
     for (int i = 0; i < compactionLogs.size(); i++) {
@@ -1085,7 +1095,8 @@ public class TestRocksDBCheckpointDiffer {
 
     differ.loadAllCompactionLogs();
 
-    differ.pruneOlderSnapshotsWithCompactionHistory();
+    waitForLock(differ,
+        RocksDBCheckpointDiffer::pruneOlderSnapshotsWithCompactionHistory);
 
     Set<String> actualNodesInForwardDAG = differ.getForwardCompactionDAG()
         .nodes()
@@ -1112,6 +1123,29 @@ public class TestRocksDBCheckpointDiffer {
       File compactionFile = filesCreated.get(i);
       assertTrue(compactionFile.exists());
     }
+  }
+
+  // Take the lock, confirm that the consumer doesn't finish
+  //  then release the lock and confirm that the consumer does finish.
+  private void waitForLock(RocksDBCheckpointDiffer differ,
+                           Consumer<RocksDBCheckpointDiffer> c)
+      throws InterruptedException, ExecutionException, TimeoutException {
+
+    Future<Boolean> future;
+    // Take the lock and start the consumer.
+    try (BootstrapStateHandler.Lock lock =
+        differ.getBootstrapStateLock().lock()) {
+      future = executorService.submit(
+          () -> {
+            c.accept(differ);
+            return true;
+          });
+      // Confirm that the consumer doesn't finish with lock taken.
+      assertThrows(TimeoutException.class,
+          () -> future.get(5000, TimeUnit.MILLISECONDS));
+    }
+    // Confirm consumer finishes when unlocked.
+    assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
   }
 
   private static Stream<Arguments> sstFilePruningScenarios() {
@@ -1161,7 +1195,8 @@ public class TestRocksDBCheckpointDiffer {
       String compactionLog,
       List<String> initialFiles,
       List<String> expectedFiles
-  ) throws IOException {
+  ) throws IOException, ExecutionException, InterruptedException,
+      TimeoutException {
     createFileWithContext(metadataDirName + "/" + compactionLogDirName
             + "/compaction_log" + COMPACTION_LOG_FILE_NAME_SUFFIX,
         compactionLog);
@@ -1179,7 +1214,9 @@ public class TestRocksDBCheckpointDiffer {
             config);
 
     differ.loadAllCompactionLogs();
-    differ.pruneSstFiles();
+
+    waitForLock(differ, RocksDBCheckpointDiffer::pruneSstFiles);
+
 
     Set<String> actualFileSetAfterPruning;
     try (Stream<Path> pathStream = Files.list(

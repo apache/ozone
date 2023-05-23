@@ -45,6 +45,10 @@ public final class OMConfigKeys {
   private OMConfigKeys() {
   }
 
+  public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
+      "ozone.filesystem.snapshot.enabled";
+  public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
+
   // Location where the OM stores its DB files. In the future we may support
   // multiple entries for performance (sharding)..
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
