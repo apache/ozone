@@ -440,7 +440,7 @@ public class BucketEndpoint extends EndpointBase {
                 new Error(keyToDelete.getKey(), "InternalError",
                     ex.getMessage()));
           } else {
-            if (request.isQuiet()) {
+            if (!request.isQuiet()) {
               result.addDeleted(new DeletedObject(keyToDelete.getKey()));
             }
             getMetrics().updateDeleteKeySuccessStats(startNanos);

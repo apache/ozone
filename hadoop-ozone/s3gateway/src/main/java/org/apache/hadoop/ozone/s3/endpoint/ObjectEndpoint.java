@@ -275,12 +275,12 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
+      if (output != null) {
+        output.close();
+      }
       if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
-      }
-      if (output != null) {
-        output.close();
         getMetrics().updateCreateKeySuccessStats(startNanos);
       }
     }
@@ -988,7 +988,6 @@ public class ObjectEndpoint extends EndpointBase {
           volume.getName(), destBucket, destkey);
 
       getMetrics().updateCopyObjectSuccessStats(startNanos);
-
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
