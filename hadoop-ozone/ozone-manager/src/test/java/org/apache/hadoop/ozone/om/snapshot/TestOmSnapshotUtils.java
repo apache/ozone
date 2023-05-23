@@ -31,29 +31,41 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
+import static org.junit.jupiter.api.Assertions.assertFalse;
 /**
- * Class to test annotation based interceptor that checks whether
- * Ozone snapshot feature is enabled.
+ * Class to test snapshot utilities.
  */
 public class TestOmSnapshotUtils {
 
   /**
-   * Check Aspect implementation with SnapshotFeatureEnabledUtil.
+   * Test linkFiles().
    */
   @Test
-  public void testLinkFiles(@TempDir File tempdir) throws Exception {
-    File dir1 = new File(tempdir, "tree1/dir1");
-    File dir2 = new File(tempdir, "tree1/dir2");
-    File tree1 = new File(tempdir, "tree1");
-    File tree2 = new File(tempdir, "tree2");
+  public void testLinkFiles(@TempDir File tempDir) throws Exception {
+
+    // Create the tree to link from
+    File dir1 = new File(tempDir, "tree1/dir1");
+    File dir2 = new File(tempDir, "tree1/dir2");
+    File tree1 = new File(tempDir, "tree1");
     assertTrue(dir1.mkdirs());
     assertTrue(dir2.mkdirs());
-    File f1 = new File(tempdir, "tree1/dir1/f1");
+    File f1 = new File(tempDir, "tree1/dir1/f1");
     Files.write(f1.toPath(), "dummyData".getBytes(UTF_8));
-    File f1Link = new File(tempdir, "tree2/dir1/f1");
+
+    // Create pointers to expected files/links.
+    File tree2 = new File(tempDir, "tree2");
+    File f1Link = new File(tempDir, "tree2/dir1/f1");
+
+    // Expected files/links shouldn't exist yet.
+    assertFalse(tree2.exists());
+    assertFalse(f1Link.exists());
 
     OmSnapshotUtils.linkFiles(tree1, tree2);
+
+    // Expected files/links should exist now.
+    assertTrue(tree2.exists());
+    assertTrue(f1Link.exists());
+    assertEquals(getINode(f1.toPath()), getINode(f1Link.toPath()));
 
     Set<String> tree1Files = Files.walk(tree1.toPath()).
         map(Path::toString).
@@ -63,6 +75,5 @@ public class TestOmSnapshotUtils {
         map(Path::toString).collect(Collectors.toSet());
 
     assertEquals(tree1Files, tree2Files);
-    assertEquals(getINode(f1.toPath()), getINode(f1Link.toPath()));
   }
 }
