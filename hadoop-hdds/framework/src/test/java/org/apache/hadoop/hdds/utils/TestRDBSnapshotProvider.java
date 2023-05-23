@@ -242,16 +242,24 @@ public class TestRDBSnapshotProvider {
 
   @Test
   public void testCheckLeaderConsistent() throws IOException {
+    // Leader inited to null at startup.
     assertTrue(rdbSnapshotProvider.getInitCount() == 1);
     File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
         "file1.sst");
     Files.write(dummyFile.toPath(),
         "dummyData".getBytes(StandardCharsets.UTF_8));
+    assertTrue(dummyFile.exists());
+
+    // Set the leader.
     rdbSnapshotProvider.checkLeaderConsistent("node1");
     assertTrue(rdbSnapshotProvider.getInitCount() == 2);
     assertFalse(dummyFile.exists());
+
+    // Confirm setting the same leader doesn't reinit.
     rdbSnapshotProvider.checkLeaderConsistent("node1");
     assertTrue(rdbSnapshotProvider.getInitCount() == 2);
+
+    // Confirm setting different leader does reinit.
     rdbSnapshotProvider.checkLeaderConsistent("node2");
     assertTrue(rdbSnapshotProvider.getInitCount() == 3);
   }

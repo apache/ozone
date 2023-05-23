@@ -280,7 +280,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     if (toExcludeFiles.contains(file)) {
       excluded.add(file.toString());
     } else {
-      String fileName = Objects.requireNonNull(file.getFileName()).toString();
+      Path fileNamePath = file.getFileName();
+      if (fileNamePath == null) {
+        throw new NullPointerException("Bad file: " + file.toString());
+      }
+      String fileName = fileNamePath.toString();
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
         // If same as existing excluded file, add a link for it.
         Path linkPath = findLinkPath(toExcludeFiles, fileName);

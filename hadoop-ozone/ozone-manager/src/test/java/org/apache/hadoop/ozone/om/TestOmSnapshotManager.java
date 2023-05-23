@@ -79,7 +79,8 @@ public class TestOmSnapshotManager {
 
   private OzoneManager om;
   private File testDir;
-  private static final String CANDIDATE_DIR_NAME = OM_DB_NAME + SNAPSHOT_CANDIDATE_DIR;
+  private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
+    SNAPSHOT_CANDIDATE_DIR;
   @Before
   public void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();

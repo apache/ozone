@@ -57,6 +57,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -172,11 +174,11 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  //  @ParameterizedTest
-  //  @ValueSource(ints = {1000})
-  @Test
-  public void testInstallSnapshot() throws Exception {
-    int numSnapshotsToCreate = 100;
+  @ParameterizedTest
+  @ValueSource(ints = {100})
+  // tried up to 1000 snapshots and this test works, but some of the
+  //  timeouts have to be increased.
+  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -191,7 +193,7 @@ public class TestOMRatisSnapshots {
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
-    // Do some transactions so that the log index increases
+    // Create some snapshots, each with new keys
     int keyIncrement = 10;
     String snapshotNamePrefix = "snapshot";
     String snapshotName = "";
@@ -224,7 +226,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
-    }, 100, 600000);
+    }, 100, 10000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -335,7 +337,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  //gbjfix
   @Timeout(300)
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
@@ -368,15 +369,17 @@ public class TestOMRatisSnapshots {
     cluster.startInactiveOM(followerNodeId);
 
     // Wait the follower download the snapshot,but get stuck by injector
-    //gbjfix
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmSnapshotProvider().getNumDownloaded() == 1;
     }, 1000, 10000);
 
+    // Get two incremental tarballs, adding new keys/snapshot for each.
     TestResults firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
     TestResults secondIncrement = getNextIncrementalTarball(240, 3, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
+
+    // Resume the follower thread, it would download the incremental snapshot.
     faultInjector.resume();
 
     // Get the latest db checkpoint from the leader OM.
@@ -386,7 +389,7 @@ public class TestOMRatisSnapshots {
         TermIndex.valueOf(transactionInfo.getTerm(),
             transactionInfo.getTransactionIndex());
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
-    //gbjfix
+
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
@@ -485,7 +488,6 @@ public class TestOMRatisSnapshots {
     // Pause the follower thread again to block the next install
     faultInjector.reset();
 
-    //gbjfix
     // Wait the follower download the incremental snapshot, but get stuck
     // by injector
     GenericTestUtils.waitFor(() ->
@@ -494,6 +496,9 @@ public class TestOMRatisSnapshots {
 
     assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
         >= leaderOMSnapshotIndex - 1);
+
+    // Now confirm tarball is just incremental and contains no unexpected
+    //  files/links.
     Path increment = Paths.get(tempDir.toString(), "increment" + numKeys);
     increment.toFile().mkdirs();
     unTarLatestTarBall(followerOM, increment);
@@ -511,7 +516,6 @@ public class TestOMRatisSnapshots {
 
     // Confirm that none of the links in the tarballs hardLinkFile
     //  match the existing files
-    // gbjnote, is the path right here?
     Path hardLinkFile = Paths.get(increment.toString(), OM_HARDLINK_FILE);
     try (Stream<String> lines = Files.lines(hardLinkFile)) {
       int lineCount = 0;
@@ -1033,7 +1037,7 @@ public class TestOMRatisSnapshots {
   private void unTarLatestTarBall(OzoneManager followerOm, Path tempDir)
       throws IOException {
     File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
-    // Find the latest snapshot.
+    // Find the latest tarball.
     String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
         filter(s -> s.toLowerCase().endsWith(".tar")).
         reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
@@ -1074,6 +1078,7 @@ public class TestOMRatisSnapshots {
 
     @Override
     public void resume() throws IOException {
+      // Make sure injector pauses before resuming.
       try {
         ready.await();
       } catch (InterruptedException e) {
