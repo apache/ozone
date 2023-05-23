@@ -127,7 +127,7 @@ public class TestNSSummaryEndpointWithFSO {
   private ReconDBProvider reconDBProvider;
   private Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 
-  private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
