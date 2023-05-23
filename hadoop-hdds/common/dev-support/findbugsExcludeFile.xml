@@ -37,4 +37,8 @@
     <Class name="~org\.apache\.hadoop\.hdds\.scm\.net\.TestNodeSchemaLoader\$.*"></Class>
     <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase"/>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
+  </Match>
 </FindBugsFilter>

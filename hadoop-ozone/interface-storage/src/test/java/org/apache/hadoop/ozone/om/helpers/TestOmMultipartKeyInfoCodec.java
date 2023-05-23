@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -31,13 +32,18 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * This class tests OmMultipartKeyInfoCodec.
+ * Test {@link OmMultipartKeyInfo#getCodec()}.
  */
-public class TestOmMultipartKeyInfoCodec {
+public class TestOmMultipartKeyInfoCodec
+    extends Proto2CodecTestBase<OmMultipartKeyInfo> {
+  @Override
+  public Codec<OmMultipartKeyInfo> getCodec() {
+    return OmMultipartKeyInfo.getCodec();
+  }
 
   @Test
   public void testOmMultipartKeyInfoCodec() {
-    OmMultipartKeyInfoCodec codec = new OmMultipartKeyInfoCodec();
+    final Codec<OmMultipartKeyInfo> codec = getCodec();
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())

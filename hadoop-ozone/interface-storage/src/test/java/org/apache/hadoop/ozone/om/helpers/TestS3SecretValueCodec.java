@@ -16,38 +16,28 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.helpers;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
-
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.ozone.test.GenericTestUtils;
-
-import static org.junit.Assert.fail;
 
 /**
- * This class test S3SecretValueCodec.
+ * Test {@link S3SecretValue#getCodec()}.
  */
-public class TestS3SecretValueCodec {
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  private S3SecretValueCodec codec;
-
-  @Before
-  public void initialize() {
-    codec = new S3SecretValueCodec();
+public class TestS3SecretValueCodec
+    extends Proto2CodecTestBase<S3SecretValue> {
+  @Override
+  public Codec<S3SecretValue> getCodec() {
+    return S3SecretValue.getCodec();
   }
+
   @Test
   public void testCodecWithCorrectData() throws Exception {
+    final Codec<S3SecretValue> codec = getCodec();
 
     S3SecretValue s3SecretValue =
         new S3SecretValue(UUID.randomUUID().toString(),
@@ -59,30 +49,5 @@ public class TestS3SecretValueCodec {
     S3SecretValue docdedS3Secret = codec.fromPersistedFormat(data);
 
     Assert.assertEquals(s3SecretValue, docdedS3Secret);
-
-  }
-
-  @Test
-  public void testCodecWithIncorrectValues() throws Exception {
-    try {
-      codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testCodecWithIncorrectValues failed");
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
-          "data from the byte array", ex);
-    }
-  }
-
-  @Test
-  public void testCodecWithNullDataFromTable() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.fromPersistedFormat(null);
-  }
-
-
-  @Test
-  public void testCodecWithNullDataFromUser() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.toPersistedFormat(null);
   }
 }
