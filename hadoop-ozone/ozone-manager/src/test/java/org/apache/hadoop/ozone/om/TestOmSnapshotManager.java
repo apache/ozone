@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -222,8 +223,10 @@ public class TestOmSnapshotManager {
       String volumeName, String bucketName) {
     String snapshotName = UUID.randomUUID().toString();
     String snapshotId = UUID.randomUUID().toString();
-    return SnapshotInfo.newInstance(
-        volumeName, bucketName, snapshotName, snapshotId);
+    return SnapshotInfo.newInstance(volumeName,
+        bucketName,
+        snapshotName,
+        snapshotId,
+        Time.now());
   }
-
 }

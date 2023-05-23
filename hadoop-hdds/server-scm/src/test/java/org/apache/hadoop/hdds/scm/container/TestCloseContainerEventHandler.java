@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.lease.Lease;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -52,6 +53,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -137,18 +139,36 @@ public class TestCloseContainerEventHandler {
         .thenReturn(pipeline);
     LeaseManager<Object> leaseManager = new LeaseManager<>("test", timeoutInMs);
     leaseManager.start();
+    LeaseManager mockLeaseManager = Mockito.mock(LeaseManager.class);
+    List<Lease<Object>> leaseList = new ArrayList<>(1);
+    Mockito.when(mockLeaseManager.acquire(any(), anyLong(), any())).thenAnswer(
+        invocation -> {
+          leaseList.add(leaseManager.acquire(
+              invocation.getArgument(0, Object.class),
+              invocation.getArgument(1),
+              invocation.getArgument(2, Callable.class)));
+          return leaseList.get(0);
+        });
     CloseContainerEventHandler closeHandler = new CloseContainerEventHandler(
         pipelineManager, containerManager, scmContext,
-        leaseManager, timeoutInMs);
+        mockLeaseManager, timeoutInMs);
     closeHandler.onMessage(container.containerID(), eventPublisher);
-    // immediate check if event is published, it should not publish in 500ms
-    Thread.sleep(500);
+    Mockito.verify(mockLeaseManager, atLeastOnce())
+        .acquire(any(), anyLong(), any());
+    Assert.assertTrue(leaseList.size() > 0);
+    // immediate check if event is published
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
-    Thread.sleep(timeoutInMs * 2);
-    // event publish already after waiting 4+ seconds
-    Mockito.verify(eventPublisher, atLeastOnce())
-        .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    // wait for event to happen
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Mockito.verify(eventPublisher, atLeastOnce())
+            .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+      } catch (Throwable ex) {
+        return false;
+      }
+      return true;
+    }, 1000, (int) timeoutInMs * 3);
     leaseManager.shutdown();
   }
 

@@ -205,6 +205,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>5GB</value>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      This determines the free space to be used for closing containers
+      When the difference between volume capacity and used reaches this number,
+      containers that reside on this volume will be closed and no new containers
+      would be allocated on this volume.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>

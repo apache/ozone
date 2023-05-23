@@ -55,6 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 
 /**
  * Class which defines utility methods for KeyValueContainer.
@@ -114,13 +115,13 @@ public final class KeyValueContainerUtil {
     }
 
     DatanodeStore store;
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreSchemaOneImpl(conf, dbFile.getAbsolutePath(),
           false);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
           false);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       // We don't create per-container store for schema v3 containers,
       // they should use per-volume db store.
       return;
@@ -153,7 +154,7 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // DB failure is catastrophic, the disk needs to be replaced.
       // In case of an exception, LOG the message and rethrow the exception.
       try {
@@ -230,7 +231,7 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    if (kvContainerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData, db.getStore());
       }
@@ -435,6 +436,12 @@ public final class KeyValueContainerUtil {
 
   }
 
+  public static boolean isSameSchemaVersion(String schema, String other) {
+    String effective1 = schema != null ? schema : SCHEMA_V1;
+    String effective2 = other != null ? other : SCHEMA_V1;
+    return effective1.equals(effective2);
+  }
+
   /**
    * Utilities for container_delete_service directory
    * which is located under <volume>/hdds/<cluster-id>/tmp/.
@@ -502,8 +509,7 @@ public final class KeyValueContainerUtil {
         KeyValueContainerData keyValueContainerData =
             (KeyValueContainerData) containerData;
 
-        if (keyValueContainerData.getSchemaVersion()
-            .equals(OzoneConsts.SCHEMA_V3)) {
+        if (keyValueContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           // Container file doesn't include the volume
           // so we need to set it here in order to get the db file.
           keyValueContainerData.setVolume(hddsVolume);

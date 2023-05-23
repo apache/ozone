@@ -416,6 +416,7 @@ message ContainerReplicaHistoryProto {
     required int64 firstSeenTime = 2;
     required int64 lastSeenTime = 3;
     required int64 bcsId = 4;
+    optional string state = 5;
 }
 
 message SCMContainerReplicaProto {

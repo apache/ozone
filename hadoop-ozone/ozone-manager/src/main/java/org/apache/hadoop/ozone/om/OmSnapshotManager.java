@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -353,7 +352,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
-        new OmDBDiffReportEntryCodec());
+        SnapshotDiffReportOzone.getDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class,
         new SnapshotDiffJob.SnapshotDiffJobCodec());
     return registry.build();
@@ -380,10 +379,14 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire deletedTable write lock
+    // Acquire active DB deletedDirectoryTable write lock to block
+    // DirDeletingTask
+    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
+        .writeLock().lock();
+    // Acquire active DB deletedTable write lock to block KeyDeletingTask
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
-    // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
+
     try {
       // Create DB checkpoint for snapshot
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
@@ -395,14 +398,18 @@ public final class OmSnapshotManager implements AutoCloseable {
       deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
     } finally {
-      // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
           .writeLock().unlock();
+      // Release deletedDirectoryTable write lock
+      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
+          .writeLock().unlock();
     }
 
-    LOG.info("Created checkpoint : {} for snapshot {}",
-        dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    if (dbCheckpoint != null) {
+      LOG.info("Created checkpoint : {} for snapshot {}",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    }
 
     final RocksDBCheckpointDiffer dbCpDiffer =
         store.getRocksDBCheckpointDiffer();
