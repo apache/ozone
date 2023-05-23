@@ -124,11 +124,9 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
-    OMFileCreateRequest omFileCreateRequest =
-        getOMFileCreateRequest(omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
-    OMRequest modifiedOmRequest =
-        omFileCreateRequest.preExecute(ozoneManager);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
     long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
@@ -149,7 +147,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
 
-    List<OmKeyLocationInfo> omKeyLocationInfoList =
+    List< OmKeyLocationInfo > omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
     Assert.assertTrue(omKeyLocationInfoList.size() == 1);
 

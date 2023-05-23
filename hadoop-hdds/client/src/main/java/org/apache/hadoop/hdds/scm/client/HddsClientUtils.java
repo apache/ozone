@@ -46,7 +46,6 @@ import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 
-
 /**
  * Utility methods for Ozone and Container Clients.
  *
