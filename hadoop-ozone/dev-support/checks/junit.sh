@@ -19,6 +19,7 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+: ${CANCEL_NATIVE_VERSION_CHECK:="false"}
 : ${CHECK:="unit"}
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
@@ -39,6 +40,13 @@ if [[ "${FAIL_FAST:-}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
+fi
+
+if [[ "${CANCEL_NATIVE_VERSION_CHECK}" != "true" ]]; then
+  NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
+  . "$DIR/native_check.sh"
+  init_native_maven_opts
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} ${NATIVE_MAVEN_OPTIONS}"
 fi
 
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then

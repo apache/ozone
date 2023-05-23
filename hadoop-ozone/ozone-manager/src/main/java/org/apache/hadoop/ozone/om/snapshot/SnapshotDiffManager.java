@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -38,8 +40,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeConstants;
@@ -52,7 +52,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -119,7 +118,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  */
 public class SnapshotDiffManager implements AutoCloseable {
   private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
+      LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
   private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
   private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
@@ -164,6 +163,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean snapshotForceFullDiff;
   private final Optional<ManagedSSTDumpTool> sstDumpTool;
+
+  private Optional<ExecutorService> sstDumptoolExecService;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffManager(ManagedRocksDB db,
@@ -264,16 +265,18 @@ public class SnapshotDiffManager implements AutoCloseable {
           OMConfigKeys
               .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      ExecutorService execService = new ThreadPoolExecutor(0,
+      this.sstDumptoolExecService = Optional.of(new ThreadPoolExecutor(0,
               threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
-              new ThreadPoolExecutor.DiscardPolicy());
-      return Optional.of(new ManagedSSTDumpTool(execService, bufferSize));
+              new ThreadPoolExecutor.DiscardPolicy()));
+      return Optional.of(new ManagedSSTDumpTool(sstDumptoolExecService.get(),
+          bufferSize));
     } catch (NativeLibraryNotLoadedException e) {
-      return Optional.empty();
+      this.sstDumptoolExecService.ifPresent(ExecutorService::shutdown);
     }
+    return Optional.empty();
   }
 
   /**
@@ -433,7 +436,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     return new OFSPath(bucketPath, new OzoneConfiguration());
   }
 
-  private SnapshotDiffReportOzone createPageResponse(
+  @VisibleForTesting
+  SnapshotDiffReportOzone createPageResponse(
       final SnapshotDiffJob snapDiffJob,
       final String volumeName,
       final String bucketName,
@@ -783,7 +787,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentSet<byte[]> objectIDsToCheck,
-      final String diffDir 
+      final String diffDir
   ) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
@@ -831,7 +835,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
+  void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
                                 Table<String, ? extends WithObjectID> tsTable,
                                 Set<String> deltaFiles,
                                 boolean nativeRocksToolsLoaded,
@@ -899,7 +903,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
+  Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
                                     OmSnapshot toSnapshot,
                                     List<String> tablesToLookUp,
                                     SnapshotInfo fsInfo,
@@ -970,12 +974,11 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private long generateDiffReport(
+  long generateDiffReport(
       final String jobId,
       final PersistentSet<byte[]> objectIDsToCheck,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-      final PersistentMap<byte[], byte[]> newObjIdToKeyMap
-  ) {
+      final PersistentMap<byte[], byte[]> newObjIdToKeyMap) {
 
     LOG.debug("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
@@ -1204,8 +1207,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   /**
    * check if the given key is in the bucket specified by tablePrefix map.
    */
-  private boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
-      String tableName) {
+  boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
+                        String tableName) {
     String volumeBucketDbPrefix;
     // In case of FSO - either File/Directory table
     // the key Prefix would be volumeId/bucketId and
@@ -1265,5 +1268,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (executorService != null) {
       executorService.shutdown();
     }
+    this.sstDumptoolExecService.ifPresent(ExecutorService::shutdown);
   }
 }
