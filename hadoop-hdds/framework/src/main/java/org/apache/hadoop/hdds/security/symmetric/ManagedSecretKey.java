@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtobufUtils;
 
@@ -150,5 +151,30 @@ public final class ManagedSecretKey {
     SecretKey secretKey = new SecretKeySpec(message.getEncoded().toByteArray(),
         message.getAlgorithm());
     return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
+  }
+
+  public static ManagedSecretKey fromProtobuf(
+      OzoneManagerProtocolProtos.GetCurrentSecretKeyResponse response) {
+    UUID id = ProtobufUtils.fromProtobuf(response.getSecretKey().getId());
+    Instant creationTime =
+        Instant.ofEpochMilli(response.getSecretKey().getCreationTime());
+    Instant expiryTime =
+        Instant.ofEpochMilli(response.getSecretKey().getExpiryTime());
+    SecretKey secretKey =
+        new SecretKeySpec(response.getSecretKey().getEncoded().toByteArray(),
+            response.getSecretKey().getAlgorithm());
+    return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
+  }
+
+  public static OzoneManagerProtocolProtos.ManagedSecretKey toProto(
+      ManagedSecretKey secretKey) {
+    OzoneManagerProtocolProtos.ManagedSecretKey.Builder builder =
+        OzoneManagerProtocolProtos.ManagedSecretKey.newBuilder();
+    builder.setId(ProtobufUtils.toProtobuf(secretKey.getId()))
+        .setCreationTime(secretKey.getCreationTime().toEpochMilli())
+        .setExpiryTime(secretKey.getExpiryTime().toEpochMilli())
+        .setAlgorithm(secretKey.getSecretKey().getAlgorithm())
+        .setEncoded(ByteString.copyFrom(secretKey.getSecretKey().getEncoded()));
+    return builder.build();
   }
 }

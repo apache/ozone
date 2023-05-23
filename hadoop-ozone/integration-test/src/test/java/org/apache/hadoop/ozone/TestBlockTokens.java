@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -55,10 +56,14 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.SecretKey;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -112,6 +117,7 @@ public final class TestBlockTokens {
   public Timeout timeout = Timeout.seconds(180);
 
   private static MiniKdc miniKdc;
+  private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
   private static File workDir;
   private static File ozoneKeytab;
@@ -121,6 +127,7 @@ public final class TestBlockTokens {
   private static String host;
   private static String clusterId;
   private static String scmId;
+  private static String omServiceId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static BlockInputStreamFactory blockInputStreamFactory =
@@ -137,6 +144,7 @@ public final class TestBlockTokens {
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+    omServiceId = "om-service-test";
 
     startMiniKdc();
     setSecureConfig();
@@ -144,6 +152,7 @@ public final class TestBlockTokens {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
+    ozoneAdmin = new OzoneAdmin(conf);
     createTestData();
   }
 
@@ -271,6 +280,37 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
+  @Test
+  public void testGetCurrentSecretKey() {
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    PrintStream printStream = new PrintStream(outputStream);
+    System.setOut(printStream);
+
+    String[] args =
+        new String[]{"om", "fetch-current-key", "--service-id=" + omServiceId};
+    ozoneAdmin.execute(args);
+
+    String actualOutput = outputStream.toString();
+    System.setOut(System.out);
+
+    String actualCurrentKey = testGetCurrentSecretKeyUtil(actualOutput);
+    SecretKey key =
+        getScmSecretKeyManager().getCurrentSecretKey().getSecretKey();
+    byte[] encodedKey = key.getEncoded();
+    String expectedCurrentKey = Base64.getEncoder().encodeToString(encodedKey);
+    assertEquals(expectedCurrentKey, actualCurrentKey);
+  }
+
+  private String testGetCurrentSecretKeyUtil(String output) {
+    // Extract the current secret key from the output
+    String[] lines = output.split(System.lineSeparator());
+    for (String line : lines) {
+      if (line.startsWith("Current Secret Key: ")) {
+        return line.substring("Current Secret Key: ".length()).trim();
+      }
+    }
+    return null;
+  }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
@@ -383,6 +423,7 @@ public final class TestBlockTokens {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
+        .setOMServiceId("om-service-test")
         .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)

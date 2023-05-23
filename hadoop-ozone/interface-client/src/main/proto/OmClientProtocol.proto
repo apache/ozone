@@ -134,6 +134,7 @@ enum Type {
   TransferLeadership = 117;
   SnapshotPurge = 118;
   RecoverLease = 119;
+  GetCurrentSecretKey = 120;
 }
 
 message OMRequest {
@@ -252,6 +253,7 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
+  optional GetCurrentSecretKeyRequest       GetCurrentSecretKeyRequest     = 120;
 }
 
 message OMResponse {
@@ -362,6 +364,7 @@ message OMResponse {
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
+  optional GetCurrentSecretKeyResponse       GetCurrentSecretKeyResponse   = 120;
 }
 
 enum Status {
@@ -587,6 +590,22 @@ message SetVolumePropertyRequest {
 
 message SetVolumePropertyResponse {
     optional bool response = 1;
+}
+
+message GetCurrentSecretKeyRequest {
+
+}
+
+message ManagedSecretKey {
+    required hdds.UUID id = 1;
+    required uint64 creationTime = 2;
+    required uint64 expiryTime = 3;
+    required string algorithm = 4;
+    required bytes encoded = 5;
+}
+
+message GetCurrentSecretKeyResponse {
+  required ManagedSecretKey secretKey = 1;
 }
 
 /**

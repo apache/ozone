@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -78,6 +79,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -309,6 +312,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case TransferLeadership:
         responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
             request.getTransferOmLeadershipRequest()));
+        break;
+      case GetCurrentSecretKey:
+        GetCurrentSecretKeyResponse getCurrentSecretKeyResponse =
+            getCurrentSecretKey(request.getGetCurrentSecretKeyRequest());
+        responseBuilder.setGetCurrentSecretKeyResponse(
+            getCurrentSecretKeyResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -942,6 +951,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     boolean res = impl.triggerRangerBGSync(rangerBGSyncRequest.getNoWait());
 
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
+  }
+
+  private GetCurrentSecretKeyResponse getCurrentSecretKey(
+      GetCurrentSecretKeyRequest request) {
+    ManagedSecretKey managedSecretKey = impl.getCurrentSecretKey();
+    GetCurrentSecretKeyResponse response =
+        GetCurrentSecretKeyResponse.newBuilder()
+            .setSecretKey(ManagedSecretKey.toProto(managedSecretKey))
+            .build();
+    return response;
   }
 
   @RequestFeatureValidator(
