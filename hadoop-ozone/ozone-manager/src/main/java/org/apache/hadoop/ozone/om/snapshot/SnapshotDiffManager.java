@@ -152,7 +152,8 @@ public class SnapshotDiffManager implements AutoCloseable {
    * similar type of request at any point of time.
    */
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
-  private final ExecutorService executorService;
+  private final ExecutorService snapDiffExecutor;
+  private ExecutorService sstDumpToolExecutor;
 
   /**
    * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
@@ -213,7 +214,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         byte[].class,
         byte[].class);
 
-    this.executorService = new ThreadPoolExecutor(threadPoolSize,
+    this.snapDiffExecutor = new ThreadPoolExecutor(threadPoolSize,
         threadPoolSize,
         0,
         TimeUnit.MILLISECONDS,
@@ -264,13 +265,14 @@ public class SnapshotDiffManager implements AutoCloseable {
           OMConfigKeys
               .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      ExecutorService execService = new ThreadPoolExecutor(0,
+      sstDumpToolExecutor = new ThreadPoolExecutor(0,
               threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
               new ThreadPoolExecutor.DiscardPolicy());
-      return Optional.of(new ManagedSSTDumpTool(execService, bufferSize));
+      return Optional.of(new ManagedSSTDumpTool(sstDumpToolExecutor,
+          bufferSize));
     } catch (NativeLibraryNotLoadedException e) {
       return Optional.empty();
     }
@@ -560,7 +562,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
-      executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
+      snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
@@ -1261,9 +1263,29 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
+    if (snapDiffExecutor != null) {
+      closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
+    }
+    if (sstDumpToolExecutor != null) {
+      closeExecutorService(sstDumpToolExecutor, "SstDumpToolExecutor");
+    }
+  }
+
+  private void closeExecutorService(ExecutorService executorService,
+                                    String serviceName) {
     if (executorService != null) {
-      executorService.shutdown();
+      LOG.info("Shutting down executorService: '{}'", serviceName);
+      executorService.shutdownNow();
+      try {
+        if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+        executorService.shutdownNow();
+      }
     }
   }
 }
