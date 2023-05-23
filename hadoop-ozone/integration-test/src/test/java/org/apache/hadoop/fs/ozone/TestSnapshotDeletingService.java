@@ -82,7 +82,7 @@ public class TestSnapshotDeletingService {
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
+        200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100);
@@ -469,19 +469,6 @@ public class TestSnapshotDeletingService {
       fail("testDoubleBuffer failed with: " + ex);
     }
     return count == expectedCount;
-  }
-
-  private boolean assertSnapshotStatus(String tableKey,
-      SnapshotInfo.SnapshotStatus snapshotStatus) {
-
-    SnapshotInfo info = null;
-    try {
-      info = cluster.getOzoneManager().getMetadataManager()
-          .getSnapshotInfoTable().get(tableKey);
-    } catch (IOException ex) {
-      fail("Snapshot doesn't exist: " + ex);
-    }
-    return info != null && info.getSnapshotStatus() == snapshotStatus;
   }
 }
 
