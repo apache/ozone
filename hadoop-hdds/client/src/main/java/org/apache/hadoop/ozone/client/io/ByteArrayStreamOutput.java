@@ -38,12 +38,14 @@ public abstract class ByteArrayStreamOutput extends OutputStream
   @Override
   public void write(ByteBuffer buffer, int off, int len) throws IOException {
     if (len == 0) {
-      // noop, avoid creating an array
-    } else if (buffer.hasArray()) {
+      return;
+    }
+
+    if (buffer.hasArray()) {
       write(buffer.array(), off, len);
     } else {
       final byte[] array = new byte[Math.min(ARRAY_SIZE_LIMIT, len)];
-      for (; len > 0; ) {
+      for (; len > 0;) {
         final ByteBuffer readonly = buffer.asReadOnlyBuffer();
         final int writeSize = Math.min(array.length, len);
         readonly.position(off);
