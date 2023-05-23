@@ -94,13 +94,13 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
+    int minimumPipelines = getMinimumPipelines(repConfig);
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < getMinimumPipelines(repConfig)) {
+      if (openPipelineCount < minimumPipelines) {
         try {
-          return allocateContainer(
-              repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
