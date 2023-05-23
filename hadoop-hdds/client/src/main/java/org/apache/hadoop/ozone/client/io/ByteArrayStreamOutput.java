@@ -33,16 +33,26 @@ import java.nio.ByteBuffer;
  */
 public abstract class ByteArrayStreamOutput extends OutputStream
     implements ByteBufferStreamOutput {
+  private static final int ARRAY_SIZE_LIMIT = 64 << 10; //64KB
+
   @Override
   public void write(ByteBuffer buffer, int off, int len) throws IOException {
-    if (buffer.hasArray()) {
+    if (len == 0) {
+      // noop, avoid creating an array
+    } else if (buffer.hasArray()) {
       write(buffer.array(), off, len);
     } else {
-      final byte[] array = new byte[len];
-      final ByteBuffer readonly = buffer.asReadOnlyBuffer();
-      readonly.position(off).limit(off + len);
-      readonly.get(array);
-      write(array);
+      final byte[] array = new byte[Math.min(ARRAY_SIZE_LIMIT, len)];
+      for (; len > 0; ) {
+        final ByteBuffer readonly = buffer.asReadOnlyBuffer();
+        final int writeSize = Math.min(array.length, len);
+        readonly.position(off);
+        off += writeSize;
+        readonly.limit(off);
+        readonly.get(array, 0, writeSize);
+        write(array, 0, writeSize);
+        len -= writeSize;
+      }
     }
   }
 
