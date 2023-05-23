@@ -3623,7 +3623,7 @@
 
   <property>
     <name>ozone.recon.containerkey.flush.db.max.threshold</name>
-    <value>1000</value>
+    <value>150000</value>
     <tag>OZONE, RECON, PERFORMANCE</tag>
     <description>
       Maximum threshold number of entries to hold in memory for Container Key Mapper task in hashmap before flushing to

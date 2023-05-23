@@ -155,7 +155,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.containerkey.flush.db.max.threshold";
 
   public static final long
-      OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 1000L;
+      OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.snapshot.task.interval.delay";
