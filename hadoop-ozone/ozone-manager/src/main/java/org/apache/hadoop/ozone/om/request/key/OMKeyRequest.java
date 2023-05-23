@@ -826,7 +826,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (uncommitted.isEmpty()) {
       return null;
     }
-    LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+    LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
     // This is a special marker to indicate that SnapshotDeletingService

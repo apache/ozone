@@ -680,6 +680,9 @@ public class TestContainerEndpoint {
             responseWithLimitObject.getContainers().stream().findFirst()
                     .orElse(null);
     assertNotNull(containerWithLimit);
+    assertTrue(containerWithLimit.getReplicas().stream()
+        .map(ContainerHistory::getState)
+        .allMatch(s -> s.equals("UNHEALTHY")));
 
     Collection<MissingContainerMetadata> recordsWithLimit
             = responseWithLimitObject.getContainers();
@@ -761,6 +764,10 @@ public class TestContainerEndpoint {
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
+    assertTrue(records.stream()
+        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
+            .map(ContainerHistory::getState))
+        .allMatch(s -> s.equals("UNHEALTHY")));
     List<UnhealthyContainerMetadata> missing = records
         .stream()
         .filter(r -> r.getContainerState()
@@ -859,7 +866,10 @@ public class TestContainerEndpoint {
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
-
+    assertTrue(records.stream()
+        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
+            .map(ContainerHistory::getState))
+            .allMatch(s -> s.equals("UNHEALTHY")));
     // There should only be 5 missing containers and no others as we asked for
     // only missing.
     assertEquals(5, records.size());
@@ -890,6 +900,10 @@ public class TestContainerEndpoint {
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
             3, 1).getEntity();
+    assertTrue(firstBatch.getContainers().stream()
+        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
+            .map(ContainerHistory::getState))
+        .allMatch(s -> s.equals("UNHEALTHY")));
 
     UnhealthyContainersResponse secondBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
@@ -917,16 +931,19 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN");
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN");
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN");
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
         (List<ContainerHistory>) response.getEntity();
+    assertTrue(histories.stream()
+        .map(ContainerHistory::getState)
+        .allMatch(s -> s.equals("OPEN")));
     Set<String> datanodes = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             u1.toString(), u2.toString(), u3.toString(), u4.toString())));
@@ -1002,10 +1019,14 @@ public class TestContainerEndpoint {
     missingList.add(missing);
     containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
 
-    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L);
-    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L);
-    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L);
-    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L);
+    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
+        "UNHEALTHY");
+    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
+        "UNHEALTHY");
+    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
+        "UNHEALTHY");
+    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
+        "UNHEALTHY");
   }
 
   protected ContainerWithPipeline getTestContainer(

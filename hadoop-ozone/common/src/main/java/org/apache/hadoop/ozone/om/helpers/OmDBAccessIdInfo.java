@@ -17,16 +17,29 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo;
 
 import java.io.IOException;
 
 /**
  * This class is used for storing Ozone tenant accessId info.
+ * <p>
+ * This class is immutable.
  */
 public final class OmDBAccessIdInfo {
+  private static final Codec<OmDBAccessIdInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(ExtendedUserAccessIdInfo.class),
+      OmDBAccessIdInfo::getFromProtobuf,
+      OmDBAccessIdInfo::getProtobuf,
+      true);
+
+  public static Codec<OmDBAccessIdInfo> getCodec() {
+    return CODEC;
+  }
+
   /**
    * Name of the tenant.
    */
@@ -45,9 +58,6 @@ public final class OmDBAccessIdInfo {
    */
   private final boolean isDelegatedAdmin;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmDBAccessIdInfo.class);
-
   public OmDBAccessIdInfo(String tenantId, String userPrincipal,
                           boolean isAdmin, boolean isDelegatedAdmin) {
     this.tenantId = tenantId;
@@ -63,8 +73,8 @@ public final class OmDBAccessIdInfo {
   /**
    * Convert OmDBAccessIdInfo to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo getProtobuf() {
-    return OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo.newBuilder()
+  public ExtendedUserAccessIdInfo getProtobuf() {
+    return ExtendedUserAccessIdInfo.newBuilder()
         .setTenantId(tenantId)
         .setUserPrincipal(userPrincipal)
         .setIsAdmin(isAdmin)
@@ -76,7 +86,7 @@ public final class OmDBAccessIdInfo {
    * Convert protobuf to OmDBAccessIdInfo.
    */
   public static OmDBAccessIdInfo getFromProtobuf(
-      OzoneManagerProtocolProtos.ExtendedUserAccessIdInfo infoProto)
+      ExtendedUserAccessIdInfo infoProto)
       throws IOException {
     return new Builder()
         .setTenantId(infoProto.getTenantId())

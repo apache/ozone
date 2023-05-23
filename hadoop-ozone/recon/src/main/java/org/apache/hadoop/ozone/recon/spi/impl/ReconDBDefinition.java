@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
-import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -63,24 +62,24 @@ public class ReconDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containerKeyCountTable",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition
       <Long, ContainerReplicaHistoryList> REPLICA_HISTORY =
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, NSSummary>
       NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
           "namespaceSummaryTable",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           NSSummary.class,
           new NSSummaryCodec());
 
@@ -90,9 +89,9 @@ public class ReconDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history_v2",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
 
   @Override
   public String getName() {
