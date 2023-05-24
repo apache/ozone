@@ -360,7 +360,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
                           </Col>
                         </Row>
                       </div> :
-                      <div>No data to visualize container size distribution. Add files to Ozone to see a visualization on container size distribution.</div>)}
+                      <div>No data available for container size distribution visualization. Add files to Ozone</div>)}
                 </div>
               }
             </TabPane>
