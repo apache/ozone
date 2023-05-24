@@ -681,6 +681,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Ozone Manager. The
+      permissions have to be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs</name>
     <value/>
     <tag>OZONE, OM, SCM, CONTAINER, STORAGE, REQUIRED</tag>
@@ -692,6 +701,15 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       dfs.container.ratis.datanode.storage.dir be configured separately.
+    </description>
+  </property>
+  <property>
+    <name>ozone.metadata.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
+      to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
+      default permissions for OM,SCM,Recon,Datanode are not set.
     </description>
   </property>
 
@@ -729,6 +747,15 @@
       If undefined, then the SCM will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Storage Container Manager. The
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>
@@ -2784,6 +2811,15 @@
       If undefined, then the Recon will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Recon. The
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>

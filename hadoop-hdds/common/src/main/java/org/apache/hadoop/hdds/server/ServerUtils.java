@@ -19,14 +19,20 @@ package org.apache.hadoop.hdds.server;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.http.client.methods.HttpRequestBase;
@@ -40,6 +46,7 @@ public final class ServerUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ServerUtils.class);
+
 
   private ServerUtils() {
   }
@@ -152,8 +159,10 @@ public final class ServerUtils {
   }
 
   /**
-   * Utility method to get value of a given key that corresponds to a DB
-   * directory.
+   * Utility method to retrieve the value of a key representing a DB directory
+   * and create a File object for the directory. The method also sets the
+   * directory permissions based on the configuration.
+   *
    * @param conf configuration bag
    * @param key Key to test
    * @param componentName Which component's key is this
@@ -163,7 +172,6 @@ public final class ServerUtils {
                                             String key,
                                             String componentName) {
     final Collection<String> metadirs = conf.getTrimmedStringCollection(key);
-
     if (metadirs.size() > 1) {
       throw new IllegalArgumentException(
           "Bad config setting " + key +
@@ -178,11 +186,89 @@ public final class ServerUtils {
             dbDirPath + " specified in configuration setting " +
             key);
       }
+      try {
+        Path path = dbDirPath.toPath();
+        // Fetch the permissions for the respective component from the config
+        String permissionValue = getPermissions(key, conf);
+        String symbolicPermission = getSymbolicPermission(permissionValue);
+
+        // Set the permissions for the directory
+        Files.setPosixFilePermissions(path,
+            PosixFilePermissions.fromString(symbolicPermission));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to set directory permissions for " +
+            dbDirPath + ": " + e.getMessage(), e);
+      }
       return dbDirPath;
     }
 
     return null;
   }
+
+  /**
+   * Fetches the symbolic representation of the permission value.
+   *
+   * @param permissionValue the permission value (octal or symbolic)
+   * @return the symbolic representation of the permission value
+   */
+  private static String getSymbolicPermission(String permissionValue) {
+    if (isSymbolic(permissionValue)) {
+      // For symbolic representation, use it directly
+      return permissionValue;
+    } else {
+      // For octal representation, convert it to FsPermission object and then
+      // to symbolic representation
+      short octalPermission = Short.parseShort(permissionValue, 8);
+      FsPermission fsPermission = new FsPermission(octalPermission);
+      return fsPermission.toString();
+    }
+  }
+
+  /**
+   * Checks if the permission value is in symbolic representation.
+   *
+   * @param permissionValue the permission value to check
+   * @return true if the permission value is in symbolic representation,
+   * false otherwise
+   */
+  private static boolean isSymbolic(String permissionValue) {
+    return permissionValue.matches(".*[rwx].*");
+  }
+
+
+  /**
+   * Retrieves the permissions' configuration value for a given config key.
+   *
+   * @param key  The configuration key.
+   * @param conf The ConfigurationSource object containing the config
+   * @return The permissions' configuration value for the specified key.
+   * @throws IllegalArgumentException If the configuration value is not defined
+   */
+  public static String getPermissions(String key, ConfigurationSource conf) {
+    String configName = "";
+
+    // Assign the appropriate config name based on the KEY
+    if (key.equals(ReconConfigKeys.OZONE_RECON_DB_DIR)) {
+      configName = ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS;
+    } else if (key.equals(ScmConfigKeys.OZONE_SCM_DB_DIRS)) {
+      configName = ScmConfigKeys.OZONE_SCM_DB_DIRS_PERMISSIONS;
+    } else if (key.equals(OzoneConfigKeys.OZONE_OM_DB_DIRS)) {
+      configName = OzoneConfigKeys.OZONE_OM_DB_DIRS_PERMISSIONS;
+    } else {
+      // If the permissions are not defined for the config, we make it fall
+      // back to the default permissions for metadata files and directories
+      configName = OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS;
+    }
+
+    String configValue = conf.get(configName);
+    if (configValue != null) {
+      return configValue;
+    }
+
+    throw new IllegalArgumentException(
+        "Invalid configuration value for key: " + key);
+  }
+
 
   /**
    * Checks and creates Ozone Metadir Path if it does not exist.
@@ -202,7 +288,7 @@ public final class ServerUtils {
   }
 
   public static void setOzoneMetaDirPath(OzoneConfiguration conf,
-      String path) {
+                                         String path) {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, path);
   }
 
@@ -212,7 +298,7 @@ public final class ServerUtils {
    * If the directory is missing the method tries to create it.
    *
    * @param conf The ozone configuration object
-   * @param key The configuration key which specify the directory.
+   * @param key  The configuration key which specify the directory.
    * @return The path of the directory.
    */
   public static File getDBPath(ConfigurationSource conf, String key) {
