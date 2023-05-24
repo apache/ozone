@@ -64,7 +64,7 @@ public class TestReplicationAnnotation {
       }
 
       @Override
-      public boolean doSnapshotRequest() throws IOException {
+      public boolean triggerSnapshot() throws IOException {
         throw new IOException("submitSnapshotRequest is called.");
       }
 

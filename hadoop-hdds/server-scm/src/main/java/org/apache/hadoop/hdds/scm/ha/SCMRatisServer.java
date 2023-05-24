@@ -42,7 +42,7 @@ public interface SCMRatisServer {
       throws IOException, ExecutionException, InterruptedException,
       TimeoutException;
 
-  boolean doSnapshotRequest() throws IOException;
+  boolean triggerSnapshot() throws IOException;
 
   void stop() throws IOException;
 

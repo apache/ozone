@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -44,7 +45,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
   private SnapshotInfo latestSnapshot;
-  private long txFlushPending = 0;
+  private AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
@@ -63,7 +64,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
     rwLock.readLock().lock();
     try {
-      txFlushPending++;
+      txFlushPending.getAndIncrement();
       table.putWithBatch(getCurrentBatchOperation(), key, value);
     } finally {
       rwLock.readLock().unlock();
@@ -75,7 +76,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       throws IOException {
     rwLock.readLock().lock();
     try {
-      txFlushPending++;
+      txFlushPending.getAndIncrement();
       table.deleteWithBatch(getCurrentBatchOperation(), key);
     } finally {
       rwLock.readLock().unlock();
@@ -99,12 +100,19 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    return latestSnapshot;
+    rwLock.writeLock().lock();
+    try {
+      return latestSnapshot;
+    } finally {
+      rwLock.writeLock().unlock();
+    }
   }
 
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
+    rwLock.writeLock().lock();
     this.latestSnapshot = latestSnapshot;
+    rwLock.writeLock().unlock();
   }
 
   @Override
@@ -129,7 +137,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           deletedBlockLog instanceof DeletedBlockLogImpl);
       ((DeletedBlockLogImpl) deletedBlockLog).onFlush();
     } finally {
-      txFlushPending = 0;
+      txFlushPending.set(0);
       lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
@@ -159,7 +167,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
       }
       latestSnapshot = latestTrxInfo.toSnapshotInfo();
     } finally {
-      txFlushPending = 0;
+      txFlushPending.set(0);
       lastSnapshotTimeMs = scm.getSystemClock().millis();
       rwLock.writeLock().unlock();
     }
@@ -170,7 +178,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     rwLock.readLock().lock();
     try {
       long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
-      return txFlushPending > 0 && timeDiff > snapshotWaitTime;
+      return txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
     } finally {
       rwLock.readLock().unlock();
     }

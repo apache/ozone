@@ -204,7 +204,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public boolean doSnapshotRequest() throws IOException {
+    public boolean triggerSnapshot() throws IOException {
       throw new IOException("submitSnapshotRequest is called.");
     }
 

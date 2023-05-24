@@ -78,6 +78,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final RaftServer.Division division;
   private final GrpcTlsConfig grpcTlsConfig;
   private boolean isStopped;
+  private final long requestTimeout;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -85,6 +86,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       final StorageContainerManager scm, final SCMHADBTransactionBuffer buffer)
       throws IOException {
     this.scm = scm;
+    
+    requestTimeout = ozoneConf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+        "Ratis request timeout cannot be less than 1000ms.");
+    
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
     LOG.info("starting Raft server for scm:{}", scm.getScmId());
     // During SCM startup, the bootstrapped node will be started just with
@@ -215,12 +224,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout = ozoneConf.getTimeDuration(
-                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
-                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
-                TimeUnit.MILLISECONDS);
-    Preconditions.checkArgument(requestTimeout > 1000L,
-            "Ratis request timeout cannot be less than 1000ms.");
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -231,20 +234,13 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public boolean doSnapshotRequest() throws IOException {
-    final long requestTimeout = ozoneConf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
-        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    Preconditions.checkArgument(requestTimeout > 1000L,
-        "Ratis request timeout cannot be less than 1000ms.");
-    
+  public boolean triggerSnapshot() throws IOException {
     final SnapshotManagementRequest req = SnapshotManagementRequest.newCreate(
         clientId, getDivision().getId(), getDivision().getGroup().getGroupId(),
         nextCallId(), requestTimeout);
     final RaftClientReply raftClientReply = server.snapshotManagement(req);
     if (!raftClientReply.isSuccess()) {
-      LOG.info("Snapshot request failed", raftClientReply.getException());
+      LOG.warn("Snapshot request failed", raftClientReply.getException());
     }
     return raftClientReply.isSuccess();
   }
