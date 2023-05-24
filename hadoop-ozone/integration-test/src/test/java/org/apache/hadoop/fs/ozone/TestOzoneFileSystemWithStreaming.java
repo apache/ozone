@@ -63,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestOzoneFileSystemWithStreaming {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFileSystemWithStreaming.class);
-  private static final int DATASTREAM_AUTO_THRESHOLD = 2 << 20;
+  private static final int AUTO_THRESHOLD = 2 << 20;
 
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
@@ -81,7 +81,7 @@ public class TestOzoneFileSystemWithStreaming {
 
     CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
-    CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, DATASTREAM_AUTO_THRESHOLD + "B");
+    CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, AUTO_THRESHOLD + "B");
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     cluster = MiniOzoneCluster.newBuilder(CONF)
@@ -154,9 +154,9 @@ public class TestOzoneFileSystemWithStreaming {
     LOG.info("wrapped: {}", wrapped.getClass());
     Assertions.assertEquals(SelectorOutputStream.class, wrapped.getClass());
     final SelectorOutputStream<?> selector = (SelectorOutputStream<?>) wrapped;
-    final boolean belowThreshold = data.length <= DATASTREAM_AUTO_THRESHOLD;
+    final boolean belowThreshold = data.length <= AUTO_THRESHOLD;
     LOG.info("data.length={}, threshold={}, belowThreshold? {}",
-        data.length, DATASTREAM_AUTO_THRESHOLD, belowThreshold);
+        data.length, AUTO_THRESHOLD, belowThreshold);
     assertUnderlying(selector, belowThreshold);
 
     out.close();
