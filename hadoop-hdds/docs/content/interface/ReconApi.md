@@ -247,45 +247,6 @@ Returns the UnhealthyContainerMetadata objects for the containers in the given s
 Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
-### GET /api/v1/containers/deleted
-
-
-**Parameters**
-
-* prevKey (optional)
-
-  Only returns the containers that are present after the given prevKey container id.
-  Example: prevKey=5, this will skip containers till it seeks correctly to the given containerId (5).
-
-* limit (optional)
-
-  Only returns the limited number of results. The default limit is 1000.
-
-**Returns**
-
-Returns all DELETED containers in SCM and number of keys in respective containers in SCM.
-
-```json
-{
-  "containers": [
-    {
-      "containerId": "1",
-      "state": "DELETED",
-      "pipelineId": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-      "numOfKeys": "3",
-      "inStateSince": "2020-11-18T18:09:17.722Z"
-    },
-    {
-      "containerId": "2",
-      "state": "DELETED",
-      "pipelineId": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
-      "numOfKeys": "10",
-      "inStateSince": "2020-11-18T18:09:17.722Z"
-    }
-    ...
-  ]
-}
-```
 
 ### GET /api/v1/containers/mismatch
 
@@ -298,8 +259,8 @@ Returns the list of mis-matched containers between OM and SCM
 ```json
 [
   {
-    "containerId" : "1",
-    "numberOfKeys" : "3",
+    "containerId" : 1,
+    "numberOfKeys" : 3,
     "pipelines" : [
       "pipelineId" : "1423ghjds832403232",
       "pipelineId" : "32vds94943fsdh4443",
@@ -311,73 +272,34 @@ Returns the list of mis-matched containers between OM and SCM
 ]
 ```
 
-### GET /api/v1/containers/mismatch/keys
+### GET /api/v1/containers/mismatch/deleted
 
 
 **Parameters**
 
 * prevKey (optional)
 
-  Only returns the set of keys that are present after the given prevKey id.
-  Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly 
-  to the given prevKey for a containerId.
+   Returns the set of deleted containers in SCM which are present in OM to find out
+   list of keys mapped to such DELETED state containers after the given prevKey (ContainerId).
+   Example: prevKey=5, skip containers till it seeks correctly to the previous containerId.
 
 * limit (optional)
 
-  Only returns the limited number of results. The default limit is 1000.
+   Only returns the limited number of results. The default limit is 1000.
 
 **Returns**
 
-Returns keys/files/dirs which are mapped to containers in DELETED state in SCM.
+Returns the set of deleted containers in SCM which are present in OM to find out
+list of keys mapped to such DELETED state containers.
 
 ```json
 [
   {
-    "totalCount": 3,
-    "keys": [
-      {
-        "volume": "sampleVol",
-        "bucket": "bucketOne",
-        "key": "key_one",
-        "dataSize": 0,
-        "versions": [
-          0
-        ],
-        "blockIds": {
-          "0": [
-            {
-              "containerID": 1,
-              "localID": 101
-            }
-          ]
-        }
-      },
-      {
-        "volume": "sampleVol",
-        "bucket": "bucketOne",
-        "key": "key_two",
-        "dataSize": 0,
-        "versions": [
-          0,
-          1
-        ],
-        "blockIds": {
-          "0": [
-            {
-              "containerID": 1,
-              "localID": 103
-            }
-          ],
-          "1": [
-            {
-              "containerID": 1,
-              "localID": 104
-            }
-          ]
-        }
-      }
-    ]
+    "containerId": 2,
+    "numberOfKeys": 2,
+    "pipelines": []
   }
+  ...
 ]
 ```
 
@@ -388,12 +310,12 @@ Returns keys/files/dirs which are mapped to containers in DELETED state in SCM.
 
 * prevKey (optional)
 
-  Only returns the set of keys/files which are open and present after the given prevKey id.
-  Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly to the given prevKey.
+    Returns the set of keys/files which are open and present after the given prevKey id.
+    Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly to the given prevKey.
 
 * limit (optional)
 
-  Only returns the limited number of results. The default limit is 1000.
+    Only returns the limited number of results. The default limit is 1000.
 
 **Returns**
 
@@ -401,48 +323,49 @@ Returns set of keys/files which are open.
 
 ```json
 {
-  replicatedTotal: 13824,
-  unreplicatedTotal: 4608,
-  entities: [
+  "lastKey": "/vol1/fso-bucket/dir1/dir2/file2",
+  "replicatedTotal": 13824,
+  "unreplicatedTotal": 4608,
+  "entities": [
     {
-      path: “/vol1/bucket1/key1”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 1024,
-      replicatedSize: 3072,
-      unreplicatedSize: 1024,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
+      "path": "/vol1/bucket1/key1",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 1024,
+      "replicatedSize": 3072,
+      "unreplicatedSize": 1024,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
     {
-      path: “/vol1/bucket1/key2”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 512,
-      replicatedSize: 1536,
-      unreplicatedSize: 512,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
+      "path": "/vol1/bucket1/key2",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 512,
+      "replicatedSize": 1536,
+      "unreplicatedSize": 512,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
     {
-      path: “/vol1/fso-bucket/dir1/file1”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 1024,
-      replicatedSize: 3072,
-      unreplicatedSize: 1024,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
+      "path": "/vol1/fso-bucket/dir1/file1",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 1024,
+      "replicatedSize": 3072,
+      "unreplicatedSize": 1024,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
     {
-      path: “/vol1/fso-bucket/dir1/dir2/file2”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 2048,
-      replicatedSize: 6144,
-      unreplicatedSize: 2048,
-      replicationType: RATIS,
-      replicationFactor: THREE
+      "path": "/vol1/fso-bucket/dir1/dir2/file2",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 2048,
+      "replicatedSize": 6144,
+      "unreplicatedSize": 2048,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
     }
   ]
 }
@@ -455,7 +378,7 @@ Returns set of keys/files which are open.
 
 * prevKey (optional)
 
-  Only returns the set of keys/files/dirs pending for deletion that are present after the given prevKey id.
+  Returns the set of keys/files pending for deletion that are present after the given prevKey id.
   Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly to the given prevKey.
 
 * limit (optional)
@@ -464,54 +387,109 @@ Returns set of keys/files which are open.
 
 **Returns**
 
-Returns set of keys/files/dirs pending for deletion.
+Returns set of keys/files pending for deletion.
 
 ```json
 {
-  replicatedTotal: 13824,
-  unreplicatedTotal: 4608,
-  entities: [
+  "lastKey": "sampleVol/bucketOne/key_one",
+  "replicatedTotal": -1530804718628866300,
+  "unreplicatedTotal": -1530804718628866300,
+  "deletedkeyinfo": [
     {
-      path: “/vol1/bucket1/key1”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 1024,
-      replicatedSize: 3072,
-      unreplicatedSize: 1024,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
-    {
-      path: “/vol1/bucket1/key2”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 512,
-      replicatedSize: 1536,
-      unreplicatedSize: 512,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
-    {
-      path: “/vol1/fso-bucket/dir1/file1”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 1024,
-      replicatedSize: 3072,
-      unreplicatedSize: 1024,
-      replicationType: RATIS,
-      replicationFactor: THREE
-    }.
-    {
-      path: “/vol1/fso-bucket/dir1/dir2/file2”,
-      keyState: “Open”,
-      inStateSince: 1667564193026,
-      size: 2048,
-      replicatedSize: 6144,
-      unreplicatedSize: 2048,
-      replicationType: RATIS,
-      replicationFactor: THREE
+      "omKeyInfoList": [
+        {
+          "metadata": {},
+          "objectID": 0,
+          "updateID": 0,
+          "parentObjectID": 0,
+          "volumeName": "sampleVol",
+          "bucketName": "bucketOne",
+          "keyName": "key_one",
+          "dataSize": -1530804718628866300,
+          "keyLocationVersions": [],
+          "creationTime": 0,
+          "modificationTime": 0,
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "STANDALONE"
+          },
+          "fileChecksum": null,
+          "fileName": "key_one",
+          "acls": [],
+          "path": "0/key_one",
+          "file": false,
+          "latestVersionLocations": null,
+          "replicatedSize": -1530804718628866300,
+          "fileEncryptionInfo": null,
+          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
+          "updateIDset": false
+        }
+      ]
     }
-  ]
+  ],
+  "status": "OK"
+}
+```
+
+### GET /api/v1/keys/deletePending/dirs
+
+
+**Parameters**
+
+* prevKey (optional)
+
+   Returns the set of directories pending for deletion that are present after the given prevKey id.
+   Example: prevKey=/vol1/bucket1/bucket1/dir1, this will skip directories till it seeks correctly to the given prevKey.
+
+* limit (optional)
+
+   Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+   Returns set of directories pending for deletion.
+
+```json
+{
+  "lastKey": "vol1/bucket1/bucket1/dir1",
+  "replicatedTotal": -1530804718628866300,
+  "unreplicatedTotal": -1530804718628866300,
+  "deletedkeyinfo": [
+    {
+      "omKeyInfoList": [
+        {
+          "metadata": {},
+          "objectID": 0,
+          "updateID": 0,
+          "parentObjectID": 0,
+          "volumeName": "sampleVol",
+          "bucketName": "bucketOne",
+          "keyName": "key_one",
+          "dataSize": -1530804718628866300,
+          "keyLocationVersions": [],
+          "creationTime": 0,
+          "modificationTime": 0,
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "STANDALONE"
+          },
+          "fileChecksum": null,
+          "fileName": "key_one",
+          "acls": [],
+          "path": "0/key_one",
+          "file": false,
+          "latestVersionLocations": null,
+          "replicatedSize": -1530804718628866300,
+          "fileEncryptionInfo": null,
+          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
+          "updateIDset": false
+        }
+      ]
+    }
+  ],
+  "status": "OK"
 }
 ```
 
