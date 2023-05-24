@@ -224,7 +224,6 @@ public class TestOmSnapshotManager {
     Files.write(Paths.get(leaderSnapDir2.toString(), "noLink.sst"), dummyData);
     Files.write(Paths.get(leaderSnapDir2.toString(), "nonSstFile"), dummyData);
 
-
     // Also create the follower files.
     candidateDir = new File(testDir.toString(),
         CANDIDATE_DIR_NAME);
