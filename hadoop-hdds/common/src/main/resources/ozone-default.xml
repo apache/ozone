@@ -1634,7 +1634,15 @@
       or be directly or indirectly in a group defined in this property.
     </description>
   </property>
-
+  <property>
+    <name>ozone.s3g.default.bucket.layout</name>
+    <value>OBJECT_STORE</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bucket layout that will be used when buckets are created through
+      the S3 API.
+    </description>
+  </property>
   <property>
     <name>ozone.readonly.administrators</name>
     <value/>

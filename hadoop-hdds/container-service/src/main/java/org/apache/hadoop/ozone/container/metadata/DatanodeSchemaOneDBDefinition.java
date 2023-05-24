@@ -50,7 +50,7 @@ public class DatanodeSchemaOneDBDefinition
           String.class,
           new SchemaOneKeyCodec(),
           BlockData.class,
-          new BlockDataCodec());
+          BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
         METADATA =
@@ -59,7 +59,7 @@ public class DatanodeSchemaOneDBDefinition
             String.class,
             new SchemaOneKeyCodec(),
             Long.class,
-            new LongCodec());
+            LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
         DELETED_BLOCKS =

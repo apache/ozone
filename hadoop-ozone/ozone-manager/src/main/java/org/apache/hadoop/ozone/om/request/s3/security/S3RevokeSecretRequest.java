@@ -96,8 +96,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             // Remove if entry exists in table
             if (s3SecretManager.hasS3Secret(kerberosID)) {
               // Invalid entry in table cache immediately
-              s3SecretManager.invalidateCacheEntry(kerberosID,
-                  transactionLogIndex);
+              s3SecretManager.invalidateCacheEntry(kerberosID);
               return new S3RevokeSecretResponse(kerberosID,
                   s3SecretManager,
                   omResponse.setStatus(Status.OK).build());

@@ -75,6 +75,9 @@ import javax.annotation.Nonnull;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -649,6 +652,34 @@ public class TestReplicationSupervisor {
   }
 
   @Test
+  public void poolSizeCanBeIncreased() {
+    datanode.setPersistedOpState(IN_SERVICE);
+    ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .build();
+
+    try {
+      subject.nodeStateUpdated(ENTERING_MAINTENANCE);
+    } finally {
+      subject.stop();
+    }
+  }
+
+  @Test
+  public void poolSizeCanBeDecreased() {
+    datanode.setPersistedOpState(IN_MAINTENANCE);
+    ReplicationSupervisor subject = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .build();
+
+    try {
+      subject.nodeStateUpdated(IN_SERVICE);
+    } finally {
+      subject.stop();
+    }
+  }
+
+  @Test
   public void testMaxQueueSize() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -688,7 +719,7 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(2 * maxQueueSize, rs.getTotalInFlightReplications());
 
     // queue size is restored
-    rs.nodeStateUpdated(HddsProtos.NodeOperationalState.IN_SERVICE);
+    rs.nodeStateUpdated(IN_SERVICE);
     Assert.assertEquals(maxQueueSize, rs.getMaxQueueSize());
     Assert.assertEquals(replicationMaxStreams, threadPoolSize.get());
   }

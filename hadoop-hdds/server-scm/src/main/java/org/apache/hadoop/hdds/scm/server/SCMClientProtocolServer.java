@@ -778,7 +778,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ScmInfo getScmInfo() throws IOException {
+  public ScmInfo getScmInfo() {
     boolean auditSuccess = true;
     try {
       ScmInfo.Builder builder =
