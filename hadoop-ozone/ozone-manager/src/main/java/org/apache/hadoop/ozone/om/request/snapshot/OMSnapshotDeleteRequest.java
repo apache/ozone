@@ -211,7 +211,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (snapshotInfo == null) {
       // Dummy SnapshotInfo for logging and audit logging when erred
       snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-          snapshotName, null);
+          snapshotName, null, Time.now());
     }
 
     // Perform audit logging outside the lock
@@ -220,6 +220,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     final String snapshotPath = snapshotInfo.getSnapshotPath();
     if (exception == null) {
+      omMetrics.decNumSnapshotActive();
       LOG.info("Deleted snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
     } else {

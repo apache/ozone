@@ -24,7 +24,11 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerRequestInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerResponseInterceptor;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetricsServerTransportFilter;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.grpc.metrics.GrpcMetrics;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -35,15 +39,13 @@ import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.grpc.Server;
+import io.grpc.ServerInterceptors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_GRPC_TLS_PROVIDER_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 
@@ -54,8 +56,9 @@ public class GrpcOzoneManagerServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOzoneManagerServer.class);
 
+  private final GrpcMetrics omS3gGrpcMetrics;
   private Server server;
-  private int port = 8981;
+  private int port;
   private final int maxSize;
 
   public GrpcOzoneManagerServer(OzoneConfiguration config,
@@ -79,7 +82,9 @@ public class GrpcOzoneManagerServer {
           GrpcOmTransport.GrpcOmTransportConfig.class).
           getPort();
     }
-    
+
+    this.omS3gGrpcMetrics = GrpcMetrics.create(config);
+
     init(omTranslator,
         delegationTokenMgr,
         config,
@@ -92,9 +97,14 @@ public class GrpcOzoneManagerServer {
                    CertificateClient caClient) {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(maxSize)
-        .addService(new OzoneManagerServiceGrpc(omTranslator,
-            delegationTokenMgr,
-            omServerConfig));
+        .addService(ServerInterceptors.intercept(
+            new OzoneManagerServiceGrpc(omTranslator,
+                delegationTokenMgr,
+                omServerConfig),
+            new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
+            new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
+        .addTransportFilter(
+            new GrpcMetricsServerTransportFilter(omS3gGrpcMetrics));
 
     SecurityConfig secConf = new SecurityConfig(omServerConfig);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
@@ -128,6 +138,8 @@ public class GrpcOzoneManagerServer {
       LOG.info("Server {} is shutdown", getClass().getSimpleName());
     } catch (InterruptedException ex) {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
+    } finally {
+      omS3gGrpcMetrics.unRegister();
     }
   }
   public int getPort() {

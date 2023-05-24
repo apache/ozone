@@ -365,7 +365,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
-        bucketName, snapshotName, UUID.randomUUID().toString());
+        bucketName, snapshotName, UUID.randomUUID().toString(), Time.now());
     addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
   }
 
@@ -376,7 +376,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-        snapshotName, UUID.randomUUID().toString());
+        snapshotName, UUID.randomUUID().toString(), Time.now());
     addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
   }
 

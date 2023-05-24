@@ -48,6 +48,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
  * Utils functions to help block functions.
@@ -76,11 +77,11 @@ public final class BlockUtils {
       ConfigurationSource conf, boolean readOnly) throws IOException {
 
     DatanodeStore store;
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath, readOnly);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath, readOnly);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       store = new DatanodeStoreSchemaThreeImpl(conf, containerDBPath,
           readOnly);
     } else {
@@ -126,7 +127,7 @@ public final class BlockUtils {
 
     String containerDBPath = containerData.getDbFile().getAbsolutePath();
     try {
-      if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+      if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
         Preconditions.checkNotNull(cache);
         return cache.getDB(containerDBPath, conf);
@@ -155,8 +156,7 @@ public final class BlockUtils {
       ConfigurationSource conf) {
     Preconditions.checkNotNull(container);
     Preconditions.checkNotNull(container.getDbFile());
-    Preconditions.checkState(!container.getSchemaVersion()
-        .equals(OzoneConsts.SCHEMA_V3));
+    Preconditions.checkState(!container.hasSchema(OzoneConsts.SCHEMA_V3));
 
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
@@ -183,7 +183,7 @@ public final class BlockUtils {
    */
   public static void addDB(DatanodeStore store, String containerDBPath,
       ConfigurationSource conf, String schemaVersion) {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
       Preconditions.checkNotNull(cache);
       cache.addDB(containerDBPath, new RawDB(store, containerDBPath));

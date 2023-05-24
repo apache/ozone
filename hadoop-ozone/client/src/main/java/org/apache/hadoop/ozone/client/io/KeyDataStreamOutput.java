@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -44,6 +43,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -69,7 +69,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
   private boolean closed;
-  private FileEncryptionInfo feInfo;
 
   // how much of data is actually written yet to underlying stream
   private long offset;
@@ -127,7 +126,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
-    this.feInfo = info.getFileEncryptionInfo();
     this.writeOffset = 0;
     this.clientID = handler.getId();
   }
@@ -397,10 +395,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
   }
 
-  public FileEncryptionInfo getFileEncryptionInfo() {
-    return feInfo;
-  }
-
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockDataStreamOutputEntryPool.getExcludeList();
@@ -414,7 +408,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
     private int chunkSize;
-    private String requestID;
+    private final String requestID = UUID.randomUUID().toString();
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
@@ -449,11 +443,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
     public Builder setChunkSize(int size) {
       this.chunkSize = size;
-      return this;
-    }
-
-    public Builder setRequestID(String id) {
-      this.requestID = id;
       return this;
     }
 

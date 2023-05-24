@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -37,23 +36,18 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -425,32 +419,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        List<SnapshotMoveKeyInfos> toReclaimList,
-        List<SnapshotMoveKeyInfos> toNextDBList,
-        List<HddsProtos.KeyValue> renamedList,
-        List<String> dirsToMove) {
-
-      SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
-          SnapshotMoveDeletedKeysRequest.newBuilder()
-              .setFromSnapshot(snapInfo.getProtobuf());
-
-      SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-          .addAllReclaimKeys(toReclaimList)
-          .addAllNextDBKeys(toNextDBList)
-          .addAllRenamedKeys(renamedList)
-          .addAllDeletedDirsToMove(dirsToMove)
-          .build();
-
-      OMRequest omRequest = OMRequest.newBuilder()
-          .setCmdType(Type.SnapshotMoveDeletedKeys)
-          .setSnapshotMoveDeletedKeysRequest(moveDeletedKeys)
-          .setClientId(clientId.toString())
-          .build();
-
-      submitRequest(omRequest);
-    }
-
     private boolean checkDirReclaimable(
         Table.KeyValue<String, OmKeyInfo> deletedDir,
         Table<String, OmDirectoryInfo> previousDirTable,
@@ -570,31 +538,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         return omSnapshotManager.getSnapshotInfo(tableKey);
       }
       return null;
-    }
-
-    private void submitRequest(OMRequest omRequest) {
-      try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(getRunCount().get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
-        }
-      } catch (ServiceException e) {
-        LOG.error("Snapshot Deleting request failed. " +
-            "Will retry at next run.", e);
-      }
     }
   }
 

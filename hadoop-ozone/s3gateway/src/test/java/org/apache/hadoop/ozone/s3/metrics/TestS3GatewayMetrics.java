@@ -43,8 +43,10 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -376,8 +378,9 @@ public class TestS3GatewayMetrics {
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
     // GET the key from the bucket
-    keyEndpoint.get(bucketName, keyName, null, 0,
-        null);
+    Response response = keyEndpoint.get(bucketName, keyName, null, 0, null);
+    StreamingOutput stream = (StreamingOutput) response.getEntity();
+    stream.write(new ByteArrayOutputStream());
     long curMetric = metrics.getGetKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }

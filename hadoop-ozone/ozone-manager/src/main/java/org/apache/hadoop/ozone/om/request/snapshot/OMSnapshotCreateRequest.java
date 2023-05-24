@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +85,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         possibleName,
-        snapshotId);
+        snapshotId,
+        createSnapshotRequest.getCreationTime());
     snapshotName = snapshotInfo.getName();
     snapshotPath = snapshotInfo.getSnapshotPath();
   }
@@ -110,6 +112,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     return omRequest.toBuilder().setCreateSnapshotRequest(
         omRequest.getCreateSnapshotRequest().toBuilder()
             .setSnapshotId(UUID.randomUUID().toString())
+            .setCreationTime(Time.now())
             .build()).build();
   }
   
@@ -120,7 +123,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
-    omMetrics.incNumSnapshotActive();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
@@ -228,6 +230,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Created snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
+      omMetrics.incNumSnapshotActive();
     } else {
       omMetrics.incNumSnapshotCreateFails();
       LOG.error("Failed to create snapshot '{}' under path '{}'",

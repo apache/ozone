@@ -383,6 +383,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   int minHealthyVolumeNum(List <DatanodeDetails> dnList);
 
+  int totalHealthyVolumeCount();
+
   int pipelineLimit(DatanodeDetails dn);
 
   int minPipelineLimit(List<DatanodeDetails> dn);

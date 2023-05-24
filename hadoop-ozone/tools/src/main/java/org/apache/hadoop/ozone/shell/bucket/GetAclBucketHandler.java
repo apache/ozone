@@ -17,10 +17,16 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.acl.AclHandler;
 import org.apache.hadoop.ozone.shell.acl.GetAclHandler;
 import picocli.CommandLine;
+
+import java.io.IOException;
 
 /**
  * Get ACL of bucket.
@@ -32,9 +38,40 @@ public class GetAclBucketHandler extends GetAclHandler {
   @CommandLine.Mixin
   private BucketUri address;
 
+  @CommandLine.Option(names = {"--source"},
+      defaultValue = "false",
+      description = "Display source bucket ACLs if --source=true," +
+          " default false to display ACLs of the link bucket itself.")
+  private boolean getSourceAcl;
+
   @Override
   protected OzoneAddress getAddress() {
     return address.getValue();
   }
 
+  @Override
+  protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
+    if (getSourceAcl) {
+      obj = getSourceObj(client, obj);
+    }
+    super.execute(client, obj);
+  }
+
+  private OzoneObj getSourceObj(OzoneClient client, OzoneObj obj)
+      throws IOException {
+    OzoneBucket bucket = client.getObjectStore()
+        .getVolume(obj.getVolumeName())
+        .getBucket(obj.getBucketName());
+    if (!bucket.isLink()) {
+      return obj;
+    }
+    obj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucket.getSourceBucket())
+        .setVolumeName(bucket.getSourceVolume())
+        .setKeyName(obj.getKeyName())
+        .setResType(obj.getResourceType())
+        .setStoreType(obj.getStoreType())
+        .build();
+    return getSourceObj(client, obj);
+  }
 }

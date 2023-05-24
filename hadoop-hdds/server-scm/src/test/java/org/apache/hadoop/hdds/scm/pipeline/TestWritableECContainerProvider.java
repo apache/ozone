@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -43,10 +43,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +60,6 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -76,33 +72,30 @@ import static org.mockito.Mockito.verify;
  */
 public class TestWritableECContainerProvider {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestWritableECContainerProvider.class);
   private static final String OWNER = "SCM";
   private PipelineManager pipelineManager;
-  private ContainerManager containerManager
+  private final ContainerManager containerManager
       = Mockito.mock(ContainerManager.class);
-  private PipelineChoosePolicy pipelineChoosingPolicy
+  private final PipelineChoosePolicy pipelineChoosingPolicy
       = new HealthyPipelineChoosePolicy();
 
   private OzoneConfiguration conf;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
-  private NodeManager nodeManager;
-  private WritableContainerProvider provider;
-  private ReplicationConfig repConfig;
-  private int minPipelines;
+  private MockNodeManager nodeManager;
+  private WritableContainerProvider<ECReplicationConfig> provider;
+  private ECReplicationConfig repConfig;
 
   private Map<ContainerID, ContainerInfo> containers;
+  private WritableECContainerProviderConfig providerConf;
 
   @BeforeEach
   public void setup() throws IOException {
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
-    WritableECContainerProvider.WritableECContainerProviderConfig providerConf =
-        conf.getObject(WritableECContainerProvider
-            .WritableECContainerProviderConfig.class);
-    minPipelines = providerConf.getMinimumPipelines();
+
+    providerConf = conf.getObject(WritableECContainerProviderConfig.class);
+
     containers = new HashMap<>();
     File testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
@@ -113,8 +106,8 @@ public class TestWritableECContainerProvider {
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+
+    provider = createSubject();
 
     Mockito.doAnswer(call -> {
       Pipeline pipeline = (Pipeline)call.getArguments()[2];
@@ -124,47 +117,88 @@ public class TestWritableECContainerProvider {
           pipeline.getId(), container.containerID());
       containers.put(container.containerID(), container);
       return container;
-    }).when(containerManager).getMatchingContainer(Matchers.anyLong(),
-        Matchers.anyString(), Matchers.any(Pipeline.class));
+    }).when(containerManager).getMatchingContainer(Mockito.anyLong(),
+        Mockito.anyString(), Mockito.any(Pipeline.class));
 
     Mockito.doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))
-        .when(containerManager).getContainer(Matchers.any(ContainerID.class));
+        .when(containerManager).getContainer(Mockito.any(ContainerID.class));
 
   }
 
-  @Test
-  public void testPipelinesCreatedUpToMinLimitAndRandomPipelineReturned()
-      throws IOException, TimeoutException {
-    // The first 5 calls should return a different container
-    Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      assertFalse(allocatedContainers.contains(container));
-      allocatedContainers.add(container);
-    }
+  private WritableContainerProvider<ECReplicationConfig> createSubject() {
+    return createSubject(pipelineManager);
+  }
 
-    allocatedContainers.clear();
-    for (int i = 0; i < 20; i++) {
+  private WritableContainerProvider<ECReplicationConfig> createSubject(
+      PipelineManager customPipelineManager) {
+    return new WritableECContainerProvider(providerConf, getMaxContainerSize(),
+        nodeManager, customPipelineManager, containerManager,
+        pipelineChoosingPolicy);
+  }
+
+  @Test
+  void testPipelinesCreatedBasedOnTotalDiskCount()
+      throws IOException, TimeoutException {
+    providerConf.setMinimumPipelines(1);
+    nodeManager.setNumHealthyVolumes(20);
+
+    int volumeCount = nodeManager.totalHealthyVolumeCount();
+    int pipelineLimit = volumeCount / repConfig.getRequiredNodes();
+    Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit);
+    assertReusesExisting(allocated, pipelineLimit);
+  }
+
+  @Test
+  void testPipelinesCreatedBasedOnTotalDiskCountWithFactor()
+      throws IOException, TimeoutException {
+    int factor = 10;
+    providerConf.setMinimumPipelines(1);
+    providerConf.setPipelinePerVolumeFactor(factor);
+    nodeManager.setNumHealthyVolumes(5);
+
+    int volumeCount = nodeManager.totalHealthyVolumeCount();
+    int pipelineLimit = factor * volumeCount / repConfig.getRequiredNodes();
+    Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit);
+    assertReusesExisting(allocated, pipelineLimit);
+  }
+
+  @Test
+  void testPipelinesCreatedUpToMinLimitAndRandomPipelineReturned()
+      throws IOException, TimeoutException {
+    int minimumPipelines = providerConf.getMinimumPipelines();
+    Set<ContainerInfo> allocated = assertDistinctContainers(minimumPipelines);
+    assertReusesExisting(allocated, minimumPipelines);
+  }
+
+  private Set<ContainerInfo> assertDistinctContainers(int n)
+      throws IOException, TimeoutException {
+    Set<ContainerInfo> allocatedContainers = new HashSet<>();
+    for (int i = 0; i < n; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      assertFalse(allocatedContainers.contains(container),
+          "Provided existing container for request " + i);
       allocatedContainers.add(container);
     }
-    // Should have minPipelines containers created
-    assertEquals(minPipelines,
-        pipelineManager.getPipelines(repConfig, OPEN).size());
-    // We should have more than 1 allocatedContainers in the set proving a
-    // random container is selected each time. Do not check for 5 here as there
-    // is a reasonable chance that in 20 turns we don't pick all 5 nodes.
-    assertTrue(allocatedContainers.size() > 2);
+    return allocatedContainers;
+  }
+
+  private void assertReusesExisting(Set<ContainerInfo> existing, int n)
+      throws IOException, TimeoutException {
+    for (int i = 0; i < 3 * n; i++) {
+      ContainerInfo container =
+          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
+      assertTrue(existing.contains(container),
+          "Provided new container for request " + i);
+    }
   }
 
   @Test
   public void testPiplineLimitIgnoresExcludedPipelines()
       throws IOException, TimeoutException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
+    for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -186,7 +220,7 @@ public class TestWritableECContainerProvider {
   public void testNewPipelineCreatedIfAllPipelinesExcluded()
       throws IOException, TimeoutException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
+    for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -206,7 +240,7 @@ public class TestWritableECContainerProvider {
   public void testNewPipelineCreatedIfAllContainersExcluded()
       throws IOException, TimeoutException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
+    for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
@@ -234,8 +268,7 @@ public class TestWritableECContainerProvider {
         throw new IOException("Cannot create pipelines");
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = createSubject();
 
     try {
       provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -265,8 +298,7 @@ public class TestWritableECContainerProvider {
         return super.createPipeline(repConfig);
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = createSubject();
 
     try {
       provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -288,13 +320,8 @@ public class TestWritableECContainerProvider {
   @Test
   public void testNewContainerAllocatedAndPipelinesClosedIfNoSpaceInExisting()
       throws IOException, TimeoutException {
-    Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      assertFalse(allocatedContainers.contains(container));
-      allocatedContainers.add(container);
-    }
+    Set<ContainerInfo> allocatedContainers =
+        assertDistinctContainers(providerConf.getMinimumPipelines());
     // Update all the containers to make them nearly full, but with enough space
     // for an EC block to be striped across them.
     for (ContainerInfo c : allocatedContainers) {
@@ -336,16 +363,11 @@ public class TestWritableECContainerProvider {
         throw new PipelineNotFoundException("Simulated exception");
       }
     };
-    provider = new WritableECContainerProvider(
-        conf, pipelineManager, containerManager, pipelineChoosingPolicy);
+    provider = createSubject();
 
-    Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      assertFalse(allocatedContainers.contains(container));
-      allocatedContainers.add(container);
-    }
+    Set<ContainerInfo> allocatedContainers =
+        assertDistinctContainers(providerConf.getMinimumPipelines());
+
     // Now attempt to get a container - any attempt to use an existing with
     // throw PNF and then we must allocate a new one
     ContainerInfo newContainer =
@@ -357,19 +379,14 @@ public class TestWritableECContainerProvider {
   @Test
   public void testContainerNotFoundWhenAttemptingToUseExisting()
       throws IOException, TimeoutException {
-    Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
-      ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      assertFalse(allocatedContainers.contains(container));
-      allocatedContainers.add(container);
-    }
+    Set<ContainerInfo> allocatedContainers =
+        assertDistinctContainers(providerConf.getMinimumPipelines());
 
     // Ensure ContainerManager always throws when a container is requested so
     // existing pipelines cannot be used
     Mockito.doAnswer(call -> {
       throw new ContainerNotFoundException();
-    }).when(containerManager).getContainer(Matchers.any(ContainerID.class));
+    }).when(containerManager).getContainer(Mockito.any(ContainerID.class));
 
     ContainerInfo newContainer =
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -390,7 +407,7 @@ public class TestWritableECContainerProvider {
     // When tha happens, CM will change the container state to CLOSING and
     // remove it from the container list in pipeline Manager.
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
-    for (int i = 0; i < minPipelines; i++) {
+    for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
       ContainerInfo container = provider.getContainer(
           1, repConfig, OWNER, new ExcludeList());
       assertFalse(allocatedContainers.contains(container));
@@ -412,8 +429,7 @@ public class TestWritableECContainerProvider {
   public void testExcludedNodesPassedToCreatePipelineIfProvided()
       throws IOException, TimeoutException {
     PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
-    provider = new WritableECContainerProvider(
-        conf, pipelineManagerSpy, containerManager, pipelineChoosingPolicy);
+    provider = createSubject(pipelineManagerSpy);
     ExcludeList excludeList = new ExcludeList();
 
     // EmptyList should be passed if there are no nodes excluded.
