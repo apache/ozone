@@ -59,7 +59,7 @@ public class TestHeatMapInfo {
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
   private String auditRespStr;
-  private HeatMapUtil heatMapUtilUnderTest;
+  private HeatMapServiceImpl heatMapService;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
@@ -79,10 +79,9 @@ public class TestHeatMapInfo {
             .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(HeatMapUtil.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    heatMapUtilUnderTest = reconTestInjector.getInstance(HeatMapUtil.class);
+    heatMapService = reconTestInjector.getInstance(HeatMapServiceImpl.class);
     auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -757,7 +756,7 @@ public class TestHeatMapInfo {
     List<EntityMetaData> entityMetaDataList =
         Arrays.stream(entities).collect(Collectors.toList());
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        heatMapUtilUnderTest.generateHeatMap(entityMetaDataList);
+        heatMapService.generateHeatMap(entityMetaDataList);
     Assertions.assertTrue(
         entityReadAccessHeatMapResponse.getChildren().size() > 0);
     Assertions.assertEquals(12,

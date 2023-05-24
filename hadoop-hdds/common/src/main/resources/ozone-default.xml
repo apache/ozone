@@ -3626,8 +3626,8 @@
     <value></value>
     <tag>OZONE, RECON</tag>
     <description>
-      Fully qualified heatmap provider implementation class name.
-      E.g. org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl
+      Fully qualified heatmap provider implementation class name. if this value is not set,
+      then will use the default implementation class  "org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl".
     </description>
   </property>
 
