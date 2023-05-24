@@ -78,12 +78,13 @@ public class RDBStore implements DBStore {
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
+  private final ManagedDBOptions dbOptions;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName, boolean enableCompactionLog,
+                  String dbJmxBeanNameName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration)
@@ -97,11 +98,12 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
         dbJmxBeanNameName;
+    this.dbOptions = dbOptions;
 
     try {
-      if (enableCompactionLog) {
+      if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
-            dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR,
+            getSnapshotMetadataDir(),
             DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
             dbLocation.toString(), configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
@@ -140,7 +142,7 @@ public class RDBStore implements DBStore {
         Files.createDirectories(snapshotsParentDirPath);
       }
 
-      if (enableCompactionLog) {
+      if (enableCompactionDag) {
         ColumnFamily ssInfoTableCF = db.getColumnFamily(SNAPSHOT_INFO_TABLE);
         Preconditions.checkNotNull(ssInfoTableCF,
             "SnapshotInfoTable column family handle should not be null");
@@ -179,12 +181,24 @@ public class RDBStore implements DBStore {
     }
   }
 
+  public String getSnapshotMetadataDir() {
+    return dbLocation.getParent() + OM_KEY_PREFIX + OM_SNAPSHOT_DIFF_DIR;
+  }
+
   public String getSnapshotsParentDir() {
     return snapshotsParentDir;
   }
 
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
+  }
+
+
+  /**
+   * Returns the RocksDB's DBOptions.
+   */
+  public ManagedDBOptions getDbOptions() {
+    return dbOptions;
   }
 
   @Override

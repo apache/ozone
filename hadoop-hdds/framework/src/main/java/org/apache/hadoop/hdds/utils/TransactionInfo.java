@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.StringUtils;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
@@ -33,21 +36,32 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
 
 /**
  * TransactionInfo which is persisted to DB.
+ * <p>
+ * This class is immutable.
  */
 public final class TransactionInfo {
+  private static final Codec<TransactionInfo> CODEC = new DelegatedCodec<>(
+      StringCodec.get(),
+      TransactionInfo::new,
+      TransactionInfo::generateTransactionInfo,
+      true);
+
+  public static Codec<TransactionInfo> getCodec() {
+    return CODEC;
+  }
 
   // Term associated with Ratis Log index in Ratis enabled cluster. In
   // non-Ratis cluster, term is set to -1.
-  private long term; // term associated with the ratis log index.
+  private final long term; // term associated with the ratis log index.
   // Ratis Log index in Ratis enabled cluster or the unique transaction
   // index {@link OzoneManagerServerSideTransalatorPB#transactionIndex} in
   // non-Ratis cluster
-  private long transactionIndex;
+  private final long transactionIndex;
 
   private TransactionInfo(String transactionInfo) {
     String[] tInfo =
         transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
-    Preconditions.checkState(tInfo.length == 2,
+    Preconditions.checkArgument(tInfo.length == 2,
         "Incorrect TransactionInfo value");
 
     term = Long.parseLong(tInfo[0]);
@@ -97,12 +111,7 @@ public final class TransactionInfo {
    * @return transaction info.
    */
   private String generateTransactionInfo() {
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(term);
-    stringBuilder.append(TRANSACTION_INFO_SPLIT_KEY);
-    stringBuilder.append(transactionIndex);
-
-    return stringBuilder.toString();
+    return term + TRANSACTION_INFO_SPLIT_KEY + transactionIndex;
   }
 
   /**

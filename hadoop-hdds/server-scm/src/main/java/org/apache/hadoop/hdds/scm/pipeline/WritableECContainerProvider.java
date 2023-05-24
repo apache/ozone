@@ -24,16 +24,16 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
@@ -55,23 +55,25 @@ public class WritableECContainerProvider
   private static final Logger LOG = LoggerFactory
       .getLogger(WritableECContainerProvider.class);
 
-  private final ConfigurationSource conf;
+  private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
 
-  public WritableECContainerProvider(ConfigurationSource conf,
-      PipelineManager pipelineManager, ContainerManager containerManager,
+  public WritableECContainerProvider(WritableECContainerProviderConfig config,
+      long containerSize,
+      NodeManager nodeManager,
+      PipelineManager pipelineManager,
+      ContainerManager containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
-    this.conf = conf;
-    this.providerConfig =
-        conf.getObject(WritableECContainerProviderConfig.class);
+    this.providerConfig = config;
+    this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
-    this.containerSize = getConfiguredContainerSize();
+    this.containerSize = containerSize;
   }
 
   /**
@@ -87,19 +89,18 @@ public class WritableECContainerProvider
    *                    not be considered.
    * @return A containerInfo representing a block group with with space for the
    *         write, or null if no container can be allocated.
-   * @throws IOException
    */
   @Override
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
+    int minimumPipelines = getMinimumPipelines(repConfig);
     synchronized (this) {
       int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < providerConfig.getMinimumPipelines()) {
+      if (openPipelineCount < minimumPipelines) {
         try {
-          return allocateContainer(
-              repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container for {} with {} existing "
               + "containers", repConfig, openPipelineCount, e);
@@ -159,6 +160,16 @@ public class WritableECContainerProvider
     }
   }
 
+  private int getMinimumPipelines(ECReplicationConfig repConfig) {
+    final double factor = providerConfig.getPipelinePerVolumeFactor();
+    int volumeBasedCount = 0;
+    if (factor > 0) {
+      int volumes = nodeManager.totalHealthyVolumeCount();
+      volumeBasedCount = (int) factor * volumes / repConfig.getRequiredNodes();
+    }
+    return Math.max(volumeBasedCount, providerConfig.getMinimumPipelines());
+  }
+
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
       long size, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
@@ -205,17 +216,13 @@ public class WritableECContainerProvider
     return container.getUsedBytes() + size <= containerSize;
   }
 
-  private long getConfiguredContainerSize() {
-    return (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
-  }
-
   /**
    * Class to hold configuration for WriteableECContainerProvider.
    */
-  @ConfigGroup(prefix = "ozone.scm.ec")
+  @ConfigGroup(prefix = WritableECContainerProviderConfig.PREFIX)
   public static class WritableECContainerProviderConfig {
+
+    private static final String PREFIX = "ozone.scm.ec";
 
     @Config(key = "pipeline.minimum",
         defaultValue = "5",
@@ -233,6 +240,38 @@ public class WritableECContainerProvider
       this.minimumPipelines = minPipelines;
     }
 
+    private static final String PIPELINE_PER_VOLUME_FACTOR_KEY =
+        "pipeline.per.volume.factor";
+    private static final double PIPELINE_PER_VOLUME_FACTOR_DEFAULT = 1;
+    private static final String PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE = "1";
+    private static final String EC_PIPELINE_PER_VOLUME_FACTOR_KEY =
+        PREFIX + "." + PIPELINE_PER_VOLUME_FACTOR_KEY;
+
+    @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
+        type = ConfigType.DOUBLE,
+        defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
+        tags = {SCM},
+        description = "TODO"
+    )
+    private double pipelinePerVolumeFactor = PIPELINE_PER_VOLUME_FACTOR_DEFAULT;
+
+    public double getPipelinePerVolumeFactor() {
+      return pipelinePerVolumeFactor;
+    }
+
+    @PostConstruct
+    public void validate() {
+      if (pipelinePerVolumeFactor < 0) {
+        LOG.warn("{} must be non-negative, but was {}. Defaulting to {}",
+            EC_PIPELINE_PER_VOLUME_FACTOR_KEY, pipelinePerVolumeFactor,
+            PIPELINE_PER_VOLUME_FACTOR_DEFAULT);
+        pipelinePerVolumeFactor = PIPELINE_PER_VOLUME_FACTOR_DEFAULT;
+      }
+    }
+
+    public void setPipelinePerVolumeFactor(double v) {
+      pipelinePerVolumeFactor = v;
+    }
   }
 
 }

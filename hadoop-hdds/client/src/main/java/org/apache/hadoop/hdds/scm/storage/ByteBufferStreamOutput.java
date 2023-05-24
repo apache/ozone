@@ -23,33 +23,35 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
-* This interface is for writing an output stream of ByteBuffers.
-* An ByteBufferStreamOutput accepts nio ByteBuffer and sends them to some sink.
-*/
+ * This interface is similar to {@link java.io.OutputStream}
+ * except that this class support {@link ByteBuffer} instead of byte[].
+ */
 public interface ByteBufferStreamOutput extends Closeable {
   /**
-   * Try to write all the bytes in ByteBuf b to DataStream.
+   * Similar to {@link java.io.OutputStream#write(byte[])},
+   * except that the parameter of this method is a {@link ByteBuffer}.
    *
-   * @param b the data.
+   * @param buffer the buffer containing data to be written.
    * @exception IOException if an I/O error occurs.
    */
-  default void write(ByteBuffer b) throws IOException {
+  default void write(ByteBuffer buffer) throws IOException {
+    final ByteBuffer b = buffer.asReadOnlyBuffer();
     write(b, b.position(), b.remaining());
   }
 
   /**
-   * Try to write the [off:off + len) slice in ByteBuf b to DataStream.
+   * Similar to {@link java.io.OutputStream#write(byte[], int, int)},
+   * except that the parameter of this method is a {@link ByteBuffer}.
    *
-   * @param b the data.
-   * @param off the start offset in the data.
+   * @param buffer the buffer containing data to be written.
+   * @param off the start offset.
    * @param len the number of bytes to write.
    * @exception  IOException  if an I/O error occurs.
    */
-  void write(ByteBuffer b, int off, int len) throws IOException;
+  void write(ByteBuffer buffer, int off, int len) throws IOException;
 
   /**
-   * Flushes this DataStream output and forces any buffered output bytes
-   * to be written out.
+   * Flush this output and force any buffered output bytes to be written out.
    *
    * @exception  IOException  if an I/O error occurs.
    */

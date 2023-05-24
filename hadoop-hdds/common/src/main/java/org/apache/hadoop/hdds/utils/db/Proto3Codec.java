@@ -24,9 +24,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Parser;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.IntFunction;
+import java.util.function.ToIntFunction;
 
 /**
  * Codecs to serialize/deserialize Protobuf v3 messages.
@@ -45,10 +47,10 @@ public final class Proto3Codec<M extends MessageLite>
     return (Codec<T>) codec;
   }
 
-  private static <M extends MessageLite> Parser<M> getParser(Class<M> clazz) {
+  private static <T extends MessageLite> Parser<T> getParser(Class<T> clazz) {
     final String name = "PARSER";
     try {
-      return (Parser<M>) clazz.getField(name).get(null);
+      return (Parser<T>) clazz.getField(name).get(null);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Failed to get " + name + " field from " + clazz, e);
@@ -66,11 +68,8 @@ public final class Proto3Codec<M extends MessageLite>
     return true;
   }
 
-  @Override
-  public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) {
-    final int size = message.getSerializedSize();
-    return allocator.apply(size).put(buffer -> {
+  private ToIntFunction<ByteBuffer> writeTo(M message, int size) {
+    return buffer -> {
       try {
         message.writeTo(CodedOutputStream.newInstance(buffer));
       } catch (IOException e) {
@@ -78,7 +77,14 @@ public final class Proto3Codec<M extends MessageLite>
             "Failed to writeTo: message=" + message, e);
       }
       return size;
-    });
+    };
+  }
+
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull M message,
+      IntFunction<CodecBuffer> allocator) {
+    final int size = message.getSerializedSize();
+    return allocator.apply(size).put(writeTo(message, size));
   }
 
   @Override

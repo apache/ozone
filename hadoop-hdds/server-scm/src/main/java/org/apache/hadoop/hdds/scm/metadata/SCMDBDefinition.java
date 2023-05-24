@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -49,7 +48,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "deletedBlocks",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           DeletedBlocksTransaction.class,
           new DeletedBlocksTransactionCodec());
 
@@ -98,7 +97,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
           new PipelineCodec());
 
@@ -118,13 +117,13 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           TransactionInfo.class,
-          new TransactionInfoCodec());
+          TransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
       new DBColumnFamilyDefinition<>(
           "crls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
           new CRLInfoCodec());
 
@@ -135,7 +134,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
@@ -144,7 +143,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
       MoveDataNodePair>
