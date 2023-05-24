@@ -836,19 +836,16 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
-                                Table<String, ? extends WithObjectID> tsTable,
-                                Set<String> deltaFiles,
-                                boolean nativeRocksToolsLoaded,
-                                PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-                                PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-                                PersistentSet<byte[]> objectIDsToCheck,
-                                Map<String, String> tablePrefixes)
-      throws IOException, NativeLibraryNotLoadedException, RocksDBException {
-
+                        Table<String, ? extends WithObjectID> tsTable,
+                        Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
+                        PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                        PersistentMap<byte[], byte[]> newObjIdToKeyMap,
+                        PersistentSet<byte[]> objectIDsToCheck,
+                        Map<String, String> tablePrefixes) throws IOException,
+      NativeLibraryNotLoadedException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
-
     boolean isDirectoryTable =
         fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
@@ -903,17 +900,12 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
-                                    OmSnapshot toSnapshot,
-                                    List<String> tablesToLookUp,
-                                    SnapshotInfo fsInfo,
-                                    SnapshotInfo tsInfo,
-                                    boolean useFullDiff,
-                                    Map<String, String> tablePrefixes,
-                                    String diffDir)
+  Set<String> getDeltaFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot,
+                            List<String> tablesToLookUp, SnapshotInfo fsInfo,
+                            SnapshotInfo tsInfo, boolean useFullDiff,
+                            Map<String, String> tablePrefixes, String diffDir)
       throws RocksDBException, IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
-
     final Set<String> deltaFiles = new HashSet<>();
 
     // Check if compaction DAG is available, use that if so

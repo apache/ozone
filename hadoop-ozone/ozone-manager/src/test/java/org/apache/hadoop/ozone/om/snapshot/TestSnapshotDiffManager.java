@@ -87,7 +87,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
-
 /**
  * Test class for SnapshotDiffManager Class.
  */
@@ -189,11 +188,12 @@ public class TestSnapshotDiffManager {
     String snap1 = "snap1";
     String snap2 = "snap2";
 
+    String diffDir = Files.createTempDirectory("snapdiff_dir").toString();
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
     Mockito.when(differ.getSSTDiffListWithFullPath(Mockito.any(),
-        Mockito.any(), Mockito.anyString()))
+        Mockito.any(), Mockito.eq(diffDir)))
         .thenReturn(Lists.newArrayList(randomStrings));
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
@@ -201,8 +201,7 @@ public class TestSnapshotDiffManager {
     Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
         snapshotCache.get(snap1), snapshotCache.get(snap2),
         Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
-        Collections.EMPTY_MAP,
-        Files.createTempDirectory("snapdiff_dir").toString());
+        Collections.EMPTY_MAP, diffDir);
     Assertions.assertEquals(randomStrings, deltaFiles);
   }
 

@@ -153,7 +153,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
         env:
           OZONE_WITH_COVERAGE: false
-          CANCEL_NATIVE_VERSION_CHECK: true
+          SKIP_NATIVE_VERSION_CHECK: true
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts

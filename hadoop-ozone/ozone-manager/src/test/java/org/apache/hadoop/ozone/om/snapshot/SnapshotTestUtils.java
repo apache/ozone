@@ -28,7 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Util classes for mocking Snapshot Persistent DataStructures.
+ * Util classes for Snapshot Persistent DataStructures for tests.
  */
 public class SnapshotTestUtils {
 

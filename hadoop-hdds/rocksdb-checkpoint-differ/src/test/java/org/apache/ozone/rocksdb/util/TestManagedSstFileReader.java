@@ -19,6 +19,7 @@ package org.apache.ozone.rocksdb.util;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -70,11 +71,11 @@ public class TestManagedSstFileReader {
              managedEnvOptions, managedOptions)) {
       sstFileWriter.open(file.getAbsolutePath());
       for (Map.Entry<String, Integer> entry : keys.entrySet()) {
+        byte[] keyByte = StringUtils.string2Bytes(entry.getKey());
         if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getBytes(StandardCharsets.UTF_8));
+          sstFileWriter.delete(keyByte);
         } else {
-          sstFileWriter.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
-              entry.getKey().getBytes(StandardCharsets.UTF_8));
+          sstFileWriter.put(keyByte, keyByte);
         }
       }
       sstFileWriter.finish();
@@ -104,7 +105,6 @@ public class TestManagedSstFileReader {
     }
     return Pair.of(keys, files);
   }
-
 
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
@@ -144,7 +144,9 @@ public class TestManagedSstFileReader {
         .getKeyStreamWithTombstone(sstDumpTool)) {
       keyStream.forEach(keys::remove);
       Assertions.assertEquals(0, keys.size());
+    } finally {
+      executorService.shutdown();
     }
-    executorService.shutdown();
+
   }
 }
