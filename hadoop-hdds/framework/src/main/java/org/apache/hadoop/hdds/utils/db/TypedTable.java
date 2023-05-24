@@ -118,6 +118,22 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  private byte[] encodeKey(KEY key) throws IOException {
+    return key == null? null : keyCodec.toPersistedFormat(key);
+  }
+
+  private byte[] encodeValue(VALUE value) throws IOException {
+    return value == null? null : valueCodec.toPersistedFormat(value);
+  }
+
+  private KEY decodeKey(byte[] key) throws IOException {
+    return key == null? null : keyCodec.fromPersistedFormat(key);
+  }
+
+  private VALUE decodeValue(byte[] value) throws IOException {
+    return value == null? null : valueCodec.fromPersistedFormat(value);
+  }
+
   @Override
   public void put(KEY key, VALUE value) throws IOException {
     if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
@@ -128,9 +144,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       return;
     }
 
-    final byte[] keyData = keyCodec.toPersistedFormat(key);
-    final byte[] valueData = valueCodec.toPersistedFormat(value);
-    rawTable.put(keyData, valueData);
+    rawTable.put(encodeKey(key), encodeValue(value));
   }
 
   @Override
@@ -143,9 +157,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           valueCodec.toDirectCodecBuffer(value));
     }
 
-    final byte[] keyData = keyCodec.toPersistedFormat(key);
-    final byte[] valueData = valueCodec.toPersistedFormat(value);
-    rawTable.putWithBatch(batch, keyData, valueData);
+    rawTable.putWithBatch(batch, encodeKey(key), encodeValue(value));
   }
 
   @Override
@@ -164,7 +176,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return false;
     } else {
-      return rawTable.isExist(keyCodec.toPersistedFormat(key));
+      return rawTable.isExist(encodeKey(key));
     }
   }
 
@@ -265,33 +277,31 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private VALUE getFromTable(KEY key) throws IOException {
-    final byte[] keyBytes = keyCodec.toPersistedFormat(key);
+    final byte[] keyBytes = encodeKey(key);
     byte[] valueBytes = rawTable.get(keyBytes);
-    return valueCodec.fromPersistedFormat(valueBytes);
+    return decodeValue(valueBytes);
   }
 
   private VALUE getFromTableIfExist(KEY key) throws IOException {
-    final byte[] keyBytes = keyCodec.toPersistedFormat(key);
+    final byte[] keyBytes = encodeKey(key);
     byte[] valueBytes = rawTable.getIfExist(keyBytes);
-    return valueCodec.fromPersistedFormat(valueBytes);
+    return decodeValue(valueBytes);
   }
 
   @Override
   public void delete(KEY key) throws IOException {
-    rawTable.delete(keyCodec.toPersistedFormat(key));
+    rawTable.delete(encodeKey(key));
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
-    rawTable.deleteWithBatch(batch, keyCodec.toPersistedFormat(key));
+    rawTable.deleteWithBatch(batch, encodeKey(key));
   }
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
-    rawTable.deleteRange(
-        keyCodec.toPersistedFormat(beginKey),
-        keyCodec.toPersistedFormat(endKey));
+    rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
   }
 
   @Override
@@ -302,7 +312,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
       throws IOException {
-    final byte[] prefixBytes = keyCodec.toPersistedFormat(prefix);
+    final byte[] prefixBytes = encodeKey(prefix);
     return new TypedTableIterator(rawTable.iterator(prefixBytes));
   }
 
@@ -352,10 +362,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
-    final byte[] startKeyBytes = startKey == null ? null
-        : keyCodec.toPersistedFormat(startKey);
-    final byte[] prefixBytes = prefix == null ? null
-        : keyCodec.toPersistedFormat(prefix);
+    final byte[] startKeyBytes = encodeKey(startKey);
+    final byte[] prefixBytes = encodeKey(prefix);
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
@@ -374,10 +382,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
-    final byte[] startKeyBytes = startKey == null ? null
-        : keyCodec.toPersistedFormat(startKey);
-    final byte[] prefixBytes = prefix == null ? null
-        : keyCodec.toPersistedFormat(prefix);
+    final byte[] startKeyBytes = encodeKey(startKey);
+    final byte[] prefixBytes = encodeKey(prefix);
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getSequentialRangeKVs(startKeyBytes, count,
@@ -392,14 +398,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException {
-    rawTable.deleteBatchWithPrefix(batch, keyCodec.toPersistedFormat(prefix));
+    rawTable.deleteBatchWithPrefix(batch, encodeKey(prefix));
   }
 
   @Override
   public void dumpToFileWithPrefix(File externalFile, KEY prefix)
       throws IOException {
-    rawTable.dumpToFileWithPrefix(externalFile,
-        keyCodec.toPersistedFormat(prefix));
+    rawTable.dumpToFileWithPrefix(externalFile, encodeKey(prefix));
   }
 
   @Override
@@ -435,12 +440,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KEY getKey() throws IOException {
-      return keyCodec.fromPersistedFormat(rawKeyValue.getKey());
+      return decodeKey(rawKeyValue.getKey());
     }
 
     @Override
     public VALUE getValue() throws IOException {
-      return valueCodec.fromPersistedFormat(rawKeyValue.getValue());
+      return decodeValue(rawKeyValue.getValue());
     }
   }
 
@@ -469,7 +474,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public TypedKeyValue seek(KEY key) throws IOException {
-      final byte[] keyBytes = keyCodec.toPersistedFormat(key);
+      final byte[] keyBytes = encodeKey(key);
       KeyValue<byte[], byte[]> result = rawIterator.seek(keyBytes);
       if (result == null) {
         return null;
