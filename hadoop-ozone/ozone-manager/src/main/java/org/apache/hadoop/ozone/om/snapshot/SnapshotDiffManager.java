@@ -40,6 +40,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeConstants;
@@ -118,7 +120,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  */
 public class SnapshotDiffManager implements AutoCloseable {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotDiffManager.class);
+          LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
   private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
   private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
@@ -151,7 +153,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    * similar type of request at any point of time.
    */
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
-  private final ExecutorService executorService;
+  private final ExecutorService snapDiffExecutor;
 
   /**
    * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
@@ -214,7 +216,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         byte[].class,
         byte[].class);
 
-    this.executorService = new ThreadPoolExecutor(threadPoolSize,
+    this.snapDiffExecutor = new ThreadPoolExecutor(threadPoolSize,
         threadPoolSize,
         0,
         TimeUnit.MILLISECONDS,
@@ -274,7 +276,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       return Optional.of(new ManagedSSTDumpTool(sstDumptoolExecService.get(),
           bufferSize));
     } catch (NativeLibraryNotLoadedException e) {
-      this.sstDumptoolExecService.ifPresent(ExecutorService::shutdown);
+      this.sstDumptoolExecService.ifPresent(exec ->
+          closeExecutorService(exec, "SstDumpToolExecutor"));
     }
     return Optional.empty();
   }
@@ -564,7 +567,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
-      executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
+      snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
@@ -966,8 +969,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  long generateDiffReport(
-      final String jobId,
+  long generateDiffReport(final String jobId,
       final PersistentSet<byte[]> objectIDsToCheck,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap) {
@@ -1256,10 +1258,28 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
-    if (executorService != null) {
-      executorService.shutdown();
+  public void close() {
+    if (snapDiffExecutor != null) {
+      closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
     }
-    this.sstDumptoolExecService.ifPresent(ExecutorService::shutdown);
+    this.sstDumptoolExecService.ifPresent(exec ->
+        closeExecutorService(exec, "SstDumpToolExecutor"));
+  }
+
+  private void closeExecutorService(ExecutorService executorService,
+                                    String serviceName) {
+    if (executorService != null) {
+      LOG.info("Shutting down executorService: '{}'", serviceName);
+      executorService.shutdownNow();
+      try {
+        if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+        executorService.shutdownNow();
+      }
+    }
   }
 }

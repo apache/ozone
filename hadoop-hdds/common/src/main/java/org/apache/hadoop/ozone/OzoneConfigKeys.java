@@ -164,6 +164,8 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_EC_GRPC_RETRIES_MAX =
       "ozone.client.ec.grpc.retries.max";
   public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
+  public static final String OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY
+      = "ozone.grpc.metrics.percentiles.intervals";
 
   /**
    * Ozone administrator users delimited by comma.

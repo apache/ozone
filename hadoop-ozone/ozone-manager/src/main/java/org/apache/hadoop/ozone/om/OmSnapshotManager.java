@@ -830,6 +830,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
+    if (snapshotDiffManager != null) {
+      snapshotDiffManager.close();
+    }
+    if (snapshotCache != null) {
+      snapshotCache.invalidateAll();
+    }
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
     }

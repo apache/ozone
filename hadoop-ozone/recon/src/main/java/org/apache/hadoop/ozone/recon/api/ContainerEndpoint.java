@@ -68,7 +68,6 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -141,9 +140,12 @@ public class ContainerEndpoint {
       // Send back an empty response
       return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
+
     long containersCount;
-    Collection<ContainerMetadata> containerMetaDataList =
-        containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
+    List<ContainerMetadata> containerMetaDataList =
+        // Get the containers starting from the prevKey+1 which will skip the
+        // container having prevKey ID
+        containerManager.getContainers(ContainerID.valueOf(prevKey + 1), limit)
             .stream()
             .map(container -> {
               ContainerMetadata containerMetadata =
@@ -154,8 +156,15 @@ public class ContainerEndpoint {
             .collect(Collectors.toList());
 
     containersCount = containerMetaDataList.size();
+
+    // Get the last container ID from the List
+    long lastContainerID = containerMetaDataList.isEmpty() ? prevKey :
+        containerMetaDataList.get(containerMetaDataList.size() - 1)
+            .getContainerID();
+
     ContainersResponse containersResponse =
-        new ContainersResponse(containersCount, containerMetaDataList);
+        new ContainersResponse(containersCount, containerMetaDataList,
+            lastContainerID);
     return Response.ok(containersResponse).build();
   }
 

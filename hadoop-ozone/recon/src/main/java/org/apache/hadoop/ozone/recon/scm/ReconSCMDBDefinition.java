@@ -23,14 +23,18 @@ import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
-import org.apache.hadoop.ozone.recon.codec.ReconNodeDBKeyCodec;
 
 /**
  * Recon SCM db file for ozone.
  */
 public class ReconSCMDBDefinition extends SCMDBDefinition {
+  private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
+      StringCodec.get(), UUID::fromString, UUID::toString, true);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 
@@ -39,7 +43,7 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
       new DBColumnFamilyDefinition<UUID, DatanodeDetails>(
           "nodes",
           UUID.class,
-          new ReconNodeDBKeyCodec(),
+          UUID_CODEC,
           DatanodeDetails.class,
           DatanodeDetails.getCodec());
 

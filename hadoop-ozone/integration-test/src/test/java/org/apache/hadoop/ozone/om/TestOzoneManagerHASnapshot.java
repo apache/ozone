@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -40,10 +41,13 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -89,6 +93,98 @@ public class TestOzoneManagerHASnapshot {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  // Test snapshot diff when OM restarts in HA OM env.
+  @Test
+  public void testSnapshotDiffWhenOmLeaderRestart()
+      throws Exception {
+    String snapshot1 = "snap-" + RandomStringUtils.randomNumeric(10);
+    String snapshot2 = "snap-" + RandomStringUtils.randomNumeric(10);
+
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+    store.createSnapshot(volumeName, bucketName, snapshot1);
+
+    for (int i = 0; i < 100; i++) {
+      createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+    }
+
+    store.createSnapshot(volumeName, bucketName, snapshot2);
+
+    SnapshotDiffResponse response =
+        store.snapshotDiff(volumeName, bucketName,
+            snapshot1, snapshot2, null, 0, false);
+
+    assertEquals(IN_PROGRESS, response.getJobStatus());
+
+    String oldLeader = cluster.getOMLeader().getOMNodeId();
+
+    OzoneManager omLeader = cluster.getOMLeader();
+    cluster.shutdownOzoneManager(omLeader);
+    cluster.restartOzoneManager(omLeader, true);
+
+    await().atMost(Duration.ofSeconds(120))
+        .until(() -> cluster.getOMLeader() != null);
+
+    String newLeader = cluster.getOMLeader().getOMNodeId();
+
+    if (Objects.equals(oldLeader, newLeader)) {
+      // If old leader becomes leader again. Job should be done by this time.
+      response = store.snapshotDiff(volumeName, bucketName,
+          snapshot1, snapshot2, null, 0, false);
+      assertEquals(DONE, response.getJobStatus());
+      assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
+    } else {
+      // If new leader is different from old leader. SnapDiff request will be
+      // new to OM, and job status should be IN_PROGRESS.
+      response = store.snapshotDiff(volumeName, bucketName, snapshot1,
+          snapshot2, null, 0, false);
+      assertEquals(IN_PROGRESS, response.getJobStatus());
+      while (true) {
+        response = store.snapshotDiff(volumeName, bucketName, snapshot1,
+                snapshot2, null, 0, false);
+        if (DONE == response.getJobStatus()) {
+          assertEquals(100,
+              response.getSnapshotDiffReport().getDiffList().size());
+          break;
+        }
+        Thread.sleep(response.getWaitTimeInMs());
+      }
+    }
+  }
+
+  @Test
+  public void testSnapshotIdConsistency() throws Exception {
+    createFileKey(ozoneBucket, "key-" + RandomStringUtils.randomNumeric(10));
+
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(10);
+
+    store.createSnapshot(volumeName, bucketName, snapshotName);
+    List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
+    List<String> snapshotIds = new ArrayList<>();
+
+    for (OzoneManager ozoneManager : ozoneManagers) {
+      await().atMost(Duration.ofSeconds(120))
+          .until(() -> {
+            SnapshotInfo snapshotInfo;
+            try {
+              snapshotInfo = ozoneManager.getMetadataManager()
+                  .getSnapshotInfoTable()
+                  .get(SnapshotInfo.getTableKey(volumeName,
+                      bucketName,
+                      snapshotName));
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+
+            if (snapshotInfo != null) {
+              snapshotIds.add(snapshotInfo.getSnapshotID());
+            }
+            return snapshotInfo != null;
+          });
+    }
+
+    assertEquals(1, snapshotIds.stream().distinct().count());
   }
 
   /**
@@ -146,8 +242,8 @@ public class TestOzoneManagerHASnapshot {
     for (int i = 0; i < 100; i++) {
       int index = i % 10;
       createFileKey(ozoneBuckets.get(index),
-          "key-" + RandomStringUtils.randomNumeric(3));
-      String snapshot1 = "snapshot-" + RandomStringUtils.randomNumeric(5);
+          "key-" + RandomStringUtils.randomNumeric(10));
+      String snapshot1 = "snapshot-" + RandomStringUtils.randomNumeric(10);
       store.createSnapshot(volumeNames.get(index),
           bucketNames.get(index), snapshot1);
     }
