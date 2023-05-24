@@ -119,19 +119,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private byte[] encodeKey(KEY key) throws IOException {
-    return key == null? null : keyCodec.toPersistedFormat(key);
+    return key == null ? null : keyCodec.toPersistedFormat(key);
   }
 
   private byte[] encodeValue(VALUE value) throws IOException {
-    return value == null? null : valueCodec.toPersistedFormat(value);
+    return value == null ? null : valueCodec.toPersistedFormat(value);
   }
 
   private KEY decodeKey(byte[] key) throws IOException {
-    return key == null? null : keyCodec.fromPersistedFormat(key);
+    return key == null ? null : keyCodec.fromPersistedFormat(key);
   }
 
   private VALUE decodeValue(byte[] value) throws IOException {
-    return value == null? null : valueCodec.fromPersistedFormat(value);
+    return value == null ? null : valueCodec.fromPersistedFormat(value);
   }
 
   @Override
