@@ -571,7 +571,7 @@ public class DefaultCAServer implements CertificateServer {
         .setBeginDate(beginDate)
         .setEndDate(endDate)
         .makeCA()
-        .setConfiguration(securityConfig.getConfiguration())
+        .setConfiguration(securityConfig)
         .setKey(key);
 
     builder.addInetAddresses();

@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -128,8 +129,11 @@ public class TestOzoneManagerRatisServer {
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     secConfig = new SecurityConfig(conf);
+    HddsProtos.OzoneManagerDetailsProto omInfo =
+        OzoneManager.getOmDetailsProto(conf, omID);
     certClient =
-        new OMCertificateClient(secConfig, omStorage, null, null, null);
+        new OMCertificateClient(
+            secConfig, null, omStorage, omInfo, "", null, null, null);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();

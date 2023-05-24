@@ -52,7 +52,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestKeyCodec {
 
-  private OzoneConfiguration configuration;
   private SecurityConfig securityConfig;
   private String component;
   private HDDSKeyGenerator keyGenerator;
@@ -60,11 +59,11 @@ public class TestKeyCodec {
 
   @BeforeEach
   public void init(@TempDir Path tempDir) throws IOException {
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     prefix = tempDir.toString();
     configuration.set(HDDS_METADATA_DIR_NAME, prefix);
-    keyGenerator = new HDDSKeyGenerator(configuration);
     securityConfig = new SecurityConfig(configuration);
+    keyGenerator = new HDDSKeyGenerator(securityConfig);
     component = "test_component";
   }
 

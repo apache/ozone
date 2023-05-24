@@ -59,10 +59,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -90,9 +88,7 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CRYPTO_SIGN_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.RENEW_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 
-import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 
@@ -126,15 +122,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
-  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
-  private static UserGroupInformation ugi;
 
-  protected DefaultCertificateClient(SecurityConfig securityConfig, Logger log,
-      String certSerialId, String component,
-      Consumer<String> saveCertId, Runnable shutdown) {
+  protected DefaultCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
+      Logger log,
+      String certSerialId,
+      String component,
+      Consumer<String> saveCertId,
+      Runnable shutdown
+  ) {
     Objects.requireNonNull(securityConfig);
     this.securityConfig = securityConfig;
+    this.scmSecurityClient = scmSecurityClient;
     keyCodec = new KeyCodec(securityConfig, component);
     this.logger = log;
     this.certificateMap = new ConcurrentHashMap<>();
@@ -529,8 +531,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       throws CertificateException {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
-        .setConfiguration(securityConfig.getConfiguration());
-    builder.addInetAddresses();
+            .setConfiguration(securityConfig)
+            .addInetAddresses();
     return builder;
   }
 
@@ -1197,10 +1199,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return securityConfig;
   }
 
-  public OzoneConfiguration getConfig() {
-    return (OzoneConfiguration)securityConfig.getConfiguration();
-  }
-
   private synchronized String updateCertSerialId(String newCertSerialId) {
     certSerialId = newCertSerialId;
     loadAllCertificates();
@@ -1219,22 +1217,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {
-    if (scmSecurityProtocolClient == null) {
-      scmSecurityProtocolClient =
-          getScmSecurityClientWithMaxRetry(getConfig(), ugi);
-    }
-    return scmSecurityProtocolClient;
-  }
-
-  @VisibleForTesting
-  public void setSecureScmClient(
-      SCMSecurityProtocolClientSideTranslatorPB client) {
-    scmSecurityProtocolClient = client;
-  }
-
-  @VisibleForTesting
-  public static void setUgi(UserGroupInformation user) {
-    ugi = user;
+    return scmSecurityClient;
   }
 
   public synchronized void startCertificateMonitor() {

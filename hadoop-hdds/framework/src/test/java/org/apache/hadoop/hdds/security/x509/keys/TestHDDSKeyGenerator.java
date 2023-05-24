@@ -56,7 +56,7 @@ public class TestHDDSKeyGenerator {
   @Test
   public void testGenerateKey()
       throws NoSuchProviderException, NoSuchAlgorithmException {
-    HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
+    HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config);
     KeyPair keyPair = keyGen.generateKey();
     Assertions.assertEquals(config.getKeyAlgo(),
         keyPair.getPrivate().getAlgorithm());
@@ -76,7 +76,7 @@ public class TestHDDSKeyGenerator {
   @Test
   public void testGenerateKeyWithSize() throws NoSuchProviderException,
       NoSuchAlgorithmException {
-    HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config.getConfiguration());
+    HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config);
     KeyPair keyPair = keyGen.generateKey(4096);
     PublicKey publicKey = keyPair.getPublic();
     if (publicKey instanceof RSAPublicKey) {

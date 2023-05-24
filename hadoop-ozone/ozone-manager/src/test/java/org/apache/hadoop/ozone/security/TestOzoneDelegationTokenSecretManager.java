@@ -149,7 +149,7 @@ public class TestOzoneDelegationTokenSecretManager {
     when(omStorage.getClusterID()).thenReturn("test");
     when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
     return new OMCertificateClient(
-        securityConfig, omStorage, null, null, null) {
+        securityConfig, null, omStorage, null, "", null, null, null) {
       @Override
       public CertPath getCertPath() {
         return certPath;

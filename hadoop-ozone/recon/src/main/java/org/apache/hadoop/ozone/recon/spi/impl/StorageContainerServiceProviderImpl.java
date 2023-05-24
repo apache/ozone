@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,6 +42,7 @@ import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -199,9 +202,12 @@ public class StorageContainerServiceProviderImpl
                 ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
             SecurityConfig secConf = new SecurityConfig(configuration);
+            SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+                getScmSecurityClientWithMaxRetry(
+                    configuration, getCurrentUser());
             try (ReconCertificateClient certClient =
                      new ReconCertificateClient(
-                         secConf, reconStorage, null, null);
+                         secConf, scmSecurityClient, reconStorage, null, null);
                  SCMSnapshotDownloader downloadClient = new InterSCMGrpcClient(
                      hostAddress, grpcPort, configuration, certClient)) {
               downloadClient.download(targetFile.toPath()).get();
