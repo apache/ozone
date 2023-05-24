@@ -70,10 +70,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -101,6 +103,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
+  private long slowOpThresholdMs;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -121,6 +124,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
     this.tokenVerifier = tokenVerifier != null ? tokenVerifier
         : new NoopTokenVerifier();
+    this.slowOpThresholdMs = getSlowOpThresholdMs(conf);
 
     protocolMetrics =
         new ProtocolMessageMetrics<>(
@@ -196,6 +200,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditAction action = getAuditAction(msg.getCmdType());
     EventType eventType = getEventType(msg);
     Map<String, String> params = getAuditParams(msg);
+    Map<String, String> perf = new HashMap<>();
 
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
@@ -323,10 +328,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       audit(action, eventType, params, AuditEventStatus.FAILURE, ex);
       return ContainerUtils.logAndReturnError(LOG, ex, msg);
     }
+    perf.put("preOpLatencyMS",
+        String.valueOf(Time.monotonicNow() - startTime));
     responseProto = handler.handle(msg, container, dispatcherContext);
+    long oPLatencyMS = Time.monotonicNow() - startTime;
     if (responseProto != null) {
-      metrics.incContainerOpsLatencies(cmdType,
-              Time.monotonicNow() - startTime);
+      metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
 
       // If the request is of Write Type and the container operation
       // is unsuccessful, it implies the applyTransaction on the container
@@ -399,6 +406,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
+      performanceAudit(action, params, perf, oPLatencyMS);
 
       return responseProto;
     } else {
@@ -407,6 +415,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           new Exception("UNSUPPORTED_REQUEST"));
       return unsupportedRequest(msg);
     }
+  }
+
+  private long getSlowOpThresholdMs(ConfigurationSource config) {
+    return config.getTimeDuration(
+        HddsConfigKeys.HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_KEY,
+        HddsConfigKeys.HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT,
+            TimeUnit.MILLISECONDS);
   }
 
   private void updateBCSID(Container container,
@@ -678,6 +693,27 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  private void performanceAudit(AuditAction action, Map<String, String> params,
+      Map<String, String> performance, long opLatencyMs) {
+    if (isExceedThreshold(opLatencyMs)) {
+      performance.put("opLatencyMs", String.valueOf(opLatencyMs));
+      AuditMessage msg =
+          buildAuditMessageForPerformance(action, params, performance);
+      AUDIT.logPerformance(msg);
+    }
+  }
+
+  public AuditMessage buildAuditMessageForPerformance(AuditAction op,
+      Map<String, String> auditMap, Map<String, String> performance) {
+    return new AuditMessage.Builder()
+        .setUser(null)
+        .atIp(null)
+        .forOperation(op)
+        .withParams(auditMap)
+        .setPerformance(performance)
+        .build();
+  }
+
   //TODO: use GRPC to fetch user and ip details
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
@@ -841,6 +877,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case ReadChunk:
       auditParams.put("blockData",
           BlockID.getFromProtobuf(msg.getReadChunk().getBlockID()).toString());
+      auditParams.put("blockDataSize",
+          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       return auditParams;
 
     case DeleteChunk:
@@ -853,6 +891,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       auditParams.put("blockData",
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID())
               .toString());
+      auditParams.put("blockDataSize",
+          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       return auditParams;
 
     case ListChunk:
@@ -900,4 +940,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   }
 
+  private boolean isExceedThreshold(long opLatencyMs) {
+    return opLatencyMs >= slowOpThresholdMs;
+  }
 }
