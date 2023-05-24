@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfoCodec;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -90,7 +89,7 @@ public class SCMDBDefinition implements DBDefinition {
           BigInteger.class,
           new BigIntegerCodec(),
           CertInfo.class,
-          new CertInfoCodec());
+          CertInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<PipelineID, Pipeline>
       PIPELINES =
@@ -125,7 +124,7 @@ public class SCMDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           CRLInfo.class,
-          new CRLInfoCodec());
+          CRLInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       CRL_SEQUENCE_ID =
