@@ -139,10 +139,10 @@ public class BasicOzoneFileSystem extends FileSystem {
     streamingEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
-    streamingAutoThreshold = (int) conf.getStorageSize(
+    streamingAutoThreshold = (int) OzoneConfiguration.of(conf).getStorageSize(
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
-        org.apache.hadoop.conf.StorageUnit.BYTES);
+        StorageUnit.BYTES);
     hsyncEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
         OZONE_FS_HSYNC_ENABLED_DEFAULT);
