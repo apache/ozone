@@ -181,8 +181,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
 
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles, new HashSet<>(), excluded);
-
+    processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded);
 
     if (!includeSnapshotData) {
       return;
@@ -192,7 +192,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
-    processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles, snapshotPaths, excluded);
+    processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
+        snapshotPaths, excluded);
   }
 
   /**
@@ -300,7 +301,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
             copyFiles.add(file);
           }
         }
-      } else {// Not sst file.
+      } else { // Not sst file.
         copyFiles.add(file);
       }
     }

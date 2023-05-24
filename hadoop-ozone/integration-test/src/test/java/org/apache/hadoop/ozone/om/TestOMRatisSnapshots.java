@@ -199,7 +199,8 @@ public class TestOMRatisSnapshots {
     String snapshotName = "";
     List<String> keys = new ArrayList<>();
     SnapshotInfo snapshotInfo = null;
-    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate; snapshotCount++) {
+    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate;
+        snapshotCount++) {
       snapshotName = snapshotNamePrefix + snapshotCount;
       keys = writeKeys(keyIncrement);
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
@@ -280,14 +281,16 @@ public class TestOMRatisSnapshots {
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
   }
 
-  private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM, String snapshotName,
-                         List<String> keys, SnapshotInfo snapshotInfo)
+  private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
+                             String snapshotName,
+                             List<String> keys, SnapshotInfo snapshotInfo)
       throws IOException {
     // Read back data from snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(".snapshot/" + snapshotName + "/" + keys.get(keys.size() - 1)).build();
+        .setKeyName(".snapshot/" + snapshotName + "/" +
+            keys.get(keys.size() - 1)).build();
     OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
     Assertions.assertNotNull(omKeyInfo);
@@ -392,7 +395,7 @@ public class TestOMRatisSnapshots {
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 10s
+    // Timeout error if follower does not load update within 30s
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
@@ -448,24 +451,24 @@ public class TestOMRatisSnapshots {
     assertEquals(0, filesInCandidate.length);
 
     checkSnapshot(leaderOM, followerOM, "snap80", firstKeys, snapshotInfo2);
-    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.keys, firstIncrement.snapshotInfo);
-    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.keys, secondIncrement.snapshotInfo);
-    Assertions.assertEquals(followerOM.getOmSnapshotProvider().getInitCount(), 2,
+    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.keys,
+        firstIncrement.snapshotInfo);
+    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.keys,
+        secondIncrement.snapshotInfo);
+    Assertions.assertEquals(
+        followerOM.getOmSnapshotProvider().getInitCount(), 2,
         "Only initialized twice");
   }
 
-  private static class TestResults {
+  static class TestResults {
     SnapshotInfo snapshotInfo;
     List<String> keys;
   }
 
-  private TestResults getNextIncrementalTarball(int numKeys,
-                                                int expectedNumDownloads,
-                                                OzoneManager leaderOM,
-                                                OzoneManagerRatisServer leaderRatisServer,
-                                                FaultInjector faultInjector,
-                                                OzoneManager followerOM,
-                                                Path tempDir)
+  private TestResults getNextIncrementalTarball(
+      int numKeys, int expectedNumDownloads,
+      OzoneManager leaderOM, OzoneManagerRatisServer leaderRatisServer,
+      FaultInjector faultInjector, OzoneManager followerOM, Path tempDir)
       throws IOException, InterruptedException, TimeoutException {
     TestResults tr = new TestResults();
 
@@ -494,7 +497,8 @@ public class TestOMRatisSnapshots {
         followerOM.getOmSnapshotProvider().getNumDownloaded() ==
         expectedNumDownloads, 1000, 10000);
 
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+    assertTrue(followerOM.getOmRatisServer().
+        getLastAppliedTermIndex().getIndex()
         >= leaderOMSnapshotIndex - 1);
 
     // Now confirm tarball is just incremental and contains no unexpected
@@ -506,7 +510,8 @@ public class TestOMRatisSnapshots {
     Path followerCandidatePath = followerOM.getOmSnapshotProvider().
         getCandidateDir().toPath();
 
-    // Confirm that none of the files in the tarball match one in the candidate dir.
+    // Confirm that none of the files in the tarball match one in the
+    // candidate dir.
     assertTrue(sstFiles.size() > 0);
     for (String s: sstFiles) {
       File sstFile = Paths.get(followerCandidatePath.toString(), s).toFile();
@@ -522,7 +527,8 @@ public class TestOMRatisSnapshots {
       for (String line: lines.collect(Collectors.toList())) {
         lineCount++;
         String link = line.split("\t")[0];
-        File linkFile = Paths.get(followerCandidatePath.toString(), link).toFile();
+        File linkFile = Paths.get(
+            followerCandidatePath.toString(), link).toFile();
         assertFalse(linkFile.exists(),
             "Incremental checkpoint should not " +
                 "duplicate existing links");

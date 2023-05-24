@@ -80,7 +80,7 @@ public class TestOmSnapshotManager {
   private OzoneManager om;
   private File testDir;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
-    SNAPSHOT_CANDIDATE_DIR;
+      SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
   private File leaderSnapDir1;
   private File leaderSnapDir2;
@@ -324,12 +324,18 @@ public class TestOmSnapshotManager {
    */
   @Test
   public void testProcessFile() {
-    Path copyFile = Paths.get(testDir.toString(), "snap1/copyfile.sst");
-    Path excludeFile = Paths.get(testDir.toString(), "snap1/excludeFile.sst");
-    Path linkToExcludedFile = Paths.get(testDir.toString(), "snap2/excludeFile.sst");
-    Path linkToCopiedFile = Paths.get(testDir.toString(), "snap2/copyfile.sst");
-    Path addToCopiedFiles = Paths.get(testDir.toString(), "snap1/copyfile2.sst");
-    Path addNonSstToCopiedFiles = Paths.get(testDir.toString(), "snap1/nonSst");
+    Path copyFile = Paths.get(testDir.toString(),
+        "snap1/copyfile.sst");
+    Path excludeFile = Paths.get(testDir.toString(),
+        "snap1/excludeFile.sst");
+    Path linkToExcludedFile = Paths.get(testDir.toString(),
+        "snap2/excludeFile.sst");
+    Path linkToCopiedFile = Paths.get(testDir.toString(),
+        "snap2/copyfile.sst");
+    Path addToCopiedFiles = Paths.get(testDir.toString(),
+        "snap1/copyfile2.sst");
+    Path addNonSstToCopiedFiles = Paths.get(testDir.toString(),
+        "snap1/nonSst");
 
     Set<Path> toExcludeFiles = new HashSet<>(
         Collections.singletonList(excludeFile));
@@ -339,7 +345,8 @@ public class TestOmSnapshotManager {
 
     // Confirm the exclude file gets added to the excluded list,
     //  (and thus is excluded.)
-    processFile(excludeFile, copyFiles, hardLinkFiles, toExcludeFiles, excluded);
+    processFile(excludeFile, copyFiles, hardLinkFiles, toExcludeFiles,
+        excluded);
     Assert.assertEquals(excluded.size(), 1);
     Assert.assertEquals((excluded.get(0)), excludeFile.toString());
     Assert.assertEquals(copyFiles.size(), 1);
@@ -373,8 +380,8 @@ public class TestOmSnapshotManager {
     copyFiles = new HashSet<>(Collections.singletonList(copyFile));
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
-    processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles, toExcludeFiles,
-        excluded);
+    processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertTrue(copyFiles.contains(addNonSstToCopiedFiles));

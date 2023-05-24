@@ -479,8 +479,8 @@ public class TestOMDbCheckpointServlet {
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
     fabricatedSnapshot.toFile().mkdirs();
-    Assert.assertTrue(Paths.get(fabricatedSnapshot.toString(), FABRICATED_FILE_NAME)
-        .toFile().createNewFile());
+    Assert.assertTrue(Paths.get(fabricatedSnapshot.toString(),
+        FABRICATED_FILE_NAME).toFile().createNewFile());
 
     // Create fabricated links to snapshot dirs
     // to confirm that links are recognized even if
