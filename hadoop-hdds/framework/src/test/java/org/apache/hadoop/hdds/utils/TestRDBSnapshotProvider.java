@@ -57,9 +57,9 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
-import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -100,7 +100,7 @@ public class TestRDBSnapshotProvider {
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
-      public void close() throws IOException {
+      public void close() {
       }
 
       @Override
@@ -241,8 +241,8 @@ public class TestRDBSnapshotProvider {
 
   @Test
   public void testCheckLeaderConsistent() throws IOException {
-    // Leader inited to null at startup.
-    assertTrue(rdbSnapshotProvider.getInitCount() == 1);
+    // Leader initialized to null at startup.
+    assertEquals(1, rdbSnapshotProvider.getInitCount());
     File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
         "file1.sst");
     Files.write(dummyFile.toPath(),
@@ -251,15 +251,15 @@ public class TestRDBSnapshotProvider {
 
     // Set the leader.
     rdbSnapshotProvider.checkLeaderConsistent("node1");
-    assertTrue(rdbSnapshotProvider.getInitCount() == 2);
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
     assertFalse(dummyFile.exists());
 
-    // Confirm setting the same leader doesn't reinit.
+    // Confirm setting the same leader doesn't reinitialize.
     rdbSnapshotProvider.checkLeaderConsistent("node1");
-    assertTrue(rdbSnapshotProvider.getInitCount() == 2);
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
 
-    // Confirm setting different leader does reinit.
+    // Confirm setting different leader does reinitialize.
     rdbSnapshotProvider.checkLeaderConsistent("node2");
-    assertTrue(rdbSnapshotProvider.getInitCount() == 3);
+    assertEquals(3, rdbSnapshotProvider.getInitCount());
   }
 }

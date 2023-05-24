@@ -75,7 +75,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
- * If Kerberos is not enabled, simply append the login user name to
+ * If Kerberos is not enabled, simply append the login username to
  * `ozone.administrator`, e.g. `scm`
  */
 public class OMDBCheckpointServlet extends DBCheckpointServlet
@@ -283,7 +283,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     } else {
       Path fileNamePath = file.getFileName();
       if (fileNamePath == null) {
-        throw new NullPointerException("Bad file: " + file.toString());
+        throw new NullPointerException("Bad file: " + file);
       }
       String fileName = fileNamePath.toString();
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {

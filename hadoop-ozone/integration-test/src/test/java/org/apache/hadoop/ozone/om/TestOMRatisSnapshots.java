@@ -85,6 +85,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -377,9 +378,9 @@ public class TestOMRatisSnapshots {
     }, 1000, 10000);
 
     // Get two incremental tarballs, adding new keys/snapshot for each.
-    TestResults firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
+    IncrementData firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
-    TestResults secondIncrement = getNextIncrementalTarball(240, 3, leaderOM,
+    IncrementData secondIncrement = getNextIncrementalTarball(240, 3, leaderOM,
         leaderRatisServer, faultInjector, followerOM, tempDir);
 
     // Resume the follower thread, it would download the incremental snapshot.
@@ -415,12 +416,12 @@ public class TestOMRatisSnapshots {
       assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
-    for (String key : firstIncrement.keys) {
+    for (String key : firstIncrement.getKeys()) {
       assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
-    for (String key : secondIncrement.keys) {
+    for (String key : secondIncrement.getKeys()) {
       assertNotNull(followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
@@ -451,26 +452,32 @@ public class TestOMRatisSnapshots {
     assertEquals(0, filesInCandidate.length);
 
     checkSnapshot(leaderOM, followerOM, "snap80", firstKeys, snapshotInfo2);
-    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.keys,
-        firstIncrement.snapshotInfo);
-    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.keys,
-        secondIncrement.snapshotInfo);
+    checkSnapshot(leaderOM, followerOM, "snap160", firstIncrement.getKeys(),
+        firstIncrement.getSnapshotInfo());
+    checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
+        secondIncrement.getSnapshotInfo());
     Assertions.assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
         "Only initialized twice");
   }
 
-  static class TestResults {
-    SnapshotInfo snapshotInfo;
-    List<String> keys;
+  static class IncrementData {
+    private List<String> keys;
+    private SnapshotInfo snapshotInfo;
+    public List<String> getKeys() {
+      return keys;
+    }
+    public SnapshotInfo getSnapshotInfo() {
+      return snapshotInfo;
+    }
   }
 
-  private TestResults getNextIncrementalTarball(
+  private IncrementData getNextIncrementalTarball(
       int numKeys, int expectedNumDownloads,
       OzoneManager leaderOM, OzoneManagerRatisServer leaderRatisServer,
       FaultInjector faultInjector, OzoneManager followerOM, Path tempDir)
       throws IOException, InterruptedException, TimeoutException {
-    TestResults tr = new TestResults();
+    IncrementData tr = new IncrementData();
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -504,7 +511,7 @@ public class TestOMRatisSnapshots {
     // Now confirm tarball is just incremental and contains no unexpected
     //  files/links.
     Path increment = Paths.get(tempDir.toString(), "increment" + numKeys);
-    increment.toFile().mkdirs();
+    assertTrue(increment.toFile().mkdirs());
     unTarLatestTarBall(followerOM, increment);
     List<String> sstFiles = HAUtils.getExistingSstFiles(increment.toFile());
     Path followerCandidatePath = followerOM.getOmSnapshotProvider().
@@ -739,25 +746,25 @@ public class TestOMRatisSnapshots {
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
     OMMetadataManager followerOMMetaMgr = followerOM.getMetadataManager();
-    Assert.assertNotNull(followerOMMetaMgr.getVolumeTable().get(
+    assertNotNull(followerOMMetaMgr.getVolumeTable().get(
         followerOMMetaMgr.getVolumeKey(volumeName)));
-    Assert.assertNotNull(followerOMMetaMgr.getBucketTable().get(
+    assertNotNull(followerOMMetaMgr.getBucketTable().get(
         followerOMMetaMgr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      Assert.assertNotNull(followerOMMetaMgr.getKeyTable(
+      assertNotNull(followerOMMetaMgr.getKeyTable(
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
     OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
     for (String key : newKeys) {
-      Assert.assertNotNull(leaderOmMetaMgr.getKeyTable(
+      assertNotNull(leaderOmMetaMgr.getKeyTable(
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
     Thread.sleep(5000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
-      Assert.assertNotNull(followerOMMetaMgr.getKeyTable(
+      assertNotNull(followerOMMetaMgr.getKeyTable(
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
@@ -807,7 +814,7 @@ public class TestOMRatisSnapshots {
         getKeys(keys, 10);
         readKeys(keys);
       } catch (IOException e) {
-        Fail.fail("Read Key failed", e);
+        assertTrue(Fail.fail("Read Key failed", e));
       }
       return null;
     });
@@ -838,12 +845,12 @@ public class TestOMRatisSnapshots {
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
     OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
-    Assert.assertNotNull(followerOMMetaMngr.getVolumeTable().get(
+    assertNotNull(followerOMMetaMngr.getVolumeTable().get(
         followerOMMetaMngr.getVolumeKey(volumeName)));
-    Assert.assertNotNull(followerOMMetaMngr.getBucketTable().get(
+    assertNotNull(followerOMMetaMngr.getBucketTable().get(
         followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
     for (String key : keys) {
-      Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+      assertNotNull(followerOMMetaMngr.getKeyTable(
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
@@ -904,7 +911,7 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, errorMsg);
     Assert.assertNull("OM installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex", newTermIndex);
-    Assert.assertEquals(followerTermIndex,
+    assertEquals(followerTermIndex,
         followerRatisServer.getLastAppliedTermIndex());
     String msg = "OM DB is not stopped. Started services with Term: " +
         followerTermIndex.getTerm() + " and Index: " +
@@ -1016,7 +1023,7 @@ public class TestOMRatisSnapshots {
     while (round > 0) {
       for (String keyName : keys) {
         OzoneKeyDetails key = ozoneBucket.getKey(keyName);
-        Assert.assertEquals(keyName, key.getName());
+        assertEquals(keyName, key.getName());
       }
       round--;
     }
@@ -1089,7 +1096,7 @@ public class TestOMRatisSnapshots {
         ready.await();
       } catch (InterruptedException e) {
         e.printStackTrace();
-        Fail.fail("resume interrupted");
+        assertTrue(Fail.fail("resume interrupted"));
       }
       wait.countDown();
     }
