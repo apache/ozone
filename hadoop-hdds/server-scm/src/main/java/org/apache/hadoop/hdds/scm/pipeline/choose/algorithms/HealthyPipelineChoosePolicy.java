@@ -43,4 +43,13 @@ public class HealthyPipelineChoosePolicy extends RandomPipelineChoosePolicy {
     }
     return fallback;
   }
+
+  @Override
+  public int choosePipelineIndex(List<Pipeline> pipelineList,
+      PipelineRequestInformation pri) {
+    // As this class modified the passed in list, returning an index
+    // doesn't really make sense here. Throwing an exception incase any future
+    // code attempts to use this implementation.
+    throw new UnsupportedOperationException();
+  }
 }
