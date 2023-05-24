@@ -47,6 +47,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test cases to verify CreatePipelineCommandHandler.
@@ -91,10 +94,20 @@ public class TestCreatePipelineCommandHandler {
     Mockito.when(writeChanel.isExist(pipelineID.getProtobuf()))
         .thenReturn(false);
 
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler((leader, tls) -> raftClient);
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient,
+            executorService);
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
+
+    try {
+      executorService.shutdown();
+      executorService.awaitTermination(20, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
 
     List<Integer> priorityList =
         new ArrayList<>(Collections.nCopies(datanodes.size(), 0));
@@ -123,10 +136,20 @@ public class TestCreatePipelineCommandHandler {
     Mockito.when(writeChanel.isExist(pipelineID.getProtobuf()))
         .thenReturn(true);
 
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(new OzoneConfiguration());
+        new CreatePipelineCommandHandler(new OzoneConfiguration(),
+            executorService);
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
+
+    try {
+      executorService.shutdown();
+      executorService.awaitTermination(20, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
 
     Mockito.verify(writeChanel, Mockito.times(0))
         .addGroup(pipelineID.getProtobuf(), datanodes);

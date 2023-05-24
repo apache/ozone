@@ -17,16 +17,14 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.function.BiFunction;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -59,26 +57,25 @@ public class CreatePipelineCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(CreatePipelineCommandHandler.class);
 
   private final AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicInteger queuedCount = new AtomicInteger(0);
   private final BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient;
 
   private long totalTime;
   private final ExecutorService executor;
-  private final BlockingQueue<Runnable> workQueue;
 
   /**
    * Constructs a createPipelineCommand handler.
    */
-  public CreatePipelineCommandHandler(ConfigurationSource conf) {
-    this(RatisHelper.newRaftClient(conf));
+  public CreatePipelineCommandHandler(ConfigurationSource conf,
+                                      ExecutorService executor) {
+    this(RatisHelper.newRaftClient(conf), executor);
   }
 
   CreatePipelineCommandHandler(
-      BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient) {
+      BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient,
+      ExecutorService executor) {
     this.newRaftClient = newRaftClient;
-    this.executor = Executors.newFixedThreadPool(
-        1, new ThreadFactoryBuilder()
-            .setNameFormat("CreatePipelineCommandHandlerThread-%d").build());
-    this.workQueue = ((ThreadPoolExecutor) this.executor).getQueue();
+    this.executor = executor;
   }
 
   /**
@@ -92,7 +89,8 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    executor.execute(() -> {
+    queuedCount.incrementAndGet();
+    CompletableFuture.runAsync(() -> {
       invocationCount.incrementAndGet();
       final long startTime = Time.monotonicNow();
       final DatanodeDetails dn = context.getParent()
@@ -140,7 +138,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
         long endTime = Time.monotonicNow();
         totalTime += endTime - startTime;
       }
-    });
+    }, executor).whenComplete((v, e) -> queuedCount.decrementAndGet());
   }
 
   /**
@@ -178,7 +176,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return workQueue.size();
+    return queuedCount.get();
   }
 
   @Override
