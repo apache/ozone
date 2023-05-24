@@ -92,11 +92,11 @@ public class TableCountTask implements ReconOmTask {
       try {
         if (getTablesRequiringSizeCalculation().contains(tableName)) {
           Pair<Long, Long> details = getTableSizeAndCount(table);
-          objectCountMap.put(getRowKeyFromTable(tableName), details.getLeft());
-          sizeCountMap.put(getSizeKeyFromTable(tableName), details.getRight());
+          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
+          sizeCountMap.put(getTableSizeKeyFromTable(tableName), details.getRight());
         } else {
           long count = getCount(table.iterator());
-          objectCountMap.put(getRowKeyFromTable(tableName), count);
+          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
@@ -114,7 +114,6 @@ public class TableCountTask implements ReconOmTask {
   public Pair<Long, Long> getTableSizeAndCount(Table table) throws IOException {
     long size = 0;
     long count = 0;
-
     if (table == null) {
       return Pair.of(count, size);
     }
@@ -124,17 +123,13 @@ public class TableCountTask implements ReconOmTask {
     while (iterator.hasNext()) {
       Table.KeyValue<String, ?> kv = iterator.next();
 
-      if (kv.getValue() instanceof OmKeyInfo) {
-        size += ((OmKeyInfo) kv.getValue()).getDataSize();
+      if (kv != null && kv.getValue() != null) {
+        if (kv.getValue() instanceof OmKeyInfo) {
+          size += ((OmKeyInfo) kv.getValue()).getDataSize();
+        }
       }
-
-      if (kv.getValue() instanceof RepeatedOmKeyInfo) {
-        size += ((RepeatedOmKeyInfo) kv.getValue()).getDataSize();
-      }
-
       count++;  // Increment count for each row
     }
-
     return Pair.of(count, size);
   }
 
@@ -187,8 +182,8 @@ public class TableCountTask implements ReconOmTask {
         continue;
       }
 
-      String rowKey = getRowKeyFromTable(omdbUpdateEvent.getTable());
-      String sizeKey = getSizeKeyFromTable(omdbUpdateEvent.getTable());
+      String rowKey = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
+      String sizeKey = getTableSizeKeyFromTable(omdbUpdateEvent.getTable());
 
       try {
         switch (omdbUpdateEvent.getAction()) {
@@ -205,7 +200,7 @@ public class TableCountTask implements ReconOmTask {
 
         case DELETE:
           if (omdbUpdateEvent.getValue() != null) {
-            String key = getRowKeyFromTable(omdbUpdateEvent.getTable());
+            String key = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
             objectCountMap.computeIfPresent(key,
                 (k, count) -> count > 0 ? count - 1L : 0L);
 
@@ -268,7 +263,7 @@ public class TableCountTask implements ReconOmTask {
     Collection<String> tables = getTaskTables();
     HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
-      String key = getRowKeyFromTable(tableName);
+      String key = getTableCountKeyFromTable(tableName);
       objectCountMap.put(key, getCountForKey(key));
     }
     return objectCountMap;
@@ -278,18 +273,18 @@ public class TableCountTask implements ReconOmTask {
     Collection<String> tables = getTablesRequiringSizeCalculation();
     HashMap<String, Long> sizeCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
-      String key = getSizeKeyFromTable(tableName);
-      sizeCountMap.put(key, getCountForKey(key));
+      String key = getTableSizeKeyFromTable(tableName);
+      sizeCountMap.put(key, getSizeForKey(key));
     }
     return sizeCountMap;
   }
 
-  public static String getRowKeyFromTable(String tableName) {
+  public static String getTableCountKeyFromTable(String tableName) {
     return tableName + "Count";
   }
 
-  public static String getSizeKeyFromTable(String tableName) {
-    return tableName + "DataSize";
+  public static String getTableSizeKeyFromTable(String tableName) {
+    return tableName + "TableSize";
   }
 
   /**
@@ -300,6 +295,19 @@ public class TableCountTask implements ReconOmTask {
    * @return count
    */
   private long getCountForKey(String key) {
+    GlobalStats record = globalStatsDao.fetchOneByKey(key);
+
+    return (record == null) ? 0L : record.getValue();
+  }
+
+  /**
+   * Get the size stored for the given key from Global Stats table.
+   * Return 0 if record not found.
+   *
+   * @param key Key in the global stats table
+   * @return size
+   */
+  private long getSizeForKey(String key) {
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
 
     return (record == null) ? 0L : record.getValue();

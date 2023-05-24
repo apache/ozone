@@ -124,21 +124,21 @@ public class ClusterStateEndpoint {
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(VOLUME_TABLE));
+        TableCountTask.getTableCountKeyFromTable(VOLUME_TABLE));
     GlobalStats bucketRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(BUCKET_TABLE));
+        TableCountTask.getTableCountKeyFromTable(BUCKET_TABLE));
     // Keys from OBJECT_STORE buckets.
     GlobalStats keyRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(KEY_TABLE));
+        TableCountTask.getTableCountKeyFromTable(KEY_TABLE));
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
     GlobalStats fileRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(FILE_TABLE));
+        TableCountTask.getTableCountKeyFromTable(FILE_TABLE));
     // Keys from the DeletedTable
     GlobalStats deletedKeyRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(DELETED_TABLE));
+        TableCountTask.getTableCountKeyFromTable(DELETED_TABLE));
     // Directories from the DeletedDirectoryTable
     GlobalStats deletedDirRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(DELETED_DIR_TABLE));
+        TableCountTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
