@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -407,7 +408,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     private XceiverClientFactory xceiverManager;
     private OzoneManagerProtocol omClient;
     private int chunkSize;
-    private String requestID;
+    private final String requestID = UUID.randomUUID().toString();
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
@@ -442,11 +443,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
 
     public Builder setChunkSize(int size) {
       this.chunkSize = size;
-      return this;
-    }
-
-    public Builder setRequestID(String id) {
-      this.requestID = id;
       return this;
     }
 
