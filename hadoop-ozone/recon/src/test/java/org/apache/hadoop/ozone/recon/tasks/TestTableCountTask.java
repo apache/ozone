@@ -167,7 +167,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   }
 
   private long getCountForTable(String tableName) {
-    String key = TableCountTask.getRowKeyFromTable(tableName);
+    String key = TableCountTask.getTableCountKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
   }
 }
