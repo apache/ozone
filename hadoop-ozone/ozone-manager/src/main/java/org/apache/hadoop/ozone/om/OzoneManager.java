@@ -793,7 +793,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     }
     volumeManager = new VolumeManagerImpl(metadataManager);
-    bucketManager = new BucketManagerImpl(metadataManager);
+
+    bucketManager = new BucketManagerImpl(this, metadataManager);
 
     Class<? extends S3SecretStoreProvider> storeProviderClass =
         configuration.getClass(
@@ -810,6 +811,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new IOException(e);
     }
     S3SecretCacheProvider secretCacheProvider = S3SecretCacheProvider.IN_MEMORY;
+
     s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(
             store,

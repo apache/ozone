@@ -31,6 +31,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -166,6 +167,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
@@ -643,6 +646,11 @@ public class RpcClient implements ClientProtocol {
     if (bucketArgs.getAcls() != null) {
       listOfAcls.addAll(bucketArgs.getAcls());
     }
+    // Link bucket default acl
+    if (bucketArgs.getSourceVolume() != null
+        && bucketArgs.getSourceBucket() != null) {
+      listOfAcls.add(linkBucketDefaultAcl());
+    }
 
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder();
     builder.setVolumeName(volumeName)
@@ -735,6 +743,19 @@ public class RpcClient implements ClientProtocol {
     }
     return OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
         userRights, groupRights);
+  }
+
+  /**
+   * Link bucket default acl defined [world::rw]
+   * which is similar to Linux POSIX symbolic.
+   *
+   * @return OzoneAcl
+   */
+  private OzoneAcl linkBucketDefaultAcl() {
+    BitSet aclRights = new BitSet();
+    aclRights.set(READ.ordinal());
+    aclRights.set(WRITE.ordinal());
+    return new OzoneAcl(ACLIdentityType.WORLD, "", aclRights, ACCESS);
   }
 
   /**

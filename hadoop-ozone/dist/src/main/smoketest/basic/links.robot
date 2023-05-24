@@ -19,7 +19,7 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-Test Timeout        2 minute
+Test Timeout        4 minute
 Suite Setup         Create volumes
 
 *** Variables ***
@@ -39,35 +39,44 @@ Setup ACL tests
     Execute             ozone sh bucket create ${source}/readable-bucket
     Execute             ozone sh key put ${source}/readable-bucket/key-in-readable-bucket /etc/passwd
     Execute             ozone sh bucket create ${source}/unreadable-bucket
-    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
-    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
-    Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
 
-    Execute             ozone sh volume addacl --acl user:testuser2:r ${target}
+    Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
+    Execute             ozone sh volume addacl --acl user:testuser2:r[DEFAULT] ${target}
+
+    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
+    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link2
+
     Execute             ozone sh volume addacl --acl user:testuser2:rl ${source}
     Execute             ozone sh bucket addacl --acl user:testuser2:rl ${source}/readable-bucket
-    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/readable-link
-    Execute             ozone sh bucket addacl --acl user:testuser2:r ${target}/link-to-unreadable-bucket
+
+Verify Bucket ACL
+    [arguments]         ${source_option}   ${object}    ${type}   ${name}    ${acls}
+    ${actual_acls} =    Execute          ozone sh bucket getacl ${source_option} ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
+                        Should Be Equal    ${acls}    ${actual_acls}
 
 Can follow link with read access
     Execute             kdestroy
     Run Keyword         Kinit test user             testuser2         testuser2.keytab
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link
                         Should Contain              ${result}         key-in-readable-bucket
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link2
+                        Should Contain              ${result}         key-in-readable-bucket
 
 Cannot follow link without read access
     Execute             kdestroy
     Run Keyword         Kinit test user             testuser2         testuser2.keytab
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/unreadable-link
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
+                        Should Contain              ${result}         PERMISSION_DENIED
+    ${result} =         Execute And Ignore Error    ozone sh key list ${source}/unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
-ACL verified on source bucket
+ACL verified on source and target bucket
     Execute             kdestroy
     Run Keyword         Kinit test user             testuser2         testuser2.keytab
     ${result} =         Execute                     ozone sh bucket info ${target}/link-to-unreadable-bucket
                         Should Contain              ${result}         link-to-unreadable-bucket
                         Should Not Contain          ${result}         PERMISSION_DENIED
-    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
+    ${result} =         Execute And Ignore Error    ozone sh bucket info ${source}/unreadable-bucket
                         Should Contain              ${result}         PERMISSION_DENIED
 
 Create link loop
@@ -124,14 +133,39 @@ Bucket info shows source
                         Should Contain              ${result}            creationTime
                         Should Not contain          ${result}            metadata
 
-Source and target have separate ACLs
-    Execute       ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
-    Verify ACL    bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
-    Verify ACL    bucket    ${source}/bucket1    USER    user1    ${EMPTY}
+Source and target bucket have different ACLs
+    Execute             ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source=false  ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL          bucket          ${source}/bucket1    USER    user1    READ WRITE READ_ACL WRITE_ACL
 
-    Execute       ozone sh bucket addacl --acl group:group2:r ${source}/bucket1
-    Verify ACL    bucket    ${target}/link1      GROUP   group2    ${EMPTY}
-    Verify ACL    bucket    ${source}/bucket1    GROUP   group2    READ
+    Execute             ozone sh bucket removeacl --acl user:user1:y ${target}/link1
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE READ_ACL
+
+    Execute             ozone sh bucket setacl --acl user:user1:rw ${source}/bucket1
+    Verify ACL          bucket          ${target}/link1      USER    user1    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      USER    user1    READ WRITE
+
+    Execute             ozone sh bucket addacl --acl group:group2:r ${source}/bucket1
+    Verify ACL          bucket          ${target}/link1      GROUP   group2    ${EMPTY}
+    Verify Bucket ACL   --source        ${target}/link1      GROUP   group2    READ
+
+Source and target key have same ACLs
+    Execute             ozone sh key addacl --acl user:user1:rwxy ${source}/bucket1/key1
+    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE READ_ACL WRITE_ACL
+    Execute             ozone sh key removeacl --acl user:user1:y ${target}/link1/key1
+    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE READ_ACL
+    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE READ_ACL
+    Execute             ozone sh key setacl --acl user:user1:rw ${source}/bucket1/key1
+    Verify ACL          key       ${target}/link1/key1     USER    user1    READ WRITE
+    Verify ACL          key       ${source}/bucket1/key1   USER    user1    READ WRITE
+
+    Execute             ozone sh key addacl --acl group:group2:r ${source}/bucket1/key1
+    Verify ACL          key    ${target}/link1/key1     GROUP   group2    READ
+    Verify ACL          key    ${source}/bucket1/key1   GROUP   group2    READ
 
 Buckets and links share namespace
                         Execute                     ozone sh bucket link ${source}/bucket2 ${target}/link2
@@ -148,8 +182,8 @@ Can follow link with read access
 Cannot follow link without read access
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Cannot follow link without read access
 
-ACL verified on source bucket
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source bucket
+ACL verified on source and target bucket
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source and target bucket
 
 Loop in link chain is detected
     [setup]             Create link loop
