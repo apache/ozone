@@ -54,7 +54,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -374,7 +373,7 @@ public final class HAUtils {
 
     int truncateLength = db.toString().length() + 1;
     // Walk the db dir and get all sst files including omSnapshot files.
-    try(Stream<Path> files = Files.walk(db.toPath())) {
+    try (Stream<Path> files = Files.walk(db.toPath())) {
       sstList =
           files.filter(path -> path.toString().endsWith(ROCKSDB_SST_SUFFIX)).
               map(p -> p.toString().substring(truncateLength)).
