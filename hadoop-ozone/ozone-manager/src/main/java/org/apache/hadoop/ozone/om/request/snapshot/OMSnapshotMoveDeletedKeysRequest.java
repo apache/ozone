@@ -140,6 +140,8 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
         return nextSnapshotInfo;
       }
+
+      snapInfo = nextSnapshotInfo;
     }
     return null;
   }
