@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -166,7 +167,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       List<OmKeyLocationInfo> uncommitted;
       if (isHSync) {
-        uncommitted = new ArrayList<>();
+        uncommitted = Collections.emptyList();
       } else {
         uncommitted = omKeyInfo.updateLocationInfoList(locationInfoList, false);
       }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -219,7 +220,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted;
       if (isHSync) {
-        uncommitted = new ArrayList<>();
+        uncommitted = Collections.emptyList();
       } else {
         uncommitted = omKeyInfo.updateLocationInfoList(locationInfoList, false);
       }

@@ -178,6 +178,8 @@ public class TestHSync {
         outputStream.hsync();
         outputStream.write(data);
         outputStream.hsync();
+        assertTrue(cluster.getOzoneManager().getMetadataManager()
+            .getDeletedTable().isEmpty());
       }
     }
   }
