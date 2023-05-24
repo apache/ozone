@@ -477,7 +477,7 @@ public class TestOMRatisSnapshots {
       OzoneManager leaderOM, OzoneManagerRatisServer leaderRatisServer,
       FaultInjector faultInjector, OzoneManager followerOM, Path tempDir)
       throws IOException, InterruptedException, TimeoutException {
-    IncrementData tr = new IncrementData();
+    IncrementData id = new IncrementData();
 
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -488,10 +488,10 @@ public class TestOMRatisSnapshots {
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     // Do some transactions, let leader OM take a new snapshot and purge the
     // old logs, so that follower must download the new increment.
-    tr.keys = writeKeysToIncreaseLogIndex(leaderRatisServer,
+    id.keys = writeKeysToIncreaseLogIndex(leaderRatisServer,
         numKeys);
 
-    tr.snapshotInfo = createOzoneSnapshot(leaderOM, "snap" + numKeys);
+    id.snapshotInfo = createOzoneSnapshot(leaderOM, "snap" + numKeys);
     // Resume the follower thread, it would download the incremental snapshot.
     faultInjector.resume();
 
@@ -542,7 +542,7 @@ public class TestOMRatisSnapshots {
       }
       assertTrue(lineCount > 0);
     }
-    return tr;
+    return id;
   }
 
   @Test
