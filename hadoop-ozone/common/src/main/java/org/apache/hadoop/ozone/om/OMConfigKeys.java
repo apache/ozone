@@ -89,7 +89,6 @@ public final class OMConfigKeys {
       "ozone.om.grpc.read.thread.num";
   public static final int OZONE_OM_GRPC_READ_THREAD_NUM_DEFAULT = 32;
 
-
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
