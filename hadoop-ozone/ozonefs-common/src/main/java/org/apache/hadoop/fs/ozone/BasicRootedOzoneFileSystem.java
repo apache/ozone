@@ -118,8 +118,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean hsyncEnabled = OZONE_FS_HSYNC_ENABLED_DEFAULT;
   private boolean streamingEnabled
       = OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT;
-  private int streamingAutoThreshold
-      = OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
+  private int streamingAutoThreshold;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -139,9 +138,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     streamingEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED,
         OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED_DEFAULT);
-    streamingAutoThreshold = conf.getInt(
+    streamingAutoThreshold = (int) conf.getStorageSize(
         OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
-        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT);
+        OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT,
+        org.apache.hadoop.conf.StorageUnit.BYTES);
     hsyncEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
         OZONE_FS_HSYNC_ENABLED_DEFAULT);

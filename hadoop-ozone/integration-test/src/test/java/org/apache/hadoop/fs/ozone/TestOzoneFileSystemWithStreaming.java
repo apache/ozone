@@ -81,7 +81,7 @@ public class TestOzoneFileSystemWithStreaming {
 
     CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
-    CONF.setInt(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, DATASTREAM_AUTO_THRESHOLD);
+    CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, DATASTREAM_AUTO_THRESHOLD + "B");
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     cluster = MiniOzoneCluster.newBuilder(CONF)
