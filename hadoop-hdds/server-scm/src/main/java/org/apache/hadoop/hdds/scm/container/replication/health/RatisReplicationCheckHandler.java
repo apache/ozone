@@ -187,14 +187,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
-      ContainerHealthResult.UnderReplicatedHealthResult result =
-          new ContainerHealthResult.UnderReplicatedHealthResult(
-              container, replicaCount.getRemainingRedundancy(),
-              replicaCount.inSufficientDueToDecommission(false),
-              replicaCount.isSufficientlyReplicated(true),
-              replicaCount.isUnrecoverable());
-      result.setHasHealthyReplicas(replicaCount.getHealthyReplicaCount() > 0);
-      return result;
+      return replicaCount.toUnderHealthResult();
     }
 
     /*
@@ -209,14 +202,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             minReplicasForMaintenance, true);
     boolean isOverReplicated = consideringUnhealthy.isOverReplicated(false);
     if (isOverReplicated) {
-      boolean repOkWithPending = !consideringUnhealthy.isOverReplicated(true);
-      ContainerHealthResult.OverReplicatedHealthResult result =
-          new ContainerHealthResult.OverReplicatedHealthResult(
-              container, consideringUnhealthy.getExcessRedundancy(false),
-              repOkWithPending);
-      result.setHasMismatchedReplicas(
-          consideringUnhealthy.getMisMatchedReplicaCount() > 0);
-      return result;
+      return consideringUnhealthy.toOverHealthResult();
     }
 
     int requiredNodes = container.getReplicationConfig().getRequiredNodes();

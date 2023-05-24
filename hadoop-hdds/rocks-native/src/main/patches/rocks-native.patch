@@ -17,7 +17,7 @@
  */
 
 diff --git a/include/rocksdb/sst_dump_tool.h b/include/rocksdb/sst_dump_tool.h
-index 9261ba47d..09ed123e5 100644
+index 9261ba47d..1e62b88a3 100644
 --- a/include/rocksdb/sst_dump_tool.h
 +++ b/include/rocksdb/sst_dump_tool.h
 @@ -11,7 +11,8 @@ namespace ROCKSDB_NAMESPACE {
@@ -25,13 +25,13 @@ index 9261ba47d..09ed123e5 100644
  class SSTDumpTool {
   public:
 -  int Run(int argc, char const* const* argv, Options options = Options());
-+  int Run(int argc, char const* const* argv,Options options = Options(),
++  int Run(int argc, char const* const* argv, Options options = Options(),
 +          FILE* out = stdout, FILE* err = stderr);
  };
  
  }  // namespace ROCKSDB_NAMESPACE
 diff --git a/table/sst_file_dumper.cc b/table/sst_file_dumper.cc
-index eefbaaeee..503ec7aa6 100644
+index eefbaaeee..98d37dd5c 100644
 --- a/table/sst_file_dumper.cc
 +++ b/table/sst_file_dumper.cc
 @@ -45,7 +45,7 @@ SstFileDumper::SstFileDumper(const Options& options,
@@ -55,7 +55,7 @@ index eefbaaeee..503ec7aa6 100644
    read_options_.readahead_size = readahead_size;
    if (!silent_) {
 -    fprintf(stdout, "Process %s\n", file_path.c_str());
-+    fprintf(out, "Process %s\n", file_path.c_str());
++    fprintf(out_, "Process %s\n", file_path.c_str());
    }
    init_result_ = GetTableReader(file_name_);
  }
@@ -85,7 +85,7 @@ index eefbaaeee..503ec7aa6 100644
        }
      } else {
 -      fprintf(stdout, "Unsupported compression type: %s.\n", i.second);
-+      fprintf(out_, "Unsupported compression type: %s.\n", i.second);
++      fprintf(err_, "Unsupported compression type: %s.\n", i.second);
      }
    }
    return Status::OK();
@@ -122,19 +122,10 @@ index eefbaaeee..503ec7aa6 100644
    if (!s.ok()) {
      if (!silent_) {
 -      fprintf(stdout, "Not able to read table properties\n");
-+      fprintf(out_, "Not able to read table properties\n");
++      fprintf(err_, "Not able to read table properties\n");
      }
    }
    return s;
-@@ -382,7 +385,7 @@ Status SstFileDumper::SetTableOptionsByMagicNumber(
- 
-     options_.table_factory.reset(bbtf);
-     if (!silent_) {
--      fprintf(stdout, "Sst file format: block-based\n");
-+      fprintf(out_, "Sst file format: block-based\n");
-     }
- 
-     auto& props = table_properties_->user_collected_properties;
 @@ -410,7 +413,7 @@ Status SstFileDumper::SetTableOptionsByMagicNumber(
  
      options_.table_factory.reset(NewPlainTableFactory(plain_table_options));
@@ -144,7 +135,7 @@ index eefbaaeee..503ec7aa6 100644
      }
    } else {
      char error_msg_buffer[80];
-@@ -427,7 +430,7 @@ Status SstFileDumper::SetOldTableOptions() {
+@@ -427,12 +430,53 @@ Status SstFileDumper::SetOldTableOptions() {
    assert(table_properties_ == nullptr);
    options_.table_factory = std::make_shared<BlockBasedTableFactory>();
    if (!silent_) {
@@ -153,36 +144,82 @@ index eefbaaeee..503ec7aa6 100644
    }
  
    return Status::OK();
-@@ -478,21 +481,26 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
+ }
+ 
++void write(int value, FILE* file) {
++  char b[4];
++  b[3] =  value & 0x000000ff;
++  b[2] = (value & 0x0000ff00) >> 8;
++  b[1] = (value & 0x00ff0000) >> 16;
++  b[0] = (value & 0xff000000) >> 24;
++  std::fwrite(b, 4, 1, file);
++}
++
++void write(const char* value, int length, FILE* file) {
++  write(length, file);
++  fwrite(value, length, 1, file);
++}
++
++void write(const std::string& value, FILE* file) {
++  write(value.data(), (int)value.length(), file);
++}
++
++void write(Slice &slice, FILE* file) {
++  int size = (int)slice.size();
++  write(slice.data(), size, file);
++}
++
++void write(SequenceNumber sequenceNumber, FILE* file) {
++
++  char b[8];
++  int idx = 7;
++  while (idx >= 0) {
++    b[idx] = sequenceNumber % 256;
++    sequenceNumber /= 256;
++    idx -= 1;
++  }
++  fwrite(b, 8, 1, file);
++}
++
++void write(ParsedInternalKey &key, FILE* file) {
++  write(key.user_key, file);
++  write(key.sequence, file);
++  write(static_cast<int>(key.type), file);
++}
++
+ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
+                                      bool has_from, const std::string& from_key,
+                                      bool has_to, const std::string& to_key,
+@@ -478,22 +522,19 @@ Status SstFileDumper::ReadSequential(bool print_kv, uint64_t read_num,
  
      if (print_kv) {
        if (!decode_blob_index_ || ikey.type != kTypeBlobIndex) {
 -        fprintf(stdout, "%s => %s\n",
-+        fprintf(out_, "%lu %s => %lu %s\n",
-+                ikey.DebugString(true, output_hex_).length(),
-                 ikey.DebugString(true, output_hex_).c_str(),
-+                value.ToString(output_hex_).length(),
-                 value.ToString(output_hex_).c_str());
+-                ikey.DebugString(true, output_hex_).c_str(),
+-                value.ToString(output_hex_).c_str());
++        write(ikey, out_);
++        write(value, out_);
        } else {
          BlobIndex blob_index;
- 
+-
          const Status s = blob_index.DecodeFrom(value);
          if (!s.ok()) {
 -          fprintf(stderr, "%s => error decoding blob index\n",
-+          fprintf(err_, "%lu %s => 25 error decoding blob index\n",
-+                  ikey.DebugString(true, output_hex_).length(),
-                   ikey.DebugString(true, output_hex_).c_str());
+-                  ikey.DebugString(true, output_hex_).c_str());
++          write(ikey, err_);
++          write("error decoding blob index", err_);
            continue;
          }
- 
+-
 -        fprintf(stdout, "%s => %s\n",
-+        fprintf(out_, "%lu %s => %lu %s\n",
-+                ikey.DebugString(true, output_hex_).length(),
-                 ikey.DebugString(true, output_hex_).c_str(),
-+                blob_index.DebugString(output_hex_).length(),
-                 blob_index.DebugString(output_hex_).c_str());
+-                ikey.DebugString(true, output_hex_).c_str(),
+-                blob_index.DebugString(output_hex_).c_str());
++        write(ikey, out_);
++        std::string v = blob_index.DebugString(output_hex_);
++        write(v, out_);
        }
      }
+   }
 diff --git a/table/sst_file_dumper.h b/table/sst_file_dumper.h
 index 7be876390..ea07154da 100644
 --- a/table/sst_file_dumper.h
@@ -208,7 +245,7 @@ index 7be876390..ea07154da 100644
  
  }  // namespace ROCKSDB_NAMESPACE
 diff --git a/tools/sst_dump_tool.cc b/tools/sst_dump_tool.cc
-index 7053366e7..4bde14fff 100644
+index 7053366e7..75720a12d 100644
 --- a/tools/sst_dump_tool.cc
 +++ b/tools/sst_dump_tool.cc
 @@ -31,7 +31,7 @@ static const std::vector<std::pair<CompressionType, const char*>>
@@ -216,7 +253,7 @@ index 7053366e7..4bde14fff 100644
  namespace {
  
 -void print_help(bool to_stderr) {
-+void print_help(bool to_stderr, FILE* out, FILE* err) {
++void print_help(bool to_stderr, FILE* err_, FILE* out_) {
    std::string supported_compressions;
    for (CompressionType ct : GetSupportedCompressions()) {
      if (!supported_compressions.empty()) {
@@ -225,7 +262,7 @@ index 7053366e7..4bde14fff 100644
    }
    fprintf(
 -      to_stderr ? stderr : stdout,
-+      to_stderr ? err : out,
++      to_stderr ? err_ : out_,
        R"(sst_dump --file=<data_dir_OR_sst_file> [--command=check|scan|raw|recompress|identify]
      --file=<data_dir_OR_sst_file>
        Path to SST file or directory containing SST files
@@ -239,16 +276,26 @@ index 7053366e7..4bde14fff 100644
    std::string env_uri, fs_uri;
    const char* dir_or_file = nullptr;
    uint64_t read_num = std::numeric_limits<uint64_t>::max();
-@@ -248,7 +249,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
-               return curr.second == compression_type;
-             });
-         if (iter == kCompressions.end()) {
--          fprintf(stderr, "%s is not a valid CompressionType\n",
-+          fprintf(err, "%s is not a valid CompressionType\n",
-                   compression_type.c_str());
-           exit(1);
-         }
-@@ -273,7 +274,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -170,6 +171,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+   bool has_compression_level_from = false;
+   bool has_compression_level_to = false;
+   bool has_specified_compression_types = false;
++  bool silent = false;
+   std::string from_key;
+   std::string to_key;
+   std::string block_size_str;
+@@ -197,7 +199,9 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+   int64_t tmp_val;
+ 
+   for (int i = 1; i < argc; i++) {
+-    if (strncmp(argv[i], "--env_uri=", 10) == 0) {
++    if (strncmp(argv[i], "--silent", 8) == 0) {
++      silent = true;
++    } else if (strncmp(argv[i], "--env_uri=", 10) == 0) {
+       env_uri = argv[i] + 10;
+     } else if (strncmp(argv[i], "--fs_uri=", 9) == 0) {
+       fs_uri = argv[i] + 9;
+@@ -273,7 +277,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
          std::cerr << pik_status.getState() << "\n";
          retc = -1;
        }
@@ -257,7 +304,7 @@ index 7053366e7..4bde14fff 100644
        return retc;
      } else if (ParseIntArg(argv[i], "--compression_level_from=",
                             "compression_level_from must be numeric",
-@@ -288,9 +289,9 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -288,9 +292,9 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
                             "compression_max_dict_bytes must be numeric",
                             &tmp_val)) {
        if (tmp_val < 0 || tmp_val > std::numeric_limits<uint32_t>::max()) {
@@ -265,11 +312,11 @@ index 7053366e7..4bde14fff 100644
 +        fprintf(err, "compression_max_dict_bytes must be a uint32_t: '%s'\n",
                  argv[i]);
 -        print_help(/*to_stderr*/ true);
-+        print_help(/*to_stderr*/ true, out, err);
++        print_help(/*to_stderr*/ true, err, out);
          return 1;
        }
        compression_max_dict_bytes = static_cast<uint32_t>(tmp_val);
-@@ -298,10 +299,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -298,10 +302,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
                             "compression_zstd_max_train_bytes must be numeric",
                             &tmp_val)) {
        if (tmp_val < 0 || tmp_val > std::numeric_limits<uint32_t>::max()) {
@@ -278,11 +325,11 @@ index 7053366e7..4bde14fff 100644
                  "compression_zstd_max_train_bytes must be a uint32_t: '%s'\n",
                  argv[i]);
 -        print_help(/*to_stderr*/ true);
-+        print_help(/*to_stderr*/ true, out, err);
++        print_help(/*to_stderr*/ true, err, out);
          return 1;
        }
        compression_zstd_max_train_bytes = static_cast<uint32_t>(tmp_val);
-@@ -309,41 +310,41 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -309,41 +313,41 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
                             "compression_max_dict_buffer_bytes must be numeric",
                             &tmp_val)) {
        if (tmp_val < 0) {
@@ -291,7 +338,7 @@ index 7053366e7..4bde14fff 100644
                  "compression_max_dict_buffer_bytes must be positive: '%s'\n",
                  argv[i]);
 -        print_help(/*to_stderr*/ true);
-+        print_help(/*to_stderr*/ true, out, err);
++        print_help(/*to_stderr*/ true, err, out);
          return 1;
        }
        compression_max_dict_buffer_bytes = static_cast<uint64_t>(tmp_val);
@@ -299,7 +346,7 @@ index 7053366e7..4bde14fff 100644
        compression_use_zstd_finalize_dict = true;
      } else if (strcmp(argv[i], "--help") == 0) {
 -      print_help(/*to_stderr*/ false);
-+      print_help(/*to_stderr*/ false, out, err);
++      print_help(/*to_stderr*/ false, err, out);
        return 0;
      } else if (strcmp(argv[i], "--version") == 0) {
        printf("%s\n", GetRocksBuildInfoAsString("sst_dump").c_str());
@@ -308,7 +355,7 @@ index 7053366e7..4bde14fff 100644
 -      fprintf(stderr, "Unrecognized argument '%s'\n\n", argv[i]);
 -      print_help(/*to_stderr*/ true);
 +      fprintf(err, "Unrecognized argument '%s'\n\n", argv[i]);
-+      print_help(/*to_stderr*/ true, out, err);
++      print_help(/*to_stderr*/ true, err, out);
        return 1;
      }
    }
@@ -332,31 +379,32 @@ index 7053366e7..4bde14fff 100644
      exit(1);
    }
  
-@@ -357,8 +358,8 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -357,8 +361,8 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
    }
  
    if (dir_or_file == nullptr) {
 -    fprintf(stderr, "file or directory must be specified.\n\n");
 -    print_help(/*to_stderr*/ true);
 +    fprintf(err, "file or directory must be specified.\n\n");
-+    print_help(/*to_stderr*/ true, out, err);
++    print_help(/*to_stderr*/ true, err, out);
      exit(1);
    }
  
-@@ -373,10 +374,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -373,10 +377,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
      Status s = Env::CreateFromUri(config_options, env_uri, fs_uri, &options.env,
                                    &env_guard);
      if (!s.ok()) {
 -      fprintf(stderr, "CreateEnvFromUri: %s\n", s.ToString().c_str());
 +      fprintf(err, "CreateEnvFromUri: %s\n", s.ToString().c_str());
        exit(1);
-     } else {
+-    } else {
 -      fprintf(stdout, "options.env is %p\n", options.env);
++    } else if (!silent){
 +      fprintf(out, "options.env is %p\n", options.env);
      }
    }
  
-@@ -390,7 +391,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -390,7 +394,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
      Status s = env->FileExists(dir_or_file);
      // dir_or_file does not exist
      if (!s.ok()) {
@@ -365,13 +413,13 @@ index 7053366e7..4bde14fff 100644
                dir_or_file);
        return 1;
      }
-@@ -421,10 +422,11 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -421,10 +425,11 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
  
      ROCKSDB_NAMESPACE::SstFileDumper dumper(
          options, filename, Temperature::kUnknown, readahead_size,
 -        verify_checksum, output_hex, decode_blob_index);
 +        verify_checksum, output_hex, decode_blob_index, EnvOptions(),
-+        false, out, err);
++        silent, out, err);
      // Not a valid SST
      if (!dumper.getStatus().ok()) {
 -      fprintf(stderr, "%s: %s\n", filename.c_str(),
@@ -379,16 +427,19 @@ index 7053366e7..4bde14fff 100644
                dumper.getStatus().ToString().c_str());
        continue;
      } else {
-@@ -434,7 +436,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -433,8 +438,9 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+       // where there is at least one valid SST
        if (valid_sst_files.size() == 1) {
          // from_key and to_key are only used for "check", "scan", or ""
-         if (command == "check" || command == "scan" || command == "") {
+-        if (command == "check" || command == "scan" || command == "") {
 -          fprintf(stdout, "from [%s] to [%s]\n",
++        if (!silent && (command == "check" || command == "scan" ||
++                        command == "")) {
 +          fprintf(out, "from [%s] to [%s]\n",
                    ROCKSDB_NAMESPACE::Slice(from_key).ToString(true).c_str(),
                    ROCKSDB_NAMESPACE::Slice(to_key).ToString(true).c_str());
          }
-@@ -449,7 +451,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -449,7 +455,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
            compression_zstd_max_train_bytes, compression_max_dict_buffer_bytes,
            !compression_use_zstd_finalize_dict);
        if (!st.ok()) {
@@ -397,7 +448,7 @@ index 7053366e7..4bde14fff 100644
          exit(1);
        }
        return 0;
-@@ -461,10 +463,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -461,10 +467,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
  
        st = dumper.DumpTable(out_filename);
        if (!st.ok()) {
@@ -410,7 +461,7 @@ index 7053366e7..4bde14fff 100644
        }
        continue;
      }
-@@ -476,7 +478,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -476,7 +482,7 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
            has_from || use_from_as_prefix, from_key, has_to, to_key,
            use_from_as_prefix);
        if (!st.ok()) {
@@ -419,7 +470,7 @@ index 7053366e7..4bde14fff 100644
              st.ToString().c_str());
        }
        total_read += dumper.GetReadNumber();
-@@ -488,10 +490,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -488,10 +494,10 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
      if (command == "verify") {
        st = dumper.VerifyChecksum();
        if (!st.ok()) {
@@ -432,7 +483,7 @@ index 7053366e7..4bde14fff 100644
        }
        continue;
      }
-@@ -503,15 +505,15 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -503,15 +509,15 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
            table_properties_from_reader;
        st = dumper.ReadTableProperties(&table_properties_from_reader);
        if (!st.ok()) {
@@ -451,7 +502,7 @@ index 7053366e7..4bde14fff 100644
                    "Table Properties:\n"
                    "------------------------------\n"
                    "  %s",
-@@ -523,30 +525,30 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
+@@ -523,18 +529,18 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
          total_index_block_size += table_properties->index_size;
          total_filter_block_size += table_properties->filter_size;
          if (show_properties) {
@@ -473,30 +524,11 @@ index 7053366e7..4bde14fff 100644
        }
      }
    }
-   if (show_summary) {
--    fprintf(stdout, "total number of files: %" PRIu64 "\n", total_num_files);
--    fprintf(stdout, "total number of data blocks: %" PRIu64 "\n",
-+    fprintf(out, "total number of files: %" PRIu64 "\n", total_num_files);
-+    fprintf(out, "total number of data blocks: %" PRIu64 "\n",
-             total_num_data_blocks);
--    fprintf(stdout, "total data block size: %" PRIu64 "\n",
-+    fprintf(out, "total data block size: %" PRIu64 "\n",
-             total_data_block_size);
--    fprintf(stdout, "total index block size: %" PRIu64 "\n",
-+    fprintf(out, "total index block size: %" PRIu64 "\n",
-             total_index_block_size);
--    fprintf(stdout, "total filter block size: %" PRIu64 "\n",
-+    fprintf(out, "total filter block size: %" PRIu64 "\n",
-             total_filter_block_size);
-   }
- 
-@@ -554,24 +556,24 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
-     // No valid SST files are found
+@@ -555,9 +561,9 @@ int SSTDumpTool::Run(int argc, char const* const* argv, Options options) {
      // Exit with an error state
      if (dir) {
--      fprintf(stdout, "------------------------------\n");
+       fprintf(stdout, "------------------------------\n");
 -      fprintf(stderr, "No valid SST files found in %s\n", dir_or_file);
-+      fprintf(out, "------------------------------\n");
 +      fprintf(err, "No valid SST files found in %s\n", dir_or_file);
      } else {
 -      fprintf(stderr, "%s is not a valid SST file\n", dir_or_file);
@@ -504,22 +536,3 @@ index 7053366e7..4bde14fff 100644
      }
      return 1;
    } else {
-     if (command == "identify") {
-       if (dir) {
--        fprintf(stdout, "------------------------------\n");
--        fprintf(stdout, "List of valid SST files found in %s:\n", dir_or_file);
-+        fprintf(out, "------------------------------\n");
-+        fprintf(out, "List of valid SST files found in %s:\n", dir_or_file);
-         for (const auto& f : valid_sst_files) {
--          fprintf(stdout, "%s\n", f.c_str());
-+          fprintf(out, "%s\n", f.c_str());
-         }
--        fprintf(stdout, "Number of valid SST files: %zu\n",
-+        fprintf(out, "Number of valid SST files: %zu\n",
-                 valid_sst_files.size());
-       } else {
--        fprintf(stdout, "%s is a valid SST file\n", dir_or_file);
-+        fprintf(out, "%s is a valid SST file\n", dir_or_file);
-       }
-     }
-     // At least one valid SST

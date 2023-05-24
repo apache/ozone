@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -76,11 +77,13 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
  * If Kerberos is not enabled, simply append the login user name to
  * `ozone.administrator`, e.g. `scm`
  */
-public class OMDBCheckpointServlet extends DBCheckpointServlet {
+public class OMDBCheckpointServlet extends DBCheckpointServlet
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
+  private transient BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -112,6 +115,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+
+    lock = new Lock(om);
   }
 
   @Override
@@ -129,26 +134,26 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
-        includeSnapshotData(request));
-
-    // Exclude file
-    Map<Object, Path> finalCopyFiles = new HashMap<>();
-    copyFiles.forEach((o, path) -> {
-      String fName = path.getFileName().toString();
-      if (!toExcludeList.contains(fName)) {
-        finalCopyFiles.put(o, path);
-      } else {
-        excludedList.add(fName);
-      }
-    });
-
-    try (TarArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(destination)) {
+    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock();
+         TarArchiveOutputStream archiveOutputStream =
+             new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+      getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
+          includeSnapshotData(request));
+
+      // Exclude file
+      Map<Object, Path> finalCopyFiles = new HashMap<>();
+      copyFiles.forEach((o, path) -> {
+        String fName = path.getFileName().toString();
+        if (!toExcludeList.contains(fName)) {
+          finalCopyFiles.put(o, path);
+        } else {
+          excludedList.add(fName);
+        }
+      });
       writeFilesToArchive(finalCopyFiles, hardLinkFiles, archiveOutputStream);
     }
   }
@@ -289,5 +294,49 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
+
+  static class Lock extends BootstrapStateHandler.Lock {
+    private final BootstrapStateHandler keyDeletingService;
+    private final BootstrapStateHandler sstFilteringService;
+    private final BootstrapStateHandler rocksDbCheckpointDiffer;
+    private final BootstrapStateHandler snapshotDeletingService;
+    private final OzoneManager om;
+
+    Lock(OzoneManager om) {
+      this.om = om;
+      keyDeletingService = om.getKeyManager().getDeletingService();
+      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
+      rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
+          .getRocksDBCheckpointDiffer();
+      snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+    }
+
+    @Override
+    public BootstrapStateHandler.Lock lock()
+        throws InterruptedException {
+      // First lock all the handlers.
+      keyDeletingService.getBootstrapStateLock().lock();
+      sstFilteringService.getBootstrapStateLock().lock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
+      snapshotDeletingService.getBootstrapStateLock().lock();
+
+      // Then wait for the double buffer to be flushed.
+      om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      return this;
+    }
+
+    @Override
+    public void unlock() {
+      snapshotDeletingService.getBootstrapStateLock().unlock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
+      sstFilteringService.getBootstrapStateLock().unlock();
+      keyDeletingService.getBootstrapStateLock().unlock();
+    }
   }
 }

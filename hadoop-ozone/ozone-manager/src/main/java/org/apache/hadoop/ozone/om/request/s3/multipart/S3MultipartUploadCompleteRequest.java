@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -174,10 +173,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             failureMessage(requestedVolume, requestedBucket, keyName),
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
-      TreeMap<Integer, PartKeyInfo> partKeyInfoMap =
-          multipartKeyInfo.getPartKeyInfoMap();
 
       if (partsList.size() > 0) {
+        final OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap
+            = multipartKeyInfo.getPartKeyInfoMap();
         if (partKeyInfoMap.size() == 0) {
           LOG.error("Complete MultipartUpload failed for key {} , MPU Key has" +
                   " no parts in OM, parts given to upload are {}", ozoneKey,
@@ -206,11 +205,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         //Find all unused parts.
         List<OmKeyInfo> allKeyInfoToRemove = new ArrayList<>();
-        for (Map.Entry< Integer, PartKeyInfo> partKeyInfo :
-            partKeyInfoMap.entrySet()) {
-          if (!partNumbers.contains(partKeyInfo.getKey())) {
+        for (PartKeyInfo partKeyInfo : partKeyInfoMap) {
+          if (!partNumbers.contains(partKeyInfo.getPartNumber())) {
             allKeyInfoToRemove.add(OmKeyInfo
-                .getFromProtobuf(partKeyInfo.getValue().getPartKeyInfo()));
+                .getFromProtobuf(partKeyInfo.getPartKeyInfo()));
           }
         }
 
@@ -359,11 +357,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   protected OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
       KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
       String multipartOpenKey, OMMetadataManager omMetadataManager,
-      String ozoneKey, TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
+      String ozoneKey, OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
       List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
     OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
-        partKeyInfoMap.lastEntry().getValue().getPartKeyInfo();
+        partKeyInfoMap.lastEntry().getPartKeyInfo();
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
@@ -481,7 +479,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private long getMultipartDataSize(String requestedVolume,
       String requestedBucket, String keyName, String ozoneKey,
-      TreeMap<Integer, PartKeyInfo> partKeyInfoMap,
+      OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
       int partsListSize, List<OmKeyLocationInfo> partLocationInfos,
       List<OzoneManagerProtocolProtos.Part> partsList,
       OzoneManager ozoneManager) throws OMException {
