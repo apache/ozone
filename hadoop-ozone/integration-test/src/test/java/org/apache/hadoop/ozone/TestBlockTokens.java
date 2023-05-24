@@ -61,6 +61,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.Base64;
@@ -281,16 +282,16 @@ public final class TestBlockTokens {
   }
 
   @Test
-  public void testGetCurrentSecretKey() {
+  public void testGetCurrentSecretKey() throws UnsupportedEncodingException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    PrintStream printStream = new PrintStream(outputStream);
+    PrintStream printStream = new PrintStream(outputStream, true, "UTF-8");
     System.setOut(printStream);
 
     String[] args =
         new String[]{"om", "fetch-current-key", "--service-id=" + omServiceId};
     ozoneAdmin.execute(args);
 
-    String actualOutput = outputStream.toString();
+    String actualOutput = outputStream.toString("UTF-8");
     System.setOut(System.out);
 
     String actualCurrentKey = testGetCurrentSecretKeyUtil(actualOutput);
