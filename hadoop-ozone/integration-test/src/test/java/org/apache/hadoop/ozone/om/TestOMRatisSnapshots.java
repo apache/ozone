@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
-import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -909,8 +908,9 @@ public class TestOMRatisSnapshots {
         "TermIndex " + followerTermIndex + " and checkpoint has lower " +
         "TermIndex";
     assertLogCapture(logCapture, errorMsg);
-    Assert.assertNull("OM installed checkpoint even though checkpoint " +
-        "logIndex is less than it's lastAppliedIndex", newTermIndex);
+    assertNull(newTermIndex,
+        "OM installed checkpoint even though checkpoint " +
+            "logIndex is less than it's lastAppliedIndex");
     assertEquals(followerTermIndex,
         followerRatisServer.getLastAppliedTermIndex());
     String msg = "OM DB is not stopped. Started services with Term: " +
