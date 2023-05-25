@@ -31,12 +31,14 @@ import java.util.Objects;
  * When {@link #flush()}, {@link #hflush()}, {@link #hsync()}
  * or {@link #close()} is invoked,
  * it will force flushing the buffer and {@link OutputStream} selection.
+ * <p>
+ * This class, like many {@link OutputStream} subclasses, is NOT threadsafe.
  *
  * @param <OUT> The underlying {@link OutputStream} type.
  */
 public class SelectorOutputStream<OUT extends OutputStream>
     extends OutputStream implements Syncable {
-  /** A threadsafe buffer backed by a byte[]. */
+  /** A buffer backed by a byte[]. */
   static final class ByteArrayBuffer {
     private byte[] array;
     /** Write offset of {@link #array}. */
@@ -59,20 +61,20 @@ public class SelectorOutputStream<OUT extends OutputStream>
       }
     }
 
-    synchronized void write(byte b) {
+    void write(byte b) {
       assertRemaining(1);
       array[offset] = b;
       offset++;
     }
 
-    synchronized void write(byte[] src, int srcOffset, int length) {
+    void write(byte[] src, int srcOffset, int length) {
       Objects.requireNonNull(src, "src == null");
       assertRemaining(length);
       System.arraycopy(src, srcOffset, array, offset, length);
       offset += length;
     }
 
-    synchronized <OUT extends OutputStream> OUT selectAndClose(
+    <OUT extends OutputStream> OUT selectAndClose(
         int outstandingBytes, boolean force,
         CheckedFunction<Integer, OUT, IOException> selector)
         throws IOException {
@@ -92,24 +94,17 @@ public class SelectorOutputStream<OUT extends OutputStream>
   final class Underlying {
     /** Select an {@link OutputStream} by the number of bytes. */
     private final CheckedFunction<Integer, OUT, IOException> selector;
-    private volatile OUT out;
+    private OUT out;
 
     private Underlying(CheckedFunction<Integer, OUT, IOException> selector) {
       this.selector = selector;
     }
 
     private OUT select(int outstandingBytes, boolean force) throws IOException {
-      OUT selected = out;
-      if (selected == null) {
-        synchronized (this) {
-          selected = out;
-          if (selected == null) {
-            out = buffer.selectAndClose(outstandingBytes, force, selector);
-            selected = out;
-          }
-        }
+      if (out == null) {
+        out = buffer.selectAndClose(outstandingBytes, force, selector);
       }
-      return selected;
+      return out;
     }
   }
 

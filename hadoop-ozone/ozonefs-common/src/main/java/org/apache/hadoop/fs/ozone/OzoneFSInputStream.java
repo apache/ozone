@@ -50,10 +50,6 @@ public class OzoneFSInputStream extends FSInputStream
     this.statistics = statistics;
   }
 
-  InputStream getInputStream() {
-    return inputStream;
-  }
-
   @Override
   public int read() throws IOException {
     int byteRead = inputStream.read();

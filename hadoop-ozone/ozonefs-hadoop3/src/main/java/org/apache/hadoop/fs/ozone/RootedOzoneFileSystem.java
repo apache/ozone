@@ -101,7 +101,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   }
 
   @Override
-  protected OzoneFSOutputStream wrapFSOutputStream(
+  protected OzoneFSOutputStream createFSOutputStream(
       OzoneFSOutputStream outputStream) {
     return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
   }
