@@ -212,6 +212,7 @@ public class TestHSync {
               }
               return null;
             }));
+        os.hsync();
       }
     }
   }
