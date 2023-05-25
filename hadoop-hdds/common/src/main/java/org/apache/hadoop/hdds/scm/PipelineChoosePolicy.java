@@ -42,6 +42,8 @@ public interface PipelineChoosePolicy {
    * @return Index in the list of the chosen pipeline, or -1 if no pipeline
    *         could be selected.
    */
-  int choosePipelineIndex(List<Pipeline> pipelineList,
-      PipelineRequestInformation pri);
+  default int choosePipelineIndex(List<Pipeline> pipelineList,
+      PipelineRequestInformation pri) {
+    return pipelineList == null || pipelineList.isEmpty() ? -1 : 0;
+  }
 }

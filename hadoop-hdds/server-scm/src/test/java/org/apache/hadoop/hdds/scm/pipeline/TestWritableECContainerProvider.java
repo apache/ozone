@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
-import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
@@ -77,7 +77,7 @@ public class TestWritableECContainerProvider {
   private final ContainerManager containerManager
       = Mockito.mock(ContainerManager.class);
   private final PipelineChoosePolicy pipelineChoosingPolicy
-      = new HealthyPipelineChoosePolicy();
+      = new RandomPipelineChoosePolicy();
 
   private OzoneConfiguration conf;
   private DBStore dbStore;
