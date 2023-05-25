@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -51,10 +50,10 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
@@ -165,14 +164,28 @@ public class CertificateCodec {
    * @param pemEncodedString - PEM encoded String.
    * @return X509Certificate  - Certificate.
    * @throws CertificateException - Thrown on Failure.
-   * @throws IOException          - Thrown on Failure.
    */
   public static X509Certificate getX509Certificate(String pemEncodedString)
-      throws CertificateException, IOException {
+      throws CertificateException {
+    return getX509Certificate(pemEncodedString, Function.identity());
+  }
+
+  public static <E extends Exception> X509Certificate getX509Certificate(
+      String pemEncoded, Function<CertificateException, E> convertor)
+      throws E {
     CertificateFactory fact = getCertFactory();
-    try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
+    // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
+    final ByteArrayInputStream input = new ByteArrayInputStream(
+        pemEncoded.getBytes(DEFAULT_CHARSET));
+    try {
       return (X509Certificate) fact.engineGenerateCertificate(input);
+    } catch (CertificateException e) {
+      throw convertor.apply(e);
     }
+  }
+
+  public static IOException toIOException(CertificateException e) {
+    return new IOException("Failed to engineGenerateCertificate", e);
   }
 
   public static X509Certificate firstCertificateFrom(CertPath certificatePath) {
@@ -245,7 +258,7 @@ public class CertificateCodec {
         Paths.get(basePath.toString(), fileName).toFile();
 
     try (FileOutputStream file = new FileOutputStream(certificateFile)) {
-      IOUtils.write(pemEncodedCertificate, file, UTF_8);
+      file.write(pemEncodedCertificate.getBytes(DEFAULT_CHARSET));
     }
 
     Files.setPosixFilePermissions(certificateFile.toPath(), permissionSet);
@@ -255,11 +268,10 @@ public class CertificateCodec {
    * Gets a certificate path from the specified pem encoded String.
    */
   public static CertPath getCertPathFromPemEncodedString(
-      String pemString) throws CertificateException, IOException {
-    try (InputStream is =
-             new ByteArrayInputStream(pemString.getBytes(DEFAULT_CHARSET))) {
-      return generateCertPathFromInputStream(is);
-    }
+      String pemString) throws CertificateException {
+    // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
+    return generateCertPathFromInputStream(
+        new ByteArrayInputStream(pemString.getBytes(DEFAULT_CHARSET)));
   }
 
   private CertPath getCertPath(Path path, String fileName) throws IOException,

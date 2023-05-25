@@ -367,6 +367,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public int totalHealthyVolumeCount() {
+    return 0;
+  }
+
+  @Override
   public int pipelineLimit(DatanodeDetails dn) {
     return 1;
   }

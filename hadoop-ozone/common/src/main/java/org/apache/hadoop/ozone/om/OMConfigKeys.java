@@ -53,6 +53,10 @@ public final class OMConfigKeys {
   // multiple entries for performance (sharding)..
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
 
+  // SCM DB directory permission
+  public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
+      "ozone.om.db.dirs.permissions";
+
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
   public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 100;

@@ -1132,6 +1132,15 @@ public class SCMNodeManager implements NodeManager {
     return Collections.min(volumeCountList);
   }
 
+  @Override
+  public int totalHealthyVolumeCount() {
+    int sum = 0;
+    for (DatanodeInfo dn : nodeStateManager.getNodes(IN_SERVICE, HEALTHY)) {
+      sum += dn.getHealthyVolumeCount();
+    }
+    return sum;
+  }
+
   /**
    * Returns the pipeline limit for the datanode.
    * if the datanode pipeline limit is set, consider that as the max
