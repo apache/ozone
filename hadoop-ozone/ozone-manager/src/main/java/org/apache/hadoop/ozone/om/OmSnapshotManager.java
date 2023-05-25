@@ -89,7 +89,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REP
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
 /**
@@ -609,8 +608,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
           bucketName, snapshotName);
 
-      // Check if the snapshot directory exists.
-      checkSnapshotDirExist(ozoneManager, snapshotTableKey);
       // Block FS API reads when snapshot is not active.
       if (!skipActiveCheck) {
         checkSnapshotActive(ozoneManager, snapshotTableKey);
