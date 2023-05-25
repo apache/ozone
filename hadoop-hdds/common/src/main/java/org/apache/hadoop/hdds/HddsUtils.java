@@ -394,9 +394,9 @@ public final class HddsUtils {
   }
 
   /**
-   * Retrieve the socket address that is used by OM.
+   * Retrieve the socket address that is used by Datanode.
    * @param conf
-   * @return Target InetSocketAddress for the SCM service endpoint.
+   * @return Target InetSocketAddress for the Datanode service endpoint.
    */
   public static InetSocketAddress
       getDatanodeRpcAddress(ConfigurationSource conf) {
