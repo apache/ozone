@@ -840,6 +840,48 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 0);
   }
 
+  /**
+   * Testing scenario:
+   * 1) Snapshot snap1 created.
+   * 2) Key k1 is created.
+   * 3) Key k1 is deleted.
+   * 4) Snapshot s2 is created instantly before the key k1 is deleted.
+   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 0 keys.
+   * 6) Snapdiff b/w Active FS & snap2 taken to assert difference of 0 keys.
+   */
+  @Test
+  public void testSnapDiffWithRenameAndModified() throws Exception {
+    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    String snap1 = "snap1";
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    OmKeyInfo omKeyInfo = getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
+        key1);
+    System.out.println(omKeyInfo.toString());
+    String key1Renamed = key1 + "_renamed";
+
+    bucket.renameKey(key1, key1Renamed);
+    bucket.renameKey(key1Renamed, key1);
+
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+    OmKeyInfo omKeyInfo1 = getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
+        key1);
+    System.out.println(omKeyInfo.toString());
+    System.out.println(omKeyInfo1.toString());
+    System.out.println(diff);
+    Assert.assertEquals(diff.getDiffList(), Collections.emptyList());
+  }
+
   @Test
   public void testBucketDeleteIfSnapshotExists() throws Exception {
     String volume1 = "vol-" + counter.incrementAndGet();
@@ -1039,6 +1081,9 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap2);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap2);
+    System.out.println(keyInfo);
+    keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    System.out.println(keyInfo);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Lists.newArrayList(
         SnapshotDiffReportOzone.getDiffReportEntry(
