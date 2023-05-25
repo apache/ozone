@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -45,6 +46,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
+
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
  * node Ratis ring. The Ratis ring will have one Leader node and 2N follower
@@ -67,6 +71,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
+  private BackgroundSCMService trxBufferMonitorService = null;
 
   /**
    * Creates SCMHAManager instance.
@@ -125,6 +130,26 @@ public class SCMHAManagerImpl implements SCMHAManager {
           ratisServer.getDivision().getGroup().getPeers());
     }
     grpcServer.start();
+    createStartTransactionBufferMonitor();
+  }
+
+  private void createStartTransactionBufferMonitor() {
+    long interval = conf.getTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    SCMHATransactionBufferMonitorTask monitorTask
+        = new SCMHATransactionBufferMonitorTask(
+        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+    trxBufferMonitorService =
+        new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
+            .setScmContext(scm.getScmContext())
+            .setServiceName("SCMHATransactionMonitor")
+            .setIntervalInMillis(interval)
+            .setWaitTimeInMillis(interval)
+            .setPeriodicalTask(monitorTask).build();
+    scm.getSCMServiceManager().register(trxBufferMonitorService);
+    trxBufferMonitorService.start();
   }
 
   public SCMRatisServer getRatisServer() {
@@ -341,6 +366,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       ratisServer.stop();
       grpcServer.stop();
       close();
+    }
+    if (trxBufferMonitorService != null) {
+      trxBufferMonitorService.stop();
     }
   }
 
