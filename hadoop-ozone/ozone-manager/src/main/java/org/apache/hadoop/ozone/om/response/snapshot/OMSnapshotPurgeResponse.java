@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
@@ -92,9 +93,24 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     SnapshotInfo nextPathSnapInfo = null;
     SnapshotInfo nextGlobalSnapInfo = null;
 
+    // If the snapshot is deleted in the previous run, then the in-memory
+    // SnapshotChainManager might throw NoSuchElementException as the snapshot
+    // is removed in-memory but OMDoubleBuffer has not flushed yet.
+    boolean hasNextPathSnapshot = false;
+    boolean hasNextGlobalSnapshot = false;
+    try {
+      hasNextPathSnapshot = snapshotChainManager.hasNextPathSnapshot(
+          snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
+      hasNextGlobalSnapshot = snapshotChainManager.hasNextGlobalSnapshot(
+          snapInfo.getSnapshotID());
+    } catch (NoSuchElementException ex) {
+      LOG.warn("The Snapshot {} could have been deleted in the previous run.",
+          snapInfo.getSnapshotID(), ex);
+      return;
+    }
+
     // Updates next path snapshot's previous snapshot ID
-    if (snapshotChainManager.hasNextPathSnapshot(
-        snapInfo.getSnapshotPath(), snapInfo.getSnapshotID())) {
+    if (hasNextPathSnapshot) {
       String nextPathSnapshotId =
           snapshotChainManager.nextPathSnapshot(
               snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
@@ -112,8 +128,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     }
 
     // Updates next global snapshot's previous snapshot ID
-    if (snapshotChainManager.hasNextGlobalSnapshot(
-        snapInfo.getSnapshotID())) {
+    if (hasNextGlobalSnapshot) {
       String nextGlobalSnapshotId =
           snapshotChainManager.nextGlobalSnapshot(snapInfo.getSnapshotID());
 

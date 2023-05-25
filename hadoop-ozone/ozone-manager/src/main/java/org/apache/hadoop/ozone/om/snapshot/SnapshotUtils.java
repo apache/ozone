@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -28,8 +29,13 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
@@ -87,6 +93,26 @@ public final class SnapshotUtils {
     }
   }
 
+  /**
+   * Throws OMException FILE_NOT_FOUND if snapshot directory does not exist.
+   * @param ozoneManager ozone manager instance
+   * @param snapshotTableKey snapshot table key
+   */
+  public static void checkSnapshotDirExist(OzoneManager ozoneManager,
+                                           String snapshotTableKey)
+      throws IOException {
+    SnapshotInfo snapshotInfo = getSnapshotInfo(ozoneManager, snapshotTableKey);
+    String snapshotDir = OMStorage.getOmDbDir(ozoneManager.getConfiguration()) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
+    File metaDir = new File(snapshotDir);
+    String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+    File checkpoint = Paths.get(metaDir.toPath().toString(), dbName).toFile();
+    if (!checkpoint.exists()) {
+      throw new OMException("Unable to load snapshot. " +
+          "Snapshot directory for snapshot '" + snapshotInfo.getTableKey() +
+          "' does not exists.", FILE_NOT_FOUND);
+    }
+  }
 
   /**
    * Throws OMException FILE_NOT_FOUND if snapshot is not in active status.
