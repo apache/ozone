@@ -48,12 +48,13 @@ public class FetchKeySubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client = parent.createOmClient(omServiceId);
-    ManagedSecretKey managedSecretKey = client.getCurrentSecretKey();
-    SecretKey key = managedSecretKey.getSecretKey();
-    byte[] encodedKey = key.getEncoded();
-    String keyString = Base64.getEncoder().encodeToString(encodedKey);
-    System.out.println("Current Secret Key: " + keyString);
+    try (OzoneManagerProtocol client = parent.createOmClient(omServiceId)) {
+      ManagedSecretKey managedSecretKey = client.getCurrentSecretKey();
+      SecretKey key = managedSecretKey.getSecretKey();
+      byte[] encodedKey = key.getEncoded();
+      String keyString = Base64.getEncoder().encodeToString(encodedKey);
+      System.out.println("Current Secret Key: " + keyString);
+    }
     return null;
   }
 }
