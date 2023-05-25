@@ -30,15 +30,12 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -104,7 +101,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = true;
-      apply(omKeyInfo, trxnLogIndex);
+      apply(omKeyInfo);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // update cache.
@@ -146,7 +143,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
-  OMClientResponse onSuccess(OMResponse.Builder omResponse,
+  private OMClientResponse onSuccess(OMResponse.Builder omResponse,
       OmKeyInfo omKeyInfo, boolean operationResult, boolean isDir,
       long volumeId, long bucketId) {
     omResponse.setSuccess(operationResult);

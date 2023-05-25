@@ -117,7 +117,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
-  OMClientResponse onSuccess(OMResponse.Builder omResponse,
+  private OMClientResponse onSuccess(OMResponse.Builder omResponse,
       OmKeyInfo omKeyInfo, boolean operationResult) {
     omResponse.setSuccess(operationResult);
     omResponse.setSetTimesResponse(SetTimesResponse.newBuilder());
@@ -163,7 +163,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
         exception, getOmRequest().getUserInfo()));
   }
 
-  void apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
+  protected void apply(OmKeyInfo omKeyInfo) {
     // No need to check not null here, this will be never called with null.
     long mtime = getModificationTime();
     if (mtime >= 0) {
@@ -202,9 +202,8 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      lockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
-              bucket);
+      lockAcquired = omMetadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volume, bucket);
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
       omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
@@ -215,7 +214,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       }
 
       operationResult = true;
-      apply(omKeyInfo, trxnLogIndex);
+      apply(omKeyInfo);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // update cache.
