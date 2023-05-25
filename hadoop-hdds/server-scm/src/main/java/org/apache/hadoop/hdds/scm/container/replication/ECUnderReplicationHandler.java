@@ -564,6 +564,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private void checkAndRemoveUnhealthyReplica(
       ECContainerReplicaCount replicaCount,
       List<DatanodeDetails> deletionInFlight) {
+    LOG.debug("Finding an UNHEALTHY replica of container {} to delete so its " +
+        "host datanode can be available for replication/reconstruction.",
+        replicaCount.getContainer());
     if (!deletionInFlight.isEmpty()) {
       LOG.debug("There are {} pending deletes. Completing them could " +
           "free up nodes to fix under replication. Not deleting UNHEALTHY" +
@@ -578,40 +581,34 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       return;
     }
 
-    Set<ContainerReplica> unhealthyReplicas =
-        replicaCount.getUnhealthyReplicas();
-    if (unhealthyReplicas.isEmpty()) {
-      LOG.debug("Container {} does not have any UNHEALTHY replicas.",
-          container.containerID());
-      return;
-    }
-
-    // remove replicas that aren't on IN_SERVICE and HEALTHY DNs
-    // the leftover replicas will be eligible for deletion
-    Iterator<ContainerReplica> iterator = replicaCount.getReplicas().iterator();
+    // don't consider replicas that aren't on IN_SERVICE and HEALTHY DNs
     Set<Integer> closedReplicas = new HashSet<>();
-    while (iterator.hasNext()) {
-      ContainerReplica replica = iterator.next();
-      DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
-      NodeStatus nodeStatus;
-      boolean removed = false;
+    Set<ContainerReplica> unhealthyReplicas = new HashSet<>();
+    for (ContainerReplica replica : replicaCount.getReplicas()) {
       try {
-        nodeStatus = replicationManager.getNodeStatus(datanodeDetails);
+        NodeStatus nodeStatus =
+            replicationManager.getNodeStatus(replica.getDatanodeDetails());
         if (!nodeStatus.isHealthy() || !nodeStatus.isInService()) {
-          iterator.remove();
-          removed = true;
+          continue;
         }
       } catch (NodeNotFoundException e) {
         LOG.debug("Skipping replica {} when trying to unblock under " +
             "replication handling.", replica, e);
-        iterator.remove();
-        removed = true;
+        continue;
       }
 
-      // collect CLOSED replicas for later
-      if (!removed && replica.getState().equals(State.CLOSED)) {
+      if (replica.getState().equals(State.CLOSED)) {
+        // collect CLOSED replicas for later
         closedReplicas.add(replica.getReplicaIndex());
+      } else if (replica.getState().equals(State.UNHEALTHY)) {
+        unhealthyReplicas.add(replica);
       }
+    }
+
+    if (unhealthyReplicas.isEmpty()) {
+      LOG.debug("Container {} does not have any UNHEALTHY replicas.",
+          container.containerID());
+      return;
     }
 
     /*
@@ -634,7 +631,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
     }
 
-    // just delete any UNHEALTHY replica
+    /*
+     We didn't delete in the earlier loop - just delete any UNHEALTHY
+     replica now.
+    */
     for (ContainerReplica unhealthyReplica : unhealthyReplicas) {
       try {
         replicationManager.sendThrottledDeleteCommand(
@@ -648,4 +648,5 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
     }
   }
+
 }

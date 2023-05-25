@@ -51,9 +51,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -78,6 +76,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -549,9 +548,13 @@ public class TestECUnderReplicationHandler {
         existingReplicas.add(toAdd);
       }
 
+      // should throw an SCMException indicating no targets were found
       Assert.assertThrows(SCMException.class,
           () -> ecURH.processAndSendCommands(existingReplicas,
               Collections.emptyList(), underRep, 2));
+      Mockito.verify(replicationManager, times(0))
+          .sendThrottledDeleteCommand(eq(container), anyInt(),
+              any(DatanodeDetails.class), anyBoolean());
 
       /*
       Now, for the same container, also add an UNHEALTHY replica. The handler
@@ -570,11 +573,11 @@ public class TestECUnderReplicationHandler {
       */
       commandsSent.clear();
       Mockito.doAnswer(invocation -> {
-            commandsSent.add(Pair.of(invocation.getArgument(2),
-                createDeleteContainerCommand(invocation.getArgument(0),
-                    invocation.getArgument(1))));
-            return null;
-          })
+        commandsSent.add(Pair.of(invocation.getArgument(2),
+            createDeleteContainerCommand(invocation.getArgument(0),
+                invocation.getArgument(1))));
+        return null;
+      })
           .when(replicationManager)
           .sendThrottledDeleteCommand(Mockito.any(ContainerInfo.class),
               Mockito.anyInt(), Mockito.any(DatanodeDetails.class),
