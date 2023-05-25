@@ -176,7 +176,7 @@ public final class ContainerTestUtils {
       boolean scanMetaDataSuccess, boolean scanDataSuccess,
       AtomicLong containerIdSeq) {
     setupMockContainer(c, shouldScanData, scanDataSuccess, containerIdSeq);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
   }
 
   public static void setupMockContainer(
