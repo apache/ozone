@@ -824,7 +824,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSetAcl.incr();
   }
 
-
   @Override
   public void incNumGetAcl() {
     numGetAcl.incr();

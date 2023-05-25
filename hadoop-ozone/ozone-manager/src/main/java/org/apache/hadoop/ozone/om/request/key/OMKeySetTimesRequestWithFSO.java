@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -50,9 +51,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Handle set times request for bucket for prefix layout.
  */
 public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeySetTimesRequestWithFSO.class);
 
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
@@ -138,14 +136,13 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     }
 
     Map<String, String> auditMap = new LinkedHashMap<>();
-    onComplete(result, operationResult, exception, trxnLogIndex,
-        ozoneManager.getAuditLogger(), auditMap);
+    onComplete(result, exception, ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
   }
 
   @Override
-  OzoneManagerProtocolProtos.OMResponse.Builder onInit() {
+  protected OzoneManagerProtocolProtos.OMResponse.Builder onInit() {
     return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
@@ -157,5 +154,18 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
         OzoneManagerProtocolProtos.SetTimesResponse.newBuilder());
     return new OMKeySetTimesResponseWithFSO(omResponse.build(), omKeyInfo,
         isDir, getBucketLayout(), volumeId, bucketId);
+  }
+
+  /**
+   * Get the om client response on failure case with lock.
+   * @param omResponse
+   * @param exception
+   * @return OMClientResponse
+   */
+  @Override
+  protected OMClientResponse onFailure(OMResponse.Builder omResponse,
+      IOException exception) {
+    return new OMKeySetTimesResponseWithFSO(createErrorOMResponse(
+        omResponse, exception), getBucketLayout());
   }
 }

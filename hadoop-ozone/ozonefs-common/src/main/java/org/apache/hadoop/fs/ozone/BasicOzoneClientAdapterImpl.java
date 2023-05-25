@@ -709,7 +709,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public void setTimes(String key, long mtime, long atime) throws IOException {
-    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     bucket.setTimes(key, mtime, atime);
   }
 }

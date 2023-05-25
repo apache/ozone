@@ -2529,10 +2529,18 @@ public class TestRootedOzoneFileSystem {
       stream.write(1);
     }
 
-    fs.setTimes(path, 1000, 2000);
+    long mtime = 1000;
+    fs.setTimes(path, mtime, 2000);
 
     FileStatus fileStatus = fs.getFileStatus(path);
-    // Trash Current directory should still have been created.
-    Assert.assertEquals(1000, fileStatus.getModificationTime());
+    // verify that mtime is updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
+
+    mtime = -1;
+    fs.setTimes(path, mtime, 2000);
+
+    fileStatus = fs.getFileStatus(path);
+    // verify that mtime is updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
 }

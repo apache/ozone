@@ -315,7 +315,6 @@ public final class OzoneManagerRatisUtils {
       bucketName = keyArgs.getBucketName();
       break;
     case SetTimes:
-      //keyArgs = omRequest.getSetTimesRequest().getKeyArgs();
       volumeName = omRequest.getSetTimesRequest().getKeyArgs().getVolumeName();
       bucketName = omRequest.getSetTimesRequest().getKeyArgs().getBucketName();
       break;

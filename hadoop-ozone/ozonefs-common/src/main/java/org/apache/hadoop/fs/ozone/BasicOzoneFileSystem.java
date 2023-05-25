@@ -920,7 +920,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     statistics.incrementWriteOps(1);
     LOG.trace("setTimes() path:{}", f);
-    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
     adapter.setTimes(key, mtime, atime);
   }

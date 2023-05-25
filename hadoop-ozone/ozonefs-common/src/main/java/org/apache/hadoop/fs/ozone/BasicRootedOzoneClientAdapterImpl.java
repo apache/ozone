@@ -1366,7 +1366,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   public void setTimes(String key, long mtime, long atime) throws IOException {
-    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     OFSPath ofsPath = new OFSPath(key, config);
 
     OzoneBucket bucket = getBucket(ofsPath, false);
