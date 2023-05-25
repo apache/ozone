@@ -754,7 +754,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           objectIdToKeyNameMapForToSnapshot);
 
       updateJobStatusToDone(jobKey, totalDiffEntries);
-    } catch (ExecutionException | IOException | RocksDBException exception) {
+    } catch (IOException | RocksDBException exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
       LOG.error("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",

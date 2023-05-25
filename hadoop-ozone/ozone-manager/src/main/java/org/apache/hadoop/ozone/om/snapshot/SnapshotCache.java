@@ -111,7 +111,7 @@ public class SnapshotCache {
   /**
    * Immediately invalidate all entries and close their DB instances in cache.
    */
-  public void invalidateAll() throws IOException {
+  public void invalidateAll() {
     Iterator<Map.Entry<String, ReferenceCounted<IOmMetadataReader>>>
         it = dbMap.entrySet().iterator();
 
@@ -119,8 +119,12 @@ public class SnapshotCache {
       Map.Entry<String, ReferenceCounted<IOmMetadataReader>> entry = it.next();
       pendingEvictionList.remove(entry.getValue());
       OmSnapshot omSnapshot = (OmSnapshot) entry.getValue().get();
-      // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
-      omSnapshot.close();
+      try {
+        // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
+        omSnapshot.close();
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to close snapshot", e);
+      }
       it.remove();
     }
   }
