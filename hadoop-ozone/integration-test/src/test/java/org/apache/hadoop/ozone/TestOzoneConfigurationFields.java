@@ -21,16 +21,16 @@ import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 import java.util.Arrays;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
