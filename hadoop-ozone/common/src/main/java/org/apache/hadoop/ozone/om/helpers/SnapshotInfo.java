@@ -55,7 +55,10 @@ public final class SnapshotInfo implements Auditable {
       Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
       SnapshotInfo::getFromProtobuf,
       SnapshotInfo::getProtobuf,
-      true);
+      // FIXME: HDDS-8665 Deep copy will cause failures
+      //        - TestOMSnapshotDeleteRequest           NullPointerException
+      //        - TestOMSnapshotPurgeRequestAndResponse AssertionFailedError
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<SnapshotInfo> getCodec() {
     return CODEC;

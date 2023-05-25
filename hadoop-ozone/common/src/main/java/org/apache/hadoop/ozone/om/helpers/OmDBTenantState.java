@@ -34,7 +34,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
       Proto2Codec.get(OzoneManagerProtocolProtos.TenantState.class),
       OmDBTenantState::getFromProtobuf,
       OmDBTenantState::getProtobuf,
-      true);
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<OmDBTenantState> getCodec() {
     return CODEC;
