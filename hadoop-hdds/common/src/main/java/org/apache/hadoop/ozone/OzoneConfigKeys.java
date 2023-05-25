@@ -104,7 +104,7 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
-   * Flag to enable ratis streaming on filesystem writes.
+   * A threshold to auto select datastream to write files in OzoneFileSystem.
    */
   public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD
       = "ozone.fs.datastream.auto.threshold";
