@@ -122,7 +122,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private final SortedSet<String> reconfigurableProperties =
       ImmutableSortedSet.of();
-  private OzoneAdmins omAdmins;
+  private OzoneAdmins admins;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -328,14 +328,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO);
 
       // Get admin list
-      String omStarterUser =
+      String starterUser =
           UserGroupInformation.getCurrentUser().getShortUserName();
-      Collection<String> omAdminUsernames =
-          getOzoneAdminsFromConfig(conf, omStarterUser);
-      Collection<String> omAdminGroups =
+      Collection<String> adminUserNames =
+          getOzoneAdminsFromConfig(conf, starterUser);
+      Collection<String> adminGroupNames =
           getOzoneAdminsGroupsFromConfig(conf);
-      LOG.info("OM start with adminUsers: {}", omAdminUsernames);
-      omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
+      LOG.info("Datanode start with admins: {}", adminUserNames);
+      admins = new OzoneAdmins(adminUserNames, adminGroupNames);
 
       clientProtocolServer.start();
       startPlugins();
@@ -676,11 +676,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Return true if a UserGroupInformation is OM admin, false otherwise.
+   * Return true if a UserGroupInformation is admin, false otherwise.
    * @param callerUgi Caller UserGroupInformation
    */
   public boolean isAdmin(UserGroupInformation callerUgi) {
-    return callerUgi != null && omAdmins.isAdmin(callerUgi);
+    return callerUgi != null && admins.isAdmin(callerUgi);
   }
 
   public String reconfigurePropertyImpl(String property, String newVal)
