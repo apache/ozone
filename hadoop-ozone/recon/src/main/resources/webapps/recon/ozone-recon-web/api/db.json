@@ -14,7 +14,8 @@
     "deletedContainers": 4,
     "volumes": 5,
     "buckets": 156,
-    "keys": 253000
+    "keys": 253000,
+    "keysPendingDeletion": 1000
   },
   "datanodes": {
     "totalCount": 12,

@@ -27,16 +27,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfoCodec;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
@@ -49,9 +48,9 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "deletedBlocks",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_CERTS =
@@ -91,25 +90,25 @@ public class SCMDBDefinition implements DBDefinition {
           BigInteger.class,
           new BigIntegerCodec(),
           CertInfo.class,
-          new CertInfoCodec());
+          CertInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<PipelineID, Pipeline>
       PIPELINES =
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
-          new PipelineCodec());
+          Pipeline.getCodec());
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
       new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           ContainerInfo.class,
-          new ContainerInfoCodec());
+          ContainerInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
@@ -118,15 +117,15 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           TransactionInfo.class,
-          new TransactionInfoCodec());
+          TransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
       new DBColumnFamilyDefinition<>(
           "crls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
-          new CRLInfoCodec());
+          CRLInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       CRL_SEQUENCE_ID =
@@ -135,7 +134,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
@@ -144,7 +143,7 @@ public class SCMDBDefinition implements DBDefinition {
           String.class,
           new StringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
       MoveDataNodePair>
@@ -152,9 +151,9 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "move",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           MoveDataNodePair.class,
-          new MoveDataNodePairCodec());
+          MoveDataNodePair.getCodec());
 
   /**
    * Stores miscellaneous SCM metadata, including upgrade finalization status

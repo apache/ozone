@@ -120,7 +120,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   public void testAddToDBBatchOnOverwrite() throws Exception {
     OmKeyInfo omKeyInfo = getOmKeyInfo();
     keysToDelete =
-            OmUtils.prepareKeyForDelete(omKeyInfo, null, 100, false);
+            OmUtils.prepareKeyForDelete(omKeyInfo, 100, false);
     Assert.assertNotNull(keysToDelete);
     testAddToDBBatch();
 

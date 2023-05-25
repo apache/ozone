@@ -1539,20 +1539,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
-        try {
-          X509Certificate x509Certificate =
-              CertificateCodec.getX509Certificate(cert);
-          if (certificateStore.getCertificateByID(
-              x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
-            LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
-                    "{}", x509Certificate.getSerialNumber(),
-                scmStorageConfig.getScmId());
-            certificateStore.storeValidScmCertificate(
-                x509Certificate.getSerialNumber(), x509Certificate);
-          }
-        } catch (CertificateException ex) {
-          LOG.error("Error while decoding CA Certificate", ex);
-          throw new IOException(ex);
+        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
+            cert, CertificateCodec::toIOException);
+        if (certificateStore.getCertificateByID(
+            x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
+          LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
+                  "{}", x509Certificate.getSerialNumber(),
+              scmStorageConfig.getScmId());
+          certificateStore.storeValidScmCertificate(
+              x509Certificate.getSerialNumber(), x509Certificate);
         }
       }
     }
@@ -2057,7 +2052,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getScmRatisRoles() throws IOException {
+  public String getScmRatisRoles() {
     final SCMRatisServer server = getScmHAManager().getRatisServer();
     return server != null ?
         HddsUtils.format(server.getRatisRoles()) : "STANDALONE";

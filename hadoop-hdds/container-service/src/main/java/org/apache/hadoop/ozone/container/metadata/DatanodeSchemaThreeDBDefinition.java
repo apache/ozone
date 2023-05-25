@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -59,7 +60,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           BlockData.class,
-          new BlockDataCodec());
+          BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
@@ -68,7 +69,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
       DELETED_BLOCKS =
@@ -77,7 +78,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           ChunkInfoList.class,
-          new ChunkInfoListCodec());
+          ChunkInfoList.getCodec());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
@@ -86,7 +87,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   private static String separator = "";
 

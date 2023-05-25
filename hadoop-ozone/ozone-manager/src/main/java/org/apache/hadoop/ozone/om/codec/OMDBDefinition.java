@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 /**
  * Class defines the structure and types of the om.db.
@@ -56,17 +56,16 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     RepeatedOmKeyInfo.class,
-                    new RepeatedOmKeyInfoCodec(true));
+                    RepeatedOmKeyInfo.getCodec(true));
 
-  public static final DBColumnFamilyDefinition<String,
-            OzoneManagerStorageProtos.PersistedUserVolumeInfo>
+  public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo>
             USER_TABLE =
             new DBColumnFamilyDefinition<>(
                     OmMetadataManagerImpl.USER_TABLE,
                     String.class,
                     new StringCodec(),
-                    OzoneManagerStorageProtos.PersistedUserVolumeInfo.class,
-                    new UserVolumeInfoCodec());
+                    PersistedUserVolumeInfo.class,
+                    Proto2Codec.get(PersistedUserVolumeInfo.class));
 
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>
             VOLUME_TABLE =
@@ -75,7 +74,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmVolumeArgs.class,
-                    new OmVolumeArgsCodec());
+                    OmVolumeArgs.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_KEY_TABLE =
@@ -84,7 +83,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec(true));
+                    OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             KEY_TABLE =
@@ -93,7 +92,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec(true));
+                    OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmBucketInfo>
             BUCKET_TABLE =
@@ -102,7 +101,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmBucketInfo.class,
-                    new OmBucketInfoCodec());
+                    OmBucketInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmMultipartKeyInfo>
             MULTIPART_INFO_TABLE =
@@ -111,7 +110,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmMultipartKeyInfo.class,
-                    new OmMultipartKeyInfoCodec());
+                    OmMultipartKeyInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmPrefixInfo>
             PREFIX_TABLE =
@@ -120,7 +119,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmPrefixInfo.class,
-                    new OmPrefixInfoCodec());
+                    OmPrefixInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<OzoneTokenIdentifier, Long>
             DTOKEN_TABLE =
@@ -129,7 +128,7 @@ public class OMDBDefinition implements DBDefinition {
                     OzoneTokenIdentifier.class,
                     new TokenIdentifierCodec(),
                     Long.class,
-                    new LongCodec());
+                    LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, S3SecretValue>
             S3_SECRET_TABLE =
@@ -138,7 +137,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     S3SecretValue.class,
-                    new S3SecretValueCodec());
+                    S3SecretValue.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
             TRANSACTION_INFO_TABLE =
@@ -147,7 +146,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     TransactionInfo.class,
-                    new TransactionInfoCodec());
+                    TransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDirectoryInfo>
             DIRECTORY_TABLE =
@@ -156,7 +155,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmDirectoryInfo.class,
-                    new OmDirectoryInfoCodec());
+                    OmDirectoryInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             FILE_TABLE =
@@ -165,7 +164,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec(true));
+                    OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_FILE_TABLE =
@@ -174,13 +173,13 @@ public class OMDBDefinition implements DBDefinition {
                   String.class,
                   new StringCodec(),
                   OmKeyInfo.class,
-                  new OmKeyInfoCodec(true));
+                  OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
       DELETED_DIR_TABLE =
       new DBColumnFamilyDefinition<>(OmMetadataManagerImpl.DELETED_DIR_TABLE,
           String.class, new StringCodec(), OmKeyInfo.class,
-          new OmKeyInfoCodec(true));
+          OmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, String>
       META_TABLE = new DBColumnFamilyDefinition<>(
@@ -199,7 +198,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,  // accessId
                     new StringCodec(),
                     OmDBAccessIdInfo.class,  // tenantId, secret, principal
-                    new OmDBAccessIdInfoCodec());
+                    OmDBAccessIdInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBUserPrincipalInfo>
             PRINCIPAL_TO_ACCESS_IDS_TABLE =
@@ -208,7 +207,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,  // User principal
                     new StringCodec(),
                     OmDBUserPrincipalInfo.class,  // List of accessIds
-                    new OmDBUserPrincipalInfoCodec());
+                    OmDBUserPrincipalInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, OmDBTenantState>
             TENANT_STATE_TABLE =
@@ -217,7 +216,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,  // tenantId (tenant name)
                     new StringCodec(),
                     OmDBTenantState.class,
-                    new OmDBTenantStateCodec());
+                    OmDBTenantState.getCodec());
 
   // End tables for S3 multi-tenancy
 
@@ -228,7 +227,7 @@ public class OMDBDefinition implements DBDefinition {
           String.class,  // snapshot path
           new StringCodec(),
           SnapshotInfo.class,
-          new OmDBSnapshotInfoCodec());
+          SnapshotInfo.getCodec());
 
   /**
    * SnapshotRenamedTable that complements the keyTable (or fileTable)

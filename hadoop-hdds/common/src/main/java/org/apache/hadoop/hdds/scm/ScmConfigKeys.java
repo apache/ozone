@@ -36,6 +36,10 @@ public final class ScmConfigKeys {
   // performance.
   public static final String OZONE_SCM_DB_DIRS = "ozone.scm.db.dirs";
 
+  // SCM DB directory permission
+  public static final String OZONE_SCM_DB_DIRS_PERMISSIONS =
+      "ozone.scm.db.dirs.permissions";
+
   public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
       = "dfs.container.ratis.enabled";
   public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
