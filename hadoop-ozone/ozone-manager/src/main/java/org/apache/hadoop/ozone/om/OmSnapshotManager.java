@@ -328,7 +328,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           // metadataManager
           PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
               false);
-          KeyManagerImpl km = new KeyManagerImpl(null,
+          KeyManagerImpl km = new KeyManagerImpl(ozoneManager,
               ozoneManager.getScmClient(), snapshotMetadataManager, conf,
               ozoneManager.getBlockTokenSecretManager(),
               ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
@@ -830,6 +830,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
+    if (snapshotDiffManager != null) {
+      snapshotDiffManager.close();
+    }
+    if (snapshotCache != null) {
+      snapshotCache.invalidateAll();
+    }
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
     }

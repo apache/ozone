@@ -27,6 +27,12 @@ import org.apache.hadoop.hdds.StringUtils;
  * Codec to convert String to/from byte array.
  */
 public final class StringCodec implements Codec<String> {
+  private static final StringCodec CODEC = new StringCodec();
+
+  public static StringCodec get() {
+    return CODEC;
+  }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

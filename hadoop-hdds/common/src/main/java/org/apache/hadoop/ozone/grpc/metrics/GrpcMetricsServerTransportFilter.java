@@ -14,11 +14,34 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * <p>
- * Utility classes to encode/decode DTO objects to/from byte array.
  */
+package org.apache.hadoop.ozone.grpc.metrics;
+
+import io.grpc.Attributes;
+import io.grpc.ServerTransportFilter;
 
 /**
- * Unit tests for codec's in OM.
+ * Transport filter class for tracking active client connections.
  */
-package org.apache.hadoop.ozone.om.codec;
+public class GrpcMetricsServerTransportFilter extends ServerTransportFilter {
+
+  private GrpcMetrics grpcMetrics;
+
+  public GrpcMetricsServerTransportFilter(
+      GrpcMetrics grpcMetrics) {
+    super();
+    this.grpcMetrics = grpcMetrics;
+  }
+
+  @Override
+  public Attributes transportReady(Attributes transportAttrs) {
+    grpcMetrics.inrcNumOpenClientConnections();
+    return super.transportReady(transportAttrs);
+  }
+
+  @Override
+  public void transportTerminated(Attributes transportAttrs) {
+    grpcMetrics.decrNumOpenClientConnections();
+    super.transportTerminated(transportAttrs);
+  }
+}

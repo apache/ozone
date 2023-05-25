@@ -15,66 +15,29 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Before;
-import org.junit.Rule;
+import org.junit.Assert;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
- * This class test OmPrefixInfoCodec.
+ * Test {@link OmPrefixInfo#getCodec()}.
  */
-public class TestOmPrefixInfoCodec {
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-
-  private OmPrefixInfoCodec codec;
-
-  @Before
-  public void setUp() {
-    codec = new OmPrefixInfoCodec();
-  }
-
-  @Test
-  public void testCodecWithIncorrectValues() throws Exception {
-    try {
-      codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testCodecWithIncorrectValues failed");
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
-          "data from the byte array", ex);
-    }
-  }
-
-  @Test
-  public void testCodecWithNullDataFromTable() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.fromPersistedFormat(null);
-  }
-
-
-  @Test
-  public void testCodecWithNullDataFromUser() throws Exception {
-    thrown.expect(NullPointerException.class);
-    codec.toPersistedFormat(null);
+public class TestOmPrefixInfoCodec extends Proto2CodecTestBase<OmPrefixInfo> {
+  @Override
+  public Codec<OmPrefixInfo> getCodec() {
+    return OmPrefixInfo.getCodec();
   }
 
   @Test
@@ -90,10 +53,10 @@ public class TestOmPrefixInfoCodec {
         .addMetadata("id", "100")
         .build();
 
+    final Codec<OmPrefixInfo> codec = getCodec();
     OmPrefixInfo opiLoad = codec.fromPersistedFormat(
         codec.toPersistedFormat(opiSave));
 
-    assertTrue("Load saved prefix info should match",
-        opiLoad.equals(opiSave));
+    Assert.assertEquals("Loaded not equals to saved", opiSave, opiLoad);
   }
 }

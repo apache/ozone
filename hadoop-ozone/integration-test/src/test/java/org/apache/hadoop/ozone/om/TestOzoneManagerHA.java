@@ -25,6 +25,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -158,6 +159,8 @@ public abstract class TestOzoneManagerHA {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Some subclasses check RocksDB directly as part of their tests. These
     // depend on OBS layout.
@@ -255,6 +258,40 @@ public abstract class TestOzoneManagerHA {
     Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
 
     return ozoneBucket;
+  }
+
+  protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String linkedVolName = "volume-link-" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+
+    BucketArgs createBucketArgs = new BucketArgs.Builder()
+        .setSourceVolume(srcBuk.getVolumeName())
+        .setSourceBucket(srcBuk.getName())
+        .build();
+
+    objectStore.createVolume(linkedVolName, createVolumeArgs);
+    OzoneVolume linkedVolumeInfo = objectStore.getVolume(linkedVolName);
+
+    Assert.assertTrue(linkedVolumeInfo.getName().equals(linkedVolName));
+    Assert.assertTrue(linkedVolumeInfo.getOwner().equals(userName));
+    Assert.assertTrue(linkedVolumeInfo.getAdmin().equals(adminName));
+
+    String linkedBucketName = UUID.randomUUID().toString();
+    linkedVolumeInfo.createBucket(linkedBucketName, createBucketArgs);
+
+    OzoneBucket linkedBucket = linkedVolumeInfo.getBucket(linkedBucketName);
+
+    Assert.assertTrue(linkedBucket.getName().equals(linkedBucketName));
+    Assert.assertTrue(linkedBucket.getVolumeName().equals(linkedVolName));
+    Assert.assertTrue(linkedBucket.isLink());
+
+    return linkedBucket;
   }
 
   /**
