@@ -33,8 +33,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import static org.apache.hadoop.ozone.admin.reconfig.AbstractReconfigureSubCommand.BULK_OPERATION_IDENTIFIER;
-
 /**
  * Subcommand to group reconfigure OM related operations.
  */
@@ -59,19 +57,15 @@ public class ReconfigureCommands implements Callable<Void>,
   private CommandSpec spec;
 
   @CommandLine.Option(names = {"--address"},
-      description = "node address: <ip:port> or <hostname:port>. For Datanode" +
-          " the parameter '" + BULK_OPERATION_IDENTIFIER + "' is supported. " +
-          "This will send reconfiguration requests to all available DataNodes" +
-          " in the IN_SERVICE operational state.",
-      required = true)
-
+      description = "node address: <ip:port> or <hostname:port>.",
+      required = false)
   private String address;
 
-  @CommandLine.Option(names = {"--type", "-t"},
-      description = "Specifies the type of the server. Currently, only " +
-          "'datanode' is supported.",
+  @CommandLine.Option(names = {"--in-service-datanodes"},
+      description = "If set, the client will send reconfiguration requests " +
+          "to all available DataNodes in the IN_SERVICE operational state.",
       required = false)
-  private String type;
+  private boolean batchReconfigDatanodes;
 
   @Override
   public Void call() throws Exception {
@@ -88,8 +82,8 @@ public class ReconfigureCommands implements Callable<Void>,
     return OzoneAdmin.class;
   }
 
-  public String getType() {
-    return type != null ? type : "";
+  public boolean isBatchReconfigDatanodes() {
+    return batchReconfigDatanodes;
   }
 
   public List<String> getAllOperableNodesClientRpcAddress() {

@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeClientProtocolServer;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.admin.reconfig.AbstractReconfigureSubCommand;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.AfterClass;
@@ -176,9 +175,7 @@ public class TestReconfigShell {
       throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       ozoneAdmin.execute(new String[] {
-          "reconfig", "-t", "datanode", "--address",
-          AbstractReconfigureSubCommand.BULK_OPERATION_IDENTIFIER,
-          "properties"});
+          "reconfig",  "--in-service-datanodes", "properties"});
       String output = capture.getOutput();
 
       Assert.assertTrue(String.format(

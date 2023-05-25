@@ -28,26 +28,22 @@ import java.util.concurrent.Executors;
  * An abstract Class use to ReconfigureSubCommand.
  */
 public abstract class AbstractReconfigureSubCommand implements Callable<Void> {
-  public static final String BULK_OPERATION_IDENTIFIER = "inservicenodes";
-
   @CommandLine.ParentCommand
   private ReconfigureCommands parent;
 
   @Override
   public Void call() throws Exception {
-    if (parent.getAddress().equals(BULK_OPERATION_IDENTIFIER)) {
-      if (!parent.getType().equals("datanode")) {
-        System.out.printf("Bulk reconfiguration is not supported for '%s' " +
-            "type. It is only supported for 'datanode' type.",
-            parent.getType());
-
-        return null;
-      }
+    if (parent.isBatchReconfigDatanodes()) {
       ExecutorService executorService = Executors.newFixedThreadPool(5);
       List<String> nodes = parent.getAllOperableNodesClientRpcAddress();
       ReconfigureSubCommandUtil.parallelExecute(executorService, nodes,
           this::executeCommand);
     } else {
+      if (parent.getAddress() == null || parent.getAddress().isEmpty()) {
+        System.out.println("Error: --address must be specified if" +
+            " --in-service-datanodes is not given.");
+        return null;
+      }
       executeCommand(parent.getAddress());
     }
     return null;
