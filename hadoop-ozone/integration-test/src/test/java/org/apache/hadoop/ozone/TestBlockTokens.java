@@ -288,7 +288,7 @@ public final class TestBlockTokens {
     System.setOut(printStream);
 
     String[] args =
-        new String[]{"om", "fetch-current-key", "--service-id=" + omServiceId};
+        new String[]{"om", "fetch-key", "--service-id=" + omServiceId};
     ozoneAdmin.execute(args);
 
     String actualOutput = outputStream.toString("UTF-8");

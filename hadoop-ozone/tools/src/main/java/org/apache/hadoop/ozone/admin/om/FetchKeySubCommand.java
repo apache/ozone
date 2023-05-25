@@ -27,10 +27,10 @@ import picocli.CommandLine;
 import javax.crypto.SecretKey;
 
 /**
- * Handler of ozone admin om fetch-current-key command.
+ * Handler of ozone admin om fetch-key command.
  */
 @CommandLine.Command(
-    name = "fetch-current-key",
+    name = "fetch-key",
     description = "CLI command to fetch the latest key",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
