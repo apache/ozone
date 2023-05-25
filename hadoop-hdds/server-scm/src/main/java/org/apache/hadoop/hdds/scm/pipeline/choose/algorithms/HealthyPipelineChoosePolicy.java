@@ -17,23 +17,27 @@
 
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The healthy pipeline choose policy that chooses pipeline
  * until return healthy pipeline.
  */
-public class HealthyPipelineChoosePolicy extends RandomPipelineChoosePolicy {
+public class HealthyPipelineChoosePolicy implements PipelineChoosePolicy {
+
+  private PipelineChoosePolicy randomPolicy = new RandomPipelineChoosePolicy();
 
   @Override
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
     Pipeline fallback = null;
     while (pipelineList.size() > 0) {
-      Pipeline pipeline = super.choosePipeline(pipelineList, pri);
+      Pipeline pipeline = randomPolicy.choosePipeline(pipelineList, pri);
       if (pipeline.isHealthy()) {
         return pipeline;
       } else {
@@ -47,9 +51,8 @@ public class HealthyPipelineChoosePolicy extends RandomPipelineChoosePolicy {
   @Override
   public int choosePipelineIndex(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
-    // As this class modified the passed in list, returning an index
-    // doesn't really make sense here. Throwing an exception incase any future
-    // code attempts to use this implementation.
-    throw new UnsupportedOperationException();
+    List<Pipeline> mutableList = new ArrayList<>(pipelineList);
+    Pipeline pipeline = choosePipeline(mutableList, pri);
+    return pipelineList.indexOf(pipeline);
   }
 }
