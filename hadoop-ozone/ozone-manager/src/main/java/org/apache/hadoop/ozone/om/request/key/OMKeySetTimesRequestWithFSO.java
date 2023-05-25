@@ -153,12 +153,6 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
         isDir, getBucketLayout(), volumeId, bucketId);
   }
 
-  /**
-   * Get the om client response on failure case with lock.
-   * @param omResponse
-   * @param exception
-   * @return OMClientResponse
-   */
   @Override
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {

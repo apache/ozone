@@ -140,13 +140,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Set mtime: {} to path: {} success!", modificationTime,
-            getKeyName());
-      }
+      LOG.debug("Set mtime: {} to path: {} success!", modificationTime,
+          getKeyName());
       break;
     case FAILURE:
-      LOG.error("Set mtime {} to path {} failed!", modificationTime,
+      LOG.warn("Set mtime {} to path {} failed!", modificationTime,
           getKeyName(), exception);
       break;
     default:
@@ -164,7 +162,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   }
 
   protected void apply(OmKeyInfo omKeyInfo) {
-    // No need to check not null here, this will be never called with null.
+    // No need to check not null here, this will never be called with null.
     long mtime = getModificationTime();
     if (mtime >= 0) {
       omKeyInfo.setModificationTime(getModificationTime());

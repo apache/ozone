@@ -66,7 +66,8 @@ public class OMKeySetTimesResponseWithFSO extends OMKeySetTimesResponse {
     super(omResponse, bucketLayout);
   }
 
-  @Override public void addToDBBatch(OMMetadataManager omMetadataManager,
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
