@@ -46,6 +46,7 @@ OZONE-SITE.XML_hdds.container.report.interval=60s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.recon.heatmap.provider=org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
