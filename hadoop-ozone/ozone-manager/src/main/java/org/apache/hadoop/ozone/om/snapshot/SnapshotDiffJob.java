@@ -29,6 +29,14 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
  * POJO for Snapshot diff job.
  */
 public class SnapshotDiffJob {
+
+  private static final Codec<SnapshotDiffJob> CODEC =
+      new SnapshotDiffJobCodec();
+
+  public static Codec<SnapshotDiffJob> getCodec() {
+    return CODEC;
+  }
+
   private long creationTime;
   private String jobId;
   private JobStatus status;
@@ -180,7 +188,8 @@ public class SnapshotDiffJob {
   /**
    * Codec to encode SnapshotDiffJob as byte array.
    */
-  public static class SnapshotDiffJobCodec implements Codec<SnapshotDiffJob> {
+  private static final class SnapshotDiffJobCodec
+      implements Codec<SnapshotDiffJob> {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
         .setSerializationInclusion(JsonInclude.Include.NON_NULL)

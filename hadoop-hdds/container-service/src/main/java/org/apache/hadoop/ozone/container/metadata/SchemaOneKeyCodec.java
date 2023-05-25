@@ -34,9 +34,19 @@ import org.slf4j.LoggerFactory;
  * prefixes in the data, and determining which format it should be
  * encoded/decoded to/from.
  */
-public class SchemaOneKeyCodec implements Codec<String> {
+public final class SchemaOneKeyCodec implements Codec<String> {
   private static final Logger LOG = LoggerFactory.getLogger(
       SchemaOneKeyCodec.class);
+
+  private static final Codec<String> INSTANCE = new SchemaOneKeyCodec();
+
+  public static Codec<String> get() {
+    return INSTANCE;
+  }
+
+  private SchemaOneKeyCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(String stringObject) {

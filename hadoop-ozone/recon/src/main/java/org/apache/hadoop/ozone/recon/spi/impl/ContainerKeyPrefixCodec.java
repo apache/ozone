@@ -32,11 +32,23 @@ import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 
 /**
- * Codec to encode ContainerKeyPrefix as byte array.
+ * Codec to serialize/deserialize {@link ContainerKeyPrefix}.
  */
-public class ContainerKeyPrefixCodec implements Codec<ContainerKeyPrefix> {
+public final class ContainerKeyPrefixCodec
+    implements Codec<ContainerKeyPrefix> {
 
   private static final String KEY_DELIMITER = "_";
+
+  private static final Codec<ContainerKeyPrefix> INSTANCE =
+      new ContainerKeyPrefixCodec();
+
+  public static Codec<ContainerKeyPrefix> get() {
+    return INSTANCE;
+  }
+
+  private ContainerKeyPrefixCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix)

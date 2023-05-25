@@ -333,7 +333,7 @@ public class RDBStore implements DBStore {
   @Override
   public Map<Integer, String> getTableNames() {
     Map<Integer, String> tableNames = new HashMap<>();
-    StringCodec stringCodec = new StringCodec();
+    StringCodec stringCodec = StringCodec.get();
 
     for (ColumnFamily columnFamily : getColumnFamilies()) {
       tableNames.put(columnFamily.getID(), columnFamily.getName(stringCodec));

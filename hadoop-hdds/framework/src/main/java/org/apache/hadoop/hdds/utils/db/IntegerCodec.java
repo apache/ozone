@@ -24,9 +24,20 @@ import javax.annotation.Nonnull;
 import java.util.function.IntFunction;
 
 /**
- * Codec to convert Integer to/from byte array.
+ * Codec to serialize/deserialize {@link Integer}.
  */
 public final class IntegerCodec implements Codec<Integer> {
+
+  private static final Codec<Integer> INSTANCE = new IntegerCodec();
+
+  public static Codec<Integer> get() {
+    return INSTANCE;
+  }
+
+  private IntegerCodec() {
+    // singleton
+  }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;
