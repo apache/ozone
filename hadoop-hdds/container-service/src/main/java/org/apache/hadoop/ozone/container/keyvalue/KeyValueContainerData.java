@@ -31,10 +31,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -51,6 +51,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
@@ -388,7 +389,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return
    */
   public String startKeyEmpty() {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (hasSchema(SCHEMA_V3)) {
       return getContainerKeyPrefix(getContainerID());
     }
     return null;
@@ -400,7 +401,7 @@ public class KeyValueContainerData extends ContainerData {
    * @return
    */
   public String containerPrefix() {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (hasSchema(SCHEMA_V3)) {
       return getContainerKeyPrefix(getContainerID());
     }
     return "";
@@ -414,9 +415,14 @@ public class KeyValueContainerData extends ContainerData {
    * @return formatted key
    */
   private String formatKey(String key) {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (hasSchema(SCHEMA_V3)) {
       key = getContainerKeyPrefix(getContainerID()) + key;
     }
     return key;
   }
+
+  public boolean hasSchema(String version) {
+    return KeyValueContainerUtil.isSameSchemaVersion(schemaVersion, version);
+  }
+
 }

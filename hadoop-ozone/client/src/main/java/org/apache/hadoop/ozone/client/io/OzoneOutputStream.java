@@ -23,28 +23,46 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
- * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneOutputStream extends OutputStream {
+public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   private final OutputStream outputStream;
   private final Syncable syncable;
 
   /**
-   * Constructs OzoneOutputStream with KeyOutputStream.
+   * Constructs an instance with a {@link Syncable} {@link OutputStream}.
    *
-   * @param syncable
+   * @param outputStream an {@link OutputStream} which is {@link Syncable}.
    */
-  public OzoneOutputStream(Syncable syncable) {
-    this((OutputStream)syncable, syncable);
+  public OzoneOutputStream(Syncable outputStream) {
+    this(Optional.of(Objects.requireNonNull(outputStream,
+                "outputStream == null"))
+        .filter(s -> s instanceof OutputStream)
+        .map(s -> (OutputStream)s)
+        .orElseThrow(() -> new IllegalArgumentException(
+            "The parameter syncable is not an OutputStream")),
+        outputStream);
   }
 
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link OutputStream}
+   * with an optional {@link Syncable} object.
+   *
+   * @param outputStream for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   */
   public OzoneOutputStream(OutputStream outputStream, Syncable syncable) {
-    this.outputStream = outputStream;
-    this.syncable = syncable;
+    this.outputStream = Objects.requireNonNull(outputStream,
+        "outputStream == null");
+    this.syncable = syncable != null ? syncable
+        : outputStream instanceof Syncable ? (Syncable) outputStream
+        : null;
   }
 
   @Override
@@ -70,12 +88,10 @@ public class OzoneOutputStream extends OutputStream {
 
   public void hsync() throws IOException {
     if (syncable != null) {
-      if (outputStream != null && outputStream != syncable) {
+      if (outputStream != syncable) {
         outputStream.flush();
       }
       syncable.hsync();
-    } else if (outputStream instanceof Syncable) {
-      ((Syncable)outputStream).hsync();
     } else {
       throw new UnsupportedOperationException(outputStream.getClass()
           + " is not " + Syncable.class.getSimpleName());

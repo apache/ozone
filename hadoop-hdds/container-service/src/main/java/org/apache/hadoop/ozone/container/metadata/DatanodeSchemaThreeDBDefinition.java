@@ -59,7 +59,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           BlockData.class,
-          new BlockDataCodec());
+          BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       METADATA =
@@ -68,7 +68,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
       DELETED_BLOCKS =
@@ -77,7 +77,7 @@ public class DatanodeSchemaThreeDBDefinition
           String.class,
           new FixedLengthStringCodec(),
           ChunkInfoList.class,
-          new ChunkInfoListCodec());
+          ChunkInfoList.getCodec());
 
   public static final DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       DELETE_TRANSACTION =

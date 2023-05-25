@@ -189,15 +189,17 @@ public final class TestNSSummaryTask {
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket1.length);
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket2.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket1.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket2.length);
 
       Assert.assertEquals(1, fileDistBucket1[0]);
-      for (int i = 1; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         Assert.assertEquals(0, fileDistBucket1[i]);
       }
       Assert.assertEquals(1, fileDistBucket2[1]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 1) {
           continue;
         }
@@ -295,12 +297,13 @@ public final class TestNSSummaryTask {
           nsSummaryForBucket2.getSizeOfFiles());
 
       int[] fileSizeDist = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileSizeDist.length);
+      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileSizeDist.length);
       // 1025L
       Assert.assertEquals(1, fileSizeDist[0]);
       // 2050L
       Assert.assertEquals(1, fileSizeDist[1]);
-      for (int i = 2; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 2; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         Assert.assertEquals(0, fileSizeDist[i]);
       }
     }

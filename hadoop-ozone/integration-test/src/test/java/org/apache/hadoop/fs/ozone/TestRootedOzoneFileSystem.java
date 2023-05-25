@@ -253,7 +253,7 @@ public class TestRootedOzoneFileSystem {
     } else {
       bucketLayout = BucketLayout.LEGACY;
       conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
-          OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY);
+          OzoneConfigKeys.OZONE_BUCKET_LAYOUT_LEGACY);
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -2284,7 +2284,7 @@ public class TestRootedOzoneFileSystem {
     String bucketNameLocal = RandomStringUtils.randomNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     ofs.mkdirs(volume);
-    LambdaTestUtils.intercept(FileNotFoundException.class,
+    LambdaTestUtils.intercept(OMException.class,
         () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
     ofs.delete(volume, true);

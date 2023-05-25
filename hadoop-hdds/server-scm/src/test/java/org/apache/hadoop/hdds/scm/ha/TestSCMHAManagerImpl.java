@@ -168,8 +168,6 @@ class TestSCMHAManagerImpl {
           scm2.removePeerFromHARing(randomScmId));
       assertTrue(ex.getMessage().contains("Peer"));
 
-      // TODO: try removing primordial node from ratis ring
-
       // try removing leader scm from ratis ring
       ex = assertThrows(IOException.class, () ->
           scm2.removePeerFromHARing(scm2.getScmId()));

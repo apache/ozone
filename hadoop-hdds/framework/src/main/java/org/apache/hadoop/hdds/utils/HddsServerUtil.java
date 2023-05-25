@@ -496,13 +496,13 @@ public final class HddsServerUtil {
    * @return {@link ScmBlockLocationProtocol}
    * @throws IOException
    */
-  public static SCMSecurityProtocol getScmSecurityClient(
+  public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
       OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         new SCMSecurityProtocolClientSideTranslatorPB(
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
     return TracingUtil.createProxy(scmSecurityClient,
-        SCMSecurityProtocol.class, conf);
+        SCMSecurityProtocolClientSideTranslatorPB.class, conf);
   }
 
   /**

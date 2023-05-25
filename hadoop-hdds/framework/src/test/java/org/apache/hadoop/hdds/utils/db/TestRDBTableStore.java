@@ -114,7 +114,7 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 

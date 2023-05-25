@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Path;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -136,12 +135,8 @@ public final class OzoneSecurityUtil {
     List<X509Certificate> x509Certificates =
         new ArrayList<>(pemEncodedCerts.size());
     for (String cert : pemEncodedCerts) {
-      try {
-        x509Certificates.add(CertificateCodec.getX509Certificate(cert));
-      } catch (CertificateException ex) {
-        LOG.error("Error while converting to X509 format", ex);
-        throw new IOException(ex);
-      }
+      x509Certificates.add(CertificateCodec.getX509Certificate(
+          cert, CertificateCodec::toIOException));
     }
     return x509Certificates;
   }

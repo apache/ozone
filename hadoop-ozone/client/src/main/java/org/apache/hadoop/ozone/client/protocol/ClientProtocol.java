@@ -291,15 +291,18 @@ public interface ClientProtocol {
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.
-   * @param volumeName Name of the Volume
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Starting point of the list, this bucket is excluded
+   *
+   * @param volumeName    Name of the Volume
+   * @param bucketPrefix  Bucket prefix to match
+   * @param prevBucket    Starting point of the list, this bucket is excluded
    * @param maxListResult Max number of buckets to return.
+   * @param hasSnapshot   flag to list the buckets which have snapshot.
    * @return {@code List<OzoneBucket>}
    * @throws IOException
    */
   List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                String prevBucket, int maxListResult)
+                                String prevBucket, int maxListResult,
+                                boolean hasSnapshot)
       throws IOException;
 
   /**

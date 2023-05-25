@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -83,13 +83,16 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
     if (rcNextSnapshot != null) {
       OmSnapshot nextSnapshot = (OmSnapshot) rcNextSnapshot.get();
-      DBStore nextSnapshotStore = nextSnapshot.getMetadataManager().getStore();
+      RDBStore nextSnapshotStore =
+          (RDBStore) nextSnapshot.getMetadataManager().getStore();
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
         processKeys(writeBatch, nextSnapshot.getMetadataManager(),
             nextDBKeysList, true);
         processDirs(writeBatch, nextSnapshot.getMetadataManager());
         nextSnapshotStore.commitBatchOperation(writeBatch);
+        nextSnapshotStore.getDb().flushWal(true);
+        nextSnapshotStore.getDb().flush();
       }
       // Decrement ref count
       rcNextSnapshot.close();
@@ -101,12 +104,15 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
     // Update From Snapshot Deleted Table.
     OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
-    DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
+    RDBStore fromSnapshotStore =
+        (RDBStore) fromSnapshot.getMetadataManager().getStore();
     try (BatchOperation fromSnapshotBatchOp =
              fromSnapshotStore.initBatchOperation()) {
       processKeys(fromSnapshotBatchOp, fromSnapshot.getMetadataManager(),
           reclaimKeysList, false);
       fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
+      fromSnapshotStore.getDb().flushWal(true);
+      fromSnapshotStore.getDb().flush();
     }
     // Decrement ref count
     rcFromSnapshot.close();

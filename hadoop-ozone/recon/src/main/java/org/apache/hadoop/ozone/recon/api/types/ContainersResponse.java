@@ -32,13 +32,14 @@ public class ContainersResponse {
   private ContainersResponseData containersResponseData;
 
   public ContainersResponse() {
-    this(0, new ArrayList<>());
+    this(0, new ArrayList<>(), 0);
   }
 
   public ContainersResponse(long totalCount,
-                            Collection<ContainerMetadata> containers) {
+                            Collection<ContainerMetadata> containers,
+                            long prevKey) {
     this.containersResponseData =
-        new ContainersResponseData(totalCount, containers);
+        new ContainersResponseData(totalCount, containers, prevKey);
   }
 
   public ContainersResponseData getContainersResponseData() {
@@ -61,15 +62,23 @@ public class ContainersResponse {
     private long totalCount;
 
     /**
+     * prevKey will be the last key of the previous page.
+     */
+    @JsonProperty("prevKey")
+    private long prevKey;
+
+    /**
      * An array of containers.
      */
     @JsonProperty("containers")
     private Collection<ContainerMetadata> containers;
 
     ContainersResponseData(long totalCount,
-                           Collection<ContainerMetadata> containers) {
+                           Collection<ContainerMetadata> containers,
+                           long prevKey) {
       this.totalCount = totalCount;
       this.containers = containers;
+      this.prevKey = prevKey;
     }
 
     public long getTotalCount() {
@@ -78,6 +87,10 @@ public class ContainersResponse {
 
     public Collection<ContainerMetadata> getContainers() {
       return containers;
+    }
+
+    public long getPrevKey() {
+      return prevKey;
     }
   }
 }

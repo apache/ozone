@@ -220,7 +220,7 @@ public class BlockDeletingService extends BackgroundService {
           long minReplicatedIndex =
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
-          if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
+          if (minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
@@ -294,11 +294,11 @@ public class BlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
       try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-        if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
           crr = deleteViaSchema2(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
           crr = deleteViaSchema3(meta, container, dataDir, startTime);
         } else {
           throw new UnsupportedOperationException(

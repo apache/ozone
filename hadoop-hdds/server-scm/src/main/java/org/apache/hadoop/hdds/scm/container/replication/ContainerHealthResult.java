@@ -76,7 +76,7 @@ public class ContainerHealthResult {
 
   /**
    * Class for Unhealthy container check results, where the container has some
-   * issue other than over or under replication.
+   * issue other than over- or under-replication.
    */
   public static class UnHealthyResult extends ContainerHealthResult {
 
@@ -91,21 +91,21 @@ public class ContainerHealthResult {
   public static class UnderReplicatedHealthResult
       extends ContainerHealthResult {
 
-    // For under replicated containers, the best remaining redundancy we can
+    // For under-replicated containers, the best remaining redundancy we can
     // have is 3 for EC-10-4, 2 for EC-6-3, 1 for EC-3-2 and 2 for Ratis.
-    // A container which is under-replicated due to decommission will have one
-    // more, ie 4, 3, 2, 3 respectively. Ideally we want to sort decommission
-    // only under-replication after all other under-replicated containers.
+    // A container which is under-replicated due to decommission or maintenance
+    // will have one more, ie 4, 3, 2, 3 respectively. Ideally we want to sort
+    // such under-replication after all other under-replicated containers.
     // It may also make sense to allow under-replicated containers a chance to
-    // retry once before processing the decommission only under replication.
-    // Therefore we should adjust the weighted remaining redundancy of
-    // decommission only under-replicated containers to a floor of 5 so they
-    // sort after an under-replicated container with 3 remaining replicas (
-    // EC-10-4) and plus one retry.
-    private static final int DECOMMISSION_REDUNDANCY = 5;
+    // retry once before processing the out-of-service under-replication.
+    // Therefore, we should adjust the weighted remaining redundancy of
+    // containers under-replicated only due to out-of-service to 5, so they
+    // sort after an under-replicated container with 3 remaining replicas
+    // (EC-10-4) and plus one retry.
+    private static final int OUT_OF_SERVICE_REDUNDANCY = 5;
 
     private final int remainingRedundancy;
-    private final boolean dueToDecommission;
+    private final boolean dueToOutOfService;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
     private boolean hasHealthyReplicas;
@@ -113,19 +113,19 @@ public class ContainerHealthResult {
     private int requeueCount = 0;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
-        int remainingRedundancy, boolean dueToDecommission,
+        int remainingRedundancy, boolean dueToOutOfService,
         boolean replicatedOkWithPending, boolean unrecoverable) {
-      this(containerInfo, remainingRedundancy, dueToDecommission,
+      this(containerInfo, remainingRedundancy, dueToOutOfService,
           replicatedOkWithPending, unrecoverable, HealthState.UNDER_REPLICATED);
     }
 
     protected UnderReplicatedHealthResult(ContainerInfo containerInfo,
-        int remainingRedundancy, boolean dueToDecommission,
+        int remainingRedundancy, boolean dueToOutOfService,
         boolean replicatedOkWithPending, boolean unrecoverable,
         HealthState healthState) {
       super(containerInfo, healthState);
       this.remainingRedundancy = remainingRedundancy;
-      this.dueToDecommission = dueToDecommission;
+      this.dueToOutOfService = dueToOutOfService;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
     }
@@ -155,8 +155,8 @@ public class ContainerHealthResult {
      */
     public int getWeightedRedundancy() {
       int result = requeueCount;
-      if (dueToDecommission) {
-        result += DECOMMISSION_REDUNDANCY;
+      if (dueToOutOfService) {
+        result += OUT_OF_SERVICE_REDUNDANCY;
       } else {
         result += getRemainingRedundancy();
       }
@@ -183,8 +183,8 @@ public class ContainerHealthResult {
      * unavailable.
      * @return True is the under-replication is caused by decommission.
      */
-    public boolean underReplicatedDueToDecommission() {
-      return dueToDecommission;
+    public boolean underReplicatedDueToOutOfService() {
+      return dueToOutOfService;
     }
 
     /**
@@ -237,11 +237,38 @@ public class ContainerHealthResult {
     public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
       this.hasHealthyReplicas = hasHealthyReplicas;
     }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("UnderReplicatedHealthResult{")
+          .append("containerId=").append(getContainerInfo().getContainerID())
+          .append(", state=").append(getHealthState())
+          .append(", remainingRedundancy=").append(remainingRedundancy);
+      if (dueToOutOfService) {
+        sb.append(" +dueToOutOfService");
+      }
+      if (sufficientlyReplicatedAfterPending) {
+        sb.append(" +sufficientlyReplicatedAfterPending");
+      }
+      if (unrecoverable) {
+        sb.append(" +unrecoverable");
+      }
+      if (hasHealthyReplicas) {
+        sb.append(" +hasHealthyReplicas");
+      }
+      if (hasUnReplicatedOfflineIndexes) {
+        sb.append(" +hasUnReplicatedOfflineIndexes");
+      }
+      if (requeueCount > 0) {
+        sb.append(" requeued:").append(requeueCount);
+      }
+      return sb.append("}").toString();
+    }
   }
 
   /**
    * Class to represent a container healthy state which is mis-Replicated. This
-   * means the container is neither over nor under replicated, but its replicas
+   * means the container is neither over- nor under-replicated, but its replicas
    * don't meet the requirements of the container placement policy. Eg the
    * containers are not spread across enough racks.
    */
@@ -250,13 +277,13 @@ public class ContainerHealthResult {
 
     /**
      * In UnderReplicatedHealthState, DECOMMISSION_REDUNDANCY is defined as
-     * 5 so that containers which are really under replicated get fixed as a
+     * 5 so that containers which are really under-replicated get fixed as a
      * priority over decommissioning hosts. We have defined that a container
-     * can only be mis replicated if it is not over or under replicated. Fixing
-     * mis replication is arguably less important than competing a decommission.
-     * So as a lot of mis replicated container do not block decommission, we
-     * set the redundancy of mis replicated containers to 6 so they sort after
-     * under / over replicated and decommissioning replicas in the under
+     * can only be mis-replicated if it is not over- or under-replicated. Fixing
+     * mis-replication is arguably less important than completing decommission.
+     * To avoid a lot of mis-replicated containers blocking decommission, we
+     * set the redundancy of mis-replicated containers to 6, so they sort after
+     * under/over-replicated and decommissioning replicas in the under
      * replication queue.
      */
     private static final int MIS_REP_REDUNDANCY = 6;

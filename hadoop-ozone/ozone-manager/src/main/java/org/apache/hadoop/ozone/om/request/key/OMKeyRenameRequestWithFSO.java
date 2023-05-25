@@ -57,6 +57,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -137,10 +138,17 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       OzoneFileStatus fromKeyFileStatus =
               OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
                       bucketName, fromKeyName, 0);
+
       // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
         // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+      }
+
+      if (fromKeyFileStatus.getKeyInfo().isHsync()) {
+        throw new OMException("Open file cannot be renamed since it is " +
+            "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
+            bucketName + ", key=" + fromKeyName, RENAME_OPEN_FILE);
       }
 
       // source existed
@@ -239,8 +247,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
       LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-                      "toKey:{}. Key: {} not found.", volumeName, bucketName,
-              fromKeyName, toKeyName, fromKeyName);
+                      "toKey:{}. Exception: {}.", volumeName, bucketName,
+              fromKeyName, toKeyName, exception.getMessage());
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
