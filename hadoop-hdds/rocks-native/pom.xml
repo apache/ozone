@@ -33,6 +33,26 @@
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-io</artifactId>
         </dependency>
+      <dependency>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-annotations</artifactId>
+        <scope>compile</scope>
+      </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -265,7 +285,7 @@
                             </execution>
                             <execution>
                                 <id>build-rocksjava</id>
-                                <phase>process-resources</phase>
+                                <phase>generate-resources</phase>
                                 <configuration>
                                     <tasks>
                                         <exec executable="chmod" failonerror="true">
@@ -317,7 +337,7 @@
                             </execution>
                             <execution>
                                 <id>copy-lib-file</id>
-                                <phase>prepare-package</phase>
+                                <phase>process-classes</phase>
                                 <configuration>
                                     <tasks>
                                         <copy toDir="${project.build.outputDirectory}">
@@ -343,6 +363,14 @@
                                 <include>**/lib*.jnilib</include>
                                 <include>**/lib*.dll</include>
                             </includes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>native</groups>
+                            <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -397,7 +425,7 @@
                         <executions>
                             <execution>
                                 <id>copy-jars</id>
-                                <phase>process-resources</phase>
+                                <phase>process-sources</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>
                                 </goals>
@@ -432,6 +460,25 @@
                                 </configuration>
                             </execution>
                         </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>disable-native-testing</id>
+            <activation>
+                <property>
+                    <name>!rocks_tools_native</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups>native</excludedGroups>
+                        </configuration>
                     </plugin>
                 </plugins>
             </build>

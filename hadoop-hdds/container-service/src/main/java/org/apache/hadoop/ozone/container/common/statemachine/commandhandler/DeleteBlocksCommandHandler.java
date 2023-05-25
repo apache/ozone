@@ -225,12 +225,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               cont.getContainerData();
           cont.writeLock();
           try {
-            if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+            if (containerData.hasSchema(SCHEMA_V1)) {
               markBlocksForDeletionSchemaV1(containerData, tx);
-            } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+            } else if (containerData.hasSchema(SCHEMA_V2)) {
               markBlocksForDeletionSchemaV2(containerData, tx,
                   newDeletionBlocks, tx.getTxID());
-            } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+            } else if (containerData.hasSchema(SCHEMA_V3)) {
               markBlocksForDeletionSchemaV3(containerData, tx,
                   newDeletionBlocks, tx.getTxID());
             } else {

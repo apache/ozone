@@ -138,13 +138,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         deletedKey = omMetadataManager.getOzoneDeletePathKey(
             keyInfo.getObjectID(), deletedKey);
 
-        // TODO: [SNAPSHOT] Acquire deletedTable write table lock
-
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
-
-        // TODO: [SNAPSHOT] Release deletedTable write table lock
-
       }
 
       // Delete the visited directory from deleted directory table

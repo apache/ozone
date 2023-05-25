@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -288,6 +289,14 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder addAllMetadata(Map<String, String> metadatamap) {
       this.metadata.putAll(metadatamap);
+      return this;
+    }
+
+    public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
+      addAllMetadata(metadatamap);
+      if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
+      }
       return this;
     }
 
