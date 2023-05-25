@@ -24,7 +24,6 @@ package org.apache.hadoop.hdds.scm.server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -33,6 +32,7 @@ import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -134,10 +134,15 @@ public class SCMClientProtocolServer implements
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ReconfigurationHandler reconfigurationHandler;
 
-  public SCMClientProtocolServer(OzoneConfiguration conf,
-      StorageContainerManager scm) throws IOException {
+  public SCMClientProtocolServer(
+      OzoneConfiguration conf,
+      StorageContainerManager scm,
+      ReconfigurationHandler reconfigurationHandler
+  ) throws IOException {
     this.scm = scm;
+    this.reconfigurationHandler = reconfigurationHandler;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -1306,20 +1311,20 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void startReconfigure() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    getScm().startReconfigurationTask();
+    scm.checkAdminAccess(getRemoteUser());
+    reconfigurationHandler.startReconfigurationTask();
   }
 
   @Override
   public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    return getScm().getReconfigurationTaskStatus();
+    scm.checkAdminAccess(getRemoteUser());
+    return reconfigurationHandler.getReconfigurationTaskStatus();
   }
 
   @Override
   public List<String> listReconfigureProperties() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    return Lists.newArrayList(getScm().getReconfigurableProperties());
+    scm.checkAdminAccess(getRemoteUser());
+    return reconfigurationHandler.getReconfigurableProperties();
   }
 
   @Override

@@ -44,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,10 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -73,6 +69,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -333,6 +330,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       new ThreadLocal<>();
 
   private static boolean securityEnabled = false;
+
+  private final ReconfigurationHandler reconfigurationHandler;
   private OzoneDelegationTokenSecretManager delegationTokenMgr;
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
@@ -470,13 +469,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmMetadataReader omMetadataReader;
   private OmSnapshotManager omSnapshotManager;
 
-  /** A list of property that are reconfigurable at runtime. */
-  private final SortedSet<String> reconfigurableProperties =
-      ImmutableSortedSet.of(
-          OZONE_ADMINISTRATORS,
-          OZONE_READONLY_ADMINISTRATORS
-      );
-
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -494,6 +486,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
+    reconfigurationHandler = new ReconfigurationHandler(conf)
+        .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
+        .register(OZONE_READONLY_ADMINISTRATORS,
+            this::reconfOzoneReadOnlyAdmins);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -3919,12 +3915,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return LOG;
   }
 
-  // ReconfigurableBase get base configuration
-  @Override
-  public Configuration getConf() {
-    return getConfiguration();
-  }
-
   public OzoneConfiguration getConfiguration() {
     return configuration;
   }
@@ -4611,7 +4601,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void startReconfigure() throws IOException {
     String operationName = "startOmReconfiguration";
     checkAdminUserPrivilege(operationName);
-    startReconfigurationTask();
+    reconfigurationHandler.startReconfigurationTask();
   }
 
   @Override // ReconfigureProtocol
@@ -4619,32 +4609,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     String operationName = "getOmReconfigurationStatus";
     checkAdminUserPrivilege(operationName);
-    return getReconfigurationTaskStatus();
+    return reconfigurationHandler.getReconfigurationTaskStatus();
   }
 
   @Override // ReconfigureProtocol
   public List<String> listReconfigureProperties() throws IOException {
     String operationName = "listOmReconfigurableProperties";
     checkAdminUserPrivilege(operationName);
-    return Lists.newArrayList(getReconfigurableProperties());
-  }
-
-  @Override // ReconfigurableBase
-  public Collection<String> getReconfigurableProperties() {
-    return reconfigurableProperties;
-  }
-
-  @Override // ReconfigurableBase
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
-      return reconfOzoneAdmins(newVal);
-    } else if (property.equals(OZONE_READONLY_ADMINISTRATORS)) {
-      return reconfOzoneReadOnlyAdmins(newVal);
-    } else {
-      throw new ReconfigurationException(property, newVal,
-          getConfiguration().get(property));
-    }
+    return reconfigurationHandler.getReconfigurableProperties();
   }
 
   private String reconfOzoneAdmins(String newVal) {
@@ -4681,5 +4653,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public ReplicationConfigValidator getReplicationConfigValidator() {
     return replicationConfigValidator;
+  }
+
+  @VisibleForTesting
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
   }
 }
