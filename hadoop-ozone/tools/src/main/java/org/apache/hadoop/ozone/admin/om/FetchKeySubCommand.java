@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -53,7 +56,15 @@ public class FetchKeySubCommand implements Callable<Void> {
       SecretKey key = managedSecretKey.getSecretKey();
       byte[] encodedKey = key.getEncoded();
       String keyString = Base64.getEncoder().encodeToString(encodedKey);
+
+      Instant expiryTime = managedSecretKey.getExpiryTime();
+      DateTimeFormatter formatter = DateTimeFormatter
+          .ofPattern("yyyy-MM-dd HH:mm:ss")
+          .withZone(ZoneOffset.UTC);
+      String expiryTimeString = formatter.format(expiryTime);
+
       System.out.println("Current Secret Key: " + keyString);
+      System.out.println("Expiry Time: " + expiryTimeString);
     }
     return null;
   }
