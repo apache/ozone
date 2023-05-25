@@ -37,8 +37,6 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
   /**
    * SCMService related variables.
    */
-
-  @SuppressWarnings("parameternumber")
   public SCMHATransactionBufferMonitorTask(
       SCMHADBTransactionBuffer transactionBuffer,
       SCMRatisServer server, long flushInterval) {
@@ -53,8 +51,8 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
       LOG.debug("Running TransactionFlushTask");
       // set latest snapshot to null for force snapshot
       // the value will be reset again when snapshot is taken
-      SnapshotInfo lastSnapshot = transactionBuffer.getLatestSnapshot();
-      transactionBuffer.setLatestSnapshot(null);
+      final SnapshotInfo lastSnapshot = transactionBuffer
+          .getLatestSnapshotRef().getAndSet(null);
       try {
         server.triggerSnapshot();
       } catch (IOException e) {
@@ -62,9 +60,8 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
       } finally {
         // under failure case, if unable to take snapshot, its value
         // is reset to previous known value
-        if (null == transactionBuffer.getLatestSnapshot()) {
-          transactionBuffer.setLatestSnapshot(lastSnapshot);
-        }
+        transactionBuffer.getLatestSnapshotRef().compareAndSet(
+            null, lastSnapshot);
       }
     }
   }

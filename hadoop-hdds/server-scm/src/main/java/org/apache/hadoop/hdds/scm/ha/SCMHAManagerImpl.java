@@ -97,25 +97,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
 
   }
-  
-  private void createStartTransactionBufferMonitor() {
-    long interval = conf.getTimeDuration(
-        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
-        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    SCMHATransactionBufferMonitorTask monitorTask
-        = new SCMHATransactionBufferMonitorTask(
-        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
-    trxBufferMonitorService =
-        new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
-            .setScmContext(scm.getScmContext())
-            .setServiceName("SCMHATransactionMonitor")
-            .setIntervalInMillis(interval)
-            .setWaitTimeInMillis(interval)
-            .setPeriodicalTask(monitorTask).build();
-    scm.getSCMServiceManager().register(trxBufferMonitorService);
-    trxBufferMonitorService.start();
-  }
 
   /**
    * {@inheritDoc}
@@ -150,6 +131,25 @@ public class SCMHAManagerImpl implements SCMHAManager {
     }
     grpcServer.start();
     createStartTransactionBufferMonitor();
+  }
+
+  private void createStartTransactionBufferMonitor() {
+    long interval = conf.getTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    SCMHATransactionBufferMonitorTask monitorTask
+        = new SCMHATransactionBufferMonitorTask(
+        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+    trxBufferMonitorService =
+        new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
+            .setScmContext(scm.getScmContext())
+            .setServiceName("SCMHATransactionMonitor")
+            .setIntervalInMillis(interval)
+            .setWaitTimeInMillis(interval)
+            .setPeriodicalTask(monitorTask).build();
+    scm.getSCMServiceManager().register(trxBufferMonitorService);
+    trxBufferMonitorService.start();
   }
 
   public SCMRatisServer getRatisServer() {

@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -29,6 +28,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -44,8 +45,9 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
-  private SnapshotInfo latestSnapshot;
-  private AtomicLong txFlushPending = new AtomicLong(0);
+  private final AtomicReference<SnapshotInfo> latestSnapshot
+      = new AtomicReference<>();
+  private final AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
@@ -100,19 +102,17 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    rwLock.writeLock().lock();
-    try {
-      return latestSnapshot;
-    } finally {
-      rwLock.writeLock().unlock();
-    }
+    return latestSnapshot.get();
   }
 
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
-    rwLock.writeLock().lock();
-    this.latestSnapshot = latestSnapshot;
-    rwLock.writeLock().unlock();
+    this.latestSnapshot.set(latestSnapshot);
+  }
+
+  @Override
+  public AtomicReference<SnapshotInfo> getLatestSnapshotRef() {
+    return latestSnapshot;
   }
 
   @Override
@@ -127,7 +127,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
       metadataStore.getStore().commitBatchOperation(currentBatchOperation);
       currentBatchOperation.close();
-      this.latestSnapshot = latestTrxInfo.toSnapshotInfo();
+      this.latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
       // reset batch operation
       currentBatchOperation = metadataStore.getStore().initBatchOperation();
 
@@ -165,7 +165,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
                 .setCurrentTerm(0)
                 .build();
       }
-      latestSnapshot = latestTrxInfo.toSnapshotInfo();
+      latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
     } finally {
       txFlushPending.set(0);
       lastSnapshotTimeMs = scm.getSystemClock().millis();

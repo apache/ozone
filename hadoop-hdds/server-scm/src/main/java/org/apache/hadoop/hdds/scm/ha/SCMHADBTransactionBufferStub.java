@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 // TODO: Move this class to test package after fixing Recon
@@ -93,6 +94,11 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
 
+  }
+
+  @Override
+  public AtomicReference<SnapshotInfo> getLatestSnapshotRef() {
+    return null;
   }
 
   @Override
