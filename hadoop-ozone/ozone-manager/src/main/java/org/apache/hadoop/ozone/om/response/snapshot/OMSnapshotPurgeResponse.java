@@ -139,8 +139,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       // If both next global and path snapshot are same, it may overwrite
       // nextPathSnapInfo.setPathPreviousSnapshotID(), adding this check
       // will prevent it.
-      if (nextGlobalSnapInfo != null && nextGlobalSnapInfo.getSnapshotID()
-          .equals(nextPathSnapInfo.getSnapshotID())) {
+      if (nextGlobalSnapInfo != null && nextPathSnapInfo != null &&
+          nextGlobalSnapInfo.getSnapshotID().equals(
+              nextPathSnapInfo.getSnapshotID())) {
         nextPathSnapInfo.setGlobalPreviousSnapshotID(
             snapInfo.getPathPreviousSnapshotID());
         metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
