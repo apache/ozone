@@ -92,6 +92,7 @@ public class DatanodeStateMachine implements Closeable {
   static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
+  private final ExecutorService pipelineCommandExecutorService;
   private final ConfigurationSource conf;
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
@@ -216,6 +217,11 @@ public class DatanodeStateMachine implements Closeable {
     reconstructECContainersCommandHandler =
         new ReconstructECContainersCommandHandler(conf, supervisor,
         ecReconstructionCoordinator);
+
+    pipelineCommandExecutorService = Executors
+        .newSingleThreadExecutor(new ThreadFactoryBuilder()
+            .setNameFormat("PipelineCommandHandlerThread-%d").build());
+
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
@@ -229,8 +235,10 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads(), clock,
             dnConf.getCommandQueueLimit()))
-        .addHandler(new ClosePipelineCommandHandler())
-        .addHandler(new CreatePipelineCommandHandler(conf))
+        .addHandler(
+            new ClosePipelineCommandHandler(pipelineCommandExecutorService))
+        .addHandler(new CreatePipelineCommandHandler(conf,
+            pipelineCommandExecutorService))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf,
             supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
@@ -410,20 +418,8 @@ public class DatanodeStateMachine implements Closeable {
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
     ecReconstructionMetrics.unRegister();
-    executorService.shutdown();
-    try {
-      if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-        executorService.shutdownNow();
-      }
-
-      if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-        LOG.error("Unable to shutdown state machine properly.");
-      }
-    } catch (InterruptedException e) {
-      LOG.error("Error attempting to shutdown.", e);
-      executorService.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
+    executorServiceShutdownGraceful(executorService);
+    executorServiceShutdownGraceful(pipelineCommandExecutorService);
 
     if (connectionManager != null) {
       connectionManager.close();
@@ -443,6 +439,23 @@ public class DatanodeStateMachine implements Closeable {
 
     if (queueMetrics != null) {
       DatanodeQueueMetrics.unRegister();
+    }
+  }
+
+  private void executorServiceShutdownGraceful(ExecutorService executor) {
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        LOG.error("Unable to shutdown state machine properly.");
+      }
+    } catch (InterruptedException e) {
+      LOG.error("Error attempting to shutdown.", e);
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
     }
   }
 
