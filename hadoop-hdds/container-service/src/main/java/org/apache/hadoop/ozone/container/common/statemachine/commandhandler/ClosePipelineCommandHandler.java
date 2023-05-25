@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -50,12 +50,12 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   private final AtomicLong invocationCount = new AtomicLong(0);
   private final AtomicInteger queuedCount = new AtomicInteger(0);
   private long totalTime;
-  private final ExecutorService executor;
+  private final Executor executor;
 
   /**
    * Constructs a closePipelineCommand handler.
    */
-  public ClosePipelineCommandHandler(ExecutorService executor) {
+  public ClosePipelineCommandHandler(Executor executor) {
     this.executor = executor;
   }
 

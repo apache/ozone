@@ -18,8 +18,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
@@ -61,19 +60,19 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   private final BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient;
 
   private long totalTime;
-  private final ExecutorService executor;
+  private final Executor executor;
 
   /**
    * Constructs a createPipelineCommand handler.
    */
   public CreatePipelineCommandHandler(ConfigurationSource conf,
-                                      ExecutorService executor) {
+                                      Executor executor) {
     this(RatisHelper.newRaftClient(conf), executor);
   }
 
   CreatePipelineCommandHandler(
       BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> newRaftClient,
-      ExecutorService executor) {
+      Executor executor) {
     this.newRaftClient = newRaftClient;
     this.executor = executor;
   }
@@ -177,20 +176,5 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return queuedCount.get();
-  }
-
-  @Override
-  public void stop() {
-    if (executor != null) {
-      try {
-        executor.shutdown();
-        if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
-          executor.shutdownNow();
-        }
-      } catch (InterruptedException ie) {
-        // Ignore, we don't really care about the failure.
-        Thread.currentThread().interrupt();
-      }
-    }
   }
 }
