@@ -613,13 +613,14 @@ public final class OmUtils {
   }
 
   /**
-   * Verify if key name contains invalid snapshot reserved word or not.
+   * Verify if key name contains snapshot reserved word.
    * This verification will run even when
    * ozone.om.keyname.character.check.enabled sets to false
    */
   public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
           throws OMException {
-    if (keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+    if (keyName != null && 
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
       throw new OMException(
           "Cannot create key under path reserved for "
               + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
