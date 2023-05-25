@@ -109,7 +109,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
-        ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
