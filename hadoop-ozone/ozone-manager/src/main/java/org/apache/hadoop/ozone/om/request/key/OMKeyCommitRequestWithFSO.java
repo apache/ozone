@@ -165,12 +165,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      List<OmKeyLocationInfo> uncommitted;
-      if (isHSync) {
-        uncommitted = Collections.emptyList();
-      } else {
-        uncommitted = omKeyInfo.updateLocationInfoList(locationInfoList, false);
-      }
+      List<OmKeyLocationInfo> uncommitted =
+          omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -215,8 +211,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
-          omKeyInfo);
+      OmKeyInfo pseudoKeyInfo;
+      if (isHSync) {
+        pseudoKeyInfo = null;
+      } else {
+        pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
+            omKeyInfo);
+      }
       if (pseudoKeyInfo != null) {
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
