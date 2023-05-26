@@ -30,9 +30,21 @@ import java.nio.ByteBuffer;
 import static org.apache.commons.compress.utils.CharsetNames.UTF_8;
 
 /**
- * Codec to encode KeyPrefixContainer as byte array.
+ * Codec to serialize/deserialize {@link KeyPrefixContainer}.
  */
-public class KeyPrefixContainerCodec implements Codec<KeyPrefixContainer> {
+public final class KeyPrefixContainerCodec
+    implements Codec<KeyPrefixContainer> {
+
+  private static final Codec<KeyPrefixContainer> INSTANCE =
+      new KeyPrefixContainerCodec();
+
+  public static Codec<KeyPrefixContainer> get() {
+    return INSTANCE;
+  }
+
+  private KeyPrefixContainerCodec() {
+    // singleton
+  }
 
   private static final String KEY_DELIMITER = "_";
 

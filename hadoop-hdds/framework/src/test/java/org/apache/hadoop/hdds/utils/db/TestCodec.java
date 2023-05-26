@@ -55,7 +55,7 @@ public final class TestCodec {
 
   @Test
   public void testIntegerCodec() throws Exception {
-    final IntegerCodec codec = new IntegerCodec();
+    final Codec<Integer> codec = IntegerCodec.get();
     runTest(codec, 0, Integer.BYTES);
     runTest(codec, 1, Integer.BYTES);
     runTest(codec, -1, Integer.BYTES);
@@ -87,7 +87,7 @@ public final class TestCodec {
 
   @Test
   public void testStringCodec() throws Exception {
-    final StringCodec codec = new StringCodec();
+    final StringCodec codec = StringCodec.get();
     runTest(codec, "", 0);
 
     for (int i = 0; i < NUM_LOOPS; i++) {

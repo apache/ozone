@@ -353,8 +353,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    registry.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+    registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     return registry.build();
   }
 
