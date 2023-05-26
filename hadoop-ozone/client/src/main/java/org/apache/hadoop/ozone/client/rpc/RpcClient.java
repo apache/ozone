@@ -1768,17 +1768,9 @@ public class RpcClient implements ClientProtocol {
         .addPreallocateBlocks(
             openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-
-    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
-    if (feInfo != null) {
-      // todo: need to support file encrypt,
-      //  https://issues.apache.org/jira/browse/HDDS-5892
-      throw new UnsupportedOperationException(
-          "FileEncryptionInfo is not yet supported in " +
-              "createMultipartStreamKey");
-    } else {
-      return new OzoneDataStreamOutput(keyOutputStream);
-    }
+    final OzoneOutputStream out = createSecureOutputStream(
+        openKey, keyOutputStream, null);
+    return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
   }
 
   @Override
