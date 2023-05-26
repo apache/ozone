@@ -112,6 +112,13 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
+   * Returns the total size of all 'OmKeyInfo' objects.
+   */
+  public long getDataSize() {
+    return dataSize;
+  }
+
+  /**
    * Builder of RepeatedOmKeyInfo.
    */
   public static class Builder {
