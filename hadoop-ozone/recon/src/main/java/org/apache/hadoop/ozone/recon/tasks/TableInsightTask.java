@@ -53,18 +53,18 @@ import static org.jooq.impl.DSL.using;
  * Class to iterate over the OM DB and store the total counts of volumes,
  * buckets, keys, open keys, deleted keys, etc.
  */
-public class TableCountTask implements ReconOmTask {
+public class TableInsightTask implements ReconOmTask {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TableCountTask.class);
+      LoggerFactory.getLogger(TableInsightTask.class);
 
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
   private ReconOMMetadataManager reconOMMetadataManager;
 
   @Inject
-  public TableCountTask(GlobalStatsDao globalStatsDao,
-                        Configuration sqlConfiguration,
-                        ReconOMMetadataManager reconOMMetadataManager) {
+  public TableInsightTask(GlobalStatsDao globalStatsDao,
+                          Configuration sqlConfiguration,
+                          ReconOMMetadataManager reconOMMetadataManager) {
     this.globalStatsDao = globalStatsDao;
     this.sqlConfiguration = sqlConfiguration;
     this.reconOMMetadataManager = reconOMMetadataManager;
@@ -109,7 +109,7 @@ public class TableCountTask implements ReconOmTask {
     writeCountsToDB(objectCountMap);
     writeCountsToDB(sizeCountMap);
 
-    LOG.info("Completed a 'reprocess' run of TableCountTask.");
+    LOG.info("Completed a 'reprocess' run of TableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -153,7 +153,7 @@ public class TableCountTask implements ReconOmTask {
 
   @Override
   public String getTaskName() {
-    return "TableCountTask";
+    return "TableInsightTask";
   }
 
   public Collection<String> getTaskTables() {
@@ -233,7 +233,7 @@ public class TableCountTask implements ReconOmTask {
     writeCountsToDB(objectCountMap);
     writeCountsToDB(objectSizeMap);  // Write size data to DB
 
-    LOG.info("Completed a 'process' run of TableCountTask.");
+    LOG.info("Completed a 'process' run of TableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 

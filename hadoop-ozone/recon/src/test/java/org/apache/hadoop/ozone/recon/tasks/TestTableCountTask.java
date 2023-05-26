@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -35,7 +34,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -55,7 +53,7 @@ import static org.mockito.Mockito.when;
 public class TestTableCountTask extends AbstractReconSqlDBTest {
 
   private GlobalStatsDao globalStatsDao;
-  private TableCountTask tableCountTask;
+  private TableInsightTask tableInsightTask;
   private DSLContext dslContext;
   private boolean isSetupDone = false;
 
@@ -64,7 +62,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
     globalStatsDao = getDao(GlobalStatsDao.class);
-    tableCountTask = new TableCountTask(globalStatsDao, getConfiguration(),
+    tableInsightTask = new TableInsightTask(globalStatsDao, getConfiguration(),
             omMetadataManager);
     dslContext = getDslContext();
   }
@@ -84,7 +82,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   public void testReprocess() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     // Mock 5 rows in each table and test the count
-    for (String tableName : tableCountTask.getTaskTables()) {
+    for (String tableName : tableInsightTask.getTaskTables()) {
       TypedTable<String, Object> table = mock(TypedTable.class);
       TypedTable.TypedTableIterator mockIter = mock(TypedTable
           .TypedTableIterator.class);
@@ -99,7 +97,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
           .thenReturn(false);
     }
 
-    Pair<String, Boolean> result = tableCountTask.reprocess(omMetadataManager);
+    Pair<String, Boolean> result = tableInsightTask.reprocess(omMetadataManager);
     assertTrue(result.getRight());
 
     assertEquals(5L, getCountForTable(KEY_TABLE));
@@ -113,7 +111,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   public void testProcess() {
     ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
     // Create 5 put, 1 delete and 1 update event for each table
-    for (String tableName: tableCountTask.getTaskTables()) {
+    for (String tableName: tableInsightTask.getTaskTables()) {
       for (int i = 0; i < 5; i++) {
         events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
       }
@@ -125,7 +123,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
       events.add(getOMUpdateEvent("item1", null, tableName, UPDATE));
     }
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(events);
-    tableCountTask.process(omUpdateEventBatch);
+    tableInsightTask.process(omUpdateEventBatch);
 
     // Verify 4 items in each table. (5 puts - 1 delete + 0 update)
     assertEquals(4L, getCountForTable(KEY_TABLE));
@@ -136,14 +134,14 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
 
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
-    for (String tableName: tableCountTask.getTaskTables()) {
+    for (String tableName: tableInsightTask.getTaskTables()) {
       newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT));
       // This delete event should be a noop since value is null
       newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE));
     }
 
     omUpdateEventBatch = new OMUpdateEventBatch(newEvents);
-    tableCountTask.process(omUpdateEventBatch);
+    tableInsightTask.process(omUpdateEventBatch);
 
     // Verify 5 items in each table. (1 new put + 0 delete)
     assertEquals(5L, getCountForTable(KEY_TABLE));
@@ -165,7 +163,7 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
   }
 
   private long getCountForTable(String tableName) {
-    String key = TableCountTask.getTableCountKeyFromTable(tableName);
+    String key = TableInsightTask.getTableCountKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
   }
 }

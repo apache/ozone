@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
-import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.hadoop.ozone.recon.tasks.TableInsightTask;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -124,21 +124,21 @@ public class ClusterStateEndpoint {
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(VOLUME_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(VOLUME_TABLE));
     GlobalStats bucketRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(BUCKET_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(BUCKET_TABLE));
     // Keys from OBJECT_STORE buckets.
     GlobalStats keyRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(KEY_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
     GlobalStats fileRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(FILE_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
     // Keys from the DeletedTable
     GlobalStats deletedKeyRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(DELETED_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(DELETED_TABLE));
     // Directories from the DeletedDirectoryTable
     GlobalStats deletedDirRecord = globalStatsDao.findById(
-        TableCountTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
+        TableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
