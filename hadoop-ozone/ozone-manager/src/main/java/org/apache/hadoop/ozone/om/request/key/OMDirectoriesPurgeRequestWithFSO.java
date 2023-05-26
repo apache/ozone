@@ -79,7 +79,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+                getSnapshotPrefix(snapshotInfo.getName()), true);
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {

@@ -33,6 +33,9 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +52,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,6 +234,29 @@ public final class ContainerUtils {
       throw new StorageContainerException("Unable to create Message Digest, " +
           "usually this is a java configuration issue.", NO_SUCH_ALGORITHM);
     }
+  }
+
+  public static boolean recentlyScanned(Container<?> container,
+      long minScanGap, Logger log) {
+    Optional<Instant> lastScanTime =
+        container.getContainerData().lastDataScanTime();
+    Instant now = Instant.now();
+    // Container is considered recently scanned if it was scanned within the
+    // configured time frame. If the optional is empty, the container was
+    // never scanned.
+    boolean recentlyScanned = lastScanTime.map(scanInstant ->
+        Duration.between(now, scanInstant).abs()
+            .compareTo(Duration.ofMillis(minScanGap)) < 0)
+        .orElse(false);
+
+    if (recentlyScanned && log.isDebugEnabled()) {
+      log.debug("Skipping scan for container {} which was last " +
+              "scanned at {}. Current time is {}.",
+          container.getContainerData().getContainerID(), lastScanTime.get(),
+          now);
+    }
+
+    return recentlyScanned;
   }
 
   /**

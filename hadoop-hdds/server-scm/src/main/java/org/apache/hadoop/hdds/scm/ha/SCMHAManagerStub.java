@@ -203,6 +203,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
       return SCMRatisResponse.decode(reply);
     }
 
+    @Override
+    public boolean triggerSnapshot() throws IOException {
+      throw new IOException("submitSnapshotRequest is called.");
+    }
+
     private Message process(final SCMRatisRequest request) throws Exception {
       try {
         final Object handler = handlers.get(request.getType());
