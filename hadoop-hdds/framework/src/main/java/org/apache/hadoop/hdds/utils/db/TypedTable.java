@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -51,23 +52,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   private final RDBTable rawTable;
 
-  private final CodecRegistry codecRegistry;
-
   private final Class<KEY> keyType;
-
+  private final Codec<KEY> keyCodec;
   private final Class<VALUE> valueType;
+  private final Codec<VALUE> valueCodec;
 
+  private final boolean supportCodecBuffer;
   private final TableCache<CacheKey<KEY>, CacheValue<VALUE>> cache;
 
   private static final long EPOCH_DEFAULT = -1L;
 
   /**
-   * Create an TypedTable from the raw table.
-   * Default cache type for the table is {@link CacheType#PARTIAL_CACHE}.
-   * @param rawTable
-   * @param codecRegistry
-   * @param keyType
-   * @param valueType
+   * The same as this(rawTable, codecRegistry, keyType, valueType,
+   *                  CacheType.PARTIAL_CACHE).
    */
   public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
@@ -78,21 +75,31 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   /**
    * Create an TypedTable from the raw table with specified cache type.
-   * @param rawTable
-   * @param codecRegistry
-   * @param keyType
-   * @param valueType
-   * @param cacheType
-   * @throws IOException
+   *
+   * @param rawTable The underlying (untyped) table in RocksDB.
+   * @param codecRegistry To look up codecs.
+   * @param keyType The key type.
+   * @param valueType The value type.
+   * @param cacheType How to cache the entries?
+   * @throws IOException if failed to iterate the raw table.
    */
   public TypedTable(RDBTable rawTable,
       CodecRegistry codecRegistry, Class<KEY> keyType,
       Class<VALUE> valueType,
       CacheType cacheType) throws IOException {
-    this.rawTable = rawTable;
-    this.codecRegistry = codecRegistry;
-    this.keyType = keyType;
-    this.valueType = valueType;
+    this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
+    Objects.requireNonNull(codecRegistry, "codecRegistry == null");
+
+    this.keyType = Objects.requireNonNull(keyType, "keyType == null");
+    this.keyCodec = codecRegistry.getCodecFromClass(keyType);
+    Objects.requireNonNull(keyCodec, "keyCodec == null");
+
+    this.valueType = Objects.requireNonNull(valueType, "valueType == null");
+    this.valueCodec = codecRegistry.getCodecFromClass(valueType);
+    Objects.requireNonNull(valueCodec, "valueCodec == null");
+
+    this.supportCodecBuffer = keyCodec.supportCodecBuffer()
+        && valueCodec.supportCodecBuffer();
 
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
@@ -115,38 +122,45 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  private byte[] encodeKey(KEY key) throws IOException {
+    return key == null ? null : keyCodec.toPersistedFormat(key);
+  }
+
+  private byte[] encodeValue(VALUE value) throws IOException {
+    return value == null ? null : valueCodec.toPersistedFormat(value);
+  }
+
+  private KEY decodeKey(byte[] key) throws IOException {
+    return key == null ? null : keyCodec.fromPersistedFormat(key);
+  }
+
+  private VALUE decodeValue(byte[] value) throws IOException {
+    return value == null ? null : valueCodec.fromPersistedFormat(value);
+  }
+
   @Override
   public void put(KEY key, VALUE value) throws IOException {
-    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
-    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
-    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+    if (supportCodecBuffer) {
       try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
            CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
         rawTable.put(k.asReadOnlyByteBuffer(), v.asReadOnlyByteBuffer());
       }
-      return;
+    } else {
+      rawTable.put(encodeKey(key), encodeValue(value));
     }
-
-    byte[] keyData = codecRegistry.asRawData(key);
-    byte[] valueData = codecRegistry.asRawData(value);
-    rawTable.put(keyData, valueData);
   }
 
   @Override
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value)
       throws IOException {
-    final Codec<KEY> keyCodec = codecRegistry.getCodec(key);
-    final Codec<VALUE> valueCodec = codecRegistry.getCodec(value);
-    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+    if (supportCodecBuffer) {
       // The buffers will be released after commit.
       rawTable.putWithBatch(batch,
           keyCodec.toDirectCodecBuffer(key),
           valueCodec.toDirectCodecBuffer(value));
+    } else {
+      rawTable.putWithBatch(batch, encodeKey(key), encodeValue(value));
     }
-
-    byte[] keyData = codecRegistry.asRawData(key);
-    byte[] valueData = codecRegistry.asRawData(value);
-    rawTable.putWithBatch(batch, keyData, valueData);
   }
 
   @Override
@@ -165,7 +179,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return false;
     } else {
-      return rawTable.isExist(codecRegistry.asRawData(key));
+      return rawTable.isExist(encodeKey(key));
     }
   }
 
@@ -190,8 +204,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
-      return codecRegistry.copyObject(cacheResult.getValue().getCacheValue(),
-          valueType);
+      return valueCodec.copyObject(cacheResult.getValue().getCacheValue());
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return null;
     } else {
@@ -258,8 +271,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
-      return codecRegistry.copyObject(cacheResult.getValue().getCacheValue(),
-          valueType);
+      return valueCodec.copyObject(cacheResult.getValue().getCacheValue());
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return null;
     } else {
@@ -268,47 +280,43 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   private VALUE getFromTable(KEY key) throws IOException {
-    byte[] keyBytes = codecRegistry.asRawData(key);
+    final byte[] keyBytes = encodeKey(key);
     byte[] valueBytes = rawTable.get(keyBytes);
-    return codecRegistry.asObject(valueBytes, valueType);
+    return decodeValue(valueBytes);
   }
 
   private VALUE getFromTableIfExist(KEY key) throws IOException {
-    byte[] keyBytes = codecRegistry.asRawData(key);
+    final byte[] keyBytes = encodeKey(key);
     byte[] valueBytes = rawTable.getIfExist(keyBytes);
-    return codecRegistry.asObject(valueBytes, valueType);
+    return decodeValue(valueBytes);
   }
 
   @Override
   public void delete(KEY key) throws IOException {
-    rawTable.delete(codecRegistry.asRawData(key));
+    rawTable.delete(encodeKey(key));
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key)
       throws IOException {
-    rawTable.deleteWithBatch(batch, codecRegistry.asRawData(key));
+    rawTable.deleteWithBatch(batch, encodeKey(key));
   }
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
-    rawTable.deleteRange(codecRegistry.asRawData(beginKey),
-        codecRegistry.asRawData(endKey));
+    rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
   }
 
   @Override
   public TableIterator<KEY, TypedKeyValue> iterator() throws IOException {
-    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
-        rawTable.iterator();
-    return new TypedTableIterator(iterator, keyType, valueType);
+    return new TypedTableIterator(rawTable.iterator());
   }
 
   @Override
   public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
       throws IOException {
-    TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator =
-        rawTable.iterator(codecRegistry.asRawData(prefix));
-    return new TypedTableIterator(iterator, keyType, valueType);
+    final byte[] prefixBytes = encodeKey(prefix);
+    return new TypedTableIterator(rawTable.iterator(prefixBytes));
   }
 
   @Override
@@ -357,14 +365,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
-    byte[] startKeyBytes = null;
-    byte[] prefixBytes = null;
-    if (startKey != null) {
-      startKeyBytes = codecRegistry.asRawData(startKey);
-    }
-    if (prefix != null) {
-      prefixBytes = codecRegistry.asRawData(prefix);
-    }
+    final byte[] startKeyBytes = encodeKey(startKey);
+    final byte[] prefixBytes = encodeKey(prefix);
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
@@ -383,14 +385,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
-    byte[] startKeyBytes = null;
-    byte[] prefixBytes = null;
-    if (startKey != null) {
-      startKeyBytes = codecRegistry.asRawData(startKey);
-    }
-    if (prefix != null) {
-      prefixBytes = codecRegistry.asRawData(prefix);
-    }
+    final byte[] startKeyBytes = encodeKey(startKey);
+    final byte[] prefixBytes = encodeKey(prefix);
 
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
         rawTable.getSequentialRangeKVs(startKeyBytes, count,
@@ -405,14 +401,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
       throws IOException {
-    rawTable.deleteBatchWithPrefix(batch, codecRegistry.asRawData(prefix));
+    rawTable.deleteBatchWithPrefix(batch, encodeKey(prefix));
   }
 
   @Override
   public void dumpToFileWithPrefix(File externalFile, KEY prefix)
       throws IOException {
-    rawTable.dumpToFileWithPrefix(externalFile,
-        codecRegistry.asRawData(prefix));
+    rawTable.dumpToFileWithPrefix(externalFile, encodeKey(prefix));
   }
 
   @Override
@@ -430,28 +425,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache;
   }
 
-  public Table<byte[], byte[]> getRawTable() {
-    return rawTable;
-  }
-
-  public CodecRegistry getCodecRegistry() {
-    return codecRegistry;
-  }
-
-  public Class<KEY> getKeyType() {
-    return keyType;
-  }
-
-  public Class<VALUE> getValueType() {
-    return valueType;
-  }
-
   /**
    * Key value implementation for strongly typed tables.
    */
   public class TypedKeyValue implements KeyValue<KEY, VALUE> {
 
-    private KeyValue<byte[], byte[]> rawKeyValue;
+    private final KeyValue<byte[], byte[]> rawKeyValue;
 
     public TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue) {
       this.rawKeyValue = rawKeyValue;
@@ -464,12 +443,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KEY getKey() throws IOException {
-      return codecRegistry.asObject(rawKeyValue.getKey(), keyType);
+      return decodeKey(rawKeyValue.getKey());
     }
 
     @Override
     public VALUE getValue() throws IOException {
-      return codecRegistry.asObject(rawKeyValue.getValue(), valueType);
+      return decodeValue(rawKeyValue.getValue());
     }
   }
 
@@ -478,18 +457,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   public class TypedTableIterator implements TableIterator<KEY, TypedKeyValue> {
 
-    private TableIterator<byte[], ? extends KeyValue<byte[], byte[]>>
+    private TableIterator<byte[], KeyValue<byte[], byte[]>>
         rawIterator;
-    private final Class<KEY> keyClass;
-    private final Class<VALUE> valueClass;
 
     public TypedTableIterator(
-        TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> rawIterator,
-        Class<KEY> keyType,
-        Class<VALUE> valueType) {
+        TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
       this.rawIterator = rawIterator;
-      keyClass = keyType;
-      valueClass = valueType;
     }
 
     @Override
@@ -504,7 +477,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public TypedKeyValue seek(KEY key) throws IOException {
-      byte[] keyBytes = codecRegistry.asRawData(key);
+      final byte[] keyBytes = encodeKey(key);
       KeyValue<byte[], byte[]> result = rawIterator.seek(keyBytes);
       if (result == null) {
         return null;

@@ -73,18 +73,17 @@ public class RDBStore implements DBStore {
   private final String snapshotsParentDir;
   private final RDBMetrics rdbMetrics;
   private final RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
-  private final String dbJmxBeanName;
 
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
-  private long maxDbUpdatesSizeThreshold;
+  private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
 
   @SuppressWarnings("parameternumber")
   public RDBStore(File dbFile, ManagedDBOptions dbOptions,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
-                  String dbJmxBeanNameName, boolean enableCompactionDag,
+                  String dbJmxBeanName, boolean enableCompactionDag,
                   long maxDbUpdatesSizeThreshold,
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration)
@@ -96,8 +95,6 @@ public class RDBStore implements DBStore {
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
     codecRegistry = registry;
     dbLocation = dbFile;
-    dbJmxBeanName = dbJmxBeanNameName == null ? dbFile.getName() :
-        dbJmxBeanNameName;
     this.dbOptions = dbOptions;
 
     try {
@@ -116,6 +113,9 @@ public class RDBStore implements DBStore {
 
       // dbOptions.statistics() only contribute to part of RocksDB metrics in
       // Ozone. Enable RocksDB metrics even dbOptions.statistics() is off.
+      if (dbJmxBeanName == null) {
+        dbJmxBeanName = dbFile.getName();
+      }
       metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
           dbJmxBeanName);
       if (metrics == null) {
