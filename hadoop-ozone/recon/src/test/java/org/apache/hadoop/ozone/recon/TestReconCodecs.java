@@ -37,7 +37,7 @@ public class TestReconCodecs {
     ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
         System.currentTimeMillis(), "TestKeyPrefix", 0);
 
-    Codec<ContainerKeyPrefix> codec = new ContainerKeyPrefixCodec();
+    Codec<ContainerKeyPrefix> codec = ContainerKeyPrefixCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(containerKeyPrefix);
     Assertions.assertTrue(persistedFormat != null);
     ContainerKeyPrefix fromPersistedFormat =
@@ -48,7 +48,7 @@ public class TestReconCodecs {
   @Test
   public void testIntegerCodec() throws IOException {
     Integer i = 1000;
-    Codec<Integer> codec = new IntegerCodec();
+    Codec<Integer> codec = IntegerCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(i);
     Assertions.assertTrue(persistedFormat != null);
     Integer fromPersistedFormat =

@@ -46,6 +46,7 @@ import java.util.Map;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -335,7 +336,7 @@ public class TestOzoneTokenIdentifier {
     idWrite.setOmServiceId("defaultServiceId");
 
     byte[] oldIdBytes = idWrite.getBytes();
-    TokenIdentifierCodec idCodec = new TokenIdentifierCodec();
+    Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();
 
     OzoneTokenIdentifier idRead = null;
     try {

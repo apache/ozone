@@ -22,9 +22,19 @@ import java.io.IOException;
 import com.google.common.primitives.Shorts;
 
 /**
- * Codec to convert Short to/from byte array.
+ * Codec to serialize/deserialize {@link Short}.
  */
-public class ShortCodec implements Codec<Short> {
+public final class ShortCodec implements Codec<Short> {
+
+  private static final Codec<Short> INSTANCE = new ShortCodec();
+
+  public static Codec<Short> get() {
+    return INSTANCE;
+  }
+
+  private ShortCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(Short object) throws IOException {

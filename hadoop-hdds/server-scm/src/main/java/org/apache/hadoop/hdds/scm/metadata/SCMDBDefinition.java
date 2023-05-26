@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
@@ -49,25 +50,25 @@ public class SCMDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_CERTS =
       new DBColumnFamilyDefinition<>(
           "validCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_SCM_CERTS =
       new DBColumnFamilyDefinition<>(
           "validSCMCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   /**
    * This column family is Deprecated in favor of REVOKED_CERTS_V2.
@@ -78,16 +79,16 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "revokedCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, CertInfo>
       REVOKED_CERTS_V2 =
       new DBColumnFamilyDefinition<>(
           "revokedCertsV2",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           CertInfo.class,
           CertInfo.getCodec());
 
@@ -98,7 +99,7 @@ public class SCMDBDefinition implements DBDefinition {
           PipelineID.class,
           PipelineID.getCodec(),
           Pipeline.class,
-          new PipelineCodec());
+          Pipeline.getCodec());
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
@@ -107,14 +108,14 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerID.class,
           ContainerID.getCodec(),
           ContainerInfo.class,
-          new ContainerInfoCodec());
+          ContainerInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
       new DBColumnFamilyDefinition<>(
           "scmTransactionInfos",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           TransactionInfo.class,
           TransactionInfo.getCodec());
 
@@ -131,7 +132,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -140,7 +141,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "sequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -152,7 +153,7 @@ public class SCMDBDefinition implements DBDefinition {
           ContainerID.class,
           ContainerID.getCodec(),
           MoveDataNodePair.class,
-          new MoveDataNodePairCodec());
+          MoveDataNodePair.getCodec());
 
   /**
    * Stores miscellaneous SCM metadata, including upgrade finalization status
@@ -162,16 +163,16 @@ public class SCMDBDefinition implements DBDefinition {
       META = new DBColumnFamilyDefinition<>(
           "meta",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           String.class,
-          new StringCodec());
+          StringCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ByteString>
       STATEFUL_SERVICE_CONFIG =
       new DBColumnFamilyDefinition<>(
           "statefulServiceConfig",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           ByteString.class,
           ByteStringCodec.getInstance());
 

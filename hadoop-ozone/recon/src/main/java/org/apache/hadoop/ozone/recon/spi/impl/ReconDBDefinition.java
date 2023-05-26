@@ -44,18 +44,18 @@ public class ReconDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containerKeyTable",
           ContainerKeyPrefix.class,
-          new ContainerKeyPrefixCodec(),
+          ContainerKeyPrefixCodec.get(),
           Integer.class,
-          new IntegerCodec());
+          IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<KeyPrefixContainer, Integer>
       KEY_CONTAINER =
       new DBColumnFamilyDefinition<>(
           "keyContainerTable",
           KeyPrefixContainer.class,
-          new KeyPrefixContainerCodec(),
+          KeyPrefixContainerCodec.get(),
           Integer.class,
-          new IntegerCodec());
+          IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<Long, Long>
       CONTAINER_KEY_COUNT =
@@ -81,7 +81,7 @@ public class ReconDBDefinition implements DBDefinition {
           Long.class,
           LongCodec.get(),
           NSSummary.class,
-          new NSSummaryCodec());
+          NSSummaryCodec.get());
 
   // Container Replica History with bcsId tracking.
   public static final DBColumnFamilyDefinition

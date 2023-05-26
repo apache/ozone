@@ -52,7 +52,7 @@ public class CRLDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 

@@ -51,7 +51,7 @@ public final class CodecRegistry {
     return new Builder()
         .addCodec(String.class, StringCodec.get())
         .addCodec(Long.class, LongCodec.get())
-        .addCodec(Integer.class, new IntegerCodec())
+        .addCodec(Integer.class, IntegerCodec.get())
         .addCodec(byte[].class, ByteArrayCodec.get());
   }
 

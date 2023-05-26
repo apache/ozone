@@ -712,7 +712,6 @@
       default permissions for OM,SCM,Recon,Datanode are not set.
     </description>
   </property>
-
   <property>
     <name>ozone.metastore.rocksdb.statistics</name>
     <value>OFF</value>
@@ -3436,6 +3435,18 @@
     <description>Wait duration before which close container
       is send to DN.</description>
   </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
+    <value>1024</value>
+    <tag>SCM, OZONE</tag>
+    <description>Raft snapshot gap index after which snapshot can be taken.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
+    <value>600s</value>
+    <tag>SCM, OZONE</tag>
+    <description>Wait duration for flush of buffered transaction.</description>
+  </property>
 
 
   <property>
@@ -3665,6 +3676,16 @@
     <description>
       Maximum threshold number of entries to hold in memory for NSSummary task in hashmap before flushing to
       recon rocks DB namespaceSummaryTable
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Fully qualified heatmap provider implementation class name. If this value is not set,
+      then will use the default implementation class  "org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl".
     </description>
   </property>
 

@@ -19,16 +19,19 @@
 package org.apache.hadoop.hdds.utils.db;
 
 /**
- * Codec to convert byte array to/from byte array.
+ * No-op codec for byte arrays.
  */
 public final class ByteArrayCodec implements Codec<byte[]> {
-  private static final ByteArrayCodec CODEC = new ByteArrayCodec();
 
-  public static ByteArrayCodec get() {
-    return CODEC;
+  private static final Codec<byte[]> INSTANCE = new ByteArrayCodec();
+
+  public static Codec<byte[]> get() {
+    return INSTANCE;
   }
 
-  private ByteArrayCodec() { }
+  private ByteArrayCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(byte[] bytes) {

@@ -4576,18 +4576,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private IOmMetadataReader getReader(OmKeyArgs keyArgs) throws IOException {
     return omSnapshotManager.checkForSnapshot(
-        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName(),
+        false);
   }
 
   private IOmMetadataReader getReader(String volumeName, String bucketName,
       String key) throws IOException {
-    return omSnapshotManager.checkForSnapshot(volumeName, bucketName, key);
+    return omSnapshotManager.checkForSnapshot(volumeName, bucketName, key,
+        false);
   }
 
   private IOmMetadataReader getReader(OzoneObj ozoneObj) throws IOException {
     return omSnapshotManager.checkForSnapshot(
         ozoneObj.getVolumeName(), ozoneObj.getBucketName(),
-        ozoneObj.getKeyName());
+        ozoneObj.getKeyName(), false);
   }
 
   public SnapshotDiffResponse snapshotDiff(String volume,

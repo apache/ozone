@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.BANDWIDTH_PER_VOLUME_DEFAULT;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP;
+import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.DATA_SCAN_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.METADATA_SCAN_INTERVAL_DEFAULT;
@@ -55,6 +57,7 @@ public class TestContainerScannerConfiguration {
 
     conf.setLong(METADATA_SCAN_INTERVAL_KEY, validInterval);
     conf.setLong(DATA_SCAN_INTERVAL_KEY, validInterval);
+    conf.setLong(CONTAINER_SCAN_MIN_GAP, validInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, validBandwidth);
     conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, validOnDemandBandwidth);
 
@@ -63,6 +66,7 @@ public class TestContainerScannerConfiguration {
 
     assertEquals(validInterval, csConf.getMetadataScanInterval());
     assertEquals(validInterval, csConf.getDataScanInterval());
+    assertEquals(validInterval, csConf.getContainerScanMinGap());
     assertEquals(validBandwidth, csConf.getBandwidthPerVolume());
     assertEquals(validOnDemandBandwidth,
         csConf.getOnDemandBandwidthPerVolume());
@@ -75,6 +79,7 @@ public class TestContainerScannerConfiguration {
 
     conf.setLong(METADATA_SCAN_INTERVAL_KEY, invalidInterval);
     conf.setLong(DATA_SCAN_INTERVAL_KEY, invalidInterval);
+    conf.setLong(CONTAINER_SCAN_MIN_GAP, invalidInterval);
     conf.setLong(VOLUME_BYTES_PER_SECOND_KEY, invalidBandwidth);
     conf.setLong(ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY, invalidBandwidth);
 
@@ -85,6 +90,8 @@ public class TestContainerScannerConfiguration {
         csConf.getMetadataScanInterval());
     assertEquals(DATA_SCAN_INTERVAL_DEFAULT,
         csConf.getDataScanInterval());
+    assertEquals(CONTAINER_SCAN_MIN_GAP_DEFAULT,
+        csConf.getContainerScanMinGap());
     assertEquals(BANDWIDTH_PER_VOLUME_DEFAULT,
         csConf.getBandwidthPerVolume());
     assertEquals(ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT,
@@ -105,5 +112,7 @@ public class TestContainerScannerConfiguration {
         csConf.getBandwidthPerVolume());
     assertEquals(ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT,
         csConf.getOnDemandBandwidthPerVolume());
+    assertEquals(CONTAINER_SCAN_MIN_GAP_DEFAULT,
+        csConf.getContainerScanMinGap());
   }
 }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -34,9 +35,10 @@ import java.util.Optional;
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
  */
-public class ContainerDataScanner extends AbstractContainerScanner {
+public class BackgroundContainerDataScanner extends
+    AbstractBackgroundContainerScanner {
   public static final Logger LOG =
-      LoggerFactory.getLogger(ContainerDataScanner.class);
+      LoggerFactory.getLogger(BackgroundContainerDataScanner.class);
 
   /**
    * The volume that we're scanning.
@@ -47,21 +49,28 @@ public class ContainerDataScanner extends AbstractContainerScanner {
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
+  private final long minScanGap;
 
-  public ContainerDataScanner(ContainerScannerConfiguration conf,
-                              ContainerController controller,
-                              HddsVolume volume) {
+  public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
+                                        ContainerController controller,
+                                        HddsVolume volume) {
     super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval());
     this.controller = controller;
     this.volume = volume;
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
+    this.minScanGap = conf.getContainerScanMinGap();
+  }
+
+  private boolean shouldScan(Container<?> container) {
+    return container.shouldScanData() &&
+        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 
   @Override
   public void scanContainer(Container<?> c) throws IOException {
-    if (!c.shouldScanData()) {
+    if (!shouldScan(c)) {
       return;
     }
     ContainerData containerData = c.getContainerData();
@@ -70,12 +79,12 @@ public class ContainerDataScanner extends AbstractContainerScanner {
     if (!c.scanData(throttler, canceler)) {
       metrics.incNumUnHealthyContainers();
       controller.markContainerUnhealthy(containerId);
-    } else {
-      Instant now = Instant.now();
-      logScanCompleted(containerData, now);
-      controller.updateDataScanTimestamp(containerId, now);
     }
+
     metrics.incNumContainersScanned();
+    Instant now = Instant.now();
+    logScanCompleted(containerData, now);
+    controller.updateDataScanTimestamp(containerId, now);
   }
 
   @Override
@@ -125,13 +134,15 @@ public class ContainerDataScanner extends AbstractContainerScanner {
 
     @Override
     public synchronized void throttle(long numOfBytes) {
-      ContainerDataScanner.this.metrics.incNumBytesScanned(numOfBytes);
+      BackgroundContainerDataScanner.this.metrics.incNumBytesScanned(
+          numOfBytes);
       super.throttle(numOfBytes);
     }
 
     @Override
     public synchronized void throttle(long numOfBytes, Canceler c) {
-      ContainerDataScanner.this.metrics.incNumBytesScanned(numOfBytes);
+      BackgroundContainerDataScanner.this.metrics.incNumBytesScanned(
+          numOfBytes);
       super.throttle(numOfBytes, c);
     }
   }
