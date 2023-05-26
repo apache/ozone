@@ -24,9 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.Map;
 
 /**
  * Simple interface to provide information to create a DBStore..
@@ -57,29 +55,9 @@ public interface DBDefinition {
   /**
    * @return The column families present in the DB.
    */
-  DBColumnFamilyDefinition[] getColumnFamilies();
+  Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies();
 
-  /**
-   * Get the key type class for the given table.
-   * @param table table name
-   * @return the class of key type of the given table wrapped in an
-   * {@link Optional}
-   */
-  default Optional<Class> getKeyType(String table) {
-    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
-        table)).map((Function<DBColumnFamilyDefinition, Class>)
-        DBColumnFamilyDefinition::getKeyType).findAny();
-  }
-
-  /**
-   * Get the value type class for the given table.
-   * @param table table name
-   * @return the class of value type of the given table wrapped in an
-   * {@link Optional}
-   */
-  default Optional<Class> getValueType(String table) {
-    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
-        table)).map((Function<DBColumnFamilyDefinition, Class>)
-        DBColumnFamilyDefinition::getValueType).findAny();
+  default DBColumnFamilyDefinition<?, ?> getColumnFamily(String name) {
+    return getColumnFamilies().get(name);
   }
 }

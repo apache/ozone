@@ -18,9 +18,9 @@
  */
 package org.apache.hadoop.ozone.recon.scm;
 
+import java.util.Map;
 import java.util.UUID;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -48,6 +48,10 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
           DatanodeDetails.class,
           DatanodeDetails.getCodec());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          SCMDBDefinition.get().getColumnFamilies(), NODES);
+
   @Override
   public String getName() {
     return RECON_SCM_DB_NAME;
@@ -59,7 +63,7 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return ArrayUtils.add(super.getColumnFamilies(), NODES);
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 }

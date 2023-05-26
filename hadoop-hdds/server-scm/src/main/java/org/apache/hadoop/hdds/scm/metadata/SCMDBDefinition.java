@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -42,6 +43,15 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
  * Class defines the structure and types of the scm.db.
  */
 public class SCMDBDefinition implements DBDefinition {
+  private static final SCMDBDefinition INSTANCE = new SCMDBDefinition();
+
+  public static SCMDBDefinition get() {
+    return INSTANCE;
+  }
+
+  public SCMDBDefinition() {
+    // TODO: change it to private to enforce singleton.
+  }
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETED_BLOCKS =
@@ -176,6 +186,23 @@ public class SCMDBDefinition implements DBDefinition {
           ByteString.class,
           ByteStringCodec.getInstance());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINERS,
+          CRLS,
+          CRL_SEQUENCE_ID,
+          DELETED_BLOCKS,
+          META,
+          MOVE,
+          PIPELINES,
+          REVOKED_CERTS,
+          REVOKED_CERTS_V2,
+          SEQUENCE_ID,
+          STATEFUL_SERVICE_CONFIG,
+          TRANSACTIONINFO,
+          VALID_CERTS,
+          VALID_SCM_CERTS);
+
   @Override
   public String getName() {
     return "scm.db";
@@ -187,10 +214,7 @@ public class SCMDBDefinition implements DBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META,
-        STATEFUL_SERVICE_CONFIG};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 }

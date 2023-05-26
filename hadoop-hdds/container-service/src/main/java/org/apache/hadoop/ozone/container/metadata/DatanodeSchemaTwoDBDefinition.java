@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
+import java.util.Map;
+
 /**
  * This class defines the RocksDB structure for datanodes following schema
  * version 2, where the block data, metadata, and transactions which are to be
@@ -77,11 +79,16 @@ public class DatanodeSchemaTwoDBDefinition extends
     super(dbPath, config);
   }
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          BLOCK_DATA,
+          METADATA,
+          DELETED_BLOCKS,
+          DELETE_TRANSACTION);
+
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
-        getDeleteTransactionsColumnFamily()};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 
   @Override

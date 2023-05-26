@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
+import java.util.Map;
+
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 /**
@@ -70,6 +72,12 @@ public class DatanodeSchemaOneDBDefinition
             ChunkInfoList.class,
             SchemaOneChunkInfoListCodec.get());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          BLOCK_DATA,
+          METADATA,
+          DELETED_BLOCKS);
+
   public DatanodeSchemaOneDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
@@ -93,8 +101,7 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getMetadataColumnFamily(),
-        getDeletedBlocksColumnFamily(), getBlockDataColumnFamily()};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 }

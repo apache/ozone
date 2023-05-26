@@ -195,7 +195,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       Path checkpointLocation = checkpoint.getCheckpointLocation();
       TransactionInfo checkpointTxnInfo = HAUtils
           .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
-              checkpointLocation, new SCMDBDefinition());
+              checkpointLocation, SCMDBDefinition.get());
 
       LOG.info("Installing checkpoint with SCMTransactionInfo {}",
           checkpointTxnInfo);
@@ -250,7 +250,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     Path checkpointLocation = dbCheckpoint.getCheckpointLocation();
     TransactionInfo checkpointTrxnInfo = HAUtils
         .getTrxnInfoFromCheckpoint(OzoneConfiguration.of(conf),
-            checkpointLocation, new SCMDBDefinition());
+            checkpointLocation, SCMDBDefinition.get());
 
     LOG.info("Installing checkpoint with SCMTransactionInfo {}",
         checkpointTrxnInfo);

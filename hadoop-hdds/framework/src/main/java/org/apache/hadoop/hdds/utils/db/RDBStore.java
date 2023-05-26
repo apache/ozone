@@ -346,11 +346,6 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public CodecRegistry getCodecRegistry() {
-    return codecRegistry;
-  }
-
-  @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
       throws SequenceNumberNotFoundException {
     return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);

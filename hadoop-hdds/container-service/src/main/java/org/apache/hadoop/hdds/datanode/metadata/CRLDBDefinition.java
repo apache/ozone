@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.File;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -55,6 +56,10 @@ public class CRLDBDefinition implements DBDefinition {
           StringCodec.get(),
           Long.class,
           LongCodec.get());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          PENDING_CRLS, CRL_SEQUENCE_ID);
 
   @Override
   public String getName() {
@@ -89,7 +94,7 @@ public class CRLDBDefinition implements DBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {PENDING_CRLS, CRL_SEQUENCE_ID};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 }

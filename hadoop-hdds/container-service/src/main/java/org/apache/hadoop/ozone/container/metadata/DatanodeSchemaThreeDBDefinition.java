@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 
+import java.util.Map;
+
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
@@ -91,6 +93,13 @@ public class DatanodeSchemaThreeDBDefinition
 
   private static String separator = "";
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+         BLOCK_DATA,
+         METADATA,
+         DELETED_BLOCKS,
+         DELETE_TRANSACTION);
+
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
@@ -115,10 +124,8 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
-        getDeleteTransactionsColumnFamily()};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return COLUMN_FAMILIES;
   }
 
   @Override

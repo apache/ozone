@@ -64,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -284,9 +285,16 @@ public final class HAUtils {
 
   public static Table<String, TransactionInfo> getTransactionInfoTable(
       DBStore dbStore, DBDefinition definition) throws IOException {
-    return Arrays.stream(definition.getColumnFamilies())
-        .filter(t -> t.getValueType() == TransactionInfo.class).findFirst()
-        .get().getTable(dbStore);
+    final Optional<DBColumnFamilyDefinition<?, ?>> columnFamily
+        = definition.getColumnFamilies().values().stream()
+        .filter(t -> t.getValueType() == TransactionInfo.class)
+        .findFirst();
+    if (!columnFamily.isPresent()) {
+      throw new IllegalArgumentException(
+          "TransactionInfo table not found from " + definition.getName());
+    }
+    return (Table<String, TransactionInfo>)
+        columnFamily.get().getTable(dbStore);
   }
 
   /**
@@ -330,7 +338,7 @@ public final class HAUtils {
             .setPath(Paths.get(metaDir.getPath()));
     // Add column family names and codecs.
     for (DBColumnFamilyDefinition columnFamily : definition
-        .getColumnFamilies()) {
+        .getColumnFamilies().values()) {
 
       dbStoreBuilder.addTable(columnFamily.getName());
       dbStoreBuilder

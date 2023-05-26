@@ -174,7 +174,7 @@ public final class DBStoreBuilder {
 
     // Add column family names and codecs.
     for (DBColumnFamilyDefinition columnFamily :
-        definition.getColumnFamilies()) {
+        definition.getColumnFamilies().values()) {
 
       addTable(columnFamily.getName(), columnFamily.getCfOptions());
       addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());

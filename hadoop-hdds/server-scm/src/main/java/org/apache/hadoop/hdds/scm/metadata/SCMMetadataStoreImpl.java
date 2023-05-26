@@ -121,7 +121,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       throws IOException {
     if (this.store == null) {
 
-      File metaDir = HAUtils.getMetaDir(new SCMDBDefinition(), configuration);
+      File metaDir = HAUtils.getMetaDir(SCMDBDefinition.get(), configuration);
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
       // the OM process should be terminated.
@@ -138,7 +138,7 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
       }
 
 
-      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+      this.store = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
 
       deletedBlocksTable =
           DELETED_BLOCKS.getTable(this.store);

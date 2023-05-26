@@ -307,11 +307,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return false;
     }
 
-    Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
-    for (DBColumnFamilyDefinition cfDef : dbDefinition.getColumnFamilies()) {
-      LOG.info("Found table: {}", cfDef.getTableName());
-      columnFamilyMap.put(cfDef.getTableName(), cfDef);
-    }
+    final Map<String, DBColumnFamilyDefinition<?, ?>> columnFamilyMap
+        = dbDefinition.getColumnFamilies();
     if (!columnFamilyMap.containsKey(tableName)) {
       err().print("Error: Table with name '" + tableName + "' not found");
       return false;
@@ -320,7 +317,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     DBColumnFamilyDefinition columnFamilyDefinition =
         columnFamilyMap.get(tableName);
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-        columnFamilyDefinition.getTableName().getBytes(UTF_8),
+        columnFamilyDefinition.getName().getBytes(UTF_8),
         columnFamilyHandleList);
     if (columnFamilyHandle == null) {
       throw new IllegalStateException("columnFamilyHandle is null");
