@@ -196,14 +196,6 @@ public class ContainerSet implements Iterable<Container<?>> {
     });
   }
 
-  /**
-   * Return an container Iterator over {@link ContainerSet#containerMap}.
-   * @return {@literal Iterator<Container<?>>}
-   */
-  public Iterator<Container<?>> getContainerIterator() {
-    return iterator();
-  }
-
   @Override
   public Iterator<Container<?>> iterator() {
     return containerMap.values().iterator();
