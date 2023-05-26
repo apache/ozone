@@ -44,11 +44,22 @@ public class ReferenceCounted<T> implements AutoCloseable {
   private final AtomicLong refCount;
 
   public ReferenceCounted(T obj) {
-    // TODO: Add a param to allow disabling ref counting to reduce active DB
-    //  access penalties due to AtomicLong operations?
+    this.obj = obj;
     this.threadMap = new ConcurrentHashMap<>();
     this.refCount = new AtomicLong(0L);
+  }
+
+  public ReferenceCounted(T obj, boolean disableCounter) {
+    // A param to allow disabling ref counting to reduce active DB
+    //  access penalties due to AtomicLong operations.
     this.obj = obj;
+    if (disableCounter) {
+      this.threadMap = null;
+      this.refCount = null;
+    } else {
+      this.threadMap = new ConcurrentHashMap<>();
+      this.refCount = new AtomicLong(0L);
+    }
   }
 
   /**
@@ -59,6 +70,10 @@ public class ReferenceCounted<T> implements AutoCloseable {
   }
 
   public long incrementRefCount() { // TODO: [SNAPSHOT] Rename to increment()
+    if (refCount == null) {
+      return -1L;
+    }
+
     long tid = Thread.currentThread().getId();
 
     // Put the new mapping if absent, atomically
@@ -80,6 +95,10 @@ public class ReferenceCounted<T> implements AutoCloseable {
   }
 
   public long decrementRefCount() {
+    if (refCount == null) {
+      return -1L;
+    }
+
     long tid = Thread.currentThread().getId();
 
     Preconditions.checkState(threadMap.containsKey(tid),
@@ -108,6 +127,10 @@ public class ReferenceCounted<T> implements AutoCloseable {
    * @return The total number of times the object has been held reference to.
    */
   public long getTotalRefCount() {
+    if (refCount == null) {
+      return -1L;
+    }
+
     return refCount.get();
   }
 
@@ -115,6 +138,10 @@ public class ReferenceCounted<T> implements AutoCloseable {
    * @return Number of times current thread has held reference to the object.
    */
   public long getCurrentThreadRefCount() {
+    if (refCount == null) {
+      return -1L;
+    }
+
     long tid = Thread.currentThread().getId();
     return threadMap.getOrDefault(tid, 0L);
   }
@@ -123,7 +150,6 @@ public class ReferenceCounted<T> implements AutoCloseable {
   public void close() {
     // Decrease ref count by 1 when close() is called on this object
     // so it is eligible to be used with try-with-resources.
-    // TODO: Double check.
     decrementRefCount();
   }
 }

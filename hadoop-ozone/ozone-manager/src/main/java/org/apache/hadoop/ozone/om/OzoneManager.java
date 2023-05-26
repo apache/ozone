@@ -832,7 +832,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         perfMetrics);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
-    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader);
+    // Active DB's OmMetadataReader instance does not need to be referenced
+    // counted, but it still needs to be wrapped to be consistent.
+    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true);
 
     // TODO: [SNAPSHOT] Revisit this in HDDS-8529.
     omSnapshotManager = new OmSnapshotManager(this);
