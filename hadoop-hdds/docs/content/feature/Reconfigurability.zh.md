@@ -110,13 +110,13 @@ ozone.example.config
 
 
 ### 批量操作
-如果要对 Datanode 执行批操作，可以将 `--address` 设置为 `inservicenodes`。<br>
+如果要对 Datanode 执行批操作，你可以设置 `--in-service-datanodes` 标志.
 这将向所有 operational state 为 “IN_SERVICE” 的可用 Datanode 发送 reconfig 请求。<br>
-执行批量操作时，必须使用 `-t/--type` 指定要操作的节点类型。 目前只有Datanode支持批量操作
+目前只有 Datanode 支持批量操作
 
 
 >例如, 列出 Datanode 所有可配置的属性:<br>
-> $ `ozone admin reconfig -t datanode --address=inservicenodes properties`<br>
+> $ `ozone admin reconfig --in-service-datanodes properties`<br>
 Datanode: Node [hadoop1:9864] Reconfigurable properties:<br>
 ozone.example.config<br>
 Datanode: Node [hadoop2:9864] Reconfigurable properties:<br>
