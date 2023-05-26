@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -44,7 +43,8 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -92,8 +92,10 @@ public class TableCountTask implements ReconOmTask {
       try {
         if (getTablesRequiringSizeCalculation().contains(tableName)) {
           Pair<Long, Long> details = getTableSizeAndCount(table);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
-          sizeCountMap.put(getTableSizeKeyFromTable(tableName), details.getRight());
+          objectCountMap.put(getTableCountKeyFromTable(tableName),
+              details.getLeft());
+          sizeCountMap.put(getTableSizeKeyFromTable(tableName),
+              details.getRight());
         } else {
           long count = getCount(table.iterator());
           objectCountMap.put(getTableCountKeyFromTable(tableName), count);
