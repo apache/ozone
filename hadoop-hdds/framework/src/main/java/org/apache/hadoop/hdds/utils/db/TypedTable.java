@@ -57,6 +57,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final Class<VALUE> valueType;
   private final Codec<VALUE> valueCodec;
 
+  private final boolean supportCodecBuffer;
   private final TableCache<CacheKey<KEY>, CacheValue<VALUE>> cache;
 
   private static final long EPOCH_DEFAULT = -1L;
@@ -97,6 +98,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     this.valueCodec = codecRegistry.getCodecFromClass(valueType);
     Objects.requireNonNull(valueCodec, "valueCodec == null");
 
+    this.supportCodecBuffer = keyCodec.supportCodecBuffer()
+        && valueCodec.supportCodecBuffer();
+
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>();
       //fill cache
@@ -136,28 +140,27 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void put(KEY key, VALUE value) throws IOException {
-    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+    if (supportCodecBuffer) {
       try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
            CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
         rawTable.put(k.asReadOnlyByteBuffer(), v.asReadOnlyByteBuffer());
       }
-      return;
+    } else {
+      rawTable.put(encodeKey(key), encodeValue(value));
     }
-
-    rawTable.put(encodeKey(key), encodeValue(value));
   }
 
   @Override
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value)
       throws IOException {
-    if (keyCodec.supportCodecBuffer() && valueCodec.supportCodecBuffer()) {
+    if (supportCodecBuffer) {
       // The buffers will be released after commit.
       rawTable.putWithBatch(batch,
           keyCodec.toDirectCodecBuffer(key),
           valueCodec.toDirectCodecBuffer(value));
+    } else {
+      rawTable.putWithBatch(batch, encodeKey(key), encodeValue(value));
     }
-
-    rawTable.putWithBatch(batch, encodeKey(key), encodeValue(value));
   }
 
   @Override
