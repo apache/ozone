@@ -640,7 +640,7 @@ public class ReconStorageContainerManagerFacade
             .setName(dbFile.getName())
             .setPath(dbFile.toPath().getParent());
     for (DBColumnFamilyDefinition columnFamily :
-        definition.getColumnFamilies().values()) {
+        definition.getColumnFamilies()) {
       dbStoreBuilder.addTable(columnFamily.getName());
       dbStoreBuilder.addCodec(columnFamily.getKeyType(),
           columnFamily.getKeyCodec());

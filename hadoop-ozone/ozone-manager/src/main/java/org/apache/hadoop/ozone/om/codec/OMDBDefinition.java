@@ -49,7 +49,7 @@ import java.util.Map;
 /**
  * Class defines the structure and types of the om.db.
  */
-public class OMDBDefinition implements DBDefinition {
+public class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =
@@ -274,6 +274,10 @@ public class OMDBDefinition implements DBDefinition {
           USER_TABLE,
           VOLUME_TABLE);
 
+  public OMDBDefinition() {
+    super(COLUMN_FAMILIES);
+  }
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -282,11 +286,6 @@ public class OMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-    return COLUMN_FAMILIES;
   }
 }
 

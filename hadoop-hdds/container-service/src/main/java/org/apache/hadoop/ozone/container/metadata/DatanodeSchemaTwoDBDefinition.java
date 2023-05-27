@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -35,8 +36,9 @@ import java.util.Map;
  * version 2, where the block data, metadata, and transactions which are to be
  * deleted are put in their own separate column families.
  */
-public class DatanodeSchemaTwoDBDefinition extends
-        AbstractDatanodeDBDefinition {
+public class DatanodeSchemaTwoDBDefinition
+    extends AbstractDatanodeDBDefinition
+    implements DBDefinition.WithMapInterface {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
@@ -87,7 +89,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           DELETE_TRANSACTION);
 
   @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
     return COLUMN_FAMILIES;
   }
 

@@ -49,9 +49,7 @@ import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -307,15 +305,12 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return false;
     }
 
-    final Map<String, DBColumnFamilyDefinition<?, ?>> columnFamilyMap
-        = dbDefinition.getColumnFamilies();
-    if (!columnFamilyMap.containsKey(tableName)) {
+    final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
+        dbDefinition.getColumnFamily(tableName);
+    if (columnFamilyDefinition == null) {
       err().print("Error: Table with name '" + tableName + "' not found");
       return false;
     }
-
-    DBColumnFamilyDefinition columnFamilyDefinition =
-        columnFamilyMap.get(tableName);
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
         columnFamilyDefinition.getName().getBytes(UTF_8),
         columnFamilyHandleList);

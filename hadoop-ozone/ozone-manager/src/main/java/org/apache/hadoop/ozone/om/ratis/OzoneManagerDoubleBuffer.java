@@ -481,7 +481,7 @@ public final class OzoneManagerDoubleBuffer {
     if (cleanupTableInfo != null) {
       final List<String> cleanupTables;
       if (cleanupTableInfo.cleanupAll()) {
-        cleanupTables = new OMDBDefinition().getColumnFamilies().values()
+        cleanupTables = new OMDBDefinition().getColumnFamilies()
             .stream()
             .map(DBColumnFamilyDefinition::getName)
             .collect(Collectors.toList());

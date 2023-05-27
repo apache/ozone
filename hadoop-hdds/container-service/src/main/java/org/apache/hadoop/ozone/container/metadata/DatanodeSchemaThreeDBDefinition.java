@@ -21,6 +21,7 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -54,7 +55,8 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
 public class DatanodeSchemaThreeDBDefinition
-    extends AbstractDatanodeDBDefinition {
+    extends AbstractDatanodeDBDefinition
+    implements DBDefinition.WithMapInterface {
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
@@ -124,7 +126,7 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
     return COLUMN_FAMILIES;
   }
 

@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Streams;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -64,7 +65,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -285,16 +285,10 @@ public final class HAUtils {
 
   public static Table<String, TransactionInfo> getTransactionInfoTable(
       DBStore dbStore, DBDefinition definition) throws IOException {
-    final Optional<DBColumnFamilyDefinition<?, ?>> columnFamily
-        = definition.getColumnFamilies().values().stream()
-        .filter(t -> t.getValueType() == TransactionInfo.class)
-        .findFirst();
-    if (!columnFamily.isPresent()) {
-      throw new IllegalArgumentException(
-          "TransactionInfo table not found from " + definition.getName());
-    }
     return (Table<String, TransactionInfo>)
-        columnFamily.get().getTable(dbStore);
+        Streams.stream(definition.getColumnFamilies())
+        .filter(t -> t.getValueType() == TransactionInfo.class).findFirst()
+        .get().getTable(dbStore);
   }
 
   /**
@@ -338,7 +332,7 @@ public final class HAUtils {
             .setPath(Paths.get(metaDir.getPath()));
     // Add column family names and codecs.
     for (DBColumnFamilyDefinition columnFamily : definition
-        .getColumnFamilies().values()) {
+        .getColumnFamilies()) {
 
       dbStoreBuilder.addTable(columnFamily.getName());
       dbStoreBuilder

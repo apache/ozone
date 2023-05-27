@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 /**
  * Class defines the structure and types of the scm.db.
  */
-public class SCMDBDefinition implements DBDefinition {
+public class SCMDBDefinition extends DBDefinition.WithMap {
   private static final SCMDBDefinition INSTANCE = new SCMDBDefinition();
 
   public static SCMDBDefinition get() {
@@ -50,7 +50,11 @@ public class SCMDBDefinition implements DBDefinition {
   }
 
   public SCMDBDefinition() {
-    // TODO: change it to private to enforce singleton.
+    this(COLUMN_FAMILIES);
+  }
+
+  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+    super(map);
   }
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
@@ -211,10 +215,5 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ScmConfigKeys.OZONE_SCM_DB_DIRS;
-  }
-
-  @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-    return COLUMN_FAMILIES;
   }
 }

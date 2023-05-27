@@ -38,7 +38,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Map;
 
 /**
  * Tests RDBStore creation.
@@ -173,14 +172,10 @@ public class TestDBStoreBuilder {
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-          new DBColumnFamilyDefinition<>(sampleTableName,
-              String.class, StringCodec.get(), Long.class, LongCodec.get());
-      private final Map<String, DBColumnFamilyDefinition<?, ?>> columnFamilies
-          = DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable);
-
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            String.class, StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(sampleTable) {
       {
         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
@@ -197,11 +192,6 @@ public class TestDBStoreBuilder {
       @Override
       public String getLocationConfigKey() {
         return null;
-      }
-
-      @Override
-      public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-        return columnFamilies;
       }
 
       @Override
@@ -253,14 +243,10 @@ public class TestDBStoreBuilder {
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-              new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-                      StringCodec.get(), Long.class, LongCodec.get());
-      private final Map<String, DBColumnFamilyDefinition<?, ?>> columnFamilies
-          = DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable);
-
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
+            StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(sampleTable) {
       @Override
       public String getName() {
         return "sampleDB";
@@ -269,11 +255,6 @@ public class TestDBStoreBuilder {
       @Override
       public String getLocationConfigKey() {
         return null;
-      }
-
-      @Override
-      public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-        return columnFamilies;
       }
 
       @Override

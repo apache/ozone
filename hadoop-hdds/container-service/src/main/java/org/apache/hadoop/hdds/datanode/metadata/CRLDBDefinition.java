@@ -38,7 +38,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 /**
  * Class defines the structure and types of the crl.db.
  */
-public class CRLDBDefinition implements DBDefinition {
+public class CRLDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<Long, CRLInfo> PENDING_CRLS =
       new DBColumnFamilyDefinition<>(
@@ -60,6 +60,11 @@ public class CRLDBDefinition implements DBDefinition {
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           PENDING_CRLS, CRL_SEQUENCE_ID);
+
+  public CRLDBDefinition() {
+    // TODO: change it to singleton
+    super(COLUMN_FAMILIES);
+  }
 
   @Override
   public String getName() {
@@ -91,10 +96,5 @@ public class CRLDBDefinition implements DBDefinition {
         + DNCertificateClient.COMPONENT_NAME
         + File.separator
         + OzoneConsts.CRL_DB_DIRECTORY_NAME);
-  }
-
-  @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-    return COLUMN_FAMILIES;
   }
 }

@@ -18,11 +18,13 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,12 +42,14 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
   public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
       Map<String, DBColumnFamilyDefinition<?, ?>> existing,
       DBColumnFamilyDefinition<?, ?>... families) {
-    final Map<String, DBColumnFamilyDefinition<?, ?>> map
-        = new HashMap<>(existing);
-    for (DBColumnFamilyDefinition<?, ?> f : families) {
-      map.put(f.getName(), f);
-    }
-    return Collections.unmodifiableMap(map);
+    return CollectionUtils.newUnmodifiableMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName, existing);
+  }
+
+  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>>
+      newUnmodifiableMultiMap(DBColumnFamilyDefinition<?, ?>... families) {
+    return CollectionUtils.newUnmodifiableMultiMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName);
   }
 
   private final String tableName;

@@ -33,11 +33,12 @@ import java.util.Map;
 /**
  * RocksDB definition for the DB internal to Recon.
  */
-public class ReconDBDefinition implements DBDefinition {
+public class ReconDBDefinition extends DBDefinition.WithMap {
 
   private final String dbName;
 
   public ReconDBDefinition(String dbName) {
+    super(COLUMN_FAMILIES);
     this.dbName = dbName;
   }
 
@@ -112,10 +113,5 @@ public class ReconDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-  }
-
-  @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-    return COLUMN_FAMILIES;
   }
 }

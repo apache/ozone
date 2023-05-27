@@ -24,6 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -55,9 +58,69 @@ public interface DBDefinition {
   /**
    * @return The column families present in the DB.
    */
-  Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies();
+  Iterable<DBColumnFamilyDefinition<?, ?>> getColumnFamilies();
 
+  /**
+   * @return The column families for the given name.
+   */
+  List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(String name);
+
+
+  /**
+   * @return The unique column family for the given name.
+   */
   default DBColumnFamilyDefinition<?, ?> getColumnFamily(String name) {
-    return getColumnFamilies().get(name);
+    final List<DBColumnFamilyDefinition<?, ?>> list = getColumnFamilies(name);
+    if (list == null || list.isEmpty()) {
+      return null;
+    }
+    if (list.size() > 1) {
+      throw new IllegalStateException("Multi-valued: The name " + name
+          + " maps to multiple values " + list + " in " + getName());
+    }
+    return list.get(0);
+  }
+
+  /**
+   * Define a {@link WithMapInterface#getMap()} methods
+   * to implement {@link #getColumnFamily(String)}
+   * and {@link #getColumnFamilies()}.
+   */
+  interface WithMapInterface extends DBDefinition {
+    /** @return the underlying map. */
+    Map<String, DBColumnFamilyDefinition<?, ?>> getMap();
+
+    @Override
+    default Collection<DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+      return getMap().values();
+    }
+
+    @Override
+    default List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(
+        String name) {
+      final DBColumnFamilyDefinition<?, ?> d = getMap().get(name);
+      return d != null ? Collections.singletonList(d) : Collections.emptyList();
+    }
+  }
+
+  /**
+   * Provide constructors to initialize {@link #map}
+   * and use it to implement {@link #getMap()}.
+   */
+  abstract class WithMap implements WithMapInterface {
+    private final Map<String, DBColumnFamilyDefinition<?, ?>> map;
+
+    protected WithMap(DBColumnFamilyDefinition<?, ?> def) {
+      this(DBColumnFamilyDefinition.newUnmodifiableMap(def));
+    }
+
+    protected WithMap(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+      this.map = map;
+    }
+
+    @Override
+    public final Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
+      return map;
+    }
   }
 }

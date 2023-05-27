@@ -50,7 +50,11 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-          SCMDBDefinition.get().getColumnFamilies(), NODES);
+          SCMDBDefinition.get().getMap(), NODES);
+
+  public ReconSCMDBDefinition() {
+    super(COLUMN_FAMILIES);
+  }
 
   @Override
   public String getName() {
@@ -60,10 +64,5 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-  }
-
-  @Override
-  public Map<String, DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
-    return COLUMN_FAMILIES;
   }
 }
