@@ -490,8 +490,6 @@ public class TestSnapshotDiffManager {
           if (objectId > 25 && objectId < 50) {
             diffMap.put(objectId, SnapshotDiffReport.DiffType.CREATE);
           }
-
-
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -565,7 +563,6 @@ public class TestSnapshotDiffManager {
                     return null;
                   }).when(mock).put(Matchers.any(), Matchers.any());
               })) {
-
       String testJobId = "jobId";
       String testJobId2 = "jobId2";
       SnapshotDiffManager snapshotDiffManager =

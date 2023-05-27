@@ -90,7 +90,7 @@ public class SnapshotTestUtils {
   public static class StubbedPersistentMap<K, V> implements
       PersistentMap<K, V>  {
 
-    private Map<K, V> map;
+    private final Map<K, V> map;
 
     public StubbedPersistentMap(Map<K, V> map) {
       this();
@@ -130,7 +130,7 @@ public class SnapshotTestUtils {
    * @param <K>
    */
   public static class StubbedPersistentSet<K> implements PersistentSet<K> {
-    private Set<K> set;
+    private final Set<K> set;
 
     public StubbedPersistentSet(Set<K> map) {
       this();
