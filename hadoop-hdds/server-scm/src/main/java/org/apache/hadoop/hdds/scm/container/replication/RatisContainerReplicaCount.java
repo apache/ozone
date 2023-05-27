@@ -359,7 +359,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    *         for under replicated and a negative value for over replicated.
    */
   private int missingReplicas() {
-    int delta = repFactor - getAvailableReplicas();
+    int availableReplicas = getAvailableReplicas();
+    int delta = repFactor - availableReplicas;
 
     if (delta < 0) {
       // Over replicated, so may need to remove a container.
@@ -368,7 +369,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       // May be under-replicated, depending on maintenance.
       delta = Math.max(0, delta - getMaintenanceCount());
       int neededHealthy =
-          Math.max(0, minHealthyForMaintenance - getAvailableReplicas());
+          Math.max(0, minHealthyForMaintenance - availableReplicas);
       delta = Math.max(neededHealthy, delta);
       return delta;
     } else { // delta == 0
