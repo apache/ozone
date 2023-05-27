@@ -192,11 +192,7 @@ public class ContainerController {
     return handlers.get(container.getContainerType());
   }
 
-  public Iterator<Container<?>> getContainers() {
-    return containerSet.getContainerIterator();
-  }
-
-  public Iterable<Container<?>> getContainerSet() {
+  public Iterable<Container<?>> getContainers() {
     return containerSet;
   }
 
