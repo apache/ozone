@@ -43,8 +43,6 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.NativeConstants;
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -251,11 +249,6 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
-    if (!NativeLibraryLoader.getInstance()
-        .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
-      return Optional.empty();
-    }
-
     try {
       int threadPoolSize = conf.getInt(
               OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
@@ -439,15 +432,16 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @VisibleForTesting
-  SnapshotDiffReportOzone createPageResponse(
-      final SnapshotDiffJob snapDiffJob,
-      final String volumeName,
-      final String bucketName,
-      final String fromSnapshotName,
-      final String toSnapshotName,
-      final int index,
-      final int pageSize
-  ) throws IOException {
+  SnapshotDiffReportOzone createPageResponse(final SnapshotDiffJob snapDiffJob,
+      final String volumeName, final String bucketName,
+      final String fromSnapshotName, final String toSnapshotName,
+      final int index, final int pageSize) throws IOException {
+    if (index < 0 || pageSize <= 0) {
+      throw new IllegalArgumentException(String.format(
+          "Index should be a number >= 0. Given index %d. Page size " +
+          "should be a positive number > 0. Given page size is %d",
+          index, pageSize));
+    }
     List<DiffReportEntry> diffReportList = new ArrayList<>();
 
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);
@@ -485,7 +479,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private void checkReportsIntegrity(final SnapshotDiffJob diffJob,
                                      final int totalDiffEntries)
       throws IOException {
-    if (diffJob.getTotalDiffEntries() != totalDiffEntries) {
+    if (diffJob.getTotalDiffEntries() > totalDiffEntries) {
       LOG.error("Expected TotalDiffEntries: {} but found only " +
               "TotalDiffEntries: {}",
           diffJob.getTotalDiffEntries(),

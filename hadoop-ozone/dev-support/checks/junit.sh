@@ -42,7 +42,7 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
 fi
 
-if [[ "${SKIP_NATIVE_VERSION_CHECK}" != "true" ]]; then
+if [[ "${SKIP_NATIVE_VERSION_CHECK}" == "false" ]]; then
   NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
   . "$DIR/native_check.sh"
   init_native_maven_opts
