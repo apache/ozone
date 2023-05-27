@@ -55,7 +55,7 @@ public class InterSCMGrpcService extends
     Preconditions.checkNotNull(scm);
     this.scm = scm;
     this.transactionInfoTable = HAUtils.getTransactionInfoTable(
-        scm.getScmMetadataStore().getStore(), SCMDBDefinition.get());
+        scm.getScmMetadataStore().getStore(), new SCMDBDefinition());
     provider =
         new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
   }

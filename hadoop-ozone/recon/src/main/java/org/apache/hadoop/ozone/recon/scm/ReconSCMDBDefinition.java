@@ -50,7 +50,7 @@ public class ReconSCMDBDefinition extends SCMDBDefinition {
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-          SCMDBDefinition.get().getMap(), NODES);
+          new SCMDBDefinition().getMap(), NODES);
 
   public ReconSCMDBDefinition() {
     super(COLUMN_FAMILIES);

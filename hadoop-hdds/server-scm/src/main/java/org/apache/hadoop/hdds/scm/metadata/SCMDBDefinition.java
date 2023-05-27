@@ -43,12 +43,6 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
  * Class defines the structure and types of the scm.db.
  */
 public class SCMDBDefinition extends DBDefinition.WithMap {
-  private static final SCMDBDefinition INSTANCE = new SCMDBDefinition();
-
-  public static SCMDBDefinition get() {
-    return INSTANCE;
-  }
-
   public SCMDBDefinition() {
     this(COLUMN_FAMILIES);
   }
