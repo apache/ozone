@@ -214,7 +214,6 @@ public class ReplicationManager implements SCMService {
    * @param clock Clock object used to get the current time
    * @param legacyReplicationManager The legacy ReplicationManager instance
    * @param replicaPendingOps The pendingOps instance
-   * @throws IOException
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
@@ -528,7 +527,6 @@ public class ReplicationManager implements SCMService {
    * @param replicaIndex The index of the container replica to be replicated
    * @return A pair containing the datanode that the command was sent to, and
    *         the command created.
-   * @throws CommandTargetOverloadedException
    */
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
@@ -638,7 +636,6 @@ public class ReplicationManager implements SCMService {
    * @param target The target to push container replica to
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendLowPriorityReplicateContainerCommand(
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
@@ -656,7 +653,6 @@ public class ReplicationManager implements SCMService {
    * @param command The command to send.
    * @param containerInfo The container the command is for.
    * @param target The datanode which will receive the command.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
@@ -673,7 +669,6 @@ public class ReplicationManager implements SCMService {
    * @param target The datanode which will receive the command.
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target,
@@ -956,7 +951,6 @@ public class ReplicationManager implements SCMService {
    * ContainerReplicaCount object for the container.
    * @param containerID The ID of the container
    * @return ContainerReplicaCount for the given container
-   * @throws ContainerNotFoundException
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
@@ -977,7 +971,6 @@ public class ReplicationManager implements SCMService {
    * replication health and return the health status.
    * @param containerInfo The container to check
    * @param replicas The set of replicas to use to check for the check
-   * @return
    */
   public ContainerHealthResult getContainerReplicationHealth(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas) {

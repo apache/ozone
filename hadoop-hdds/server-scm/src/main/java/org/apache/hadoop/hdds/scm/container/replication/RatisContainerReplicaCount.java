@@ -487,8 +487,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Return the delta from the expected number of replicas, optionally
    * considering inflight add and deletes.
-   * @param includePendingDelete
-   * @param includePendingAdd
    * @return zero if perfectly replicated, a negative value for over replication
    *         and a positive value for under replication. The magnitude of the
    *         return value indicates how many replias the container is over or
