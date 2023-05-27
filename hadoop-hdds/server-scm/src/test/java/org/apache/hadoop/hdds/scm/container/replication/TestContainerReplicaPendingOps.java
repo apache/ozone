@@ -110,7 +110,7 @@ public class TestContainerReplicaPendingOps {
       Assertions.assertEquals(ADD, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
-        .map(s -> s.getTarget()).collect(Collectors.toList());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
     Assertions.assertTrue(allDns.contains(dn1));
     Assertions.assertTrue(allDns.contains(dn2));
     Assertions.assertTrue(allDns.contains(dn3));
@@ -137,7 +137,7 @@ public class TestContainerReplicaPendingOps {
       Assertions.assertEquals(DELETE, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
-        .map(s -> s.getTarget()).collect(Collectors.toList());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
     Assertions.assertTrue(allDns.contains(dn1));
     Assertions.assertTrue(allDns.contains(dn2));
     Assertions.assertTrue(allDns.contains(dn3));
@@ -234,7 +234,7 @@ public class TestContainerReplicaPendingOps {
     Assertions.assertEquals(2, ops.size());
     // We should lose the entries for DN1
     List<DatanodeDetails> dns = ops.stream()
-        .map(s -> s.getTarget())
+        .map(ContainerReplicaOp::getTarget)
         .collect(Collectors.toList());
     Assertions.assertFalse(dns.contains(dn1));
     Assertions.assertTrue(dns.contains(dn2));
