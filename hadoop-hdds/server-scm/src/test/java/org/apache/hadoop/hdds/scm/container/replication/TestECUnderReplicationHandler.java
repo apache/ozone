@@ -99,9 +99,9 @@ public class TestECUnderReplicationHandler {
   private PlacementPolicy ecPlacementPolicy;
   private int remainingMaintenanceRedundancy = 1;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
-  private AtomicBoolean throwOverloadedExceptionOnReplication
+  private final AtomicBoolean throwOverloadedExceptionOnReplication
       = new AtomicBoolean(false);
-  private AtomicBoolean throwOverloadedExceptionOnReconstruction
+  private final AtomicBoolean throwOverloadedExceptionOnReconstruction
       = new AtomicBoolean(false);
 
   @BeforeEach

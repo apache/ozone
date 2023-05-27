@@ -55,7 +55,7 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<PendingOpType, AtomicLong>
       pendingOpCount = new ConcurrentHashMap<>();
   private ReplicationManagerMetrics replicationMetrics = null;
-  private List<ContainerReplicaPendingOpsSubscriber> subscribers =
+  private final List<ContainerReplicaPendingOpsSubscriber> subscribers =
       new ArrayList<>();
 
   public ContainerReplicaPendingOps(final ConfigurationSource conf,

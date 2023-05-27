@@ -155,7 +155,7 @@ public class ReplicationManager implements SCMService {
    * Legacy RM will hopefully be removed after completing refactor
    * for now, it is used to process non-EC container.
    */
-  private LegacyReplicationManager legacyReplicationManager;
+  private final LegacyReplicationManager legacyReplicationManager;
 
   /**
    * Set of nodes which have been excluded for replication commands due to the
