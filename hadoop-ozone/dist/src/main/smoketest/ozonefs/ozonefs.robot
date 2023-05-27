@@ -18,6 +18,7 @@ Documentation       Ozone FS tests
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
 Test Timeout        5 minutes
 Suite Setup         Setup for FS test
@@ -165,14 +166,18 @@ Get file
 
 Inherit Acls
                    Execute               ozone sh bucket addacl -a=user:user1:rlw[DEFAULT] ${VOLUME}/${BUCKET}
-                   Execute               ozone fs -mkdir -p ${BASE_URL}dir1/dir2
-                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/        USER   user1   READ WRITE LIST
-                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir2/   USER   user1   READ WRITE LIST
+                   Execute               ozone fs -mkdir -p ${DEEP_URL}dir1/dir2
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/               USER   user1   READ WRITE LIST
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir2/          USER   user1   READ WRITE LIST
 
                    Execute               ozone sh key addacl -a=user:user2:rw[DEFAULT] ${VOLUME}/${BUCKET}/dir1/
-                   Execute               ozone fs -mkdir ${BASE_URL}dir1/dir3
-                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/   USER   user1   ${EMPTY}
-                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/   USER   user2   READ WRITE
+                   Execute               ozone fs -mkdir ${DEEP_URL}dir1/dir3
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/          USER   user1   READ WRITE LIST
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/          USER   user2   READ WRITE
+
+                   Execute               ozone sh key put /tmp/GET.txt ${DEEP_URL}dir1/dir3/GET.txt
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/GET.txt   USER   user1   READ WRITE LIST
+                   Verify ACL            key   ${VOLUME}/${BUCKET}/dir1/dir3/GET.txt   USER   user2   READ WRITE
 
 
 *** Keywords ***

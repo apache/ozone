@@ -171,7 +171,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLeafNodeName(),
             keyArgs, omPathInfo.getLeafNodeObjectId(),
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
-            inheritDefaultAcls(keyArgs, omBucketInfo.getAcls()));
+            buildAcls(keyArgs, omPathInfo.getAcls()));
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
@@ -272,8 +272,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     long lastKnownParentId = pathInfo.getLastKnownParentId();
     List<String> missingParents = pathInfo.getMissingParents();
-    List<OzoneAcl> inheritAcls =
-        inheritDefaultAcls(keyArgs, pathInfo.getAcls());
+    List<OzoneAcl> acls = buildAcls(keyArgs, pathInfo.getAcls());
     for (String missingKey : missingParents) {
       long nextObjId = baseObjId + objectCount;
       if (nextObjId > maxObjId) {
@@ -286,7 +285,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       LOG.debug("missing parent {} getting added to DirectoryTable",
               missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
-              keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, inheritAcls);
+              keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, acls);
       objectCount++;
 
       missingParentInfos.add(dirInfo);

@@ -87,13 +87,10 @@ public class TestRecursiveAclWithFSO {
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
        l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
     String aclWorldAll = "world::a";
-
     List<String> keys = new ArrayList<>();
     // Create volumes with user1
-
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-
       createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclWorldAll);
     }
 
@@ -101,9 +98,7 @@ public class TestRecursiveAclWithFSO {
     UserGroupInformation.setLoginUser(user1);
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-
       OzoneVolume volume = objectStore.getVolume("volume1");
-
       BucketArgs omBucketArgs =
           BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
 
@@ -148,7 +143,6 @@ public class TestRecursiveAclWithFSO {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-
       String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
       String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
 
@@ -160,7 +154,6 @@ public class TestRecursiveAclWithFSO {
       keys.add(keyf6);
       keys.add(file1);
       keys.add(file2);
-
       createKeys(objectStore, ozoneBucket, keys);
 
       // Test case 1
@@ -185,7 +178,6 @@ public class TestRecursiveAclWithFSO {
         assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
             ome.getResult(), "Permission check failed");
       }
-
       // perform rename
       try {
         ozoneBucket.renameKey("a/b2", "a/b2_renamed");
@@ -199,7 +191,6 @@ public class TestRecursiveAclWithFSO {
       // Test case 2
       // Remove acl from directory c2, delete/rename a/b1 should throw
       // permission denied since c2 is a subdirectory
-
       user1.doAs((PrivilegedExceptionAction<Void>) () -> {
         try (OzoneClient c = cluster.newClient()) {
           ObjectStore o = c.getObjectStore();
@@ -250,7 +241,7 @@ public class TestRecursiveAclWithFSO {
         .setVolumeName(ozoneBucket.getVolumeName())
         .setStoreType(OzoneObj.StoreType.OZONE)
         .setResType(OzoneObj.ResourceType.KEY).build();
-    List<OzoneAcl> aclList1 = objectStore.getAcl(ozoneObj); //
+    List<OzoneAcl> aclList1 = objectStore.getAcl(ozoneObj);
     for (OzoneAcl acl : aclList1) {
       objectStore.removeAcl(ozoneObj, acl);
     }

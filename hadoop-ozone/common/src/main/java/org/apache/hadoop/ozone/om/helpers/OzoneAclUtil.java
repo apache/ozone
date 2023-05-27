@@ -181,6 +181,25 @@ public final class OzoneAclUtil {
   }
 
   /**
+   * Helper function to convert the scope of ACLs to DEFAULT.
+   * This method is called in ACL inheritance scenarios.
+   * @param acls
+   */
+  public static void toDefaultScope(List<OzoneAcl> acls) {
+    acls.forEach(a -> a.setAclScope(DEFAULT));
+  }
+
+  /**
+   * Helper function to filter the DEFAULT scope ACLs.
+   * This method is called in ACL inheritance scenarios.
+   * @param acls
+   */
+  public static List<OzoneAcl> filterDefaultScope(List<OzoneAcl> acls) {
+    return acls.stream().filter(a -> a.getAclScope() == DEFAULT)
+        .collect(Collectors.toList());
+  }
+
+  /**
    * Convert a list of OzoneAclInfo(protoc) to list of OzoneAcl(java).
    * @param protoAcls
    * @return list of OzoneAcl.

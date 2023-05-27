@@ -202,7 +202,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(getAclsForKey(keyArgs, bucketInfo,
+          .setAcls(getAclsForKey(keyArgs, bucketInfo, null,
               ozoneManager.getPrefixManager()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)

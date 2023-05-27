@@ -199,15 +199,14 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           omDirectoryResult == NONE) {
         List<String> missingParents = omPathInfo.getMissingParents();
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-        List<OzoneAcl> inheritAcls =
-            inheritDefaultAcls(keyArgs, omPathInfo.getAcls());
+        List<OzoneAcl> acls = buildAcls(keyArgs, omPathInfo.getAcls());
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
-            inheritAcls, trxnLogIndex,
+            acls, trxnLogIndex,
             ozoneManager.getDefaultReplicationConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
-            missingParents, inheritAcls, trxnLogIndex);
+            missingParents, acls, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
         OmBucketInfo omBucketInfo =
