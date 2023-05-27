@@ -574,7 +574,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * Validate to ensure that the replia index is between 1 and the max expected
    * replica index for the replication config, eg 5 for 3-2, 9 for 6-3 etc.
    * @param index The replica index to check.
-   * @Throws IllegalArgumentException if the index is out of bounds.
+   * @throws IllegalArgumentException if the index is out of bounds.
    */
   private void ensureIndexWithinBounds(Integer index, String setName) {
     if (index < 1 || index > repConfig.getRequiredNodes()) {

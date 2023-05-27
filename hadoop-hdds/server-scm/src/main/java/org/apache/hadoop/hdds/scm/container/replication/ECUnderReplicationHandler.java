@@ -430,7 +430,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * @param sources Map of Replica Index to a pair of ContainerReplica and
    *                NodeStatus. This is the list of available replicas.
    * @param excludedNodes nodes that should not be targets for new copies
-   * @@return number of commands sent
+   * @return number of commands sent
    */
   private int processMaintenanceOnlyIndexes(
       ECContainerReplicaCount replicaCount,

@@ -525,8 +525,6 @@ public class ReplicationManager implements SCMService {
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
-   * @return A pair containing the datanode that the command was sent to, and
-   *         the command created.
    */
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
