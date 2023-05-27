@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -43,7 +41,6 @@ public class TestContainerReplicaPendingOps {
 
   private ContainerReplicaPendingOps pendingOps;
   private TestClock clock;
-  private ConfigurationSource config;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
@@ -53,10 +50,9 @@ public class TestContainerReplicaPendingOps {
 
   @BeforeEach
   public void setup() {
-    config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
-    pendingOps = new ContainerReplicaPendingOps(config, clock);
+    pendingOps = new ContainerReplicaPendingOps(clock);
     rm = Mockito.mock(ReplicationManager.class);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);

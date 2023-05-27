@@ -715,7 +715,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmContext);
 
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(conf, systemClock);
+        new ContainerReplicaPendingOps(systemClock);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys

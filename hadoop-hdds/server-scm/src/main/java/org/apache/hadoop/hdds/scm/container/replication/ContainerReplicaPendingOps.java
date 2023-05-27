@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
@@ -45,7 +44,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
  */
 public class ContainerReplicaPendingOps {
 
-  private final ConfigurationSource config;
   private final Clock clock;
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
@@ -58,9 +56,7 @@ public class ContainerReplicaPendingOps {
   private final List<ContainerReplicaPendingOpsSubscriber> subscribers =
       new ArrayList<>();
 
-  public ContainerReplicaPendingOps(final ConfigurationSource conf,
-      Clock clock) {
-    this.config = conf;
+  public ContainerReplicaPendingOps(Clock clock) {
     this.clock = clock;
     resetCounters();
   }
