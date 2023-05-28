@@ -1078,16 +1078,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       BlockingService instance,
       int handlerCount)
       throws IOException {
-    RPC.Server rpcServer =
-        new RPC.Builder(conf)
-            .setProtocol(protocol)
-            .setInstance(instance)
-            .setBindAddress(addr.getHostString())
-            .setPort(addr.getPort())
-            .setNumHandlers(handlerCount)
-            .setVerbose(false)
-            .setSecretManager(null)
-            .build();
+
+    final Thread thread = Thread.currentThread();
+    final String threadName = thread.getName();
+
+    RPC.Server rpcServer;
+    try {
+      rpcServer = new RPC.Builder(conf)
+          .setProtocol(protocol)
+          .setInstance(instance)
+          .setBindAddress(addr.getHostString())
+          .setPort(addr.getPort())
+          .setNumHandlers(handlerCount)
+          .setVerbose(false)
+          .setSecretManager(null)
+          .build();
+    } finally {
+      if (!Objects.equals(threadName, thread.getName())) {
+        LOG.info("Restoring thread name {}", threadName);
+        thread.setName(threadName);
+      }
+    }
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;

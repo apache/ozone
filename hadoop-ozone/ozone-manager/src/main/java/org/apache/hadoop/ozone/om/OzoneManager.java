@@ -1262,15 +1262,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       BlockingService reconfigureProtocolService,
       int handlerCount)
       throws IOException {
-    RPC.Server rpcServer = new RPC.Builder(conf)
-        .setProtocol(OzoneManagerProtocolPB.class)
-        .setInstance(clientProtocolService)
-        .setBindAddress(addr.getHostString())
-        .setPort(addr.getPort())
-        .setNumHandlers(handlerCount)
-        .setVerbose(false)
-        .setSecretManager(delegationTokenMgr)
-        .build();
+
+    final Thread thread = Thread.currentThread();
+    final String threadName = thread.getName();
+
+    RPC.Server rpcServer;
+    try {
+      rpcServer = new RPC.Builder(conf)
+          .setProtocol(OzoneManagerProtocolPB.class)
+          .setInstance(clientProtocolService)
+          .setBindAddress(addr.getHostString())
+          .setPort(addr.getPort())
+          .setNumHandlers(handlerCount)
+          .setVerbose(false)
+          .setSecretManager(delegationTokenMgr)
+          .build();
+    } finally {
+      if (!Objects.equals(threadName, thread.getName())) {
+        LOG.info("Restoring thread name {}", threadName);
+        thread.setName(threadName);
+      }
+    }
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
