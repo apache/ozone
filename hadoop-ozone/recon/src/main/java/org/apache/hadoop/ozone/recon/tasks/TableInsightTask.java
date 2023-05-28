@@ -43,8 +43,7 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -71,8 +70,13 @@ public class TableInsightTask implements ReconOmTask {
   }
 
   /**
-   * Iterate the rows of each table in OM snapshot DB and calculate the
-   * counts for each table.
+   * Iterates the rows of each table in the OM snapshot DB and calculates the
+   * counts and sizes for table data.
+   *
+   * For tables that require data size calculation
+   * (as returned by getTablesRequiringSizeCalculation), both the number of
+   * records (count) and total data size of the records are calculated.
+   * For all other tables, only the count of records is calculated.
    *
    * @param omMetadataManager OM Metadata instance.
    * @return Pair
@@ -106,13 +110,23 @@ public class TableInsightTask implements ReconOmTask {
       }
     }
 
-    writeCountsToDB(objectCountMap);
-    writeCountsToDB(sizeCountMap);
+    writeDataToDB(objectCountMap);
+    writeDataToDB(sizeCountMap);
 
     LOG.info("Completed a 'reprocess' run of TableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
+  /**
+   *  Returns a pair with the total count of records (left) and total data size
+   *  (right) in the given table. Increments count for each record and adds the
+   *  dataSize if a record's value is an instance of OmKeyInfo. If the table is
+   *  null, returns (0,0).
+   *
+   * @param table The table from which to get the count and data size.
+   * @return A pair of Long values of count & data size
+   * @throws IOException If an I/O error occurs during the table iteration.
+   */
   public Pair<Long, Long> getTableSizeAndCount(Table table) throws IOException {
     long size = 0;
     long count = 0;
@@ -135,6 +149,9 @@ public class TableInsightTask implements ReconOmTask {
     return Pair.of(count, size);
   }
 
+  /**
+   * Returns a collection of table names that require data size calculation.
+   */
   public Collection<String> getTablesRequiringSizeCalculation() {
     List<String> taskTables = new ArrayList<>();
     taskTables.add(OPEN_KEY_TABLE);
@@ -161,7 +178,7 @@ public class TableInsightTask implements ReconOmTask {
   }
 
   /**
-   * Read the update events and update the count of respective object
+   * Read the update events and update the count and sizes of respective object
    * (volume, bucket, key etc.) based on the action (put or delete).
    *
    * @param events Update events - PUT, DELETE and UPDATE.
@@ -184,13 +201,13 @@ public class TableInsightTask implements ReconOmTask {
         continue;
       }
 
-      String rowKey = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
+      String countKey = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
       String sizeKey = getTableSizeKeyFromTable(omdbUpdateEvent.getTable());
 
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          objectCountMap.computeIfPresent(rowKey, (k, count) -> count + 1L);
+          objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
 
           // Compute size if the table is size-related
           if (sizeRelatedTables.contains(omdbUpdateEvent.getTable()) &&
@@ -209,6 +226,8 @@ public class TableInsightTask implements ReconOmTask {
             // Compute size if the table is size-related
             if (sizeRelatedTables.contains(omdbUpdateEvent.getTable()) &&
                 omdbUpdateEvent.getValue() instanceof OmKeyInfo) {
+              // The code ensures the resulting size isn't negative by setting
+              // values smaller than the OmKeyInfo object's data size to 0L.
               objectSizeMap.computeIfPresent(sizeKey, (k, size) -> size >
                   ((OmKeyInfo) omdbUpdateEvent.getValue()).getDataSize() ?
                   size -
@@ -230,19 +249,19 @@ public class TableInsightTask implements ReconOmTask {
       }
     }
 
-    writeCountsToDB(objectCountMap);
-    writeCountsToDB(objectSizeMap);  // Write size data to DB
+    writeDataToDB(objectCountMap); // Write count data to DB
+    writeDataToDB(objectSizeMap);  // Write size data to DB
 
     LOG.info("Completed a 'process' run of TableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
 
-  private void writeCountsToDB(Map<String, Long> objectCountMap) {
+  private void writeDataToDB(Map<String, Long> dataMap) {
     List<GlobalStats> insertGlobalStats = new ArrayList<>();
     List<GlobalStats> updateGlobalStats = new ArrayList<>();
 
-    for (Entry<String, Long> entry : objectCountMap.entrySet()) {
+    for (Entry<String, Long> entry : dataMap.entrySet()) {
       Timestamp now =
           using(sqlConfiguration).fetchValue(select(currentTimestamp()));
       GlobalStats record = globalStatsDao.fetchOneByKey(entry.getKey());
@@ -282,11 +301,11 @@ public class TableInsightTask implements ReconOmTask {
   }
 
   public static String getTableCountKeyFromTable(String tableName) {
-    return tableName + "Count";
+    return tableName + "TableCount";
   }
 
   public static String getTableSizeKeyFromTable(String tableName) {
-    return tableName + "TableSize";
+    return tableName + "DataSize";
   }
 
   /**

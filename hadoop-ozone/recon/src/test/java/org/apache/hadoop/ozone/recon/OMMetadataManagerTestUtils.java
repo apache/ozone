@@ -261,6 +261,71 @@ public final class OMMetadataManagerTestUtils {
   }
 
   /**
+   * Write an open key to OM instance optimized for File System.
+   *
+   * @throws IOException while writing.
+   */
+  public static void writeOpenFileToOm(OMMetadataManager omMetadataManager,
+                                 String keyName,
+                                 String bucketName,
+                                 String volName,
+                                 String fileName,
+                                 long objectId,
+                                 long parentObjectId,
+                                 long bucketObjectId,
+                                 long volumeObjectId,
+                                 List<OmKeyLocationInfoGroup> locationVersions,
+                                 long dataSize)
+      throws IOException {
+
+    String openKey = omMetadataManager.getOzonePathKey(volumeObjectId,
+        bucketObjectId, parentObjectId, fileName);
+
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+        .setBucketName(bucketName)
+        .setVolumeName(volName)
+        .setKeyName(keyName)
+        .setDataSize(dataSize)
+        .setOmKeyLocationInfos(locationVersions)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setObjectID(objectId)
+        .setParentObjectID(parentObjectId)
+        .build();
+
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put(openKey, omKeyInfo);
+  }
+
+  /**
+   * Write an open key to OM instance with any other BucketLayout.
+   *
+   * @throws IOException while writing.
+   */
+  public static void writeOpenKeyToOm(OMMetadataManager omMetadataManager,
+                                  String keyName,
+                                  String bucketName,
+                                  String volName,
+                                  List<OmKeyLocationInfoGroup> locationVersions,
+                                  long dataSize)
+      throws IOException {
+
+    String openKey =
+        omMetadataManager.getOzoneKey(volName, bucketName, keyName);
+    OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
+        .setBucketName(bucketName)
+        .setVolumeName(volName)
+        .setKeyName(keyName)
+        .setDataSize(dataSize)
+        .setOmKeyLocationInfos(locationVersions)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .build();
+
+    omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
+        .put(openKey, omKeyInfo);
+  }
+
+
+  /**
    * Writes deleted key information to the Ozone Manager metadata table.
    * @param omMetadataManager the Ozone Manager metadata manager
    * @param keyNames the names of the deleted keys
