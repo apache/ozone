@@ -194,7 +194,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return family.getName();
   }
 

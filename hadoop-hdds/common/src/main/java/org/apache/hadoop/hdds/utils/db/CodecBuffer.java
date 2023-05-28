@@ -46,14 +46,9 @@ public final class CodecBuffer implements AutoCloseable {
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
 
-  /** Allocate a fixed size direct buffer. */
+  /** Allocate a direct buffer. */
   public static CodecBuffer allocateDirect(int exactSize) {
     return new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
-  }
-
-  /** Allocate a variable size direct buffer. */
-  public static CodecBuffer allocateDirect() {
-    return new CodecBuffer(POOL.directBuffer());
   }
 
   /** Allocate a heap buffer. */
@@ -193,40 +188,11 @@ public final class CodecBuffer implements AutoCloseable {
    * @param source put bytes to a {@link ByteBuffer} and return the size.
    * @return this object.
    */
-  public CodecBuffer put(ToIntFunction<ByteBuffer> source) {
+  CodecBuffer put(ToIntFunction<ByteBuffer> source) {
     assertRefCnt(1);
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
     final int size = source.applyAsInt(buffer);
-    buf.setIndex(buf.readerIndex(), w + size);
-    return this;
-  }
-
-  /**
-   * Put bytes from the given source to this buffer.
-   * The source may or may not be available.
-   *
-   * @param source put bytes to a {@link ByteBuffer}.
-   *               When the source is available,
-   *               return the size of the bytes;
-   *               otherwise, the source is unavailable and no bytes are put,
-   *               return null.
-   *               When the source is available but zero byte is put,
-   *               return 0.
-   * @return null if source returns null; otherwise return this object.
-   * @throws IOException in case the source throws an {@link IOException}.
-   */
-  public CodecBuffer put(
-      CheckedFunction<ByteBuffer, Integer, IOException> source)
-      throws IOException {
-    assertRefCnt(1);
-    final int w = buf.writerIndex();
-    final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
-    final Integer size = source.apply(buffer);
-    if (size == null) {
-      return null;
-    }
-    Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
     buf.setIndex(buf.readerIndex(), w + size);
     return this;
   }
@@ -239,7 +205,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @return this object.
    * @throws IOException in case the source throws an {@link IOException}.
    */
-  public CodecBuffer putFromSource(
+  CodecBuffer put(
       CheckedFunction<OutputStream, Integer, IOException> source)
       throws IOException {
     assertRefCnt(1);
@@ -250,5 +216,34 @@ public final class CodecBuffer implements AutoCloseable {
     }
     buf.setIndex(buf.readerIndex(), w + size);
     return this;
+  }
+
+  /**
+   * Put bytes from a source to this buffer.
+   * The source may or may not be available.
+   * The given source function must return the required size (possibly 0)
+   * if the source is available; otherwise, return null.
+   * When the buffer is smaller than the required size,
+   * it may write partial result to the buffer.
+   *
+   * @param source put bytes to a {@link ByteBuffer}.
+   * @return the return value from the source function.
+   * @throws IOException in case the source throws an {@link IOException}.
+   */
+  Integer putFromSource(
+      CheckedFunction<ByteBuffer, Integer, IOException> source)
+      throws IOException {
+    assertRefCnt(1);
+    final int i = buf.writerIndex();
+    final int writable = buf.writableBytes();
+    final ByteBuffer buffer = buf.nioBuffer(i, writable);
+    final Integer size = source.apply(buffer);
+    if (size != null) {
+      Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
+      if (size <= writable) {
+        buf.setIndex(buf.readerIndex(), i + size);
+      }
+    }
+    return size;
   }
 }

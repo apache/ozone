@@ -360,6 +360,30 @@ public class TestRDBTableStore {
     }
   }
 
+  @Test
+  public void testGetByteBuffer() throws Exception {
+    final StringCodec codec = StringCodec.get();
+    final String tableName = families.get(0);
+    try (RDBTable testTable = rdbStore.getTable(tableName)) {
+      final TypedTable<String, String> typedTable = new TypedTable<>(
+          testTable, CodecRegistry.newBuilder().build(),
+          String.class, String.class);
+
+      for (int i = 0; i < 20; i++) {
+        final int valueSize = TypedTable.BUFFER_SIZE_DEFAULT * i / 4;
+        final String key = "key" + i;
+        final byte[] keyBytes = codec.toPersistedFormat(key);
+        final String value = RandomStringUtils.random(valueSize, true, false);
+        final byte[] valueBytes = codec.toPersistedFormat(value);
+
+        testTable.put(keyBytes, valueBytes);
+        final byte[] got = testTable.get(keyBytes);
+        Assertions.assertArrayEquals(valueBytes, got);
+        Assertions.assertEquals(value, codec.fromPersistedFormat(got));
+        Assertions.assertEquals(value, typedTable.get(key));
+      }
+    }
+  }
 
   @Test
   public void testGetIfExist() throws Exception {
