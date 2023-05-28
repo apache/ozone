@@ -43,7 +43,8 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -74,7 +75,7 @@ public class TableInsightTask implements ReconOmTask {
    * counts and sizes for table data.
    *
    * For tables that require data size calculation
-   * (as returned by getTablesRequiringSizeCalculation), both the number of
+   * (as returned by getTablesToCalculateSize), both the number of
    * records (count) and total data size of the records are calculated.
    * For all other tables, only the count of records is calculated.
    *
@@ -94,7 +95,7 @@ public class TableInsightTask implements ReconOmTask {
       }
 
       try {
-        if (getTablesRequiringSizeCalculation().contains(tableName)) {
+        if (getTablesToCalculateSize().contains(tableName)) {
           Pair<Long, Long> details = getTableSizeAndCount(table);
           objectCountMap.put(getTableCountKeyFromTable(tableName),
               details.getLeft());
@@ -152,7 +153,7 @@ public class TableInsightTask implements ReconOmTask {
   /**
    * Returns a collection of table names that require data size calculation.
    */
-  public Collection<String> getTablesRequiringSizeCalculation() {
+  public Collection<String> getTablesToCalculateSize() {
     List<String> taskTables = new ArrayList<>();
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
@@ -191,8 +192,7 @@ public class TableInsightTask implements ReconOmTask {
     HashMap<String, Long> objectSizeMap =
         initializeSizeMap();  // Initialize a new map for sizes
     final Collection<String> taskTables = getTaskTables();
-    final Collection<String> sizeRelatedTables =
-        getTablesRequiringSizeCalculation();
+    final Collection<String> sizeRelatedTables = getTablesToCalculateSize();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
@@ -291,7 +291,7 @@ public class TableInsightTask implements ReconOmTask {
   }
 
   private HashMap<String, Long> initializeSizeMap() {
-    Collection<String> tables = getTablesRequiringSizeCalculation();
+    Collection<String> tables = getTablesToCalculateSize();
     HashMap<String, Long> sizeCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
       String key = getTableSizeKeyFromTable(tableName);

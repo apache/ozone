@@ -265,6 +265,7 @@ public final class OMMetadataManagerTestUtils {
    *
    * @throws IOException while writing.
    */
+  @SuppressWarnings("checkstyle:parameternumber")
   public static void writeOpenFileToOm(OMMetadataManager omMetadataManager,
                                  String keyName,
                                  String bucketName,
