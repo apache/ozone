@@ -44,7 +44,6 @@ public class TestContainerReplicaPendingOps {
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
-  private ReplicationManager rm;
   private ReplicationManagerMetrics metrics;
   private long deadline;
 
@@ -53,7 +52,7 @@ public class TestContainerReplicaPendingOps {
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
     pendingOps = new ContainerReplicaPendingOps(clock);
-    rm = Mockito.mock(ReplicationManager.class);
+    ReplicationManager rm = Mockito.mock(ReplicationManager.class);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();

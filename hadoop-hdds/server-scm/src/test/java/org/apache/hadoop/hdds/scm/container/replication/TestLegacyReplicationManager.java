@@ -135,8 +135,6 @@ public class TestLegacyReplicationManager {
   private TestClock clock;
   private File testDir;
   private DBStore dbStore;
-  private PipelineManager pipelineManager;
-  private SCMHAManager scmhaManager;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   int getInflightCount(InflightType type) {
@@ -158,13 +156,13 @@ public class TestLegacyReplicationManager {
     containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    pipelineManager = Mockito.mock(PipelineManager.class);
+    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
     when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
         .thenReturn(true);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
