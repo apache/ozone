@@ -35,7 +35,12 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenFileToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -190,7 +195,8 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
 
     // Test PUT events
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    for (String tableName :
+        tableInsightTask.getTablesToCalculateSize()) {
       for (int i = 0; i < 5; i++) {
         putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT));
       }
@@ -199,21 +205,21 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     tableInsightTask.process(putEventBatch);
 
     // After 5 PUTs, size should be 5 * 1000 = 5000 for each size-related table
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
       assertEquals(5000L, getSizeForTable(tableName));
     }
 
     // Test DELETE events
     ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
       // Delete "item0"
       deleteEvents.add(getOMUpdateEvent("item0", omKeyInfo, tableName, DELETE));
     }
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
     tableInsightTask.process(deleteEventBatch);
 
-    // After deleting "item0", size should be 4 * 1000 = 4000 for each size-related table
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    // After deleting "item0", size should be 4 * 1000 = 4000
+    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
       assertEquals(4000L, getSizeForTable(tableName));
     }
 
@@ -222,7 +228,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     OmKeyInfo updatedOmKeyInfo = mock(OmKeyInfo.class);
     when(updatedOmKeyInfo.getDataSize()).thenReturn(500L);
     ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
       // "Update" "item1" by first deleting it...
       updateEvents.add(getOMUpdateEvent("item1", omKeyInfo, tableName, DELETE));
       // ...and then putting it back with updated size
@@ -232,8 +238,8 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
     tableInsightTask.process(updateEventBatch);
 
-    // After UPDATE, size should be (4000 - 1000) + 500 = 3500 for each size-related table
-    for (String tableName : tableInsightTask.getTablesRequiringSizeCalculation()) {
+    // After UPDATE, size should be (4000 - 1000) + 500 = 3500
+    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
       assertEquals(3500L, getSizeForTable(tableName));
     }
   }
