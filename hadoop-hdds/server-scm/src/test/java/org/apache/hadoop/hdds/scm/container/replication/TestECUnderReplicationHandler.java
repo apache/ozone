@@ -488,7 +488,7 @@ public class TestECUnderReplicationHandler {
               Collections.emptyList(), underRep, 2));
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
+      Assertions.assertEquals(expectedDelete, commandsSent);
     }
   }
 
@@ -855,7 +855,7 @@ public class TestECUnderReplicationHandler {
         availableReplicas, Collections.emptyList(), underRep, 1));
     Mockito.verify(replicationManager, times(1))
         .processOverReplicatedContainer(underRep);
-    Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
+    Assertions.assertEquals(expectedDelete, commandsSent);
   }
 
   @Test
