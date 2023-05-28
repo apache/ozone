@@ -404,7 +404,7 @@ public class TestRDBTableStore {
 
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
 
-      Assertions.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
