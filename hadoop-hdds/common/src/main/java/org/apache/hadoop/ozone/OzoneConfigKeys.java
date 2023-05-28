@@ -112,6 +112,14 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * A threshold to auto select datastream to write files in OzoneFileSystem.
+   */
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD
+      = "ozone.fs.datastream.auto.threshold";
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT
+      = "4MB";
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED

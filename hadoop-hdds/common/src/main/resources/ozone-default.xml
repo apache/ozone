@@ -3697,6 +3697,15 @@
       To enable/disable filesystem write via ratis streaming.
     </description>
   </property>
+  <property>
+    <name>ozone.fs.datastream.auto.threshold</name>
+    <value>4MB</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      A threshold to auto select datastream to write files
+      in OzoneFileSystem.
+    </description>
+  </property>
 
   <property>
     <name>ozone.fs.hsync.enabled</name>
