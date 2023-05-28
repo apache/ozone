@@ -46,9 +46,14 @@ public final class CodecBuffer implements AutoCloseable {
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
 
-  /** Allocate a direct buffer. */
+  /** Allocate a fixed size direct buffer. */
   public static CodecBuffer allocateDirect(int exactSize) {
     return new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
+  }
+
+  /** Allocate a variable size direct buffer. */
+  public static CodecBuffer allocateDirect() {
+    return new CodecBuffer(POOL.directBuffer());
   }
 
   /** Allocate a heap buffer. */
@@ -199,11 +204,42 @@ public final class CodecBuffer implements AutoCloseable {
 
   /**
    * Put bytes from the given source to this buffer.
+   * The source may or may not be available.
    *
-   * @param source put bytes to an {@link OutputStream} and return the size.
-   * @return this object.
+   * @param source put bytes to a {@link ByteBuffer}.
+   *               When the source is available,
+   *               return the size of the bytes;
+   *               otherwise, the source is unavailable and no bytes are put,
+   *               return null.
+   *               When the source is available but zero byte is put,
+   *               return 0.
+   * @return null if source returns null; otherwise return this object.
+   * @throws IOException in case the source throws an {@link IOException}.
    */
   public CodecBuffer put(
+      CheckedFunction<ByteBuffer, Integer, IOException> source)
+      throws IOException {
+    assertRefCnt(1);
+    final int w = buf.writerIndex();
+    final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
+    final Integer size = source.apply(buffer);
+    if (size == null) {
+      return null;
+    }
+    Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
+    buf.setIndex(buf.readerIndex(), w + size);
+    return this;
+  }
+
+  /**
+   * Put bytes from the given source to this buffer.
+   *
+   * @param source put bytes to an {@link OutputStream} and return the size.
+   *               The returned size must be non-null and non-negative.
+   * @return this object.
+   * @throws IOException in case the source throws an {@link IOException}.
+   */
+  public CodecBuffer putFromSource(
       CheckedFunction<OutputStream, Integer, IOException> source)
       throws IOException {
     assertRefCnt(1);

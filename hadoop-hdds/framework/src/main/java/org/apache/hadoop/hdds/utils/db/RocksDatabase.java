@@ -38,6 +38,8 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.ReadOptions;
+import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -691,6 +693,32 @@ public final class RocksDatabase implements Closeable {
     try {
       counter.incrementAndGet();
       return db.get().get(family.getHandle(), key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * Get the value mapped to the given key.
+   *
+   * @param family the table to get from.
+   * @param key the buffer containing the key.
+   * @param outValue the buffer to store the output value.
+   * @return null if the key is not found;
+   *         otherwise, return the size of the key.
+   * @throws IOException if the db is closed or the db throws an exception.
+   */
+  public Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
+      throws IOException {
+    assertClose();
+    try (ReadOptions options = new ReadOptions()) {
+      counter.incrementAndGet();
+      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      return size == RocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
       closeOnError(e, true);
       final String message = "get " + bytes2String(key) + " from " + family;

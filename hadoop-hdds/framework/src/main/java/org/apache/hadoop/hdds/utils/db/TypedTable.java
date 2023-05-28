@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.ratis.util.function.CheckedFunction;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
@@ -279,10 +281,23 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  private CheckedFunction<ByteBuffer, Integer, IOException> getFromTable(
+      CodecBuffer key) {
+    return buffer -> rawTable.get(key.asReadOnlyByteBuffer(), buffer);
+  }
+
   private VALUE getFromTable(KEY key) throws IOException {
-    final byte[] keyBytes = encodeKey(key);
-    byte[] valueBytes = rawTable.get(keyBytes);
-    return decodeValue(valueBytes);
+    if (supportCodecBuffer) {
+      try (CodecBuffer outValue = CodecBuffer.allocateDirect();
+           CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
+        final CodecBuffer out = outValue.put(getFromTable(inKey));
+        return out == null ? null : valueCodec.fromCodecBuffer(out);
+      }
+    } else {
+      final byte[] keyBytes = encodeKey(key);
+      byte[] valueBytes = rawTable.get(keyBytes);
+      return decodeValue(valueBytes);
+    }
   }
 
   private VALUE getFromTableIfExist(KEY key) throws IOException {

@@ -72,7 +72,7 @@ public final class Proto2Codec<M extends MessageLite>
   public CodecBuffer toCodecBuffer(@Nonnull M message,
       IntFunction<CodecBuffer> allocator) throws IOException {
     final int size = message.getSerializedSize();
-    return allocator.apply(size).put(writeTo(message, size));
+    return allocator.apply(size).putFromSource(writeTo(message, size));
   }
 
   private CheckedFunction<OutputStream, Integer, IOException> writeTo(
