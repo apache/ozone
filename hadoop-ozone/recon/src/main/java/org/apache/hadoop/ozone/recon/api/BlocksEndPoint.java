@@ -68,35 +68,27 @@ public class BlocksEndPoint {
   }
 
   /**
-   * This API returns the total count of blocks pending deletion and a list of
-   * blocks grouped by container state
+   * This API returns list of blocks grouped by container state
    * (OPEN/CLOSING/CLOSED).
-   *
-   * Example of response:
    * {
-   *   "totalCount": 1000,
-   *   "containerStateBlockInfoListMap": {
-   *     "OPEN": [
-   *       {
-   *         "containerId": 100,
-   *         "localIDList": [
-   *           1,
-   *           2,
-   *           3,
-   *           4
-   *         ],
-   *         "localIDCount": 4,
-   *         "txID": 1
-   *       }
-   *     ]
-   *   }
+   *   "OPEN": [
+   *     {
+   *       "containerId": 100,
+   *       "localIDList": [
+   *         1,
+   *         2,
+   *         3,
+   *         4
+   *       ],
+   *       "localIDCount": 4,
+   *       "txID": 1
+   *     }
+   *   ]
    * }
-   *
    * @param limit limits the number of records having list of blocks
    *              grouped by container state (OPEN/CLOSING/CLOSED)
    * @param prevKey deletedBlocks table key to skip records before prevKey
-   * @return a Response object containing total count of blocks pending deletion
-   *         and list of blocks grouped by container state (OPEN/CLOSING/CLOSED)
+   * @return list of blocks grouped by container state (OPEN/CLOSING/CLOSED)
    */
   @GET
   @Path("/deletePending")
@@ -109,25 +101,8 @@ public class BlocksEndPoint {
       // Send back an empty response
       return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
-
-    // Create a response map to hold totalCount and containerStateList
-    Map<String, Object> response = new HashMap<>();
-
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap = new HashMap<>();
-
-    try (
-        Table<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            deletedBlocksTable = DELETED_BLOCKS.getTable(this.scmDBStore)) {
-      long totalCount = deletedBlocksTable.getEstimatedKeyCount();
-      response.put("totalCount",
-          totalCount); // Add totalCount to the response map
-    } catch (Exception e) {
-      throw new WebApplicationException(e,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-
     try (
         Table<Long,
             StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
@@ -194,9 +169,6 @@ public class BlocksEndPoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    // At the end, add the containerStateBlockInfoListMap to the response map
-    response.put("containerStateList", containerStateBlockInfoListMap);
-
-    return Response.ok(response).build();
+    return Response.ok(containerStateBlockInfoListMap).build();
   }
 }
