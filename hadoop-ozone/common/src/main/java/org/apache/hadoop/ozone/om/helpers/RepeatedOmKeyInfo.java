@@ -54,7 +54,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   private final List<OmKeyInfo> omKeyInfoList;
-  private long dataSize;
 
   public RepeatedOmKeyInfo(List<OmKeyInfo> omKeyInfos) {
     this.omKeyInfoList = omKeyInfos;
@@ -67,18 +66,10 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
 
   public void addOmKeyInfo(OmKeyInfo info) {
     this.omKeyInfoList.add(info);
-    this.dataSize += info.getDataSize();
   }
 
   public List<OmKeyInfo> getOmKeyInfoList() {
     return omKeyInfoList;
-  }
-
-  /**
-   * Returns the total size of all 'OmKeyInfo' objects.
-   */
-  public long getDataSize() {
-    return dataSize;
   }
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
