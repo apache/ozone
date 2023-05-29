@@ -131,6 +131,43 @@ public class TestBlocksEndPoint {
   }
 
   @Test
+  public void testDeletedBlocksCount() throws Exception {
+    // Initialize a list of block local IDs to use in deleted transactions
+    List<Long> localIdList = new ArrayList<>();
+    localIdList.add(1L);
+    localIdList.add(2L);
+    localIdList.add(3L);
+    localIdList.add(4L);
+
+    // Fetch the table from SCM DB store for DELETED_BLOCKS
+    Table<Long, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
+        deletedBlocksTable = DELETED_BLOCKS.getTable(this.scmDBStore);
+
+    // Add five transactions to the DELETED_BLOCKS table, each transaction
+    // has a different containerID and uses the same localIdList
+    for (int i = 1; i <= 5; i++) {
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+              .newBuilder().setTxID(i).setContainerID(100L + i)
+              .addAllLocalID(localIdList).setCount(4).build();
+      deletedBlocksTable.put((long) i, dtx);
+    }
+
+    // Fetch blocks pending deletion from the blocks endpoint
+    Response blocksPendingDeletionResponse =
+        blocksEndPoint.getBlocksPendingDeletion(5, 1);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) blocksPendingDeletionResponse.getEntity();
+
+    // Fetch the totalCount value from the response map
+    long actualCount = (long) responseMap.get("totalCount");
+
+    Assertions.assertEquals(5, actualCount);
+  }
+
+
+  @Test
   public void testGetBlocksPendingDeletion() throws Exception {
     List<Long> localIdList = new ArrayList<>();
     localIdList.add(1L);
@@ -148,11 +185,19 @@ public class TestBlocksEndPoint {
 
     Response blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 0);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) blocksPendingDeletion.getEntity();
+
+    // Fetch the totalCount and containerStateBlockInfoListMap values
+    long totalCount = (long) responseMap.get("totalCount");
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap =
-        (Map<String, List<ContainerBlocksInfoWrapper>>)
-            blocksPendingDeletion.getEntity();
+        (Map<String, List<ContainerBlocksInfoWrapper>>) responseMap.get(
+            "containerStateList");
+
     Assertions.assertNotNull(containerStateBlockInfoListMap);
+    Assertions.assertEquals(1, totalCount);
     Assertions.assertEquals(1, containerStateBlockInfoListMap.size());
     List<ContainerBlocksInfoWrapper> containerBlocksInfoWrappers =
         containerStateBlockInfoListMap.get("OPEN");
@@ -181,19 +226,25 @@ public class TestBlocksEndPoint {
         deletedBlocksTable = DELETED_BLOCKS.getTable(this.scmDBStore);
     deletedBlocksTable.put(1L, dtx);
 
-    dtx =
-        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-            .newBuilder().setTxID(2).setContainerID(101L)
-            .addAllLocalID(localIdList).setCount(4).build();
+    dtx = StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+        .newBuilder().setTxID(2).setContainerID(101L)
+        .addAllLocalID(localIdList).setCount(4).build();
     deletedBlocksTable.put(2L, dtx);
 
     Response blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 0);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) blocksPendingDeletion.getEntity();
+
+    long totalCount = (long) responseMap.get("totalCount");
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap =
-        (Map<String, List<ContainerBlocksInfoWrapper>>)
-            blocksPendingDeletion.getEntity();
+        (Map<String, List<ContainerBlocksInfoWrapper>>) responseMap.get(
+            "containerStateList");
+
     Assertions.assertNotNull(containerStateBlockInfoListMap);
+    Assertions.assertEquals(2, totalCount);
     Assertions.assertEquals(1, containerStateBlockInfoListMap.size());
     List<ContainerBlocksInfoWrapper> containerBlocksInfoWrappers =
         containerStateBlockInfoListMap.get("OPEN");
@@ -230,10 +281,16 @@ public class TestBlocksEndPoint {
 
     Response blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 2);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) blocksPendingDeletion.getEntity();
+
+    long totalCount = (long) responseMap.get("totalCount");
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap =
-        (Map<String, List<ContainerBlocksInfoWrapper>>)
-            blocksPendingDeletion.getEntity();
+        (Map<String, List<ContainerBlocksInfoWrapper>>) responseMap.get(
+            "containerStateList");
+
     Assertions.assertNotNull(containerStateBlockInfoListMap);
     Assertions.assertEquals(1, containerStateBlockInfoListMap.size());
     List<ContainerBlocksInfoWrapper> containerBlocksInfoWrappers =
@@ -248,16 +305,17 @@ public class TestBlocksEndPoint {
 
     blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 3);
+    responseMap = (Map<String, Object>) blocksPendingDeletion.getEntity();
     containerStateBlockInfoListMap =
-        (Map<String, List<ContainerBlocksInfoWrapper>>)
-            blocksPendingDeletion.getEntity();
+        (Map<String, List<ContainerBlocksInfoWrapper>>) responseMap.get(
+            "containerStateList");
     Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
 
     blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 4);
     containerStateBlockInfoListMap =
-        (Map<String, List<ContainerBlocksInfoWrapper>>)
-            blocksPendingDeletion.getEntity();
+        (Map<String, List<ContainerBlocksInfoWrapper>>) responseMap.get(
+            "containerStateList");
     Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
   }
 
