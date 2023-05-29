@@ -327,6 +327,8 @@ public class TestRDBTableStore {
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
+    final byte[] zeroSizeKey = {(byte) (key[0] + 1)};
+    final byte[] zeroSizeValue = {};
 
     final String tableName = families.get(0);
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
@@ -339,6 +341,11 @@ public class TestRDBTableStore {
       testTable.delete(key);
       Assertions.assertFalse(testTable.isExist(key));
 
+      // Test a key with zero size value.
+      Assertions.assertNull(testTable.get(zeroSizeKey));
+      testTable.put(zeroSizeKey, zeroSizeValue);
+      Assertions.assertEquals(0, testTable.get(zeroSizeKey).length);
+
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns false for a key that is definitely not present.
@@ -347,6 +354,7 @@ public class TestRDBTableStore {
       RDBMetrics rdbMetrics = rdbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
@@ -357,6 +365,13 @@ public class TestRDBTableStore {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
       Assertions.assertTrue(testTable.isExist(key));
+      Assertions.assertEquals(0, testTable.get(zeroSizeKey).length);
+      Assertions.assertTrue(testTable.isExist(zeroSizeKey));
+
+      RDBMetrics rdbMetrics = rdbStore.getMetrics();
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyMayExistChecks());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyGets());
     }
   }
 
@@ -413,7 +428,7 @@ public class TestRDBTableStore {
 
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
 
-      Assertions.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);

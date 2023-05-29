@@ -645,28 +645,21 @@ public final class RocksDatabase implements Closeable {
   }
 
   /**
-   * @return false if the key definitely does not exist in the database;
-   *         otherwise, return true.
-   * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
-   */
-  public boolean keyMayExist(ColumnFamily family, byte[] key)
-      throws IOException {
-    assertClose();
-    try {
-      counter.incrementAndGet();
-      return db.get().keyMayExist(family.getHandle(), key, null);
-    } finally {
-      counter.decrementAndGet();
-    }
-  }
-
-  /**
+   * - When the key definitely does not exist in the database,
+   *   this method returns null.
+   * - When the key is found in memory,
+   *   this method returns a supplier
+   *   and {@link Supplier#get()}} returns the value.
+   * - When this method returns a supplier
+   *   but {@link Supplier#get()} returns null,
+   *   the key may or may not exist in the database.
+   *
    * @return the null if the key definitely does not exist in the database;
    *         otherwise, return a {@link Supplier}.
    * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
-  public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
-      byte[] key) throws IOException {
+  Supplier<byte[]> keyMayExist(ColumnFamily family, byte[] key)
+      throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
@@ -686,7 +679,7 @@ public final class RocksDatabase implements Closeable {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
-  public byte[] get(ColumnFamily family, byte[] key) throws IOException {
+  byte[] get(ColumnFamily family, byte[] key) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();

@@ -107,13 +107,17 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public boolean isExist(byte[] key) throws IOException {
     rdbMetrics.incNumDBKeyMayExistChecks();
-    final Supplier<byte[]> holder = db.keyMayExistHolder(family, key);
+    final Supplier<byte[]> holder = db.keyMayExist(family, key);
     if (holder == null) {
-      return false;
+      return false;  // definitely not exists
     }
     final byte[] value = holder.get();
-    final boolean exists = (value != null && value.length > 0)
-        || db.get(family, key) != null;
+    if (value != null) {
+      return true; // definitely exists
+    }
+
+    // inconclusive: the key may or may not exist
+    final boolean exists = get(key) != null;
     if (!exists) {
       rdbMetrics.incNumDBKeyMayExistMisses();
     }
@@ -122,6 +126,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public byte[] get(byte[] key) throws IOException {
+    rdbMetrics.incNumDBKeyGets();
     return db.get(family, key);
   }
 
@@ -145,18 +150,21 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] getIfExist(byte[] key) throws IOException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    final boolean keyMayExist = db.keyMayExist(family, key);
-    if (keyMayExist) {
-      // Not using out value from string builder, as that is causing
-      // IllegalArgumentException during protobuf parsing.
-      rdbMetrics.incNumDBKeyGetIfExistGets();
-      final byte[] val = db.get(family, key);
-      if (val == null) {
-        rdbMetrics.incNumDBKeyGetIfExistMisses();
-      }
-      return val;
+    final Supplier<byte[]> value = db.keyMayExist(family, key);
+    if (value == null) {
+      return null; // definitely not exists
     }
-    return null;
+    if (value.get() != null) {
+      return value.get(); // definitely exists
+    }
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final byte[] val = get(key);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
   }
 
   @Override
