@@ -2588,7 +2588,7 @@
   </property>
   <property>
     <name>hdds.datanode.client.address</name>
-    <value>0.0.0.0:9864</value>
+    <value/>
     <tag>OZONE, HDDS, MANAGEMENT</tag>
     <description>
       The address of the Ozone Datanode client service.
