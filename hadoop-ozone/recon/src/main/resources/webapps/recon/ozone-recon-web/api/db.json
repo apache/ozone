@@ -1943,5 +1943,2893 @@
         ]
       }
     ]
+  },
+  "bucketHeatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "deveshnewvol2",
+        "children": [
+          {
+            "label": "obsbuck11",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 39202,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/obsbuck11",
+            "minAccessCount": 39202,
+            "maxAccessCount": 39202
+          },
+          {
+            "label": "deveshbuck21",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 5675,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/obsbuck21",
+            "minAccessCount": 5675,
+            "maxAccessCount": 5675
+          },
+          {
+            "label": "deveshbuck31",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4867,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck31",
+            "minAccessCount": 4867,
+            "maxAccessCount": 4867
+          },
+          {
+            "label": "obsbuck12",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4655,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/obsbuck12",
+            "minAccessCount": 4655,
+            "maxAccessCount": 4655
+          },
+          {
+            "label": "deveshbuck32",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4606,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck32",
+            "minAccessCount": 4606,
+            "maxAccessCount": 4606
+          },
+          {
+            "label": "deveshbuck33",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 3832,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck33",
+            "minAccessCount": 3832,
+            "maxAccessCount": 3832
+          },
+          {
+            "label": "fsobuck11",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2369,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/fsobuck11",
+            "minAccessCount": 2369,
+            "maxAccessCount": 2369
+          },
+          {
+            "label": "fsobuck13",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2228,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/fsobuck13",
+            "minAccessCount": 2228,
+            "maxAccessCount": 2228
+          },
+          {
+            "label": "obsbuck13",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1984,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/obsbuck13",
+            "minAccessCount": 1984,
+            "maxAccessCount": 1984
+          },
+          {
+            "label": "fsobuck12",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1895,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/fsobuck12",
+            "minAccessCount": 1895,
+            "maxAccessCount": 1895
+          },
+          {
+            "label": "deveshbuck22",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 271,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck22",
+            "minAccessCount": 271,
+            "maxAccessCount": 271
+          },
+          {
+            "label": "deveshbuck23",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 245,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck23",
+            "minAccessCount": 245,
+            "maxAccessCount": 245
+          }
+        ],
+        "size": 3072,
+        "path": "/deveshnewvol2"
+      },
+      {
+        "label": "deveshnewvol2",
+        "children": [
+          {
+            "label": "deveshbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1015,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck2",
+            "minAccessCount": 1015,
+            "maxAccessCount": 1015
+          },
+          {
+            "label": "deveshbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 839,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck1",
+            "minAccessCount": 839,
+            "maxAccessCount": 839
+          },
+          {
+            "label": "deveshbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 727,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck3",
+            "minAccessCount": 727,
+            "maxAccessCount": 727
+          }
+        ],
+        "size": 768,
+        "path": "/deveshnewvol"
+      },
+      {
+        "label": "deveshvol3",
+        "children": [
+          {
+            "label": "deveshbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 271,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol3/deveshbuck2",
+            "minAccessCount": 271,
+            "maxAccessCount": 271
+          },
+          {
+            "label": "deveshbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 237,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck1",
+            "minAccessCount": 237,
+            "maxAccessCount": 237
+          },
+          {
+            "label": "deveshbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 213,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/deveshbuck3",
+            "minAccessCount": 213,
+            "maxAccessCount": 213
+          }
+        ],
+        "size": 768,
+        "path": "/deveshnewvol3"
+      },
+      {
+        "label": "vol3",
+        "children": [
+          {
+            "label": "testbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 187,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/vol3/testbuck1",
+            "minAccessCount": 187,
+            "maxAccessCount": 187
+          },
+          {
+            "label": "testbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 185,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/testbuck2",
+            "minAccessCount": 185,
+            "maxAccessCount": 185
+          },
+          {
+            "label": "testbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 73,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/deveshnewvol2/testbuck3",
+            "minAccessCount": 73,
+            "maxAccessCount": 73
+          }
+        ],
+        "size": 768,
+        "path": "/vol3"
+      },
+      {
+        "label": "volumerep",
+        "children": [
+          {
+            "label": "bucket2",
+            "children": [
+              {
+                "label": "label1",
+                "size": 0,
+                "accessCount": 3,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volumerep/bucket2",
+            "minAccessCount": 3,
+            "maxAccessCount": 3
+          },
+          {
+            "label": "bucket1",
+            "children": [
+              {
+                "label": "label2",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volumerep/bucket1",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 512,
+        "path": "/volumerep"
+      },
+      {
+        "label": "tvol",
+        "children": [
+          {
+            "label": "buck",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/tvol/buck",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 256,
+        "path": "/tvol"
+      },
+      {
+        "label": "vol1",
+        "children": [
+          {
+            "label": "buck5",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/vol1/buck5",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 256,
+        "path": "/vol1"
+      },
+      {
+        "label": "volume1",
+        "children": [
+          {
+            "label": "fso-bucket",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volume1/fso-bucket",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          },
+          {
+            "label": "bucket1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volume1/bucket1",
+            "minAccessCount": 1,
+            "maxAccessCount": 1
+          }
+        ],
+        "size": 512,
+        "path": "/volume1"
+      }
+    ],
+    "size": 6912,
+    "minAccessCount": 1,
+    "maxAccessCount": 39202
+  },
+  "keyHeatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "deveshnewvol2",
+        "children": [
+          {
+            "label": "obsbuck11",
+            "children": [
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 84,
+                "color": 1.0
+              },
+              {
+                "label": "demo35",
+                "size": 256,
+                "accessCount": 50,
+                "color": 0.595
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo46",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo61",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo92",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo11",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.547
+              },
+              {
+                "label": "demo43",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.547
+              },
+              {
+                "label": "demo13",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo4",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo72",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo23",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo25",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo38",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo50",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo41",
+                "size": 256,
+                "accessCount": 42,
+                "color": 0.5
+              },
+              {
+                "label": "demo49",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.488
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo29",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo93",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo30",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.464
+              },
+              {
+                "label": "demo31",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.464
+              },
+              {
+                "label": "demo52",
+                "size": 256,
+                "accessCount": 38,
+                "color": 0.452
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo42",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo80",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 36,
+                "color": 0.428
+              },
+              {
+                "label": "demo77",
+                "size": 256,
+                "accessCount": 36,
+                "color": 0.428
+              },
+              {
+                "label": "demo90",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.416
+              },
+              {
+                "label": "demo98",
+                "size": 256,
+                "accessCount": 33,
+                "color": 0.392
+              },
+              {
+                "label": "demo21",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo47",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo70",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.369
+              },
+              {
+                "label": "demo85",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.369
+              },
+              {
+                "label": "demo55",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.345
+              },
+              {
+                "label": "demo58",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.345
+              },
+              {
+                "label": "demo65",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.333
+              },
+              {
+                "label": "demo68",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.333
+              },
+              {
+                "label": "demo78",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo8",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo9",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo62",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.309
+              },
+              {
+                "label": "demo63",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.309
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo48",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo54",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo33",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo45",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo83",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo28",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.273
+              },
+              {
+                "label": "demo59",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.273
+              },
+              {
+                "label": "demo12",
+                "size": 256,
+                "accessCount": 22,
+                "color": 0.261
+              }
+            ],
+            "size": 13824,
+            "path": "/deveshnewvol2/obsbuck11",
+            "minAccessCount": 22,
+            "maxAccessCount": 84
+          },
+          {
+            "label": "obsbuck13",
+            "children": [
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 65,
+                "color": 1.0
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.63
+              }
+            ],
+            "size": 512,
+            "path": "/deveshnewvol2/obsbuck13",
+            "minAccessCount": 41,
+            "maxAccessCount": 65
+          },
+          {
+            "label": "obsbuck12",
+            "children": [
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 55,
+                "color": 1.0
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.818
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.781
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 34,
+                "color": 0.618
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 30,
+                "color": 0.545
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.527
+              }
+            ],
+            "size": 1536,
+            "path": "/deveshnewvol2/obsbuck12",
+            "minAccessCount": 29,
+            "maxAccessCount": 55
+          },
+          {
+            "label": "deveshbuck33",
+            "children": [
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 49,
+                "color": 1.0
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.938
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.877
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.816
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.795
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.714
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.489
+              }
+            ],
+            "size": 1792,
+            "path": "/deveshnewvol2/deveshbuck33",
+            "minAccessCount": 24,
+            "maxAccessCount": 49
+          },
+          {
+            "label": "deveshbuck31",
+            "children": [
+              {
+                "label": "demo9",
+                "size": 256,
+                "accessCount": 48,
+                "color": 1.0
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 47,
+                "color": 0.979
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.854
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.854
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.77
+              },
+              {
+                "label": "demo11",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.77
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.729
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.666
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.645
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.562
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.541
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.5
+              },
+              {
+                "label": "demo16",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.479
+              }
+            ],
+            "size": 3328,
+            "path": "/deveshnewvol2/deveshbuck31",
+            "minAccessCount": 23,
+            "maxAccessCount": 48
+          },
+          {
+            "label": "fsobuck11",
+            "children": [
+              {
+                "label": "test_dir/demo1",
+                "size": 256,
+                "accessCount": 45,
+                "color": 1.0
+              },
+              {
+                "label": "test_dir/demo2",
+                "size": 256,
+                "accessCount": 34,
+                "color": 0.755
+              }
+            ],
+            "size": 512,
+            "path": "/deveshnewvol2/fsobuck11",
+            "minAccessCount": 34,
+            "maxAccessCount": 45
+          },
+          {
+            "label": "deveshbuck32",
+            "children": [
+              {
+                "label": "demo17",
+                "size": 256,
+                "accessCount": 44,
+                "color": 1.0
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 42,
+                "color": 0.954
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.931
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.909
+              },
+              {
+                "label": "demo4",
+                "size": 256,
+                "accessCount": 38,
+                "color": 0.863
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.84
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.727
+              },
+              {
+                "label": "demo8",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.727
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 30,
+                "color": 0.681
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.636
+              },
+              {
+                "label": "demo14",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.613
+              },
+              {
+                "label": "demo13",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.522
+              }
+            ],
+            "size": 3072,
+            "path": "/deveshnewvol2/deveshbuck32",
+            "minAccessCount": 23,
+            "maxAccessCount": 44
+          },
+          {
+            "label": "fsobuck13",
+            "children": [
+              {
+                "label": "test_dir/demo2",
+                "size": 256,
+                "accessCount": 38,
+                "color": 1.0
+              },
+              {
+                "label": "test_dir/demo1",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.605
+              }
+            ],
+            "size": 512,
+            "path": "/deveshnewvol2/fsobuck13",
+            "minAccessCount": 23,
+            "maxAccessCount": 38
+          }
+        ],
+        "size": 25088,
+        "path": "/deveshnewvol2/"
+      },
+      {
+        "label": "volume1",
+        "children": [
+          {
+            "label": "fso-bucket",
+            "children": [
+              {
+                "label": ".trash",
+                "size": 256,
+                "accessCount": 24,
+                "color": 1.0
+              },
+              {
+                "label": ".trash/om",
+                "size": 256,
+                "accessCount": 24,
+                "color": 1.0
+              }
+            ],
+            "size": 512,
+            "path": "/volume1/fso-bucket",
+            "minAccessCount": 24,
+            "maxAccessCount": 24
+          }
+        ],
+        "size": 512,
+        "path": "/volume1/"
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 22,
+    "maxAccessCount": 84
+  },
+  "heatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "hivevolTest1",
+        "children": [
+          {
+            "label": "hivebucketTest1",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/test1.dat",
+                "size": 1026,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/test2",
+                "size": 20,
+                "accessCount": 68567,
+                "color": 0.56
+              }
+            ],
+            "size": 22358,
+            "path": "/hivevolTest1/hivebucketTest2",
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          }
+        ],
+        "size": 7168,
+        "path": "/hivevolTest1"
+      },
+      {
+        "label": "hivevolTest2",
+        "children": [
+          {
+            "label": "hivebucketTest2",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/test11.dat",
+                "size": 2500,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/test12",
+                "size": 300000,
+                "accessCount": 68567,
+                "color": 0.56
+              }
+            ],
+            "size": 1536,
+            "path": "/hivevolTest1/hivebucketTest2",
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          }
+        ],
+        "size": 7168,
+        "path": "/hivevolTest2"
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 2924,
+    "maxAccessCount": 155074
+  },
+  "heatmapTestClick": {
+    "label": "root",
+    "children": [
+      {
+        "label": "heatmapTest1/hivevolTest1/hivebucketTest1",
+        "children": [
+          {
+            "label": "Test1",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 68567,
+                "color": 0.56
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 36114,
+                "color": 0.45
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 9047,
+                "color": 0.62
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 9044,
+                "color": 0.78
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 6463,
+                "color": 0.88
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 5712,
+                "color": 0.92
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 5440,
+                "color": 0.98
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 4627,
+                "color": 0.100
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 4624,
+                "color": 0.150
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 4015,
+                "color": 0.200
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3811,
+                "color": 0.250
+              },
+              {
+                "label": "enc_path/hive_tpcds/store",
+                "size": 256,
+                "accessCount": 2927,
+                "color": 0.018
+              },
+              {
+                "label": "enc_path/hive_tpcds/store/store.dat",
+                "size": 256,
+                "accessCount": 2924,
+                "color": 0.300
+              }
+            ],
+            "size": 3584,
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          },
+          {
+            "label": "Test2",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 155069,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 68566,
+                "color": 0.350
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 36119,
+                "color": 0.400
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 9047,
+                "color": 0.450
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 9044,
+                "color": 0.500
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 6463,
+                "color": 0.550
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 5712,
+                "color": 0.600
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 5440,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 4627,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 4624,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 4015,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3811,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/store",
+                "size": 256,
+                "accessCount": 2927,
+                "color": 0.900
+              },
+              {
+                "label": "reg_path/hive_tpcds/store/store.dat",
+                "size": 256,
+                "accessCount": 2924,
+                "color": 0.950
+              }
+            ],
+            "size": 3584,
+            "minAccessCount": 2924,
+            "maxAccessCount": 155069
+          }
+        ],
+        "size": 7168
+      },
+      {
+        "label": "TestVolume 3",
+        "children": [
+          {
+            "label": "hivebuck1675429571",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 129977,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 57481,
+                "color": 0.950
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 30280,
+                "color": 0.900
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 7584,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 7581,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 5418,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4788,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 4560,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3879,
+                "color": 0.600
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3876,
+                "color": 0.550
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 3366,
+                "color": 0.500
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3195,
+                "color": 0.450
+              }
+            ],
+            "size": 3072,
+            "minAccessCount": 3195,
+            "maxAccessCount": 129977
+          },
+          {
+            "label": "hiveencbuck1675429572",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 128525,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 56950,
+                "color": 0.400
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 29936,
+                "color": 0.350
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 7494,
+                "color": 0.300
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 7486,
+                "color": 0.250
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 5357,
+                "color": 0.200
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4718,
+                "color": 0.150
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 4510,
+                "color": 0.035
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3831,
+                "color": 0.650
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3827,
+                "color": 0.700
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 3328,
+                "color": 0.025
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3167,
+                "color": 0.000
+              }
+            ],
+            "size": 3072,
+            "minAccessCount": 3167,
+            "maxAccessCount": 128525
+          }
+        ],
+        "size": 6144
+      },
+      {
+        "label": "hivevol1676910931",
+        "children": [
+          {
+            "label": "hivebuck1676910932",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 110185,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 48869,
+                "color": 0.443
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 25685,
+                "color": 0.633
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 6421,
+                "color": 0.580
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 6418,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 4593,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4046,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 3865,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3283,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3280,
+                "color": 0.900
+              }
+            ],
+            "size": 2560,
+            "minAccessCount": 3280,
+            "maxAccessCount": 110185
+          },
+          {
+            "label": "hiveencbuck1676910931",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 109463,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 48397,
+                "color": 0.000
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 25514,
+                "color": 0.555
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 6387,
+                "color": 0.600
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 6384,
+                "color": 0.665
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 4563,
+                "color": 0.700
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4032,
+                "color": 0.750
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 3840,
+                "color": 0.800
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3267,
+                "color": 0.850
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3264,
+                "color": 0.950
+              }
+            ],
+            "size": 2560,
+            "minAccessCount": 3264,
+            "maxAccessCount": 109463
+          }
+        ],
+        "size": 5120
+      },
+      {
+        "label": "hivevol1676533485",
+        "children": [
+          {
+            "label": "hiveencbuck1676533485",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 52456,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 23190,
+                "color": 0.000
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 12217,
+                "color": 0.050
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 3062,
+                "color": 0.100
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 3059,
+                "color": 0.150
+              }
+            ],
+            "size": 1280,
+            "minAccessCount": 3059,
+            "maxAccessCount": 52456
+          },
+          {
+            "label": "hivebuck1676533485",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 52450,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 23193,
+                "color": 0.150
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 12223,
+                "color": 1.000
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 3062,
+                "color": 0.058
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 3059,
+                "color": 0.250
+              }
+            ],
+            "size": 1280,
+            "minAccessCount": 3059,
+            "maxAccessCount": 52450
+          }
+        ],
+        "size": 2560
+      },
+      {
+        "label": "hivewritevol1676574237",
+        "children": [
+          {
+            "label": "hivebucket1676574242",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 37446,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 37446,
+            "maxAccessCount": 37446
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivevol1675358593",
+        "children": [
+          {
+            "label": "hiveencbuck1675358593",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 34205,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 15126,
+                "color": 0.750
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 7975,
+                "color": 0.180
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 7975,
+            "maxAccessCount": 34205
+          },
+          {
+            "label": "hivebuck1675358593",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 32047,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 14151,
+                "color": 0.560
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 7513,
+                "color": 0.670
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 7513,
+            "maxAccessCount": 32047
+          }
+        ],
+        "size": 1536
+      },
+      {
+        "label": "hivewritevol1675429188",
+        "children": [
+          {
+            "label": "hivebucket1675429193",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 32246,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 32246,
+            "maxAccessCount": 32246
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1676910511",
+        "children": [
+          {
+            "label": "hivebucket1676910516",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 26095,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 26095,
+            "maxAccessCount": 26095
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivevol1676900292",
+        "children": [
+          {
+            "label": "hivebuck1676900292",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 13692,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 6048,
+                "color": 0.125
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 3187,
+                "color": 0.568
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 3187,
+            "maxAccessCount": 13692
+          },
+          {
+            "label": "hiveencbuck1676900293",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 13681,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 6049,
+                "color": 0.442
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 3188,
+                "color": 0.789
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 3188,
+            "maxAccessCount": 13681
+          }
+        ],
+        "size": 1536,
+        "minAccessCount": 32246,
+        "maxAccessCount": 32246
+      },
+      {
+        "label": "hivewritevol1676533084",
+        "children": [
+          {
+            "label": "hivebucket1676533089",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 12976,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 12976,
+            "maxAccessCount": 12976
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1675358193",
+        "children": [
+          {
+            "label": "hivebucket1675358197",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 8034,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 8034,
+            "maxAccessCount": 8034
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1676899876",
+        "children": [
+          {
+            "label": "hivebucket1676899881",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 3088,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 3088,
+            "maxAccessCount": 3088
+          }
+        ],
+        "size": 256
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 2924,
+    "maxAccessCount": 155074
+  },
+  "heatmapTestClick1": {
+    "label": "root",
+    "children": [
+      {
+        "label": "heatmapTest1/hivevolTest1/hivebucketTest1",
+        "children": [
+          {
+            "label": "Test1",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 68567,
+                "color": 0.56
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 36114,
+                "color": 0.45
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 9047,
+                "color": 0.62
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 9044,
+                "color": 0.78
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 6463,
+                "color": 0.88
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 5712,
+                "color": 0.92
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 5440,
+                "color": 0.98
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 4627,
+                "color": 0.100
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 4624,
+                "color": 0.150
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 4015,
+                "color": 0.200
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3811,
+                "color": 0.250
+              },
+              {
+                "label": "enc_path/hive_tpcds/store",
+                "size": 256,
+                "accessCount": 2927,
+                "color": 0.018
+              },
+              {
+                "label": "enc_path/hive_tpcds/store/store.dat",
+                "size": 256,
+                "accessCount": 2924,
+                "color": 0.300
+              }
+            ],
+            "size": 3584,
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          },
+          {
+            "label": "Test2",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 155069,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 68566,
+                "color": 0.350
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 36119,
+                "color": 0.400
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 9047,
+                "color": 0.450
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 9044,
+                "color": 0.500
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 6463,
+                "color": 0.550
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 5712,
+                "color": 0.600
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 5440,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 4627,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 4624,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 4015,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3811,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/store",
+                "size": 256,
+                "accessCount": 2927,
+                "color": 0.900
+              },
+              {
+                "label": "reg_path/hive_tpcds/store/store.dat",
+                "size": 256,
+                "accessCount": 2924,
+                "color": 0.950
+              }
+            ],
+            "size": 3584,
+            "minAccessCount": 2924,
+            "maxAccessCount": 155069
+          }
+        ],
+        "size": 7168
+      },
+      {
+        "label": "TestVolume 3",
+        "children": [
+          {
+            "label": "hivebuck1675429571",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 129977,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 57481,
+                "color": 0.950
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 30280,
+                "color": 0.900
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 7584,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 7581,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 5418,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4788,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 4560,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3879,
+                "color": 0.600
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3876,
+                "color": 0.550
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 3366,
+                "color": 0.500
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3195,
+                "color": 0.450
+              }
+            ],
+            "size": 3072,
+            "minAccessCount": 3195,
+            "maxAccessCount": 129977
+          },
+          {
+            "label": "hiveencbuck1675429572",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 128525,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 56950,
+                "color": 0.400
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 29936,
+                "color": 0.350
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 7494,
+                "color": 0.300
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 7486,
+                "color": 0.250
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 5357,
+                "color": 0.200
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4718,
+                "color": 0.150
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 4510,
+                "color": 0.035
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3831,
+                "color": 0.650
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3827,
+                "color": 0.700
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales",
+                "size": 256,
+                "accessCount": 3328,
+                "color": 0.025
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales",
+                "size": 256,
+                "accessCount": 3167,
+                "color": 0.000
+              }
+            ],
+            "size": 3072,
+            "minAccessCount": 3167,
+            "maxAccessCount": 128525
+          }
+        ],
+        "size": 6144
+      },
+      {
+        "label": "hivevol1676910931",
+        "children": [
+          {
+            "label": "hivebuck1676910932",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 110185,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 48869,
+                "color": 0.443
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 25685,
+                "color": 0.633
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 6421,
+                "color": 0.580
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 6418,
+                "color": 0.650
+              },
+              {
+                "label": "reg_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 4593,
+                "color": 0.700
+              },
+              {
+                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4046,
+                "color": 0.750
+              },
+              {
+                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 3865,
+                "color": 0.800
+              },
+              {
+                "label": "reg_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3283,
+                "color": 0.850
+              },
+              {
+                "label": "reg_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3280,
+                "color": 0.900
+              }
+            ],
+            "size": 2560,
+            "minAccessCount": 3280,
+            "maxAccessCount": 110185
+          },
+          {
+            "label": "hiveencbuck1676910931",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 109463,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 48397,
+                "color": 0.000
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 25514,
+                "color": 0.555
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 6387,
+                "color": 0.600
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 6384,
+                "color": 0.665
+              },
+              {
+                "label": "enc_path/hive_tpcds/store_sales",
+                "size": 256,
+                "accessCount": 4563,
+                "color": 0.700
+              },
+              {
+                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
+                "size": 256,
+                "accessCount": 4032,
+                "color": 0.750
+              },
+              {
+                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
+                "size": 256,
+                "accessCount": 3840,
+                "color": 0.800
+              },
+              {
+                "label": "enc_path/hive_tpcds/item",
+                "size": 256,
+                "accessCount": 3267,
+                "color": 0.850
+              },
+              {
+                "label": "enc_path/hive_tpcds/item/item.dat",
+                "size": 256,
+                "accessCount": 3264,
+                "color": 0.950
+              }
+            ],
+            "size": 2560,
+            "minAccessCount": 3264,
+            "maxAccessCount": 109463
+          }
+        ],
+        "size": 5120
+      },
+      {
+        "label": "hivevol1676533485",
+        "children": [
+          {
+            "label": "hiveencbuck1676533485",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 52456,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 23190,
+                "color": 0.000
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 12217,
+                "color": 0.050
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 3062,
+                "color": 0.100
+              },
+              {
+                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 3059,
+                "color": 0.150
+              }
+            ],
+            "size": 1280,
+            "minAccessCount": 3059,
+            "maxAccessCount": 52456
+          },
+          {
+            "label": "hivebuck1676533485",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 52450,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 23193,
+                "color": 0.150
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 12223,
+                "color": 1.000
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim",
+                "size": 256,
+                "accessCount": 3062,
+                "color": 0.058
+              },
+              {
+                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
+                "size": 256,
+                "accessCount": 3059,
+                "color": 0.250
+              }
+            ],
+            "size": 1280,
+            "minAccessCount": 3059,
+            "maxAccessCount": 52450
+          }
+        ],
+        "size": 2560
+      },
+      {
+        "label": "hivewritevol1676574237",
+        "children": [
+          {
+            "label": "hivebucket1676574242",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 37446,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 37446,
+            "maxAccessCount": 37446
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivevol1675358593",
+        "children": [
+          {
+            "label": "hiveencbuck1675358593",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 34205,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 15126,
+                "color": 0.750
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 7975,
+                "color": 0.180
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 7975,
+            "maxAccessCount": 34205
+          },
+          {
+            "label": "hivebuck1675358593",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 32047,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 14151,
+                "color": 0.560
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 7513,
+                "color": 0.670
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 7513,
+            "maxAccessCount": 32047
+          }
+        ],
+        "size": 1536
+      },
+      {
+        "label": "hivewritevol1675429188",
+        "children": [
+          {
+            "label": "hivebucket1675429193",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 32246,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 32246,
+            "maxAccessCount": 32246
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1676910511",
+        "children": [
+          {
+            "label": "hivebucket1676910516",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 26095,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 26095,
+            "maxAccessCount": 26095
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivevol1676900292",
+        "children": [
+          {
+            "label": "hivebuck1676900292",
+            "children": [
+              {
+                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 13692,
+                "color": 1.0
+              },
+              {
+                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 6048,
+                "color": 0.125
+              },
+              {
+                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 3187,
+                "color": 0.568
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 3187,
+            "maxAccessCount": 13692
+          },
+          {
+            "label": "hiveencbuck1676900293",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
+                "size": 256,
+                "accessCount": 13681,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
+                "size": 256,
+                "accessCount": 6049,
+                "color": 0.442
+              },
+              {
+                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
+                "size": 256,
+                "accessCount": 3188,
+                "color": 0.789
+              }
+            ],
+            "size": 768,
+            "minAccessCount": 3188,
+            "maxAccessCount": 13681
+          }
+        ],
+        "size": 1536,
+        "minAccessCount": 32246,
+        "maxAccessCount": 32246
+      },
+      {
+        "label": "hivewritevol1676533084",
+        "children": [
+          {
+            "label": "hivebucket1676533089",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 12976,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 12976,
+            "maxAccessCount": 12976
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1675358193",
+        "children": [
+          {
+            "label": "hivebucket1675358197",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 8034,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 8034,
+            "maxAccessCount": 8034
+          }
+        ],
+        "size": 256
+      },
+      {
+        "label": "hivewritevol1676899876",
+        "children": [
+          {
+            "label": "hivebucket1676899881",
+            "children": [
+              {
+                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
+                "size": 256,
+                "accessCount": 3088,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "minAccessCount": 3088,
+            "maxAccessCount": 3088
+          }
+        ],
+        "size": 256
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 2924,
+    "maxAccessCount": 155074
   }
 }

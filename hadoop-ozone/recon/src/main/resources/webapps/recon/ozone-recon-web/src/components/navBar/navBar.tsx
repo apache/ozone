@@ -28,9 +28,17 @@ const {Sider} = Layout;
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
+  flag: boolean;
 }
 
 class NavBar extends React.Component<INavBarProps> {
+  constructor(props = {}) {
+    super(props);
+    this.state = {
+      flag: false
+    };
+
+  }
   render() {
     const {location} = this.props;
     return (
@@ -81,6 +89,14 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Disk Usage</span>
             <Link to='/DiskUsage'/>
           </Menu.Item>
+          {
+            this.state.flag ?
+              <Menu.Item key='/HeatMap'>
+                <Icon type='bar-chart' />
+                <span>HeatMap</span>
+                <Link to='/HeatMap' />
+              </Menu.Item> : ""
+          }
         </Menu>
       </Sider>
     );
