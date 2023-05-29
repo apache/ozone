@@ -1,4 +1,8 @@
-lockfileVersion: '6.0'
+lockfileVersion: '6.1'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
 
 dependencies:
   '@ant-design/icons':
@@ -2042,7 +2046,7 @@ packages:
   /@babel/runtime@7.10.2:
     resolution: {integrity: sha512-6sF3uQw2ivImfVIl62RZ7MXhO2tap69WeWK57vAaimT6AZbE4FbqjdEJIN1UqoD6wI6B+1n9UiagafH1sxjOtg==}
     dependencies:
-      regenerator-runtime: 0.13.11
+      regenerator-runtime: 0.13.5
     dev: false
 
   /@babel/runtime@7.21.5:
@@ -13226,7 +13230,7 @@ packages:
       object-assign: 4.1.1
       promise: 8.1.0
       raf: 3.4.1
-      regenerator-runtime: 0.13.11
+      regenerator-runtime: 0.13.5
       whatwg-fetch: 3.0.0
     dev: false
 
@@ -13669,6 +13673,10 @@ packages:
 
   /regenerator-runtime@0.13.11:
     resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
+
+  /regenerator-runtime@0.13.5:
+    resolution: {integrity: sha512-ZS5w8CpKFinUzOwW3c83oPeVXoNsrLsaCoLtJvAClH135j/R77RuymhiSErhm2lKcwSCIpmvIWSbDkIfAqKQlA==}
+    dev: false
 
   /regenerator-transform@0.14.4:
     resolution: {integrity: sha512-EaJaKPBI9GvKpvUz2mz4fhx7WPgvwRLY9v3hlNHWmAuJHI13T4nwKnNvm5RWJzEdnI5g5UwtOww+S8IdoUC2bw==}
