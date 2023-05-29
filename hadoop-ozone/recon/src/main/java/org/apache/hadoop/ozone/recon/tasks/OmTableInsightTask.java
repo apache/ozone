@@ -53,18 +53,18 @@ import static org.jooq.impl.DSL.using;
  * Class to iterate over the OM DB and store the total counts of volumes,
  * buckets, keys, open keys, deleted keys, etc.
  */
-public class TableInsightTask implements ReconOmTask {
+public class OmTableInsightTask implements ReconOmTask {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TableInsightTask.class);
+      LoggerFactory.getLogger(OmTableInsightTask.class);
 
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
   private ReconOMMetadataManager reconOMMetadataManager;
 
   @Inject
-  public TableInsightTask(GlobalStatsDao globalStatsDao,
-                          Configuration sqlConfiguration,
-                          ReconOMMetadataManager reconOMMetadataManager) {
+  public OmTableInsightTask(GlobalStatsDao globalStatsDao,
+                            Configuration sqlConfiguration,
+                            ReconOMMetadataManager reconOMMetadataManager) {
     this.globalStatsDao = globalStatsDao;
     this.sqlConfiguration = sqlConfiguration;
     this.reconOMMetadataManager = reconOMMetadataManager;
@@ -114,7 +114,7 @@ public class TableInsightTask implements ReconOmTask {
     writeDataToDB(objectCountMap);
     writeDataToDB(sizeCountMap);
 
-    LOG.info("Completed a 'reprocess' run of TableInsightTask.");
+    LOG.info("Completed a 'reprocess' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
@@ -171,7 +171,7 @@ public class TableInsightTask implements ReconOmTask {
 
   @Override
   public String getTaskName() {
-    return "TableInsightTask";
+    return "OmTableInsightTask";
   }
 
   public Collection<String> getTaskTables() {
@@ -252,7 +252,7 @@ public class TableInsightTask implements ReconOmTask {
     writeDataToDB(objectCountMap); // Write count data to DB
     writeDataToDB(objectSizeMap);  // Write size data to DB
 
-    LOG.info("Completed a 'process' run of TableInsightTask.");
+    LOG.info("Completed a 'process' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 

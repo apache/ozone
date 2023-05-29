@@ -60,7 +60,7 @@ import static org.mockito.Mockito.when;
 public class TestTableInsightTask extends AbstractReconSqlDBTest {
 
   private GlobalStatsDao globalStatsDao;
-  private TableInsightTask tableInsightTask;
+  private OmTableInsightTask omTableInsightTask;
   private DSLContext dslContext;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -70,8 +70,8 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
     globalStatsDao = getDao(GlobalStatsDao.class);
-    tableInsightTask = new TableInsightTask(globalStatsDao, getConfiguration(),
-        reconOMMetadataManager);
+    omTableInsightTask = new OmTableInsightTask(
+        globalStatsDao, getConfiguration(), reconOMMetadataManager);
     dslContext = getDslContext();
   }
 
@@ -90,7 +90,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
   public void testReprocessForCount() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
     // Mock 5 rows in each table and test the count
-    for (String tableName : tableInsightTask.getTaskTables()) {
+    for (String tableName : omTableInsightTask.getTaskTables()) {
       TypedTable<String, Object> table = mock(TypedTable.class);
       TypedTable.TypedTableIterator mockIter = mock(TypedTable
           .TypedTableIterator.class);
@@ -106,7 +106,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     }
 
     Pair<String, Boolean> result =
-        tableInsightTask.reprocess(omMetadataManager);
+        omTableInsightTask.reprocess(omMetadataManager);
     assertTrue(result.getRight());
 
     assertEquals(5L, getCountForTable(KEY_TABLE));
@@ -136,7 +136,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
         "file3", "Bucket3", "Volume3", "file3", 3, 0, 3, 3, null, 3L);
 
     Pair<String, Boolean> result =
-        tableInsightTask.reprocess(reconOMMetadataManager);
+        omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
     assertEquals(6L, getSizeForTable(OPEN_KEY_TABLE));
     assertEquals(6L, getSizeForTable(OPEN_FILE_TABLE));
@@ -147,7 +147,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
   public void testProcessForCount() {
     ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
     // Create 5 put, 1 delete and 1 update event for each table
-    for (String tableName: tableInsightTask.getTaskTables()) {
+    for (String tableName: omTableInsightTask.getTaskTables()) {
       for (int i = 0; i < 5; i++) {
         events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
       }
@@ -159,7 +159,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
       events.add(getOMUpdateEvent("item1", null, tableName, UPDATE));
     }
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(events);
-    tableInsightTask.process(omUpdateEventBatch);
+    omTableInsightTask.process(omUpdateEventBatch);
 
     // Verify 4 items in each table. (5 puts - 1 delete + 0 update)
     assertEquals(4L, getCountForTable(KEY_TABLE));
@@ -170,14 +170,14 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
 
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
-    for (String tableName: tableInsightTask.getTaskTables()) {
+    for (String tableName: omTableInsightTask.getTaskTables()) {
       newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT));
       // This delete event should be a noop since value is null
       newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE));
     }
 
     omUpdateEventBatch = new OMUpdateEventBatch(newEvents);
-    tableInsightTask.process(omUpdateEventBatch);
+    omTableInsightTask.process(omUpdateEventBatch);
 
     // Verify 5 items in each table. (1 new put + 0 delete)
     assertEquals(5L, getCountForTable(KEY_TABLE));
@@ -196,30 +196,30 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     // Test PUT events
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
     for (String tableName :
-        tableInsightTask.getTablesToCalculateSize()) {
+        omTableInsightTask.getTablesToCalculateSize()) {
       for (int i = 0; i < 5; i++) {
         putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT));
       }
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
-    tableInsightTask.process(putEventBatch);
+    omTableInsightTask.process(putEventBatch);
 
     // After 5 PUTs, size should be 5 * 1000 = 5000 for each size-related table
-    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       assertEquals(5000L, getSizeForTable(tableName));
     }
 
     // Test DELETE events
     ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
-    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       // Delete "item0"
       deleteEvents.add(getOMUpdateEvent("item0", omKeyInfo, tableName, DELETE));
     }
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
-    tableInsightTask.process(deleteEventBatch);
+    omTableInsightTask.process(deleteEventBatch);
 
     // After deleting "item0", size should be 4 * 1000 = 4000
-    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       assertEquals(4000L, getSizeForTable(tableName));
     }
 
@@ -228,7 +228,7 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
     OmKeyInfo updatedOmKeyInfo = mock(OmKeyInfo.class);
     when(updatedOmKeyInfo.getDataSize()).thenReturn(500L);
     ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
-    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       // "Update" "item1" by first deleting it...
       updateEvents.add(getOMUpdateEvent("item1", omKeyInfo, tableName, DELETE));
       // ...and then putting it back with updated size
@@ -236,10 +236,10 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
           getOMUpdateEvent("item1", updatedOmKeyInfo, tableName, PUT));
     }
     OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
-    tableInsightTask.process(updateEventBatch);
+    omTableInsightTask.process(updateEventBatch);
 
     // After UPDATE, size should be (4000 - 1000) + 500 = 3500
-    for (String tableName : tableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       assertEquals(3500L, getSizeForTable(tableName));
     }
   }
@@ -256,12 +256,12 @@ public class TestTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private long getCountForTable(String tableName) {
-    String key = TableInsightTask.getTableCountKeyFromTable(tableName);
+    String key = OmTableInsightTask.getTableCountKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
   }
 
   private long getSizeForTable(String tableName) {
-    String key = TableInsightTask.getTableSizeKeyFromTable(tableName);
+    String key = OmTableInsightTask.getTableSizeKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
   }
 }
