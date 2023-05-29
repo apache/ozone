@@ -174,7 +174,8 @@ public final class TestCodec {
 
     final String multiByteChars = "官方发行包包括了源代码包和二进制代码包";
     for (int i = 0; i < NUM_LOOPS; i++) {
-      final String original = i == 0 ? multiByteChars : multiByteChars.substring(0, i);
+      final String original = i == 0 ? multiByteChars
+          : multiByteChars.substring(0, i);
       final int serializedSize = runTestStringCodec(original);
       Assertions.assertEquals(3 * original.length(), serializedSize);
     }
