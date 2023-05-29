@@ -511,9 +511,7 @@ public class TestOzoneAtRestEncryption {
 
   public void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts, boolean isStream) throws Exception {
-
-    String keyName =
-        (isStream ? "stream_mpu_test_key_" : "mpu_test_key_") + numParts;
+    String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
     String uploadID = initiateMultipartUpload(bucket, keyName,
