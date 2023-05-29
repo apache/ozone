@@ -17,6 +17,6 @@
  */
 
 /**
- * This package contains CRL related classes.
+ * This package contains security related classes.
  */
-package org.apache.hadoop.hdds.scm.crl;
+package org.apache.hadoop.hdds.scm.security;
