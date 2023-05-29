@@ -57,7 +57,7 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for Object Count Task.
  */
-public class TestTableInsightTask extends AbstractReconSqlDBTest {
+public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
   private GlobalStatsDao globalStatsDao;
   private OmTableInsightTask omTableInsightTask;
