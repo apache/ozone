@@ -230,6 +230,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.HddsUtils.keepingThreadName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
@@ -1263,26 +1264,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       int handlerCount)
       throws IOException {
 
-    final Thread thread = Thread.currentThread();
-    final String threadName = thread.getName();
-
-    RPC.Server rpcServer;
-    try {
-      rpcServer = new RPC.Builder(conf)
-          .setProtocol(OzoneManagerProtocolPB.class)
-          .setInstance(clientProtocolService)
-          .setBindAddress(addr.getHostString())
-          .setPort(addr.getPort())
-          .setNumHandlers(handlerCount)
-          .setVerbose(false)
-          .setSecretManager(delegationTokenMgr)
-          .build();
-    } finally {
-      if (!Objects.equals(threadName, thread.getName())) {
-        LOG.info("Restoring thread name {}", threadName);
-        thread.setName(threadName);
-      }
-    }
+    RPC.Server rpcServer = keepingThreadName(() -> new RPC.Builder(conf)
+        .setProtocol(OzoneManagerProtocolPB.class)
+        .setInstance(clientProtocolService)
+        .setBindAddress(addr.getHostString())
+        .setPort(addr.getPort())
+        .setNumHandlers(handlerCount)
+        .setVerbose(false)
+        .setSecretManager(delegationTokenMgr)
+        .build());
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
