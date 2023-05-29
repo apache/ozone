@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,6 +62,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
@@ -2590,8 +2590,7 @@ public class TestLegacyReplicationManager {
     // Using the same originID for all replica in the container set. If each
     // replica has a unique originID, it causes problems in ReplicationManager
     // when processing over-replicated containers.
-    final UUID originNodeId =
-        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final UUID originNodeId = getUUID(container.getContainerID());
     final ContainerReplica replica = getReplicas(container.containerID(),
         replicaState, container.getUsedBytes(), container.getNumberOfKeys(),
         bcsId, originNodeId, dn);
@@ -2600,14 +2599,16 @@ public class TestLegacyReplicationManager {
     return replica;
   }
 
+  static UUID getUUID(long id) {
+    return UUID.nameUUIDFromBytes(LongCodec.get().toPersistedFormat(id));
+  }
+
   private ContainerReplica addReplicaToDn(ContainerInfo container,
-      DatanodeDetails dn, State replicaState, long usedBytes, long numOfKeys)
-      throws ContainerNotFoundException {
+      DatanodeDetails dn, State replicaState, long usedBytes, long numOfKeys) {
     // Using the same originID for all replica in the container set. If each
     // replica has a unique originID, it causes problems in ReplicationManager
     // when processing over-replicated containers.
-    final UUID originNodeId =
-        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final UUID originNodeId = getUUID(container.getContainerID());
     final ContainerReplica replica = getReplicas(container.containerID(),
         replicaState, usedBytes, numOfKeys, 1000L, originNodeId, dn);
     containerStateManager
