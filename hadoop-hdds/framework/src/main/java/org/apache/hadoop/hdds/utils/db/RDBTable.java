@@ -66,7 +66,7 @@ class RDBTable implements Table<byte[], byte[]> {
     return family;
   }
 
-  public void put(ByteBuffer key, ByteBuffer value) throws IOException {
+  void put(ByteBuffer key, ByteBuffer value) throws IOException {
     db.put(family, key, value);
   }
 
@@ -75,8 +75,8 @@ class RDBTable implements Table<byte[], byte[]> {
     db.put(family, key, value);
   }
 
-  public void putWithBatch(BatchOperation batch, CodecBuffer key,
-      CodecBuffer value) throws IOException {
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value)
+      throws IOException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -123,6 +123,10 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] get(byte[] key) throws IOException {
     return db.get(family, key);
+  }
+
+  Integer get(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    return db.get(family, key, outValue);
   }
 
   /**
@@ -190,7 +194,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return family.getName();
   }
 

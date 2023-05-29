@@ -700,6 +700,38 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  /**
+   * Get the value mapped to the given key.
+   *
+   * @param family the table to get from.
+   * @param key the buffer containing the key.
+   * @param outValue the buffer to store the output value.
+   *                 When the buffer size is smaller than the size of the value,
+   *                 partial result will be written.
+   * @return null if the key is not found;
+   *         otherwise, return the size (possibly 0) of the value.
+   * @throws IOException if the db is closed or the db throws an exception.
+   * @see org.rocksdb.RocksDB#get(ColumnFamilyHandle, org.rocksdb.ReadOptions,
+   *                              ByteBuffer, ByteBuffer)
+   */
+  Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
+      throws IOException {
+    assertClose();
+    try (ManagedReadOptions options = new ManagedReadOptions()) {
+      counter.incrementAndGet();
+      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      LOG.debug("get: size={}, remaining={}",
+          size, outValue.asReadOnlyBuffer().remaining());
+      return size == ManagedRocksDB.NOT_FOUND ? null : size;
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public long estimateNumKeys() throws IOException {
     return getLongProperty(ESTIMATE_NUM_KEYS);
   }
