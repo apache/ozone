@@ -56,7 +56,7 @@ import static org.mockito.Mockito.when;
 import static org.slf4j.event.Level.INFO;
 
 /**
- * Test for the CRL Status Report Handler.
+ * Test for root CA rotation manager.
  */
 public class TestRootCARotationManager {
 
