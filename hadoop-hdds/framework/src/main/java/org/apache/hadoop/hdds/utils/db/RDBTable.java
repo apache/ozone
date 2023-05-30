@@ -107,7 +107,22 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isExist(byte[] key) throws IOException {
-    return getIfExist(key) != null;
+    rdbMetrics.incNumDBKeyMayExistChecks();
+    final Supplier<byte[]> holder = db.keyMayExist(family, key);
+    if (holder == null) {
+      return false;  // definitely not exists
+    }
+    final byte[] value = holder.get();
+    if (value != null) {
+      return true; // definitely exists
+    }
+
+    // inconclusive: the key may or may not exist
+    final boolean exists = get(key) != null;
+    if (!exists) {
+      rdbMetrics.incNumDBKeyMayExistMisses();
+    }
+    return exists;
   }
 
   @Override
