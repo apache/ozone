@@ -82,7 +82,7 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   private <E extends Exception> CheckedFunction<ByteBuffer, Integer, E> encode(
-      String string, int serializedSize, Function<String, E> newE) {
+      String string, Integer serializedSize, Function<String, E> newE) {
     return buffer -> {
       final CoderResult result = encoder.encode(
           CharBuffer.wrap(string), buffer, true);
@@ -91,11 +91,11 @@ abstract class StringCodecBase implements Codec<String> {
             + ", string=" + string);
       }
       final int remaining = buffer.flip().remaining();
-      if (remaining != serializedSize) {
+      if (serializedSize != null && serializedSize != remaining) {
         throw newE.apply("Size mismatched: Expected size is " + serializedSize
             + " but actual size is " + remaining + ", string=" + string);
       }
-      return serializedSize;
+      return remaining;
     };
   }
 
@@ -141,7 +141,7 @@ abstract class StringCodecBase implements Codec<String> {
     // allocate a larger buffer to avoid encoding twice.
     final int size = getSerializedSizeUpperBound(object);
     final CodecBuffer buffer = allocator.apply(size);
-    buffer.putFromSource(encode(object, size, IOException::new));
+    buffer.putFromSource(encode(object, null, IOException::new));
     return buffer;
   }
 
