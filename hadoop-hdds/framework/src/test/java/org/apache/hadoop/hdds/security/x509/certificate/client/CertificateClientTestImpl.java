@@ -120,7 +120,6 @@ public class CertificateClientTestImpl implements CertificateClient {
             .makeCA();
     rootCert = new JcaX509CertificateConverter().getCertificate(
         builder.build());
-    String aff = rootCert.getSerialNumber().toString();
     certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
     rootCerts.add(rootCert);
 
@@ -317,7 +316,6 @@ public class CertificateClientTestImpl implements CertificateClient {
             .makeCA(BigInteger.ONE.add(BigInteger.ONE));
     rootCert = new JcaX509CertificateConverter().getCertificate(
         builder.build());
-    String aff = rootCert.getSerialNumber().toString();
     certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
     rootCerts.add(rootCert);
   }
