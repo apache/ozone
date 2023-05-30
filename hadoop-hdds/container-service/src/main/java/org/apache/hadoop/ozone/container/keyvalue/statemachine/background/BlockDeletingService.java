@@ -84,7 +84,7 @@ public class BlockDeletingService extends BackgroundService {
   private ContainerDeletionChoosingPolicy containerDeletionPolicy;
   private final ConfigurationSource conf;
 
-  private final int blockLimitPerInterval;
+  private final DatanodeConfiguration dfsConf;
 
   private final BlockDeletingServiceMetrics metrics;
 
@@ -107,8 +107,7 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    dfsConf = conf.getObject(DatanodeConfiguration.class);
     metrics = BlockDeletingServiceMetrics.create();
   }
 
@@ -145,7 +144,7 @@ public class BlockDeletingService extends BackgroundService {
       // We must ensure there is no empty container in this result.
       // The chosen result depends on what container deletion policy is
       // configured.
-      containers = chooseContainerForBlockDeletion(blockLimitPerInterval,
+      containers = chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
           containerDeletionPolicy);
 
       BlockDeletingTask containerBlockInfos = null;
@@ -647,5 +646,13 @@ public class BlockDeletingService extends BackgroundService {
     public long getBytesReleased() {
       return bytesReleased;
     }
+  }
+
+  public int getBlockLimitPerInterval() {
+    return dfsConf.getBlockDeletionLimit();
+  }
+
+  public DatanodeConfiguration getDfsConf() {
+    return dfsConf;
   }
 }

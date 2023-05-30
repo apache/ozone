@@ -58,6 +58,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -82,6 +83,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.slf4j.Logger;
@@ -121,7 +124,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private DatanodeCRLStore dnCRLStore;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private final SortedSet<String> reconfigurableProperties =
-      ImmutableSortedSet.of();
+      ImmutableSortedSet.of(
+          HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL,
+          HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX
+      );
   private OzoneAdmins admins;
 
   //Constructor for DataNode PluginService
@@ -685,7 +691,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public String reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
-    return "";
+    LOG.info("Reconfiguring {} to {}", property, newVal);
+    switch (property) {
+    case HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL:
+      return reconfigBlockDeletingLimitPerInterval(newVal);
+    case HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX:
+      return reconfigBlockDeleteThreadMax(newVal);
+    default:
+      LOG.warn("Attempted to reconfigure unknown property: " + property);
+      throw new ReconfigurationException(property, newVal,
+          getConf().get(property));
+    }
   }
 
   public Collection<String> getReconfigurableProperties() {
@@ -712,4 +728,23 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         OZONE_ADMINISTRATORS_GROUPS);
   }
 
+  private String reconfigBlockDeletingLimitPerInterval(String value) {
+    getConf().set(HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, value);
+
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .getDfsConf().setBlockDeletionLimit(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigBlockDeleteThreadMax(String value) {
+    getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
+    getDatanodeStateMachine().getDnConf()
+        .setBlockDeleteThreads(Integer.parseInt(value));
+
+    DeleteBlocksCommandHandler handler =
+        (DeleteBlocksCommandHandler) getDatanodeStateMachine()
+            .getCommandDispatcher().getDeleteBlocksCommandHandler();
+    handler.setPoolSize(Integer.parseInt(value));
+    return value;
+  }
 }

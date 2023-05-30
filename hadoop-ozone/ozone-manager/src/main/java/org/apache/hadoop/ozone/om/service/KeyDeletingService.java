@@ -58,7 +58,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
   private final KeyManager manager;
   private static ClientId clientId = ClientId.randomId();
-  private final int keyLimitPerTask;
+  private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
 
   public KeyDeletingService(OzoneManager ozoneManager,
@@ -99,6 +99,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return getOzoneManager().isLeaderReady();
   }
 
+  public synchronized int getKeyLimitPerTask() {
+    return keyLimitPerTask;
+  }
+
+  public synchronized void setKeyLimitPerTask(int keyLimitPerTask) {
+    this.keyLimitPerTask = keyLimitPerTask;
+  }
+
   /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
@@ -135,7 +143,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  from if the above would be done inside getPendingDeletionKeys().
 
           List<BlockGroup> keyBlocksList = manager
-              .getPendingDeletionKeys(keyLimitPerTask);
+              .getPendingDeletionKeys(getKeyLimitPerTask());
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             int delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(), null);

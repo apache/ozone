@@ -187,6 +187,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
@@ -305,7 +306,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /** A list of property that are reconfigurable at runtime. */
   private final SortedSet<String> reconfigurableProperties =
       ImmutableSortedSet.of(
-          OZONE_ADMINISTRATORS
+          OZONE_ADMINISTRATORS,
+          HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX
       );
 
   private Clock systemClock;
@@ -2124,9 +2126,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override // ReconfigurableBase
   public String reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
+    LOG.info("Reconfiguring {} to {}", property, newVal);
+    switch (property) {
+    case OZONE_ADMINISTRATORS:
       return reconfOzoneAdmins(newVal);
-    } else {
+    case HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX:
+      return reconfHddsScmBlockDeletionPerIntervalMax(newVal);
+    default:
+      LOG.warn("Attempted to reconfigure unknown property: " + property);
       throw new ReconfigurationException(property, newVal,
           getConfiguration().get(property));
     }
@@ -2140,6 +2147,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
+  }
+
+  private String reconfHddsScmBlockDeletionPerIntervalMax(String newVal) {
+    getConfiguration().set(HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX, newVal);
+
+    getScmBlockManager().getSCMBlockDeletingService()
+        .setBlockDeleteTXNum(Integer.parseInt(newVal));
+    return newVal;
   }
 
   /**

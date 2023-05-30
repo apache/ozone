@@ -30,6 +30,12 @@ import java.time.Duration;
  */
 @ConfigGroup(prefix = "hdds.scm")
 public class ScmConfig {
+  public static final String CONFIG_PREFIX = "hdds.scm";
+  public static final String BLOCK_DELETION_PER_INTERVAL_MAX
+      = "block.deletion.per-interval.max";
+  public static final String HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX =
+      CONFIG_PREFIX + "." + BLOCK_DELETION_PER_INTERVAL_MAX;
+
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
@@ -77,7 +83,7 @@ public class ScmConfig {
   )
   private String pipelineChoosePolicyName;
 
-  @Config(key = "block.deletion.per-interval.max",
+  @Config(key = BLOCK_DELETION_PER_INTERVAL_MAX,
       type = ConfigType.INT,
       defaultValue = "100000",
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
@@ -138,7 +144,7 @@ public class ScmConfig {
     this.pipelineChoosePolicyName = pipelineChoosePolicyName;
   }
 
-  public void setBlockDeletionLimit(int blockDeletionLimit) {
+  public synchronized void setBlockDeletionLimit(int blockDeletionLimit) {
     this.blockDeletionLimit = blockDeletionLimit;
   }
 
@@ -158,7 +164,7 @@ public class ScmConfig {
     return pipelineChoosePolicyName;
   }
 
-  public int getBlockDeletionLimit() {
+  public synchronized int getBlockDeletionLimit() {
     return blockDeletionLimit;
   }
 

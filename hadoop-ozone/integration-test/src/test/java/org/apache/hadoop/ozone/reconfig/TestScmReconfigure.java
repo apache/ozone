@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.reconfig;
  */
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -30,9 +31,11 @@ import org.junit.rules.Timeout;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Tests for SCM Reconfigure.
@@ -83,6 +86,8 @@ public class TestScmReconfigure {
    */
   @Test
   public void testOmAdminUsersReconfigure() throws Exception {
+    assertIsPropertyReconfigurable(OZONE_ADMINISTRATORS);
+
     String userA = "mockUserA";
     String userB = "mockUserB";
     conf.set(OZONE_ADMINISTRATORS, userA);
@@ -96,6 +101,30 @@ public class TestScmReconfigure {
         scm.getScmAdminUsernames().contains(userA));
     assertTrue(userB + " should be an admin user",
         scm.getScmAdminUsernames().contains(userB));
+  }
+
+  @Test
+  public void testHddsScmBlockDeletionPerIntervalMaxReconfigure()
+      throws Exception {
+    assertIsPropertyReconfigurable(HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX);
+
+    SCMBlockDeletingService blockDeletingService = scm.getScmBlockManager()
+        .getSCMBlockDeletingService();
+    int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
+
+    scm.reconfigurePropertyImpl(HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX,
+        String.valueOf(blockDeleteTXNum + 1));
+
+    assertEquals(blockDeleteTXNum + 1,
+        blockDeletingService.getBlockDeleteTXNum());
+  }
+
+  /**
+   * {@link org.apache.hadoop.conf.ReconfigurableBase#isPropertyReconfigurable}.
+   * @param config
+   */
+  private void assertIsPropertyReconfigurable(String config) {
+    assertTrue(scm.getReconfigurableProperties().contains(config));
   }
 
 }

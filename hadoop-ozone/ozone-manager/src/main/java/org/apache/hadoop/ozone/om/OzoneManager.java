@@ -256,6 +256,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -474,7 +475,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final SortedSet<String> reconfigurableProperties =
       ImmutableSortedSet.of(
           OZONE_ADMINISTRATORS,
-          OZONE_READONLY_ADMINISTRATORS
+          OZONE_READONLY_ADMINISTRATORS,
+          OZONE_KEY_DELETING_LIMIT_PER_TASK
       );
 
   @SuppressWarnings("methodlength")
@@ -4639,11 +4641,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override // ReconfigurableBase
   public String reconfigurePropertyImpl(String property, String newVal)
       throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
+    LOG.info("Reconfiguring {} to {}", property, newVal);
+    switch (property) {
+    case OZONE_ADMINISTRATORS:
       return reconfOzoneAdmins(newVal);
-    } else if (property.equals(OZONE_READONLY_ADMINISTRATORS)) {
+    case OZONE_READONLY_ADMINISTRATORS:
       return reconfOzoneReadOnlyAdmins(newVal);
-    } else {
+    case OZONE_KEY_DELETING_LIMIT_PER_TASK:
+      return reconfOzoneKeyDeletingLimitPerTask(newVal);
+    default:
+      LOG.warn("Attempted to reconfigure unknown property: " + property);
       throw new ReconfigurationException(property, newVal,
           getConfiguration().get(property));
     }
@@ -4668,6 +4675,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
     return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneKeyDeletingLimitPerTask(String newVal) {
+    getConfiguration().set(OZONE_KEY_DELETING_LIMIT_PER_TASK, newVal);
+
+    getKeyManager().getDeletingService()
+        .setKeyLimitPerTask(Integer.parseInt(newVal));
+    return newVal;
   }
 
   public void validateReplicationConfig(ReplicationConfig replicationConfig)

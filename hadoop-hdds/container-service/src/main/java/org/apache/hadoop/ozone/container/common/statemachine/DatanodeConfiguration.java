@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +34,19 @@ import java.time.Duration;
 /**
  * Configuration class used for high level datanode configuration parameters.
  */
-@ConfigGroup(prefix = "hdds.datanode")
+@ConfigGroup(prefix = CONFIG_PREFIX)
 public class DatanodeConfiguration {
+  public static final String CONFIG_PREFIX = "hdds.datanode";
+
+  private static final String BLOCK_DELETING_LIMIT_PER_INTERVAL
+      = "block.deleting.limit.per.interval";
+  public static final String HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL =
+      CONFIG_PREFIX + "." + BLOCK_DELETING_LIMIT_PER_INTERVAL;
+
+  private static final String BLOCK_DELETE_THREAD_MAX
+      = "block.delete.threads.max";
+  public static final String HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX =
+      CONFIG_PREFIX + "." + BLOCK_DELETE_THREAD_MAX;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeConfiguration.class);
@@ -129,7 +142,7 @@ public class DatanodeConfiguration {
    * missed. With max threads 5, optimistically DN can handle 1500 individual
    * container delete tx in 60s with RocksDB cache miss.
    */
-  @Config(key = "block.delete.threads.max",
+  @Config(key = BLOCK_DELETE_THREAD_MAX,
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {DATANODE},
@@ -210,7 +223,7 @@ public class DatanodeConfiguration {
     this.blockDeletionInterval = duration.toMillis();
   }
 
-  @Config(key = "block.deleting.limit.per.interval",
+  @Config(key = BLOCK_DELETING_LIMIT_PER_INTERVAL,
       defaultValue = "5000",
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
@@ -219,11 +232,11 @@ public class DatanodeConfiguration {
   )
   private int blockLimitPerInterval = 5000;
 
-  public int getBlockDeletionLimit() {
+  public synchronized int getBlockDeletionLimit() {
     return blockLimitPerInterval;
   }
 
-  public void setBlockDeletionLimit(int limit) {
+  public synchronized void setBlockDeletionLimit(int limit) {
     this.blockLimitPerInterval = limit;
   }
 
@@ -547,11 +560,11 @@ public class DatanodeConfiguration {
     this.diskCheckTimeout = duration.toMillis();
   }
 
-  public int getBlockDeleteThreads() {
+  public synchronized int getBlockDeleteThreads() {
     return blockDeleteThreads;
   }
 
-  public void setBlockDeleteThreads(int threads) {
+  public synchronized void setBlockDeleteThreads(int threads) {
     this.blockDeleteThreads = threads;
   }
 

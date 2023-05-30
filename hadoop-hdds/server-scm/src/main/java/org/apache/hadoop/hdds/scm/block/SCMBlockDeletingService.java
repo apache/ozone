@@ -78,6 +78,7 @@ public class SCMBlockDeletingService extends BackgroundService
   private final NodeManager nodeManager;
   private final EventPublisher eventPublisher;
   private final SCMContext scmContext;
+  private final ScmConfig scmConf;
 
   private int blockDeleteLimitSize;
   private ScmBlockDeletingServiceMetrics metrics;
@@ -116,9 +117,9 @@ public class SCMBlockDeletingService extends BackgroundService
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.metrics = metrics;
+    scmConf = conf.getObject(ScmConfig.class);
 
-    blockDeleteLimitSize =
-        conf.getObject(ScmConfig.class).getBlockDeletionLimit();
+    blockDeleteLimitSize = scmConf.getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,
         "Block deletion limit should be positive.");
 
@@ -164,7 +165,7 @@ public class SCMBlockDeletingService extends BackgroundService
                 Type.deleteBlocksCommand) == 0).collect(Collectors.toSet());
         try {
           DatanodeDeletedBlockTransactions transactions =
-              deletedBlockLog.getTransactions(blockDeleteLimitSize, included);
+              deletedBlockLog.getTransactions(getBlockDeleteTXNum(), included);
 
           if (transactions.isEmpty()) {
             return EmptyTaskResult.newResult();
@@ -222,7 +223,11 @@ public class SCMBlockDeletingService extends BackgroundService
 
   @VisibleForTesting
   public void setBlockDeleteTXNum(int numTXs) {
-    blockDeleteLimitSize = numTXs;
+    scmConf.setBlockDeletionLimit(numTXs);
+  }
+
+  public int getBlockDeleteTXNum() {
+    return scmConf.getBlockDeletionLimit();
   }
 
   @Override
@@ -272,5 +277,9 @@ public class SCMBlockDeletingService extends BackgroundService
   @VisibleForTesting
   public ScmBlockDeletingServiceMetrics getMetrics() {
     return this.metrics;
+  }
+
+  public ScmConfig getScmConf() {
+    return scmConf;
   }
 }

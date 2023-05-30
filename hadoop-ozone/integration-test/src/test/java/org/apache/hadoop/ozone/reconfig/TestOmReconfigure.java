@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.reconfig;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import java.util.UUID;
@@ -83,6 +85,8 @@ public class TestOmReconfigure {
    */
   @Test
   public void testOmAdminUsersReconfigure() throws Exception {
+    assertIsPropertyReconfigurable(OZONE_ADMINISTRATORS);
+
     String userA = "mockUserA";
     String userB = "mockUserB";
     conf.set(OZONE_ADMINISTRATORS, userA);
@@ -103,6 +107,8 @@ public class TestOmReconfigure {
    */
   @Test
   public void testOmReadOnlyUsersReconfigure() throws Exception {
+    assertIsPropertyReconfigurable(OZONE_READONLY_ADMINISTRATORS);
+
     String userA = "mockUserA";
     String userB = "mockUserB";
     conf.set(OZONE_READONLY_ADMINISTRATORS, userA);
@@ -116,5 +122,27 @@ public class TestOmReconfigure {
         ozoneManager.getOmReadOnlyAdminUsernames().contains(userA));
     assertTrue(userB + " should be a admin user",
         ozoneManager.getOmReadOnlyAdminUsernames().contains(userB));
+  }
+
+  @Test
+  public void testOzoneKeyDeletingLimitPerTask() throws Exception {
+    assertIsPropertyReconfigurable(OZONE_KEY_DELETING_LIMIT_PER_TASK);
+
+    int originLimit =
+        ozoneManager.getKeyManager().getDeletingService().getKeyLimitPerTask();
+
+    ozoneManager.reconfigurePropertyImpl(OZONE_KEY_DELETING_LIMIT_PER_TASK,
+        String.valueOf(originLimit + 1));
+
+    assertEquals(originLimit + 1, ozoneManager.getKeyManager()
+        .getDeletingService().getKeyLimitPerTask());
+  }
+
+  /**
+   * {@link org.apache.hadoop.conf.ReconfigurableBase#isPropertyReconfigurable}.
+   * @param config
+   */
+  private void assertIsPropertyReconfigurable(String config) {
+    assertTrue(ozoneManager.getReconfigurableProperties().contains(config));
   }
 }

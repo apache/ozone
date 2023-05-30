@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -61,10 +62,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -86,7 +87,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final ConfigurationSource conf;
   private int invocationCount;
   private long totalTime;
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
   private final OzoneContainer ozoneContainer;
@@ -98,7 +99,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
-    this.executor = Executors.newFixedThreadPool(
+    this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(
         threadPoolSize, new ThreadFactoryBuilder()
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
     this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
@@ -544,5 +545,30 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
         BatchOperation batch, long txnID, DeletedBlocksTransaction delTX)
         throws IOException;
+  }
+
+  @VisibleForTesting
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
+  }
+
+  public void setPoolSize(int size) {
+    if (size <= 0) {
+      throw new IllegalArgumentException("Pool size must be positive.");
+    }
+
+    int currentCorePoolSize = executor.getCorePoolSize();
+
+    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
+    // equal to the corePoolSize. We must make sure this invariant holds when
+    // changing the pool size. Therefore, we take into account whether the
+    // new size is greater or smaller than the current core pool size.
+    if (size > currentCorePoolSize) {
+      executor.setMaximumPoolSize(size);
+      executor.setCorePoolSize(size);
+    } else {
+      executor.setCorePoolSize(size);
+      executor.setMaximumPoolSize(size);
+    }
   }
 }
