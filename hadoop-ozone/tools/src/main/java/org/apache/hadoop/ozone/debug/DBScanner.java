@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
@@ -227,7 +227,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           String cid = keyStr.substring(0, index);
           String blockId = keyStr.substring(index);
           sb.append(gson.toJson(LongCodec.get().fromPersistedFormat(
-              FixedLengthStringUtils.string2Bytes(cid)) +
+              FixedLengthStringCodec.string2Bytes(cid)) +
               keySeparatorSchemaV3 +
               blockId));
         } else {

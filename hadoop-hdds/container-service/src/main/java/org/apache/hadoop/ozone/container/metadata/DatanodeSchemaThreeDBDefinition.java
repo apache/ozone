@@ -21,7 +21,6 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -144,19 +143,19 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   public static int getContainerKeyPrefixLength() {
-    return FixedLengthStringUtils.string2Bytes(
+    return FixedLengthStringCodec.string2Bytes(
         getContainerKeyPrefix(0L)).length;
   }
 
   public static String getContainerKeyPrefix(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID))
+    return FixedLengthStringCodec.bytes2String(Longs.toByteArray(containerID))
         + separator;
   }
 
   public static byte[] getContainerKeyPrefixBytes(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.string2Bytes(
+    return FixedLengthStringCodec.string2Bytes(
         getContainerKeyPrefix(containerID));
   }
 
@@ -171,7 +170,7 @@ public class DatanodeSchemaThreeDBDefinition
   public static long getContainerId(String key) {
     int index = getContainerKeyPrefixLength();
     String cid = key.substring(0, index);
-    return Longs.fromByteArray(FixedLengthStringUtils.string2Bytes(cid));
+    return Longs.fromByteArray(FixedLengthStringCodec.string2Bytes(cid));
   }
 
   private void setSeparator(String keySeparator) {
