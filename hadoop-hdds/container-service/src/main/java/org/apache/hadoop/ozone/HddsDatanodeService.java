@@ -26,14 +26,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.collect.ImmutableSortedSet;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -41,6 +38,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -120,9 +118,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
   private HddsDatanodeClientProtocolServer clientProtocolServer;
-  private final SortedSet<String> reconfigurableProperties =
-      ImmutableSortedSet.of();
   private OzoneAdmins admins;
+  private ReconfigurationHandler reconfigurationHandler;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -324,8 +321,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("HttpServer failed to start.", ex);
       }
 
+      reconfigurationHandler = new ReconfigurationHandler(conf);
+
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
-          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO);
+          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
+          reconfigurationHandler);
 
       // Get admin list
       String starterUser =
@@ -683,15 +683,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return callerUgi != null && admins.isAdmin(callerUgi);
   }
 
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    return "";
-  }
-
-  public Collection<String> getReconfigurableProperties() {
-    return reconfigurableProperties;
-  }
-
   /**
    * Return list of OzoneAdministrators from config.
    * The service startup user will default to an admin.
@@ -712,4 +703,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         OZONE_ADMINISTRATORS_GROUPS);
   }
 
+  @VisibleForTesting
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
+  }
 }

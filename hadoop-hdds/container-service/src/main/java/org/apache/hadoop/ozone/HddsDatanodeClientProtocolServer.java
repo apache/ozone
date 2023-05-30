@@ -18,13 +18,12 @@
 
 package org.apache.hadoop.ozone;
 
-import com.google.common.collect.Lists;
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos;
@@ -42,7 +41,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
@@ -62,14 +60,17 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
   private final DatanodeDetails datanodeDetails;
   private final HddsDatanodeService service;
   private final OzoneConfiguration conf;
+  private final ReconfigurationHandler reconfigurationHandler;
 
   protected HddsDatanodeClientProtocolServer(HddsDatanodeService service,
       DatanodeDetails datanodeDetails, OzoneConfiguration conf,
-      VersionInfo versionInfo) throws IOException {
+      VersionInfo versionInfo, ReconfigurationHandler reconfigurationHandler
+  ) throws IOException {
     super(versionInfo);
     this.datanodeDetails = datanodeDetails;
     this.service = service;
     this.conf = conf;
+    this.reconfigurationHandler = reconfigurationHandler;
 
     rpcServer = getRpcServer(conf);
     clientRpcAddress = ServerUtils.updateRPCListenAddress(this.conf,
@@ -105,19 +106,19 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
   @Override
   public void startReconfigure() throws IOException {
     service.checkAdminUserPrivilege(getRemoteUser());
-    startReconfigurationTask();
+    reconfigurationHandler.startReconfigurationTask();
   }
 
   @Override
   public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
     service.checkAdminUserPrivilege(getRemoteUser());
-    return getReconfigurationTaskStatus();
+    return reconfigurationHandler.getReconfigurationTaskStatus();
   }
 
   @Override
   public List<String> listReconfigureProperties() throws IOException {
     service.checkAdminUserPrivilege(getRemoteUser());
-    return Lists.newArrayList(service.getReconfigurableProperties());
+    return reconfigurationHandler.getReconfigurableProperties();
   }
 
   // optimize ugi lookup for RPC operations to avoid a trip through
@@ -125,22 +126,6 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
   private static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  @Override
-  public Configuration getConf() {
-    return conf;
-  }
-
-  @Override
-  public Collection<String> getReconfigurableProperties() {
-    return service.getReconfigurableProperties();
-  }
-
-  @Override
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    return service.reconfigurePropertyImpl(property, newVal);
   }
 
   /**
