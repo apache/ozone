@@ -330,7 +330,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
                   </div>
                   :
                   <div style={{ height: 800 }} className='heatmapinformation'><br />
-                    This object is empty. Add volumes and Buckets to it to see a visualization on Tree Map.{' '}<br />
+                    No Data Available.{' '}<br />
                   </div>
                 }
               
