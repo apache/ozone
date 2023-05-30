@@ -831,7 +831,7 @@ public final class HddsUtils {
    * Execute some code and ensure thread name is not changed
    * (workaround for HADOOP-18433).
    */
-  public static <T, E extends IOException> T keepingThreadName(
+  public static <T, E extends IOException> T preserveThreadName(
       CheckedSupplier<T, E> supplier) throws E {
     final Thread thread = Thread.currentThread();
     final String threadName = thread.getName();
