@@ -332,7 +332,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * the last one is the root CA certificate.
    */
   @Override
-  public synchronized List<X509Certificate> getTrustChain() {
+  public synchronized List<X509Certificate> getTrustChain()
+      throws CertificateException {
     CertPath path = getCertPath();
     if (path == null || path.getCertificates() == null) {
       return null;
@@ -356,7 +357,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           chain.add(issuer);
           lastInsertedCert = issuer;
         } else {
-          throw new RuntimeException("No issuer found for certificate: " +
+          throw new CertificateException("No issuer found for certificate: " +
               lastInsertedCert);
         }
       }
