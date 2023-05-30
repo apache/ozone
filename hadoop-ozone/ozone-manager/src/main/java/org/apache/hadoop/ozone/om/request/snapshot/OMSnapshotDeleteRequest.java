@@ -52,7 +52,7 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_SUPPORT;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles DeleteSnapshot Request.
@@ -66,7 +66,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
   }
 
   @Override
-  @DisallowedUntilLayoutVersion(SNAPSHOT_SUPPORT)
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 

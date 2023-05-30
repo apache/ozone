@@ -43,7 +43,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_SUPPORT;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
@@ -59,7 +59,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   }
 
   @Override
-  @DisallowedUntilLayoutVersion(SNAPSHOT_SUPPORT)
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();

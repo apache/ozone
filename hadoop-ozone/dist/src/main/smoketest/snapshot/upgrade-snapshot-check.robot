@@ -24,8 +24,8 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Create snapshot
-    [Tags]     post-finalized-snapshot-tests
+Create snapshots
+    [Tags]     finalized-snapshot-tests
     ${output} =         Execute                ozone sh volume create snapvolume-1
                         Should not contain     ${output}       Failed
     ${output} =         Execute                ozone sh bucket create /snapvolume-1/snapbucket-1
@@ -45,8 +45,8 @@ Attempt to create snapshot when snapshot feature is disabled
     ${output} =         Execute and checkrc         ozone sh snapshot create /snapvolume-2/snapbucket-1 snapshot1    255
                         Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
-List snapshot
-    [Tags]     post-finalized-snapshot-tests
+List snapshots
+    [Tags]     finalized-snapshot-tests
     ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
                         Should contain    ${output}       snapshot1
                         Should contain    ${output}       snapshot2
@@ -58,11 +58,16 @@ Attempt to list snapshot when snapshot feature is disabled
                         Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
 Snapshot Diff
-    [Tags]     post-finalized-snapshot-tests
-    ${output} =         Execute           ozone sh snapshot snapshotDiff /snapvolume-1/snapbucket-1 snapshot1 snapshot2
-                        Should contain    ${output}       Snapshot diff job is IN_PROGRESS
-    ${output} =         Execute           ozone sh snapshot snapshotDiff /snapvolume-1/snapbucket-1 snapshot1 snapshot2
-                        Should contain    ${output}       +    key1
+    [Tags]     finalized-snapshot-tests
+    WHILE   True
+        ${output} =       Execute      ozone sh snapshot snapshotDiff /snapvolume-1/snapbucket-1 snapshot1 snapshot2
+        IF                "Snapshot diff job is IN_PROGRESS" in """${output}"""
+                          Sleep   10s
+        ELSE
+                          BREAK
+        END
+    END
+    Should contain    ${output}       +    key1
 
 Attempt to snapshotDiff when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests
@@ -70,7 +75,7 @@ Attempt to snapshotDiff when snapshot feature is disabled
                         Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
 Delete snapshot
-    [Tags]     post-finalized-snapshot-tests
+    [Tags]     finalized-snapshot-tests
     ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
                         Should not contain      ${output}       Failed
     ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1

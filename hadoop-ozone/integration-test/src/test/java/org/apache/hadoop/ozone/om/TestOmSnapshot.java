@@ -67,7 +67,6 @@ import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
@@ -88,6 +87,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
@@ -213,34 +213,34 @@ public class TestOmSnapshot {
       VoidCallable eval) throws Exception {
     OMException ex  = Assert.assertThrows(OMException.class,
             () -> eval.call());
+    Assert.assertEquals(ex.getResult(),
+            NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     Assert.assertTrue(ex.getMessage().contains(
             "cannot be invoked before finalization."));
   }
 
-  private static void preFinalizationChecks()
-      throws Exception {
+  private static void preFinalizationChecks() throws Exception {
     // None of the snapshot APIs is usable before the upgrade finalization step
     expectFailurePreFinalization(() ->
         store.createSnapshot(volumeName, bucketName,
-          UUID.randomUUID().toString()));
+            UUID.randomUUID().toString()));
     expectFailurePreFinalization(() ->
         store.listSnapshot(volumeName, bucketName));
     expectFailurePreFinalization(() ->
         store.snapshotDiff(volumeName, bucketName,
-          UUID.randomUUID().toString(),
-          UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(),
           "", 1000, false));
     expectFailurePreFinalization(() ->
         store.deleteSnapshot(volumeName, bucketName,
-          UUID.randomUUID().toString()));
+            UUID.randomUUID().toString()));
   }
 
   /**
    * Trigger OM upgrade finalization from the client and block until completion
    * (status FINALIZATION_DONE).
    */
-  private static void finalizeOMUpgrade()
-      throws IOException, InterruptedException, TimeoutException {
+  private static void finalizeOMUpgrade() throws IOException {
 
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omclient = 
