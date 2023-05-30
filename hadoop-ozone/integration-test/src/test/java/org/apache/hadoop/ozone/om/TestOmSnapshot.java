@@ -16,11 +16,17 @@
  */
 
 package org.apache.hadoop.ozone.om;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -35,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -59,6 +66,7 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.Ignore;
@@ -769,7 +777,7 @@ public class TestOmSnapshot {
   @Test
   public void testSnapDiffWithKeyRenamesRecreationAndDelete()
           throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + counter.incrementAndGet();
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -811,7 +819,7 @@ public class TestOmSnapshot {
    */
   @Test
   public void testSnapDiffReclaimWithDeferredKeyDeletion() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+    String testVolumeName = "vol" + counter.incrementAndGet();
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -842,16 +850,16 @@ public class TestOmSnapshot {
 
   /**
    * Testing scenario:
-   * 1) Snapshot snap1 created.
-   * 2) Key k1 is created.
-   * 3) Key k1 is deleted.
-   * 4) Snapshot s2 is created instantly before the key k1 is deleted.
-   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 0 keys.
-   * 6) Snapdiff b/w Active FS & snap2 taken to assert difference of 0 keys.
+   * 1) Key k1 is created.
+   * 2) Snapshot snap1 created.
+   * 3) Key k1 is renamed to key k1_renamed
+   * 4) Key k1_renamed is renamed to key k1
+   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 1 key
+   *    with 1 Modified entry.
    */
   @Test
-  public void testSnapDiffWithRenameAndModified() throws Exception {
-    String testVolumeName = "vol" + RandomStringUtils.randomNumeric(5);
+  public void testSnapDiffWithNoEffectiveRename() throws Exception {
+    String testVolumeName = "vol" + counter.incrementAndGet();
     String testBucketName = "bucket1";
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
@@ -861,9 +869,8 @@ public class TestOmSnapshot {
     String key1 = "k1";
     key1 = createFileKeyWithPrefix(bucket, key1);
     createSnapshot(testVolumeName, testBucketName, snap1);
-    OmKeyInfo omKeyInfo = getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
+    getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
         key1);
-    System.out.println(omKeyInfo.toString());
     String key1Renamed = key1 + "_renamed";
 
     bucket.renameKey(key1, key1Renamed);
@@ -874,12 +881,189 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap2);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
         snap1, snap2);
-    OmKeyInfo omKeyInfo1 = getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
+    getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
         key1);
-    System.out.println(omKeyInfo.toString());
-    System.out.println(omKeyInfo1.toString());
-    System.out.println(diff);
-    Assert.assertEquals(diff.getDiffList(), Collections.emptyList());
+    Assert.assertEquals(diff.getDiffList(), Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.MODIFY, key1)));
+  }
+
+  /**
+   * Testing scenario:
+   * 1) Key k1 is created.
+   * 2) Snapshot snap1 created.
+   * 3) Dir dir1/dir2 is created.
+   * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
+   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 3 key
+   *    with 1 rename entry & 2 dirs create entry.
+   */
+  @Test
+  public void testSnapDiffWithDirectory() throws Exception {
+
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    String snap1 = "snap1";
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    getOmKeyInfo(bucket.getVolumeName(), bucket.getName(),
+        key1);
+    bucket.createDirectory("dir1/dir2");
+    String key1Renamed = "dir1/dir2/" + key1 + "_renamed";
+    bucket.renameKey(key1, key1Renamed);
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> diffEntries;
+    if (bucketLayout.isFileSystemOptimized()) {
+      diffEntries = Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+          SnapshotDiffReport.DiffType.RENAME, key1, key1 + "_renamed"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "dir1"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "dir2"));
+    } else {
+      diffEntries = Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.RENAME, key1, key1 + "_renamed"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "dir2"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "dir1"));
+    }
+    Assert.assertEquals(diff.getDiffList(), diffEntries);
+  }
+
+  @Test
+  public void testSnapdiffWithFilesystemCreate()
+      throws IOException, URISyntaxException, InterruptedException,
+      TimeoutException {
+
+    Assume.assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket" + counter.incrementAndGet();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    String rootPath = String.format("%s://%s.%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
+        "om-service-test1");
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
+      String snap1 = "snap1";
+      String key = "/dir1/dir2/key1";
+      createSnapshot(testVolumeName, testBucketName, snap1);
+      createFileKey(fs, key);
+      String snap2 = "snap2";
+      createSnapshot(testVolumeName, testBucketName, snap2);
+      SnapshotDiffReport diff = getSnapDiffReport(testVolumeName,
+          testBucketName, snap1, snap2);
+      int idx = bucketLayout.isFileSystemOptimized() ? 0 :
+          diff.getDiffList().size() - 1;
+      Path p = new Path("/");
+      while (true) {
+        FileStatus[] fileStatuses = fs.listStatus(p);
+        Assertions.assertEquals(fileStatuses[0].isDirectory(),
+            bucketLayout.isFileSystemOptimized() &&
+                idx < diff.getDiffList().size() - 1 ||
+                !bucketLayout.isFileSystemOptimized() && idx > 0);
+        p = fileStatuses[0].getPath();
+        Assertions.assertEquals(diff.getDiffList().get(idx),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, p.getName()));
+        if (fileStatuses[0].isFile()) {
+          break;
+        }
+        idx += bucketLayout.isFileSystemOptimized() ? 1 : -1;
+      }
+    }
+  }
+
+  @Test
+  public void testSnapdiffWithFilesystemDirectoryRenameOperation()
+      throws IOException, URISyntaxException, InterruptedException,
+      TimeoutException {
+    Assume.assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket" + counter.incrementAndGet();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    String rootPath = String.format("%s://%s.%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
+        "om-service-test1");
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
+      String snap1 = "snap1";
+      String key = "/dir1/dir2/key1";
+      createFileKey(fs, key);
+      createSnapshot(testVolumeName, testBucketName, snap1);
+      String snap2 = "snap2";
+      fs.rename(new Path("/dir1/dir2"), new Path("/dir1/dir3"));
+      createSnapshot(testVolumeName, testBucketName, snap2);
+      SnapshotDiffReport diff = getSnapDiffReport(testVolumeName,
+          testBucketName, snap1, snap2);
+      if (bucketLayout.isFileSystemOptimized()) {
+        Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.RENAME, "dir2", "dir3"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "dir1")));
+      } else {
+        Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.RENAME, "dir2", "dir3"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "key1")));
+      }
+
+    }
+  }
+
+  @Test
+  public void testSnapdiffWithFilesystemDirectoryMoveOperation()
+      throws IOException, URISyntaxException, InterruptedException,
+      TimeoutException {
+    Assume.assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket" + counter.incrementAndGet();
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    String rootPath = String.format("%s://%s.%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
+        "om-service-test1");
+    try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
+      String snap1 = "snap1";
+      String key = "/dir1/dir2/key1";
+      createFileKey(fs, key);
+      fs.mkdirs(new Path("/dir3"));
+      createSnapshot(testVolumeName, testBucketName, snap1);
+      String snap2 = "snap2";
+      fs.rename(new Path("/dir1/dir2"), new Path("/dir3/dir2"));
+      createSnapshot(testVolumeName, testBucketName, snap2);
+      SnapshotDiffReport diff = getSnapDiffReport(testVolumeName,
+          testBucketName, snap1, snap2);
+      if (bucketLayout.isFileSystemOptimized()) {
+        Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "dir1"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "dir2"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "dir3")));
+      } else {
+        Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "key1"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, "dir2")));
+      }
+    }
   }
 
   @Test
@@ -1081,9 +1265,7 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap2);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap2);
-    System.out.println(keyInfo);
     keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
-    System.out.println(keyInfo);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Lists.newArrayList(
         SnapshotDiffReportOzone.getDiffReportEntry(
@@ -1344,6 +1526,25 @@ public class TestOmSnapshot {
       return true;
     }, 1000, 10000);
     return key;
+  }
+
+  private String createFileKey(FileSystem fs,
+                               String path)
+      throws IOException, InterruptedException, TimeoutException {
+    byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
+    Path pathVal = new Path(path);
+    FSDataOutputStream fileKey = fs.create(pathVal);
+    fileKey.write(value);
+    fileKey.close();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        fs.getFileStatus(pathVal);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 1000, 30000);
+    return path;
   }
 
   @Test
