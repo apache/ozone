@@ -192,7 +192,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
         // Only allocate 2 bytes since value is not needed.
         try (CodecBuffer outValue = CodecBuffer.allocateDirect(2)) {
-          return getFromTableIfExistCodecBuffer(inKey, outValue) != null;
+          return getFromTableIfExist(inKey, outValue) != null;
         }
       }
     } else {
@@ -342,7 +342,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  private Integer getFromTableIfExistCodecBuffer(CodecBuffer key,
+  private Integer getFromTableIfExist(CodecBuffer key,
       CodecBuffer outValue) throws IOException {
     return outValue.putFromSource(
         buffer -> rawTable.getIfExist(key.asReadOnlyByteBuffer(), buffer));
@@ -353,7 +353,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       for (; ;) {
         final int allocated = bufferSize.get();
         try (CodecBuffer outValue = CodecBuffer.allocateDirect(allocated)) {
-          final Integer required = getFromTableIfExistCodecBuffer(inKey, outValue);
+          final Integer required = getFromTableIfExist(inKey, outValue);
           if (required == null) {
             // key not found
             return null;
@@ -373,7 +373,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       return getFromTableIfExistCodecBuffer(key);
     } else {
       final byte[] keyBytes = encodeKey(key);
-      byte[] valueBytes = rawTable.getIfExist(keyBytes);
+      final byte[] valueBytes = rawTable.getIfExist(keyBytes);
       return decodeValue(valueBytes);
     }
   }

@@ -672,20 +672,20 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  Supplier<Integer> keyMayExist(ColumnFamily family, ByteBuffer key, ByteBuffer out)
-      throws IOException {
+  Supplier<Integer> keyMayExist(ColumnFamily family,
+      ByteBuffer key, ByteBuffer out) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
       final KeyMayExist result = db.get().keyMayExist(
           family.getHandle(), key, out);
       switch (result.exists) {
-        case kNotExist: return null;
-        case kExistsWithValue: return () -> result.valueLength;
-        case kExistsWithoutValue: return () -> null;
-        default:
-          throw new IllegalStateException(
-              "Unexpected KeyMayExistEnum case " + result.exists);
+      case kNotExist: return null;
+      case kExistsWithValue: return () -> result.valueLength;
+      case kExistsWithoutValue: return () -> null;
+      default:
+        throw new IllegalStateException(
+            "Unexpected KeyMayExistEnum case " + result.exists);
       }
     } finally {
       counter.decrementAndGet();
