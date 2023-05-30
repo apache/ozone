@@ -357,12 +357,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           if (required == null) {
             // key not found
             return null;
-          } else if (required <= allocated) {
+          } else if (required >= 0 && required <= allocated) {
             // buffer size is big enough
             return valueCodec.fromCodecBuffer(outValue);
           }
           // buffer size too small, retry
-          increaseBufferSize(required);
+          increaseBufferSize(Math.max(required, allocated));
         }
       }
     }

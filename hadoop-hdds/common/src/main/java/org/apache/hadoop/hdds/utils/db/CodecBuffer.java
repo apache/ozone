@@ -239,8 +239,7 @@ public final class CodecBuffer implements AutoCloseable {
     final ByteBuffer buffer = buf.nioBuffer(i, writable);
     final Integer size = source.apply(buffer);
     if (size != null) {
-      Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
-      if (size <= writable) {
+      if (size > 0 && size <= writable) {
         buf.setIndex(buf.readerIndex(), i + size);
       }
     }

@@ -30,7 +30,6 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,9 +175,13 @@ class RDBTable implements Table<byte[], byte[]> {
       return null; // definitely not exists
     }
     if (value.get() != null) {
-      return value.get(); // definitely exists
+      // definitely exists, return value size.
+      return value.get();
     }
-    Preconditions.assertSame(remaining, outValue.remaining(), "remaining");
+    if (outValue.remaining() < remaining) {
+      // definitely exists but value size is unknown.
+      return outValue.remaining() - remaining;
+    }
 
     // inconclusive: the key may or may not exist
     rdbMetrics.incNumDBKeyGetIfExistGets();
