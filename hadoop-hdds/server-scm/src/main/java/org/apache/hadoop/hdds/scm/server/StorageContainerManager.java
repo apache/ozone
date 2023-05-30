@@ -1636,7 +1636,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     if (rootCARotationManager != null) {
-        rootCARotationManager.stop();
+      rootCARotationManager.stop();
     }
 
     try {
