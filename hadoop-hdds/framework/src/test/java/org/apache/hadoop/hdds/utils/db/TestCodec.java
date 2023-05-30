@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+import com.google.common.primitives.Shorts;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -29,6 +32,8 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test {@link Codec} implementations.
@@ -54,47 +59,134 @@ public final class TestCodec {
   }
 
   @Test
+  public void testShortCodec() throws Exception {
+    runTestShortCodec((short)0);
+    runTestShortCodec((short)1);
+    runTestShortCodec((short)-1);
+    runTestShortCodec(Short.MAX_VALUE);
+    runTestShortCodec(Short.MIN_VALUE);
+
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final short original = (short) ThreadLocalRandom.current().nextInt();
+      runTestShortCodec(original);
+    }
+    gc();
+  }
+
+  static void runTestShortCodec(short original) throws Exception {
+    runTest(ShortCodec.get(), original, Short.BYTES);
+    runTestShorts(original);
+  }
+
+  /** Make sure that {@link ShortCodec} and {@link Shorts} are compatible. */
+  static void runTestShorts(short original) {
+    final ShortCodec codec = ShortCodec.get();
+    final byte[] bytes = Shorts.toByteArray(original);
+    Assertions.assertArrayEquals(bytes, codec.toPersistedFormat(original));
+    Assertions.assertEquals(original, Shorts.fromByteArray(bytes));
+    Assertions.assertEquals(original, codec.fromPersistedFormat(bytes));
+  }
+
+  @Test
   public void testIntegerCodec() throws Exception {
-    final Codec<Integer> codec = IntegerCodec.get();
-    runTest(codec, 0, Integer.BYTES);
-    runTest(codec, 1, Integer.BYTES);
-    runTest(codec, -1, Integer.BYTES);
-    runTest(codec, Integer.MAX_VALUE, Integer.BYTES);
-    runTest(codec, Integer.MIN_VALUE, Integer.BYTES);
+    runTestIntegerCodec(0);
+    runTestIntegerCodec(1);
+    runTestIntegerCodec(-1);
+    runTestIntegerCodec(Integer.MAX_VALUE);
+    runTestIntegerCodec(Integer.MIN_VALUE);
 
     for (int i = 0; i < NUM_LOOPS; i++) {
       final int original = ThreadLocalRandom.current().nextInt();
-      runTest(codec, original, Integer.BYTES);
+      runTestIntegerCodec(original);
     }
     gc();
+  }
+
+  static void runTestIntegerCodec(int original) throws Exception {
+    runTest(IntegerCodec.get(), original, Integer.BYTES);
+    runTestInts(original);
+  }
+
+  /** Make sure that {@link IntegerCodec} and {@link Ints} are compatible. */
+  static void runTestInts(int original) {
+    final IntegerCodec codec = IntegerCodec.get();
+    final byte[] bytes = Ints.toByteArray(original);
+    Assertions.assertArrayEquals(bytes, codec.toPersistedFormat(original));
+    Assertions.assertEquals(original, Ints.fromByteArray(bytes));
+    Assertions.assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 
   @Test
   public void testLongCodec() throws Exception {
-    final LongCodec codec = LongCodec.get();
-    runTest(codec, 0L, Long.BYTES);
-    runTest(codec, 1L, Long.BYTES);
-    runTest(codec, -1L, Long.BYTES);
-    runTest(codec, Long.MAX_VALUE, Long.BYTES);
-    runTest(codec, Long.MIN_VALUE, Long.BYTES);
+    runTestLongCodec(0L);
+    runTestLongCodec(1L);
+    runTestLongCodec(-1L);
+    runTestLongCodec(Long.MAX_VALUE);
+    runTestLongCodec(Long.MIN_VALUE);
 
     for (int i = 0; i < NUM_LOOPS; i++) {
       final long original = ThreadLocalRandom.current().nextLong();
-      runTest(codec, original, Long.BYTES);
+      runTestLongCodec(original);
     }
     gc();
   }
 
+  static void runTestLongCodec(long original) throws Exception {
+    runTest(LongCodec.get(), original, Long.BYTES);
+    runTestLongs(original);
+  }
+
+  /** Make sure that {@link LongCodec} and {@link Longs} are compatible. */
+  static void runTestLongs(long original) {
+    final LongCodec codec = LongCodec.get();
+    final byte[] bytes = Longs.toByteArray(original);
+    Assertions.assertArrayEquals(bytes, codec.toPersistedFormat(original));
+    Assertions.assertEquals(original, Longs.fromByteArray(bytes));
+    Assertions.assertEquals(original, codec.fromPersistedFormat(bytes));
+  }
+
   @Test
   public void testStringCodec() throws Exception {
-    final StringCodec codec = StringCodec.get();
-    runTest(codec, "", 0);
+    runTestStringCodec("");
 
     for (int i = 0; i < NUM_LOOPS; i++) {
       final String original = "test" + ThreadLocalRandom.current().nextLong();
-      runTest(codec, original, original.length());
+      final int serializedSize = runTestStringCodec(original);
+      Assertions.assertEquals(original.length(), serializedSize);
     }
+
+    final String alphabets = "AbcdEfghIjklmnOpqrstUvwxyz";
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = i == 0 ? alphabets : alphabets.substring(0, i);
+      final int serializedSize = runTestStringCodec(original);
+      Assertions.assertEquals(original.length(), serializedSize);
+    }
+
+    final String[] docs = {
+        "Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。",
+        "Ozone 不仅能存储数十亿个不同大小的对象，还支持在容器化环境（比如 Kubernetes）中运行。",
+        "Apache Spark、Hive 和 YARN 等应用无需任何修改即可使用 Ozone。"
+    };
+    for (String original : docs) {
+      final int serializedSize = runTestStringCodec(original);
+      Assertions.assertTrue(original.length() < serializedSize);
+    }
+
+    final String multiByteChars = "官方发行包包括了源代码包和二进制代码包";
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = i == 0 ? multiByteChars
+          : multiByteChars.substring(0, i);
+      final int serializedSize = runTestStringCodec(original);
+      Assertions.assertEquals(3 * original.length(), serializedSize);
+    }
+
     gc();
+  }
+
+  static int runTestStringCodec(String original) throws Exception {
+    final int serializedSize = UTF_8.encode(original).remaining();
+    runTest(StringCodec.get(), original, serializedSize);
+    return serializedSize;
   }
 
   @Test
