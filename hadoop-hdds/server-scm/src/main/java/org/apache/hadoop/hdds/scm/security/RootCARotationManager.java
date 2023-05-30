@@ -239,6 +239,7 @@ public class RootCARotationManager implements SCMService {
 
     @Override
     public void run() {
+      isScheduled.set(false);
       if (!isRunning.get()) {
         return;
       }
