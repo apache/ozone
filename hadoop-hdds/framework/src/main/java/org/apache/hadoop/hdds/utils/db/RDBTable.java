@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,22 +107,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isExist(byte[] key) throws IOException {
-    rdbMetrics.incNumDBKeyMayExistChecks();
-    final Supplier<byte[]> holder = db.keyMayExist(family, key);
-    if (holder == null) {
-      return false;  // definitely not exists
-    }
-    final byte[] value = holder.get();
-    if (value != null) {
-      return true; // definitely exists
-    }
-
-    // inconclusive: the key may or may not exist
-    final boolean exists = get(key) != null;
-    if (!exists) {
-      rdbMetrics.incNumDBKeyMayExistMisses();
-    }
-    return exists;
+    return getIfExist(key) != null;
   }
 
   @Override
@@ -161,6 +147,27 @@ class RDBTable implements Table<byte[], byte[]> {
     // inconclusive: the key may or may not exist
     rdbMetrics.incNumDBKeyGetIfExistGets();
     final byte[] val = get(key);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
+  }
+
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    rdbMetrics.incNumDBKeyGetIfExistChecks();
+    final int remaining = outValue.remaining();
+    final Supplier<Integer> value = db.keyMayExist(family, key, outValue);
+    if (value == null) {
+      return null; // definitely not exists
+    }
+    if (value.get() != null) {
+      return value.get(); // definitely exists
+    }
+    Preconditions.assertSame(remaining, outValue.remaining(), "remaining");
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final Integer val = get(key, outValue);
     if (val == null) {
       rdbMetrics.incNumDBKeyGetIfExistMisses();
     }
