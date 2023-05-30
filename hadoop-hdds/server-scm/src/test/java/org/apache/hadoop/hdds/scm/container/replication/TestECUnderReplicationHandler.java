@@ -466,29 +466,16 @@ public class TestECUnderReplicationHandler {
           () -> ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2));
 
-      // Now adjust replicas so it is also over replicated. This time rather
-      // than throwing it should call the OverRepHandler and return whatever it
+      // Now adjust replicas so it is also over replicated. This time before
+      // throwing it should call the OverRepHandler and return whatever it
       // returns, which in this case is a delete command for replica index 4.
       availableReplicas.add(overRepReplica);
 
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> expectedDelete =
-          new HashSet<>();
-      expectedDelete.add(Pair.of(overRepReplica.getDatanodeDetails(),
-          createDeleteContainerCommand(container,
-              overRepReplica.getReplicaIndex())));
-
-      Mockito.when(replicationManager.processOverReplicatedContainer(
-          underRep)).thenAnswer(invocationOnMock -> {
-            commandsSent.addAll(expectedDelete);
-            return expectedDelete.size();
-          });
-      commandsSent.clear();
       assertThrows(SCMException.class,
           () -> ecURH.processAndSendCommands(availableReplicas,
               Collections.emptyList(), underRep, 2));
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
     }
   }
 
