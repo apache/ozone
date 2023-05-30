@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -36,9 +37,13 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.ratis.util.MemoizedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
+import static org.apache.ratis.util.JavaUtils.getClassSimpleName;
 /**
  * Strongly typed table implementation.
  * <p>
@@ -49,6 +54,10 @@ import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_
  * @param <VALUE> type of the values in the store.
  */
 public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
+  static final Logger LOG = LoggerFactory.getLogger(TypedTable.class);
+
+  private static final long EPOCH_DEFAULT = -1L;
+  static final int BUFFER_SIZE_DEFAULT = 4 << 10; // 4 KB
 
   private final RDBTable rawTable;
 
@@ -58,9 +67,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final Codec<VALUE> valueCodec;
 
   private final boolean supportCodecBuffer;
+  private final AtomicInteger bufferSize
+      = new AtomicInteger(BUFFER_SIZE_DEFAULT);
   private final TableCache<CacheKey<KEY>, CacheValue<VALUE>> cache;
-
-  private static final long EPOCH_DEFAULT = -1L;
 
   /**
    * The same as this(rawTable, codecRegistry, keyType, valueType,
@@ -184,16 +193,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
-   * Returns the value mapped to the given key in byte array or returns null
-   * if the key is not found.
-   *
+   * Get the value mapped to the given key.
+   * <p>
    * Caller's of this method should use synchronization mechanism, when
    * accessing. First it will check from cache, if it has entry return the
    * cloned cache value, otherwise get from the RocksDB table.
    *
    * @param key metadata key
-   * @return VALUE
-   * @throws IOException
+   * @return the mapped value; or null if the key is not found.
+   * @throws IOException when {@link #getFromTable(Object)} throw an exception.
    */
   @Override
   public VALUE get(KEY key) throws IOException {
@@ -227,15 +235,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   /**
    * This method returns the value if it exists in cache, if it 
-   * does not, get the value from the underlying rockdb table. If it 
+   * does not, get the value from the underlying RockDB table. If it
    * exists in cache, it returns the same reference of the cached value.
-   * 
-   *
+   * <p>
    * Caller's of this method should use synchronization mechanism, when
    * accessing. First it will check from cache, if it has entry return the
    * cached value, otherwise get from the RocksDB table. It is caller
-   * responsibility to not to use the returned object outside the lock.
-   *
+   * responsibility not to use the returned object outside the lock.
+   * <p>
    * One example use case of this method is, when validating volume exists in
    * bucket requests and also where we need actual value of volume info. Once 
    * bucket response is added to the double buffer, only bucket info is 
@@ -243,7 +250,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * modifying the same cached object.
    * @param key metadata key
    * @return VALUE
-   * @throws IOException
+   * @throws IOException when {@link #getFromTable(Object)} throw an exception.
    */
   @Override
   public VALUE getReadCopy(KEY key) throws IOException {
@@ -279,10 +286,52 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  private static int nextBufferSize(int n) {
+    // round up to the next power of 2.
+    final long roundUp = Long.highestOneBit(n) << 1;
+    return roundUp > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) roundUp;
+  }
+
+  private void increaseBufferSize(int required) {
+    final MemoizedSupplier<Integer> newBufferSize = MemoizedSupplier.valueOf(
+        () -> nextBufferSize(required));
+    final int previous = bufferSize.getAndUpdate(
+        current -> required <= current ? current : newBufferSize.get());
+    if (newBufferSize.isInitialized()) {
+      LOG.info("{}: increaseBufferSize {} -> {}",
+          this, previous, newBufferSize.get());
+    }
+  }
+
+  private VALUE getFromTableCodecBuffer(KEY key) throws IOException {
+    try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
+      for (; ;) {
+        final int allocated = bufferSize.get();
+        try (CodecBuffer outValue = CodecBuffer.allocateDirect(allocated)) {
+          final Integer required = outValue.putFromSource(
+              buffer -> rawTable.get(inKey.asReadOnlyByteBuffer(), buffer));
+          if (required == null) {
+            // key not found
+            return null;
+          } else if (required <= allocated) {
+            // buffer size is big enough
+            return valueCodec.fromCodecBuffer(outValue);
+          }
+          // buffer size too small, retry
+          increaseBufferSize(required);
+        }
+      }
+    }
+  }
+
   private VALUE getFromTable(KEY key) throws IOException {
-    final byte[] keyBytes = encodeKey(key);
-    byte[] valueBytes = rawTable.get(keyBytes);
-    return decodeValue(valueBytes);
+    if (supportCodecBuffer) {
+      return getFromTableCodecBuffer(key);
+    } else {
+      final byte[] keyBytes = encodeKey(key);
+      byte[] valueBytes = rawTable.get(keyBytes);
+      return decodeValue(valueBytes);
+    }
   }
 
   private VALUE getFromTableIfExist(KEY key) throws IOException {
@@ -320,8 +369,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return rawTable.getName();
+  }
+
+  @Override
+  public String toString() {
+    return getClassSimpleName(getClass()) + "-" + getName()
+        + "(" + getClassSimpleName(keyType)
+        + "->" + getClassSimpleName(valueType) + ")";
   }
 
   @Override
@@ -353,7 +409,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public TableCacheMetrics createCacheMetrics() throws IOException {
+  public TableCacheMetrics createCacheMetrics() {
     return TableCacheMetrics.create(cache, getName());
   }
 
@@ -436,11 +492,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       this.rawKeyValue = rawKeyValue;
     }
 
-    public TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue,
-        Class<KEY> keyType, Class<VALUE> valueType) {
-      this.rawKeyValue = rawKeyValue;
-    }
-
     @Override
     public KEY getKey() throws IOException {
       return decodeKey(rawKeyValue.getKey());
@@ -457,8 +508,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    */
   public class TypedTableIterator implements TableIterator<KEY, TypedKeyValue> {
 
-    private TableIterator<byte[], KeyValue<byte[], byte[]>>
-        rawIterator;
+    private final TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator;
 
     public TypedTableIterator(
         TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
@@ -497,8 +547,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public TypedKeyValue next() {
-      return new TypedKeyValue(rawIterator.next(), keyType,
-          valueType);
+      return new TypedKeyValue(rawIterator.next());
     }
 
     @Override
