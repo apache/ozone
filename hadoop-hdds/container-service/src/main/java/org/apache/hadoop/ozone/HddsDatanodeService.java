@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -127,7 +128,26 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
 
-  public HddsDatanodeService(boolean printBanner, String[] args) {
+  /**
+   * Create a Datanode instance based on the supplied command-line arguments.
+   * <p>
+   * This method is intended for unit tests only. It suppresses the
+   * startup/shutdown message and skips registering Unix signal handlers.
+   *
+   * @param args      command line arguments.
+   */
+  @VisibleForTesting
+  public HddsDatanodeService(String[] args) {
+    this(false, args);
+  }
+
+  /**
+   * Create a Datanode instance based on the supplied command-line arguments.
+   *
+   * @param args        command line arguments.
+   * @param printBanner if true, then log a verbose startup message.
+   */
+  private HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
@@ -151,39 +171,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
-  /**
-   * Create a Datanode instance based on the supplied command-line arguments.
-   * <p>
-   * This method is intended for unit tests only. It suppresses the
-   * startup/shutdown message and skips registering Unix signal handlers.
-   *
-   * @param args      command line arguments.
-   * @return Datanode instance
-   */
-  @VisibleForTesting
-  public static HddsDatanodeService createHddsDatanodeService(
-      String[] args) {
-    return createHddsDatanodeService(args, false);
-  }
-
-  /**
-   * Create a Datanode instance based on the supplied command-line arguments.
-   *
-   * @param args        command line arguments.
-   * @param printBanner if true, then log a verbose startup message.
-   * @return Datanode instance
-   */
-  private static HddsDatanodeService createHddsDatanodeService(
-      String[] args, boolean printBanner) {
-    return new HddsDatanodeService(printBanner, args);
-  }
-
   public static void main(String[] args) {
     try {
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
       HddsDatanodeService hddsDatanodeService =
-          createHddsDatanodeService(args, true);
+          new HddsDatanodeService(true, args);
       hddsDatanodeService.run(args);
     } catch (Throwable e) {
       LOG.error("Exception in HddsDatanodeService.", e);
@@ -268,7 +261,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
         secConf = new SecurityConfig(conf);
         dnCertClient = new DNCertificateClient(secConf,
-            getScmSecurityClientWithMaxRetry(conf, getCurrentUser()),
+            createScmSecurityClient(),
             datanodeDetails,
             datanodeDetails.getCertSerialId(), this::saveNewCertId,
             this::terminateDatanode);
@@ -369,6 +362,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  @VisibleForTesting
+  SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient()
+      throws IOException {
+    return getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
+  }
+
   /**
    * Initialize and start Ratis server.
    * <p>
@@ -407,7 +406,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       certClient.close();
       LOG.info("Re-initialize certificate client.");
       certClient = new DNCertificateClient(secConf,
-          getScmSecurityClientWithMaxRetry(conf, getCurrentUser()),
+          createScmSecurityClient(),
           datanodeDetails, null, this::saveNewCertId, this::terminateDatanode);
       response = certClient.init();
     }
