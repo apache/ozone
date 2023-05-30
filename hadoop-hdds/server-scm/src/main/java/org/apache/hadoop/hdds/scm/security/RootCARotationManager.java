@@ -101,7 +101,7 @@ public class RootCARotationManager implements SCMService {
         HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
     renewalGracePeriod = Duration.parse(renewalGraceDurationString);
 
-    if (checkInterval.compareTo(renewalGracePeriod) >= 0 ) {
+    if (checkInterval.compareTo(renewalGracePeriod) >= 0) {
       throw new IllegalArgumentException("Property value of " +
           HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
           " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
