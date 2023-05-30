@@ -100,7 +100,8 @@ public class TestReconfigShell {
         HddsDatanodeClientProtocolServer server =
             datanodeService.getClientProtocolServer();
         InetSocketAddress socket = server.getClientRpcAddress();
-        exectureAndAssertProperties(server, socket, capture);
+        executeAndAssertProperties(datanodeService.getReconfigurationHandler(),
+            socket, capture);
       }
     }
   }
@@ -109,20 +110,22 @@ public class TestReconfigShell {
   public void testOzoneManagerGetReconfigurationProperties() throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = ozoneManager.getOmRpcServerAddr();
-      exectureAndAssertProperties(ozoneManager, socket, capture);
+      executeAndAssertProperties(ozoneManager.getReconfigurationHandler(),
+          socket, capture);
     }
   }
 
   @Test
-  public void testStorageContainerManagerrGetReconfigurationProperties()
+  public void testStorageContainerManagerGetReconfigurationProperties()
       throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = storageContainerManager.getClientRpcAddress();
-      exectureAndAssertProperties(storageContainerManager, socket, capture);
+      executeAndAssertProperties(
+          storageContainerManager.getReconfigurationHandler(), socket, capture);
     }
   }
 
-  private void exectureAndAssertProperties(
+  private void executeAndAssertProperties(
       ReconfigurableBase reconfigurableBase,
       InetSocketAddress socket, SystemOutCapturer capture)
       throws UnsupportedEncodingException {
