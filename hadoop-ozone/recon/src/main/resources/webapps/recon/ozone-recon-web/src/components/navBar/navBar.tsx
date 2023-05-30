@@ -35,7 +35,7 @@ class NavBar extends React.Component<INavBarProps> {
   constructor(props = {}) {
     super(props);
     this.state = {
-      isheatmapavailable: false
+      isheatmapavailable: true
     };
 
   }

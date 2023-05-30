@@ -147,7 +147,6 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
   };
 
   updateTreemapParent = (path: any) => {
-    console.log("Path from Child",path);
     this.setState({
       isLoading: true,
       inputPath: path
@@ -286,7 +285,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
         <div className='content-div'>
           { isLoading ? <span><Icon type='loading'/> Loading...</span> : (
             <div>
-                {(Object.keys(treeResponse).length > 0) ?
+                {(Object.keys(treeResponse).length > 0 && treeResponse.size > 0) ?
                   <div>
                   <Row>
                           <div className='go-back-button'>
@@ -298,20 +297,20 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
                               <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
                             </form>
                           </div>
-                          <div className='dropdown-button'>
+                          <div className='entity-dropdown-button'>
                             <Dropdown  overlay={entityTypeMenu} placement='bottomCenter'>
                               <Button>Entity Type:&nbsp;{this.state.entityType }<DownOutlined/></Button>
                             </Dropdown>
                           </div>
                     
-                          <div className='dropdown-button1'>
+                          <div className='date-dropdown-button'>
                             <Dropdown overlay={menuCalender} placement='bottomLeft'>
                             <Button>Last &nbsp;{date > 100 ?  new Date(date*1000).toLocaleString() : date }<DownOutlined/></Button>
                             </Dropdown>
                           </div>
                     </Row>
                     <br/><br/><br/><br/><br/>
-                      <div style={{display:"flex",alignItems: "right"}}>
+                      <div style={{display:"flex", alignItems: "right"}}>
                           <div style={{ display: "flex", alignItems: "center",marginLeft:"30px"}}>
                               <div style={{ width: "13px", height: "13px", backgroundColor: "yellow", marginRight: "5px" }}> </div>
                               <span>Less Accessed</span>
@@ -330,7 +329,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
                       </div>
                   </div>
                   :
-                  <div style={{ height: 800 }} className='metadatainformation'><br />
+                  <div style={{ height: 800 }} className='heatmapinformation'><br />
                     This object is empty. Add volumes and Buckets to it to see a visualization on Tree Map.{' '}<br />
                   </div>
                 }
