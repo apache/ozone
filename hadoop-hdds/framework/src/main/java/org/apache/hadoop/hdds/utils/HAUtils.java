@@ -451,9 +451,9 @@ public final class HAUtils {
   private static List<String> generateCAList(CertificateClient certClient)
       throws IOException {
     List<String> caCertPemList = new ArrayList<>();
-    if (certClient.getRootCACertificate() != null) {
+    if (certClient.getLatestRootCACertificate() != null) {
       caCertPemList.add(CertificateCodec.getPEMEncodedString(
-          certClient.getRootCACertificate()));
+          certClient.getLatestRootCACertificate()));
     }
     if (certClient.getCACertificate() != null) {
       caCertPemList.add(CertificateCodec.getPEMEncodedString(
@@ -516,8 +516,8 @@ public final class HAUtils {
       // X509 by buildCAList.
       if (!SCMHAUtils.isSCMHAEnabled(conf)) {
         List<X509Certificate> x509Certificates = new ArrayList<>();
-        if (certClient.getRootCACertificate() != null) {
-          x509Certificates.add(certClient.getRootCACertificate());
+        if (certClient.getLatestRootCACertificate() != null) {
+          x509Certificates.add(certClient.getLatestRootCACertificate());
         }
         x509Certificates.add(certClient.getCACertificate());
         return x509Certificates;

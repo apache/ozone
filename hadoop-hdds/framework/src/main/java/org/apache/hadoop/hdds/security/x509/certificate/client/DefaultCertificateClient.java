@@ -345,7 +345,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       if (cert != null) {
         chain.add(getCACertificate());
       }
-      cert = getRootCACertificate();
+      cert = getLatestRootCACertificate();
       if (cert != null) {
         chain.add(cert);
       }
@@ -858,7 +858,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized X509Certificate getRootCACertificate() {
+  public synchronized X509Certificate getLatestRootCACertificate() {
     if (rootCaCertId != null) {
       return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }

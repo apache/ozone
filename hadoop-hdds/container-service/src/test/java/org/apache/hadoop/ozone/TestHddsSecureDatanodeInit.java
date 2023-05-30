@@ -322,7 +322,7 @@ public class TestHddsSecureDatanodeInit {
     PublicKey publicKey1 = client.getPublicKey();
     String caCertId1 = client.getCACertificate().getSerialNumber().toString();
     String rootCaCertId1 =
-        client.getRootCACertificate().getSerialNumber().toString();
+        client.getLatestRootCACertificate().getSerialNumber().toString();
 
     // test the second time certificate rotation, generate a new cert
     newCertHolder = generateX509CertHolder(null, null,
@@ -348,7 +348,7 @@ public class TestHddsSecureDatanodeInit {
     Assert.assertFalse(client.getPublicKey().equals(publicKey1));
     Assert.assertFalse(client.getCACertificate().getSerialNumber()
         .toString().equals(caCertId1));
-    Assert.assertFalse(client.getRootCACertificate().getSerialNumber()
+    Assert.assertFalse(client.getLatestRootCACertificate().getSerialNumber()
         .toString().equals(rootCaCertId1));
   }
 

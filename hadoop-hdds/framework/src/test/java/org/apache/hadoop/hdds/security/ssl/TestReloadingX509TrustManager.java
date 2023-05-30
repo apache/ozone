@@ -50,13 +50,13 @@ public class TestReloadingX509TrustManager {
   public void testReload() throws Exception {
     TrustManager tm =
         caClient.getServerKeyStoresFactory().getTrustManagers()[0];
-    X509Certificate cert1 = caClient.getRootCACertificate();
+    X509Certificate cert1 = caClient.getLatestRootCACertificate();
     assertEquals(cert1,
         ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
 
     caClient.renewRootCA();
     caClient.renewKey();
-    X509Certificate cert2 = caClient.getRootCACertificate();
+    X509Certificate cert2 = caClient.getLatestRootCACertificate();
     assertNotEquals(cert1, cert2);
 
     assertEquals(cert2,
