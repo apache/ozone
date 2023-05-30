@@ -188,7 +188,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @param source put bytes to a {@link ByteBuffer} and return the size.
    * @return this object.
    */
-  public CodecBuffer put(ToIntFunction<ByteBuffer> source) {
+  CodecBuffer put(ToIntFunction<ByteBuffer> source) {
     assertRefCnt(1);
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
@@ -201,9 +201,11 @@ public final class CodecBuffer implements AutoCloseable {
    * Put bytes from the given source to this buffer.
    *
    * @param source put bytes to an {@link OutputStream} and return the size.
+   *               The returned size must be non-null and non-negative.
    * @return this object.
+   * @throws IOException in case the source throws an {@link IOException}.
    */
-  public CodecBuffer put(
+  CodecBuffer put(
       CheckedFunction<OutputStream, Integer, IOException> source)
       throws IOException {
     assertRefCnt(1);
@@ -214,5 +216,34 @@ public final class CodecBuffer implements AutoCloseable {
     }
     buf.setIndex(buf.readerIndex(), w + size);
     return this;
+  }
+
+  /**
+   * Put bytes from a source to this buffer.
+   * The source may or may not be available.
+   * The given source function must return the required size (possibly 0)
+   * if the source is available; otherwise, return null.
+   * When the buffer is smaller than the required size,
+   * it may write partial result to the buffer.
+   *
+   * @param source put bytes to a {@link ByteBuffer}.
+   * @return the return value from the source function.
+   * @throws IOException in case the source throws an {@link IOException}.
+   */
+  Integer putFromSource(
+      CheckedFunction<ByteBuffer, Integer, IOException> source)
+      throws IOException {
+    assertRefCnt(1);
+    final int i = buf.writerIndex();
+    final int writable = buf.writableBytes();
+    final ByteBuffer buffer = buf.nioBuffer(i, writable);
+    final Integer size = source.apply(buffer);
+    if (size != null) {
+      Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
+      if (size <= writable) {
+        buf.setIndex(buf.readerIndex(), i + size);
+      }
+    }
+    return size;
   }
 }

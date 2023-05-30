@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -69,11 +70,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -471,7 +474,8 @@ public class TestECUnderReplicationHandler {
       Set<Pair<DatanodeDetails, SCMCommand<?>>> expectedDelete =
           new HashSet<>();
       expectedDelete.add(Pair.of(overRepReplica.getDatanodeDetails(),
-          createDeleteContainerCommand(container, overRepReplica)));
+          createDeleteContainerCommand(container,
+              overRepReplica.getReplicaIndex())));
 
       Mockito.when(replicationManager.processOverReplicatedContainer(
           underRep)).thenAnswer(invocationOnMock -> {
@@ -485,6 +489,120 @@ public class TestECUnderReplicationHandler {
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
       Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
+    }
+  }
+
+  /**
+   * Tests that under replication handling tries to delete an UNHEALTHY
+   * replica if no target datanodes are found. It should delete only
+   * one UNHEALTHY replica so that the replica's host DN becomes available as a
+   * target for reconstruction/replication of a healthy replica.
+   */
+  @Test
+  public void testUnhealthyNodeDeletedIfNoTargetsFound()
+      throws IOException {
+    PlacementPolicy noNodesPolicy = ReplicationTestUtil
+        .getNoNodesTestPlacementPolicy(nodeManager, conf);
+
+    ContainerReplica decomReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            5, DECOMMISSIONING, CLOSED);
+    ContainerReplica maintReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            5, ENTERING_MAINTENANCE, CLOSED);
+
+    List<ContainerReplica> replicasToAdd = new ArrayList<>();
+    replicasToAdd.add(null);
+    replicasToAdd.add(decomReplica);
+    replicasToAdd.add(maintReplica);
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(
+            noNodesPolicy, conf, replicationManager);
+    ContainerHealthResult.UnderReplicatedHealthResult underRep =
+        new ContainerHealthResult.UnderReplicatedHealthResult(container,
+            1, false, false, false);
+    ContainerReplica unhealthyReplica =
+        ReplicationTestUtil.createContainerReplica(container.containerID(),
+            4, IN_SERVICE, UNHEALTHY);
+
+    /*
+     The underRepHandler processes in stages. First missing indexes, then
+     decommission and then maintenance. If a stage cannot find new nodes and
+     there are no commands created yet, then we should either throw, or pass
+     control to the over rep handler if the container is also over
+     replicated, or try to delete an UNHEALTHY replica if one is present.
+     In this loop we first have the container under replicated with a missing
+     index, then with a decommissioning index, and finally with a maintenance
+     index. In all cases, initially there are no UNHEALTHY replicas, so it
+     should throw an exception. Then we add 2 UNHEALTHY replicas, so
+     it should return the command to delete one.
+     */
+    for (ContainerReplica toAdd : replicasToAdd) {
+      Mockito.clearInvocations(replicationManager);
+      Set<ContainerReplica> existingReplicas = ReplicationTestUtil
+          .createReplicas(Pair.of(IN_SERVICE, 5),
+              Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+              Pair.of(IN_SERVICE, 4));
+      if (toAdd != null) {
+        existingReplicas.add(toAdd);
+      }
+
+      // should throw an SCMException indicating no targets were found
+      Assert.assertThrows(SCMException.class,
+          () -> ecURH.processAndSendCommands(existingReplicas,
+              Collections.emptyList(), underRep, 2));
+      Mockito.verify(replicationManager, times(0))
+          .sendThrottledDeleteCommand(eq(container), anyInt(),
+              any(DatanodeDetails.class), anyBoolean());
+
+      /*
+      Now, for the same container, also add an UNHEALTHY replica. The handler
+      should catch the SCMException that says no targets were found and try
+      to handle it by deleting the UNHEALTHY replica.
+      */
+      existingReplicas.add(unhealthyReplica);
+      existingReplicas.add(
+          ReplicationTestUtil.createContainerReplica(container.containerID(),
+              1, IN_SERVICE, UNHEALTHY));
+
+      /*
+      Mock such that when replication manager is called to send a delete
+      command, we add the command to commandsSet and later use it for
+      assertions.
+      */
+      commandsSent.clear();
+      Mockito.doAnswer(invocation -> {
+        commandsSent.add(Pair.of(invocation.getArgument(2),
+            createDeleteContainerCommand(invocation.getArgument(0),
+                invocation.getArgument(1))));
+        return null;
+      })
+          .when(replicationManager)
+          .sendThrottledDeleteCommand(Mockito.any(ContainerInfo.class),
+              Mockito.anyInt(), Mockito.any(DatanodeDetails.class),
+              Mockito.eq(true));
+
+      assertThrows(SCMException.class,
+          () -> ecURH.processAndSendCommands(existingReplicas,
+              Collections.emptyList(), underRep, 2));
+      Mockito.verify(replicationManager, times(1))
+          .sendThrottledDeleteCommand(container,
+              unhealthyReplica.getReplicaIndex(),
+              unhealthyReplica.getDatanodeDetails(), true);
+      Assertions.assertEquals(1, commandsSent.size());
+      Pair<DatanodeDetails, SCMCommand<?>> command =
+          commandsSent.iterator().next();
+      Assertions.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
+          command.getValue().getType());
+      DeleteContainerCommand deleteCommand =
+          (DeleteContainerCommand) command.getValue();
+      Assertions.assertEquals(unhealthyReplica.getDatanodeDetails(),
+          command.getKey());
+      Assertions.assertEquals(container.containerID(),
+          ContainerID.valueOf(deleteCommand.getContainerID()));
+      Assertions.assertEquals(unhealthyReplica.getReplicaIndex(),
+          deleteCommand.getReplicaIndex());
     }
   }
 
@@ -725,7 +843,8 @@ public class TestECUnderReplicationHandler {
 
     Set<Pair<DatanodeDetails, SCMCommand<?>>> expectedDelete = new HashSet<>();
     expectedDelete.add(Pair.of(overRepReplica.getDatanodeDetails(),
-        createDeleteContainerCommand(container, overRepReplica)));
+        createDeleteContainerCommand(container,
+            overRepReplica.getReplicaIndex())));
 
     Mockito.when(replicationManager.processOverReplicatedContainer(
         underRep)).thenAnswer(invocationOnMock -> {
@@ -966,10 +1085,10 @@ public class TestECUnderReplicationHandler {
   }
 
   private DeleteContainerCommand createDeleteContainerCommand(
-      ContainerInfo containerInfo, ContainerReplica replica) {
+      ContainerInfo containerInfo, int replicaIndex) {
     DeleteContainerCommand deleteCommand =
         new DeleteContainerCommand(containerInfo.getContainerID(), true);
-    deleteCommand.setReplicaIndex(replica.getReplicaIndex());
+    deleteCommand.setReplicaIndex(replicaIndex);
     return deleteCommand;
   }
 }

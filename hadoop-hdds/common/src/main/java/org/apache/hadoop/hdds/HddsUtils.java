@@ -65,6 +65,11 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
@@ -386,6 +391,25 @@ public final class HddsUtils {
       name = DNS.getDefaultHost(dnsInterface, nameServer, fallbackToHosts);
     }
     return name;
+  }
+
+  /**
+   * Retrieve the socket address that is used by Datanode.
+   * @param conf
+   * @return Target InetSocketAddress for the Datanode service endpoint.
+   */
+  public static InetSocketAddress
+      getDatanodeRpcAddress(ConfigurationSource conf) {
+    final String host = getHostNameFromConfigKeys(conf,
+        HDDS_DATANODE_CLIENT_BIND_HOST_KEY)
+        .orElse(HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT);
+
+    final int port = getPortNumberFromConfigKeys(conf,
+        HDDS_DATANODE_CLIENT_ADDRESS_KEY)
+        .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
+            HDDS_DATANODE_CLIENT_PORT_DEFAULT));
+
+    return NetUtils.createSocketAddr(host + ":" + port);
   }
 
   /**

@@ -41,7 +41,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           new DBColumnFamilyDefinition<>(
                   "block_data",
                   String.class,
-                  new StringCodec(),
+                  StringCodec.get(),
                   BlockData.class,
                   BlockData.getCodec());
 
@@ -50,7 +50,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           new DBColumnFamilyDefinition<>(
           "metadata",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -59,7 +59,7 @@ public class DatanodeSchemaTwoDBDefinition extends
           new DBColumnFamilyDefinition<>(
                   "deleted_blocks",
                   String.class,
-                  new StringCodec(),
+                  StringCodec.get(),
                   ChunkInfoList.class,
                   ChunkInfoList.getCodec());
 

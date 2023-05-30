@@ -148,7 +148,7 @@ public abstract class TestContainerScannersAbstract {
         healthy, corruptData, openCorruptMetadata);
     ContainerController mock = mock(ContainerController.class);
     when(mock.getContainers(vol)).thenReturn(containers.iterator());
-    when(mock.getContainers()).thenReturn(containers.iterator());
+    when(mock.getContainers()).thenReturn(containers);
 
     return mock;
   }

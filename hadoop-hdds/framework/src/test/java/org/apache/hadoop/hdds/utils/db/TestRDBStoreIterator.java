@@ -82,8 +82,8 @@ public class TestRDBStoreIterator {
             new byte[]{0x7d})
         .thenThrow(new NoSuchElementException());
 
-
-    Consumer<ByteArrayKeyValue> consumerStub = mock(Consumer.class);
+    final Consumer<Table.KeyValue<byte[], byte[]>> consumerStub
+        = mock(Consumer.class);
 
     RDBStoreIterator iter = new RDBStoreIterator(managedRocksIterator);
     iter.forEachRemaining(consumerStub);
