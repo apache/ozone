@@ -596,16 +596,8 @@ message GetCurrentSecretKeyRequest {
 
 }
 
-message ManagedSecretKey {
-    required hdds.UUID id = 1;
-    required uint64 creationTime = 2;
-    required uint64 expiryTime = 3;
-    required string algorithm = 4;
-    required bytes encoded = 5;
-}
-
 message GetCurrentSecretKeyResponse {
-  required ManagedSecretKey secretKey = 1;
+
 }
 
 /**

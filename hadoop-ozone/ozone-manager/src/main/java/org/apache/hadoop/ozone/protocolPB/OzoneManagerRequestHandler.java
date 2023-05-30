@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -79,7 +78,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
@@ -314,10 +312,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getTransferOmLeadershipRequest()));
         break;
       case GetCurrentSecretKey:
-        GetCurrentSecretKeyResponse getCurrentSecretKeyResponse =
-            getCurrentSecretKey(request.getGetCurrentSecretKeyRequest());
-        responseBuilder.setGetCurrentSecretKeyResponse(
-            getCurrentSecretKeyResponse);
+        responseBuilder.setGetCurrentSecretKeyResponse(getCurrentSecretKey());
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -953,13 +948,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
-  private GetCurrentSecretKeyResponse getCurrentSecretKey(
-      GetCurrentSecretKeyRequest request) {
-    ManagedSecretKey managedSecretKey = impl.getCurrentSecretKey();
+  private GetCurrentSecretKeyResponse getCurrentSecretKey() {
+    impl.refetchSecretKey();
     GetCurrentSecretKeyResponse response =
-        GetCurrentSecretKeyResponse.newBuilder()
-            .setSecretKey(ManagedSecretKey.toProto(managedSecretKey))
-            .build();
+        GetCurrentSecretKeyResponse.newBuilder().build();
     return response;
   }
 

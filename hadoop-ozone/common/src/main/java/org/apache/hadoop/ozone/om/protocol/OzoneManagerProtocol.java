@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -997,5 +996,5 @@ public interface OzoneManagerProtocol
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
 
-  ManagedSecretKey getCurrentSecretKey() throws IOException;
+  void refetchSecretKey() throws IOException;
 }

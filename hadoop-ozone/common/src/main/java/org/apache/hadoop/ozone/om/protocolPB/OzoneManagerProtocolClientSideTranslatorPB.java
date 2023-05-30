@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -106,7 +105,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
@@ -1359,16 +1357,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public ManagedSecretKey getCurrentSecretKey() throws IOException {
+  public void refetchSecretKey() throws IOException {
     final GetCurrentSecretKeyRequest.Builder requestBuilder =
         GetCurrentSecretKeyRequest.newBuilder();
     final OMRequest omRequest = createOMRequest(Type.GetCurrentSecretKey)
         .setGetCurrentSecretKeyRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
-    final GetCurrentSecretKeyResponse resp =
-        handleError(omResponse).getGetCurrentSecretKeyResponse();
-    return ManagedSecretKey.fromProtobuf(resp);
+    handleError(omResponse);
   }
 
   /**

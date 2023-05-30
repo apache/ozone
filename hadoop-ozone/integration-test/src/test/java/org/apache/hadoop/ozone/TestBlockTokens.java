@@ -56,7 +56,6 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.SecretKey;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.File;
@@ -64,7 +63,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.io.InputStream;
 import java.net.InetAddress;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -294,24 +292,9 @@ public final class TestBlockTokens {
     String actualOutput = outputStream.toString("UTF-8");
     System.setOut(System.out);
 
-    String actualCurrentKey = testGetCurrentSecretKeyUtil(actualOutput);
-    SecretKey key =
-        getScmSecretKeyManager().getCurrentSecretKey().getSecretKey();
-    byte[] encodedKey = key.getEncoded();
-    String expectedCurrentKey = Base64.getEncoder().encodeToString(encodedKey);
-    assertEquals(expectedCurrentKey, actualCurrentKey);
+    assertTrue(actualOutput.contains("Successfully re-fetched the secret key"));
   }
 
-  private String testGetCurrentSecretKeyUtil(String output) {
-    // Extract the current secret key from the output
-    String[] lines = output.split(System.lineSeparator());
-    for (String line : lines) {
-      if (line.startsWith("Current Secret Key: ")) {
-        return line.substring("Current Secret Key: ".length()).trim();
-      }
-    }
-    return null;
-  }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =

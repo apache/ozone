@@ -81,7 +81,6 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslator
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -1065,8 +1064,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public ManagedSecretKey getCurrentSecretKey() {
-    return secretKeyClient.getCurrentSecretKey();
+  public void refetchSecretKey() {
+    secretKeyClient.getCurrentSecretKey();
   }
 
   @VisibleForTesting
