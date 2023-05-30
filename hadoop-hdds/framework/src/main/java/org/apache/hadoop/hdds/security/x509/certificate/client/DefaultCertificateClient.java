@@ -48,6 +48,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -345,18 +346,40 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     } else {
       // case before certificate bundle is supported
-      chain.add(getCertificate());
-      X509Certificate cert = getCACertificate();
-      if (cert != null) {
-        chain.add(getCACertificate());
+      X509Certificate lastInsertedCert = getCertificate();
+      chain.add(lastInsertedCert);
+      while (!isRootCa(lastInsertedCert)) {
+        Optional<X509Certificate> issuerOpt =
+            getIssuerForCert(lastInsertedCert, getAllCaCerts());
+        if (issuerOpt.isPresent()) {
+          X509Certificate issuer = issuerOpt.get();
+          chain.add(issuer);
+          lastInsertedCert = issuer;
+        } else {
+          throw new RuntimeException("No issuer found for certificate: " +
+              lastInsertedCert);
+        }
       }
-      cert = getLatestRootCACertificate();
-      if (cert != null) {
-        chain.add(cert);
-      }
+      //add self signed certificate to the chain
+      chain.add(lastInsertedCert);
     }
 
     return chain;
+  }
+
+  private boolean isRootCa(X509Certificate cert) {
+    return cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal());
+  }
+
+  private Optional<X509Certificate> getIssuerForCert(X509Certificate cert,
+      Set<X509Certificate> issuerCerts) {
+    for (X509Certificate issuer : issuerCerts) {
+      if (cert.getIssuerX500Principal().equals(
+          issuer.getSubjectX500Principal())) {
+        return Optional.of(issuer);
+      }
+    }
+    return Optional.empty();
   }
 
   @Override
