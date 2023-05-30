@@ -840,7 +840,7 @@ public final class HddsUtils {
       return supplier.get();
     } finally {
       if (!Objects.equals(threadName, thread.getName())) {
-        LOG.info("Restoring thread name {}", threadName);
+        LOG.info("Restoring thread name: {}", threadName);
         thread.setName(threadName);
       }
     }
