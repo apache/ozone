@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -253,13 +252,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      OmKeyInfo pseudoKeyInfo;
-      if (isHSync) {
-        pseudoKeyInfo = null;
-      } else {
-        pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
-            omKeyInfo);
-      }
+      final OmKeyInfo pseudoKeyInfo = isHSync? null
+          : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       if (pseudoKeyInfo != null) {
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(

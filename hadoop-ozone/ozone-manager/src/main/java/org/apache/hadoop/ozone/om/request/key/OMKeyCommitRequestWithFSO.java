@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -211,13 +209,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      OmKeyInfo pseudoKeyInfo;
-      if (isHSync) {
-        pseudoKeyInfo = null;
-      } else {
-        pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
-            omKeyInfo);
-      }
+      final OmKeyInfo pseudoKeyInfo = isHSync? null
+          : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       if (pseudoKeyInfo != null) {
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
