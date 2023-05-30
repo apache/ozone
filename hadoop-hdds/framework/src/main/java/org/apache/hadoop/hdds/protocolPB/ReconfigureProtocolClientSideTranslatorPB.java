@@ -46,7 +46,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -61,7 +60,7 @@ import java.util.Optional;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class ReconfigureProtocolClientSideTranslatorPB implements
-    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator, Closeable {
+    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator {
   public static final Logger LOG = LoggerFactory
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 

@@ -22,14 +22,18 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.collect.ImmutableSortedSet;
 import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -45,6 +49,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -60,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -72,6 +78,8 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -111,6 +119,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
+  private HddsDatanodeClientProtocolServer clientProtocolServer;
+  private final SortedSet<String> reconfigurableProperties =
+      ImmutableSortedSet.of();
+  private OzoneAdmins admins;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -311,6 +323,21 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
+
+      clientProtocolServer = new HddsDatanodeClientProtocolServer(
+          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO);
+
+      // Get admin list
+      String starterUser =
+          UserGroupInformation.getCurrentUser().getShortUserName();
+      Collection<String> adminUserNames =
+          getOzoneAdminsFromConfig(conf, starterUser);
+      Collection<String> adminGroupNames =
+          getOzoneAdminsGroupsFromConfig(conf);
+      LOG.info("Datanode start with admins: {}", adminUserNames);
+      admins = new OzoneAdmins(adminUserNames, adminGroupNames);
+
+      clientProtocolServer.start();
       startPlugins();
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
@@ -505,6 +532,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return datanodeStateMachine;
   }
 
+  public HddsDatanodeClientProtocolServer getClientProtocolServer() {
+    return clientProtocolServer;
+  }
+
   @VisibleForTesting
   public DatanodeCRLStore getCRLStore() {
     return dnCRLStore;
@@ -517,6 +548,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         LOG.info("Interrupted during StorageContainerManager join.");
+      }
+    }
+    if (getClientProtocolServer() != null) {
+      try {
+        getClientProtocolServer().join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOG.info("Interrupted during HddsDatanodeClientProtocolServer join.");
       }
     }
   }
@@ -550,6 +589,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         } catch (Exception e) {
           LOG.error("Stopping HttpServer is failed.", e);
         }
+      }
+      if (getClientProtocolServer() != null) {
+        getClientProtocolServer().stop();
       }
       unregisterMXBean();
       // stop dn crl store
@@ -621,4 +663,53 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       terminateDatanode();
     }
   }
+
+  /**
+   * Check ozone admin privilege, throws exception if not admin.
+   */
+  public void checkAdminUserPrivilege(UserGroupInformation ugi)
+      throws IOException {
+    if (ugi != null && !isAdmin(ugi)) {
+      throw new AccessControlException("Access denied for user "
+          + ugi.getUserName() + ". Superuser privilege is required.");
+    }
+  }
+
+  /**
+   * Return true if a UserGroupInformation is admin, false otherwise.
+   * @param callerUgi Caller UserGroupInformation
+   */
+  public boolean isAdmin(UserGroupInformation callerUgi) {
+    return callerUgi != null && admins.isAdmin(callerUgi);
+  }
+
+  public String reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
+    return "";
+  }
+
+  public Collection<String> getReconfigurableProperties() {
+    return reconfigurableProperties;
+  }
+
+  /**
+   * Return list of OzoneAdministrators from config.
+   * The service startup user will default to an admin.
+   */
+  private Collection<String> getOzoneAdminsFromConfig(
+      OzoneConfiguration configuration, String starterUser) {
+    Collection<String> ozAdmins = configuration.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS);
+    if (!ozAdmins.contains(starterUser)) {
+      ozAdmins.add(starterUser);
+    }
+    return ozAdmins;
+  }
+
+  Collection<String> getOzoneAdminsGroupsFromConfig(
+      OzoneConfiguration configuration) {
+    return configuration.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS_GROUPS);
+  }
+
 }

@@ -2613,6 +2613,41 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.client.address</name>
+    <value/>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The address of the Ozone Datanode client service.
+      It is a string in the host:port format.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.bind.host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The hostname or IP address used by the Datanode client service
+      endpoint to bind.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.port</name>
+    <value>9864</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The port number of the Ozone Datanode client service.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.handler.count</name>
+    <value>1</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The number of RPC handler threads for Datanode client
+      service endpoints.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>500</value>
     <description>
