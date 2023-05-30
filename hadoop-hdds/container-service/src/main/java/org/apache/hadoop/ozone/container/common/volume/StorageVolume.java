@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.Time;
@@ -35,11 +36,17 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.io.SyncFailedException;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Random;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
@@ -495,11 +502,16 @@ public abstract class StorageVolume
    */
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
-    if (!storageDir.exists()) {
+    boolean checkPassed = DiskCheckUtil.checkExistence(LOG, storageDir) &&
+        DiskCheckUtil.checkPermissions(LOG, storageDir) &&
+        // TODO get correct tmp dir.
+        // TODO configure num bytes to write.
+        DiskCheckUtil.checkReadWrite(LOG, storageDir, storageDir, 100);
+    if (checkPassed) {
+      return VolumeCheckResult.HEALTHY;
+    } else {
       return VolumeCheckResult.FAILED;
     }
-    DiskChecker.checkDir(storageDir);
-    return VolumeCheckResult.HEALTHY;
   }
 
   @Override
