@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
@@ -139,6 +140,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -1297,7 +1299,7 @@ public final class TestSecureOzoneCluster {
           new KeyPair(scmCertClient.getPublicKey(),
               scmCertClient.getPrivateKey()), scmCert,
           Duration.ofSeconds(certLifetime),
-          InetAddress.getLocalHost().getCanonicalHostName(), clusterId);
+          "om_cert", clusterId);
       String certId = certHolder.getSerialNumber().toString();
       certCodec.writeCertificate(certHolder);
       certCodec.writeCertificate(CertificateCodec.getCertificateHolder(scmCert),
@@ -1473,6 +1475,8 @@ public final class TestSecureOzoneCluster {
         .setDigitalSignature(true)
         .setDigitalEncryption(true);
 
+
+    addIpAndDnsDataToBuilder(csrBuilder);
     LocalDateTime start = LocalDateTime.now();
     String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
         HDDS_X509_DEFAULT_DURATION_DEFAULT);
@@ -1484,5 +1488,21 @@ public final class TestSecureOzoneCluster {
                 .atZone(ZoneId.systemDefault()).toInstant()),
             csrBuilder.build(), "test", clusterId);
     return certificateHolder;
+  }
+
+  private static void addIpAndDnsDataToBuilder(
+      CertificateSignRequest.Builder csrBuilder) throws IOException {
+    DomainValidator validator = DomainValidator.getInstance();
+    // Add all valid ips.
+    OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+        ip -> {
+          csrBuilder.addIpAddress(ip.getHostAddress());
+          if (validator.isValid(ip.getCanonicalHostName())) {
+            csrBuilder.addDnsName(ip.getCanonicalHostName());
+          } else {
+            System.err.println(
+                "Invalid domain {}" + ip.getCanonicalHostName());
+          }
+        });
   }
 }
