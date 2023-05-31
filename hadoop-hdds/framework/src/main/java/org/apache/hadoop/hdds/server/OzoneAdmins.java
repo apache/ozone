@@ -24,9 +24,15 @@ import java.util.Set;
 
 import com.google.common.collect.Sets;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS_GROUPS;
 
 /**
  * This class contains ozone admin user information, username and group,
@@ -56,6 +62,35 @@ public class OzoneAdmins {
         Collections.emptySet();
   }
 
+  /**
+   * Returns an OzoneAdmins instance configured with admin users and groups
+   * from the provided configuration. The starter user is added to the
+   * admin user list if not already included.
+   *
+   * @param starterUser initial user to consider in admin list.
+   * @param configuration the configuration settings to apply.
+   * @return a configured OzoneAdmins instance.
+   */
+  public static OzoneAdmins getOzoneAdmins(String starterUser,
+                                           OzoneConfiguration configuration) {
+    Collection<String> adminUserNames =
+        getOzoneAdminsFromConfig(configuration, starterUser);
+    Collection<String> adminGroupNames =
+        getOzoneAdminsGroupsFromConfig(configuration);
+    return new OzoneAdmins(adminUserNames, adminGroupNames);
+  }
+
+  /**
+   * Check ozone admin privilege, throws exception if not admin.
+   */
+  public void checkAdminUserPrivilege(UserGroupInformation ugi)
+      throws AccessControlException {
+    if (ugi != null && !isAdmin(ugi)) {
+      throw new AccessControlException("Access denied for user "
+          + ugi.getUserName() + ". Superuser privilege is required.");
+    }
+  }
+
   private boolean hasAdminGroup(Collection<String> userGroups) {
     return !Sets.intersection(adminGroups,
         new LinkedHashSet<>(userGroups)).isEmpty();
@@ -65,13 +100,14 @@ public class OzoneAdmins {
    * Check whether the provided {@link UserGroupInformation user}
    * has admin permissions.
    *
-   * @param user
-   * @return
+   * @param user the {@link UserGroupInformation}.
+   * @return true if the user is an administrator, otherwise false.
    */
   public boolean isAdmin(UserGroupInformation user) {
-    return adminUsernames.contains(OZONE_ADMINISTRATORS_WILDCARD)
+    return user != null && (adminUsernames
+        .contains(OZONE_ADMINISTRATORS_WILDCARD)
         || adminUsernames.contains(user.getShortUserName())
-        || hasAdminGroup(user.getGroups());
+        || hasAdminGroup(user.getGroups()));
   }
 
   public Collection<String> getAdminGroups() {
@@ -88,4 +124,38 @@ public class OzoneAdmins {
         Collections.emptySet();
   }
 
+  /**
+   * Return list of administrators from config.
+   * The service startup user will default to an admin.
+   */
+  public static Collection<String> getOzoneAdminsFromConfig(
+      OzoneConfiguration conf, String starterUser) {
+    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS);
+    if (!ozAdmins.contains(starterUser)) {
+      ozAdmins.add(starterUser);
+    }
+    return ozAdmins;
+  }
+
+  /**
+   * Return list of Ozone Read only admin Usernames from config.
+   */
+  public static Collection<String> getOzoneReadOnlyAdminsFromConfig(
+      OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
+  }
+
+  private static Collection<String> getOzoneAdminsGroupsFromConfig(
+      OzoneConfiguration configuration) {
+    return configuration.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS_GROUPS);
+  }
+
+
+  public static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
+      OzoneConfiguration conf) {
+    return conf.getTrimmedStringCollection(
+        OZONE_READONLY_ADMINISTRATORS_GROUPS);
+  }
 }

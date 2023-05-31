@@ -46,20 +46,6 @@ public final class OzoneConfigUtil {
   }
 
   /**
-   * Return list of OzoneAdministrators from config.
-   * The service startup user will default to an admin.
-   */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
-      String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
-  }
-
-  /**
    * Return list of s3 administrators prop from config.
    *
    * If ozone.s3.administrators value is empty string or unset,
@@ -79,19 +65,6 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
-  /**
-   * Return list of Ozone Read only admin Usernames from config.
-   */
-  static Collection<String> getOzoneReadOnlyAdminsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
-  }
-
-  static Collection<String> getOzoneAdminsGroupsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
-  }
-
   static Collection<String> getS3AdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     Collection<String> s3AdminsGroup =
@@ -102,12 +75,6 @@ public final class OzoneConfigUtil {
               .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
     }
     return s3AdminsGroup;
-  }
-
-  static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(
-        OZONE_READONLY_ADMINISTRATORS_GROUPS);
   }
 
   public static ReplicationConfig resolveReplicationConfigPreference(

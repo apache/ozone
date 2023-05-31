@@ -399,14 +399,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    Collection<String> scmAdminUsernames =
-        getOzoneAdminsFromConfig(conf, scmStarterUser);
-    LOG.info("SCM start with adminUsers: {}", scmAdminUsernames);
-    Collection<String> scmAdminGroups =
-        conf.getTrimmedStringCollection(
-            OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
-
-    scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
+    scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
+    LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
@@ -2093,20 +2087,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
   }
 
-  /**
-   * Return list of administrators from config.
-   * The service startup user will default to an admin.
-   */
-  private Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
-      String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
-  }
-
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
   }
@@ -2135,7 +2115,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins = getOzoneAdminsFromConfig(
+    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
         getConfiguration(), scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,

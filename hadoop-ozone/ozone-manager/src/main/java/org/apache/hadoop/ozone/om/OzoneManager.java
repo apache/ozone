@@ -642,19 +642,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     perfMetrics = OMPerformanceMetrics.register();
     // Get admin list
     omStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    Collection<String> omAdminUsernames =
-        OzoneConfigUtil.getOzoneAdminsFromConfig(configuration, omStarterUser);
-    Collection<String> omAdminGroups =
-        OzoneConfigUtil.getOzoneAdminsGroupsFromConfig(configuration);
-    LOG.info("OM start with adminUsers: {}", omAdminUsernames);
-    omAdmins = new OzoneAdmins(omAdminUsernames, omAdminGroups);
+    omAdmins = OzoneAdmins.getOzoneAdmins(omStarterUser, conf);
+    LOG.info("OM start with adminUsers: {}", omAdmins.getAdminUsernames());
 
     // Get read only admin list
     Collection<String> omReadOnlyAdmins =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(
+        OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
             configuration);
     Collection<String> omReadOnlyAdminsGroups =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsGroupsFromConfig(
+        OzoneAdmins.getOzoneReadOnlyAdminsGroupsFromConfig(
             configuration);
 
     readOnlyAdmins = new OzoneAdmins(omReadOnlyAdmins,
@@ -4654,7 +4650,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins =
-        OzoneConfigUtil.getOzoneAdminsFromConfig(getConfiguration(),
+        OzoneAdmins.getOzoneAdminsFromConfig(getConfiguration(),
             omStarterUser);
     omAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
@@ -4665,7 +4661,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String reconfOzoneReadOnlyAdmins(String newVal) {
     getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
     Collection<String> pReadOnlyAdmins =
-        OzoneConfigUtil.getOzoneReadOnlyAdminsFromConfig(getConfiguration());
+        OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(getConfiguration());
     readOnlyAdmins.setAdminUsernames(pReadOnlyAdmins);
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
