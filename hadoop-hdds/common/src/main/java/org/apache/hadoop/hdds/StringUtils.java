@@ -67,7 +67,7 @@ public final class StringUtils {
   }
 
   public static String bytes2String(ByteBuffer bytes, Charset charset) {
-    return Unpooled.wrappedBuffer(bytes).toString(charset);
+    return Unpooled.wrappedBuffer(bytes.asReadOnlyBuffer()).toString(charset);
   }
 
   public static String bytes2Hex(ByteBuffer buffer, int max) {
@@ -79,6 +79,10 @@ public final class StringUtils {
       builder.append(String.format("%02X ", buffer.get()));
     }
     return builder + (remaining > max ? "..." : "");
+  }
+
+  public static String bytes2Hex(ByteBuffer buffer) {
+    return bytes2Hex(buffer, buffer.remaining());
   }
 
   /**

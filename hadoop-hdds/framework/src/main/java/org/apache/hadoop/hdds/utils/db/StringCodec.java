@@ -36,13 +36,4 @@ public final class StringCodec extends StringCodecBase {
     // singleton
     super(StandardCharsets.UTF_8);
   }
-
-  /**
-   * @return 4 * {@link String#length()} since
-   *         {@link StandardCharsets#UTF_8} uses at most 4 bytes per char.
-   */
-  @Override
-  int getSerializedSizeUpperBound(String s) {
-    return 4 * s.length();
-  }
 }

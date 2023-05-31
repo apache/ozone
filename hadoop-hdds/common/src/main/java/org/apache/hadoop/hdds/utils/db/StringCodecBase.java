@@ -27,7 +27,6 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
@@ -44,15 +43,26 @@ abstract class StringCodecBase implements Codec<String> {
   static final Logger LOG = LoggerFactory.getLogger(StringCodecBase.class);
 
   private final Charset charset;
-  private final CharsetEncoder encoder;
-  private final CharsetDecoder decoder;
+  private final int maxBytesPerChar;
 
   StringCodecBase(Charset charset) {
     this.charset = charset;
-    this.encoder = charset.newEncoder()
+    final float f = charset.newEncoder().maxBytesPerChar();
+    this.maxBytesPerChar = (int) f;
+    if (maxBytesPerChar != f) {
+      throw new ArithmeticException("Round off error in " + charset
+          + ": maxBytesPerChar = " + f + " is not an integer.");
+    }
+  }
+
+  CharsetEncoder newEncoder() {
+    return charset.newEncoder()
         .onMalformedInput(CodingErrorAction.REPORT)
         .onUnmappableCharacter(CodingErrorAction.REPORT);
-    this.decoder = charset.newDecoder()
+  }
+
+  CharsetDecoder newDecoder() {
+    return charset.newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT)
         .onUnmappableCharacter(CodingErrorAction.REPORT);
   }
@@ -71,20 +81,20 @@ abstract class StringCodecBase implements Codec<String> {
   /**
    * Returns an upper bound of the serialized size.
    * For variable-length {@link Charset}s,
-   * an upper bound can possibly be obtained without encoding.
+   * an upper bound can be obtained without encoding.
    * This method usually is much more efficient than
    * {@link #getSerializedSize(String)}.
    *
    * @return an upper bound of {@link #getSerializedSize(String)}.
    */
-  int getSerializedSizeUpperBound(String s) {
-    return getSerializedSize(s);
+  final int getSerializedSizeUpperBound(String s) {
+    return maxBytesPerChar * s.length();
   }
 
   private <E extends Exception> CheckedFunction<ByteBuffer, Integer, E> encode(
       String string, Integer serializedSize, Function<String, E> newE) {
     return buffer -> {
-      final CoderResult result = encoder.encode(
+      final CoderResult result = newEncoder().encode(
           CharBuffer.wrap(string), buffer, true);
       if (result.isError()) {
         throw newE.apply("Failed to encode with " + charset + ": " + result
@@ -102,17 +112,17 @@ abstract class StringCodecBase implements Codec<String> {
   String decode(ByteBuffer buffer) {
     Runnable error = null;
     try {
-      return decoder.decode(buffer).toString();
-    } catch (CharacterCodingException e) {
+      return newDecoder().decode(buffer.asReadOnlyBuffer()).toString();
+    } catch (Exception e) {
       error = () -> LOG.warn("Failed to decode buffer with " + charset
-          + ", buffer = (hex) " + StringUtils.bytes2Hex(buffer, 10), e);
+          + ", buffer = (hex) " + StringUtils.bytes2Hex(buffer), e);
 
       // For compatibility, try decoding using StringUtils.
       final String decoded = StringUtils.bytes2String(buffer, charset);
       // Decoded successfully, update error message.
-      error = () -> LOG.warn("Failed to decode buffer with " + charset
-          + ", buffer = (hex) " + StringUtils.bytes2Hex(buffer, 10)
-          + ". Successfully decoded to " + decoded + " after retry.", e);
+      error = () -> LOG.warn("buffer = (hex) " + StringUtils.bytes2Hex(buffer, 20)
+          + "\n  Attempt: Failed to decode buffer with " + charset
+          + "\n  Retry  : Successfully decoded buffer to " + decoded, e);
       return decoded;
     } finally {
       if (error != null) {
