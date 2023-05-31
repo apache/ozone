@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
+import org.rocksdb.KeyMayExist;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -666,6 +667,26 @@ public final class RocksDatabase implements Closeable {
       final Holder<byte[]> out = new Holder<>();
       return db.get().keyMayExist(family.getHandle(), key, out) ?
           out::getValue : null;
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  Supplier<Integer> keyMayExist(ColumnFamily family,
+      ByteBuffer key, ByteBuffer out) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      final KeyMayExist result = db.get().keyMayExist(
+          family.getHandle(), key, out);
+      switch (result.exists) {
+      case kNotExist: return null;
+      case kExistsWithValue: return () -> result.valueLength;
+      case kExistsWithoutValue: return () -> null;
+      default:
+        throw new IllegalStateException(
+            "Unexpected KeyMayExistEnum case " + result.exists);
+      }
     } finally {
       counter.decrementAndGet();
     }
