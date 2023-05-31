@@ -362,7 +362,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
             return valueCodec.fromCodecBuffer(outValue);
           }
           // buffer size too small, retry
-          increaseBufferSize(Math.max(required, allocated));
+          increaseBufferSize(required);
         }
       }
     }

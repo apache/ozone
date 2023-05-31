@@ -169,18 +169,14 @@ class RDBTable implements Table<byte[], byte[]> {
 
   Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    final int remaining = outValue.remaining();
-    final Supplier<Integer> value = db.keyMayExist(family, key, outValue);
+    final Supplier<Integer> value = db.keyMayExist(
+        family, key, outValue.duplicate());
     if (value == null) {
       return null; // definitely not exists
     }
     if (value.get() != null) {
       // definitely exists, return value size.
       return value.get();
-    }
-    if (outValue.remaining() < remaining) {
-      // definitely exists but value size is unknown.
-      return outValue.remaining() - remaining;
     }
 
     // inconclusive: the key may or may not exist
