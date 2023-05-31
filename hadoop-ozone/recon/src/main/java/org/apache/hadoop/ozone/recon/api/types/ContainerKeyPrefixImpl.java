@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * An implementation of both {@link ContainerKeyPrefix}
