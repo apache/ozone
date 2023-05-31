@@ -285,29 +285,30 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
         <div className='content-div'>
           { isLoading ? <span><Icon type='loading'/> Loading...</span> : (
             <div>
-                {(Object.keys(treeResponse).length > 0 && treeResponse.size > 0) ?
+              {(Object.keys(treeResponse).length > 0 && (treeResponse.minAccessCount > 0 || treeResponse.maxAccessCount > 0)) ?
+                (treeResponse.size === 0)? <div style={{ height: 800 }} className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br/></div>
+                  :
                   <div>
-                  <Row>
-                          <div className='go-back-button'>
-                            <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo'/></Button>
-                          </div>
-                          <div className='input-bar'>
-                            <h4>Path</h4>
-                            <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
-                              <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
-                            </form>
-                          </div>
-                          <div className='entity-dropdown-button'>
-                            <Dropdown  overlay={entityTypeMenu} placement='bottomCenter'>
-                              <Button>Entity Type:&nbsp;{this.state.entityType }<DownOutlined/></Button>
-                            </Dropdown>
-                          </div>
-                    
-                          <div className='date-dropdown-button'>
-                            <Dropdown overlay={menuCalender} placement='bottomLeft'>
-                            <Button>Last &nbsp;{date > 100 ?  new Date(date*1000).toLocaleString() : date }<DownOutlined/></Button>
-                            </Dropdown>
-                          </div>
+                    <Row>
+                            <div className='go-back-button'>
+                              <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo'/></Button>
+                            </div>
+                            <div className='input-bar'>
+                              <h4>Path</h4>
+                              <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
+                                <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
+                              </form>
+                            </div>
+                            <div className='entity-dropdown-button'>
+                              <Dropdown  overlay={entityTypeMenu} placement='bottomCenter'>
+                                <Button>Entity Type:&nbsp;{this.state.entityType }<DownOutlined/></Button>
+                              </Dropdown>
+                            </div>
+                            <div className='date-dropdown-button'>
+                              <Dropdown overlay={menuCalender} placement='bottomLeft'>
+                              <Button>Last &nbsp;{date > 100 ?  new Date(date*1000).toLocaleString() : date }<DownOutlined/></Button>
+                              </Dropdown>
+                            </div>
                     </Row>
                     <br/><br/><br/><br/><br/>
                       <div style={{display:"flex", alignItems: "right"}}>
