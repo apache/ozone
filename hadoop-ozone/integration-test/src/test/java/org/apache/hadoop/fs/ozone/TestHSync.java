@@ -200,7 +200,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      final Path file = new Path(dir, "file");
+      final Path file = new Path(dir, "fileoverwrite");
       try (FSDataOutputStream os = fs.create(file, false)) {
         os.hsync();
         UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
