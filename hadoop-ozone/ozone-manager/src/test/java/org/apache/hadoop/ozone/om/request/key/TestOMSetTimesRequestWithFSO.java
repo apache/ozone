@@ -37,8 +37,8 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
 
-  private static final String parentDir = "c/d/e";
-  private static final String fileName = "file1";
+  private static final String PARENT_DIR = "c/d/e";
+  private static final String FILE_NAME = "file1";
 
   /**
    * Verify that setTimes() on directory works as expected.
@@ -49,7 +49,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
     addKeyToTable();
-    keyName = parentDir;
+    keyName = PARENT_DIR;
 
     long mtime = 2000;
     executeAndReturn(mtime);
@@ -71,12 +71,12 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
   }
 
   protected String addKeyToTable() throws Exception {
-    String key = parentDir + "/" + fileName;
+    String key = PARENT_DIR + "/" + FILE_NAME;
     keyName = key; // updated key name
 
     // Create parent dirs for the path
     long parentId = OMRequestTestUtils
-        .addParentsToDirTable(volumeName, bucketName, parentDir,
+        .addParentsToDirTable(volumeName, bucketName, PARENT_DIR,
             omMetadataManager);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils
@@ -84,15 +84,14 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             parentId + 1, parentId, 100, Time.now());
     OMRequestTestUtils
-        .addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50,
+        .addFileToKeyTable(false, false, FILE_NAME, omKeyInfo, -1, 50,
             omMetadataManager);
     final long volumeId = omMetadataManager.getVolumeId(
         omKeyInfo.getVolumeName());
     final long bucketId = omMetadataManager.getBucketId(
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
     return omMetadataManager.getOzonePathKey(
-        volumeId, bucketId, omKeyInfo.getParentObjectID(),
-        fileName);
+        volumeId, bucketId, omKeyInfo.getParentObjectID(), FILE_NAME);
   }
 
   protected OMKeySetTimesRequest getOmKeySetTimesRequest(
