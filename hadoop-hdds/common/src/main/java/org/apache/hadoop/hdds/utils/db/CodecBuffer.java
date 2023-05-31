@@ -280,7 +280,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @return this object.
    * @throws IOException in case the source throws an {@link IOException}.
    */
-  CodecBuffer put(
+  public CodecBuffer put(
       CheckedFunction<OutputStream, Integer, IOException> source)
       throws IOException {
     assertRefCnt(1);
