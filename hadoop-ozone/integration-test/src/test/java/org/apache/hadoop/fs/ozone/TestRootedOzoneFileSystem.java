@@ -2536,8 +2536,8 @@ public class TestRootedOzoneFileSystem {
     // verify that mtime is updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
 
-    mtime = -1;
-    fs.setTimes(path, mtime, 2000);
+    long mtimeDontUpdate = -1;
+    fs.setTimes(path, mtimeDontUpdate, 2000);
 
     fileStatus = fs.getFileStatus(path);
     // verify that mtime is updated as expected.

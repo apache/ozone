@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -36,8 +37,8 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
 
-  private final String parentDir = "c/d/e";
-  private final String fileName = "file1";
+  private static final String parentDir = "c/d/e";
+  private static final String fileName = "file1";
 
   /**
    * Verify that setTimes() on directory works as expected.
@@ -54,6 +55,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     executeAndReturn(mtime);
     OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
         omMetadataManager, volumeName, bucketName, keyName, 0);
+    assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
     Assert.assertEquals(mtime, keyMtime);
@@ -62,6 +64,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     executeAndReturn(newMtime);
     keyStatus = OMFileRequest.getOMKeyInfoIfExists(
         omMetadataManager, volumeName, bucketName, keyName, 0);
+    assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();
     Assert.assertEquals(mtime, keyMtime);
