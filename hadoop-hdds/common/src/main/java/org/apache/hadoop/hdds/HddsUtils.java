@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
@@ -82,6 +83,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.hadoop.util.CheckedSupplier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
@@ -823,5 +825,24 @@ public final class HddsUtils {
       sortedOzoneProps.put(entry.getKey(), value);
     }
     return sortedOzoneProps;
+  }
+
+  /**
+   * Execute some code and ensure thread name is not changed
+   * (workaround for HADOOP-18433).
+   */
+  public static <T, E extends IOException> T preserveThreadName(
+      CheckedSupplier<T, E> supplier) throws E {
+    final Thread thread = Thread.currentThread();
+    final String threadName = thread.getName();
+
+    try {
+      return supplier.get();
+    } finally {
+      if (!Objects.equals(threadName, thread.getName())) {
+        LOG.info("Restoring thread name: {}", threadName);
+        thread.setName(threadName);
+      }
+    }
   }
 }

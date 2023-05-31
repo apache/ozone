@@ -48,6 +48,7 @@ import java.util.List;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_RPC;
 
 /**
@@ -162,8 +163,8 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return startRpcServer(configuration, rpcAddress,
-        ReconfigureProtocolPB.class, reconfigureService, handlerCount);
+    return preserveThreadName(() -> startRpcServer(configuration, rpcAddress,
+        ReconfigureProtocolPB.class, reconfigureService, handlerCount));
   }
 
   /**
