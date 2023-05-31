@@ -53,9 +53,15 @@ public class OzoneIdentityProvider implements IdentityProvider {
     UserGroupInformation ugi = schedulable.getUserGroupInformation();
     try {
       CallerContext callerContext = schedulable.getCallerContext();
+      // If the CallerContext is set by the OM then its value
+      // should have the prefix "S3Auth:S3G|"
+      // and it should be in format "S3Auth:S3G|username".
+      // If the prefix is not present then its set by a user
+      // and the value should be ignored.
       if (Objects.nonNull(callerContext) &&
-          !StringUtil.isNullOrEmpty(callerContext.getContext())) {
-        return callerContext.getContext();
+          !StringUtil.isNullOrEmpty(callerContext.getContext()) &&
+          callerContext.getContext().startsWith("S3Auth:S3G|")) {
+        return callerContext.getContext().substring(11);
       }
     } catch (UnsupportedOperationException ex) {
       LOG.error("Trying to access CallerContext from a Schedulable " +

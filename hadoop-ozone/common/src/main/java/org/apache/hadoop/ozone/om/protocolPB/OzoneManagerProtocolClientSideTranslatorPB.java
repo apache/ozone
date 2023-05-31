@@ -298,9 +298,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     if (threadLocalS3Auth.get() != null) {
       if (!Strings.isNullOrEmpty(threadLocalS3Auth.get().getAccessID())) {
+        String caller = "S3Auth:S3G|" +
+            threadLocalS3Auth.get().getAccessID();
         CallerContext callerContext =
-            new CallerContext.Builder(
-                threadLocalS3Auth.get().getAccessID()).build();
+            new CallerContext.Builder(caller).build();
         CallerContext.setCurrent(callerContext);
       }
     }

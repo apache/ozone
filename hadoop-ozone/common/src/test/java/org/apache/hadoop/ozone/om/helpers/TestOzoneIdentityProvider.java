@@ -34,22 +34,45 @@ public class TestOzoneIdentityProvider {
   /**
    * Schedulable that doesn't override getCallerContext().
    */
-  private static final Schedulable DEFAULT_SCHEDULABLE = new Schedulable() {
-    @Override
-    public UserGroupInformation getUserGroupInformation() {
-      return UserGroupInformation.createRemoteUser(ACCESS_ID);
-    }
+  private static final Schedulable DEFAULT_SCHEDULABLE =
+      new Schedulable() {
+        @Override
+        public UserGroupInformation getUserGroupInformation() {
+          return UserGroupInformation.createRemoteUser(ACCESS_ID);
+        }
 
-    @Override
-    public int getPriorityLevel() {
-      return 0;
-    }
-  };
+        @Override
+        public int getPriorityLevel() {
+          return 0;
+        }
+      };
 
   /**
    * Schedulable that overrides getCallerContext().
    */
   private static final Schedulable CALLER_CONTEXT_SCHEDULABLE =
+      new Schedulable() {
+        @Override
+        public UserGroupInformation getUserGroupInformation() {
+          return UserGroupInformation.createRemoteUser("s3g");
+        }
+
+        @Override
+        public CallerContext getCallerContext() {
+          return new CallerContext.Builder("S3Auth:S3G|" + ACCESS_ID).build();
+        }
+
+        @Override
+        public int getPriorityLevel() {
+          return 0;
+        }
+      };
+
+  /**
+   * Schedulable that overrides getCallerContext() but its value
+   * is set by the user and doesn't have the proper format.
+   */
+  private static final Schedulable NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE =
       new Schedulable() {
         @Override
         public UserGroupInformation getUserGroupInformation() {
@@ -76,17 +99,30 @@ public class TestOzoneIdentityProvider {
   public void testGetUserFromCallerContext() {
     String identity = identityProvider
         .makeIdentity(CALLER_CONTEXT_SCHEDULABLE);
-    String usernameFromContext = CALLER_CONTEXT_SCHEDULABLE
-        .getCallerContext().getContext();
 
-    Assertions.assertEquals(usernameFromContext, identity);
+    Assertions.assertEquals(ACCESS_ID, identity);
+  }
+
+  /**
+   * If CallerContext is not prefixed with "S3Auth:S3G|",
+   * then it will be ignored and UGI will be used instead.
+   */
+  @Test
+  public void testGetUserWithCallerContextNotSetProperly() {
+    String identity = identityProvider
+        .makeIdentity(NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE);
+
+    Assertions.assertEquals(
+        NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE
+            .getUserGroupInformation()
+            .getShortUserName(), identity);
   }
 
   @Test
   public void testGetUserFromUGI() {
     String identity = identityProvider.makeIdentity(DEFAULT_SCHEDULABLE);
 
-    // defaultSchedulable doesn't override CallerContext and
+    // DEFAULT_SCHEDULABLE doesn't override CallerContext and
     // accessing it should throw an exception.
     UnsupportedOperationException uoex = Assertions
         .assertThrows(UnsupportedOperationException.class,
