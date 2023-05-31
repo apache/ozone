@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -196,7 +195,7 @@ public final class ContainerTestUtils {
       throws IOException {
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
-    long containerId = HddsUtils.getTime();
+    long containerId = ContainerTestHelper.getTestContainerID();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
