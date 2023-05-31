@@ -223,9 +223,11 @@ public class TestS3GetSecretRequest {
     // This effectively makes alice a regular user.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
+    // 2. Get secret of "alice" first time.
     S3Secret s3Secret1 = processSuccessSecretRequest(
         USER_ALICE, 1, true);
 
+    Assert.assertNotNull(s3Secret1);
 
     // 2. Get secret of "alice" (as herself) again.
     s3Secret1 = processSuccessSecretRequest(
@@ -310,6 +312,7 @@ public class TestS3GetSecretRequest {
     // no secret is returned as it is the second time
     Assert.assertNull(s3GetSecretResponse2.getS3SecretValue());
   }
+
   @Test
   public void testGetSecretWithTenant() throws IOException {
 
