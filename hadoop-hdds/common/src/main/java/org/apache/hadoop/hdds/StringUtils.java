@@ -17,7 +17,8 @@
  */
 package org.apache.hadoop.hdds;
 
-import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.utils.SignalLogger;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
+import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 
 /**
@@ -40,9 +42,7 @@ public final class StringUtils {
   private StringUtils() {
   }
 
-  // Using the charset canonical name for String/byte[] conversions is much
-  // more efficient due to use of cached encoders/decoders.
-  private static final String UTF8_CSN = StandardCharsets.UTF_8.name();
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   /**
    * Priority of the StringUtils shutdown hook.
@@ -59,12 +59,11 @@ public final class StringUtils {
    * @return The decoded string
    */
   public static String bytes2String(byte[] bytes, int offset, int length) {
-    try {
-      return new String(bytes, offset, length, UTF8_CSN);
-    } catch (UnsupportedEncodingException e) {
-      // should never happen!
-      throw new IllegalArgumentException("UTF8 encoding is not supported", e);
-    }
+    return new String(bytes, offset, length, UTF8);
+  }
+
+  public static String bytes2String(ByteBuffer bytes) {
+    return Unpooled.wrappedBuffer(bytes.asReadOnlyBuffer()).toString(UTF8);
   }
 
   /**
@@ -82,12 +81,7 @@ public final class StringUtils {
    * Converts a string to a byte array using UTF8 encoding.
    */
   public static byte[] string2Bytes(String str) {
-    try {
-      return str.getBytes(UTF8_CSN);
-    } catch (UnsupportedEncodingException e) {
-      // should never happen!
-      throw new IllegalArgumentException("UTF8 decoding is not supported", e);
-    }
+    return str.getBytes(UTF8);
   }
 
   /**

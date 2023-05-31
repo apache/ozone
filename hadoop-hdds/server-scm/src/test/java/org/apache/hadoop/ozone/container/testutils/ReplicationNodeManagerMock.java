@@ -88,7 +88,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 
@@ -517,6 +517,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   @Override
   public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int totalHealthyVolumeCount() {
     return 0;
   }
 

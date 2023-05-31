@@ -718,4 +718,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return applyTransactionMap.get(transactionIndex);
   }
 
+  /**
+   * Wait until both buffers are flushed.  This is used in cases like
+   * "follower bootstrap tarball creation" where the rocksDb for the active
+   * fs needs to synchronized with the rocksdb's for the snapshots.
+   */
+  public void awaitDoubleBufferFlush() throws InterruptedException {
+    ozoneManagerDoubleBuffer.awaitFlush();
+  }
 }

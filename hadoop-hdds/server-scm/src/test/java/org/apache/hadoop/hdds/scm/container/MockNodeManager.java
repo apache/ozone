@@ -815,7 +815,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 
@@ -899,6 +899,11 @@ public class MockNodeManager implements NodeManager {
   @Override
   public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     return numHealthyDisksPerDatanode;
+  }
+
+  @Override
+  public int totalHealthyVolumeCount() {
+    return healthyNodes.size() * numHealthyDisksPerDatanode;
   }
 
   @Override

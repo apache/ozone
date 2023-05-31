@@ -18,6 +18,7 @@
 
 package org.apache.ozone.rocksdb.util;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -34,6 +35,8 @@ import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -49,6 +52,8 @@ public class ManagedSstFileReader {
 
   private final Collection<String> sstFiles;
 
+  private volatile long estimatedTotalKeys = -1;
+
   public ManagedSstFileReader(final Collection<String> sstFiles) {
     this.sstFiles = sstFiles;
   }
@@ -56,9 +61,31 @@ public class ManagedSstFileReader {
   public static <T> Stream<T> getStreamFromIterator(ClosableIterator<T> itr) {
     final Spliterator<T> spliterator =
         Spliterators.spliteratorUnknownSize(itr, 0);
-    return StreamSupport.stream(spliterator, false).onClose(() -> {
-      itr.close();
-    });
+    return StreamSupport.stream(spliterator, false).onClose(itr::close);
+  }
+
+  public long getEstimatedTotalKeys() throws RocksDBException {
+    if (estimatedTotalKeys != -1) {
+      return estimatedTotalKeys;
+    }
+
+    long estimatedSize = 0;
+    synchronized (this) {
+      if (estimatedTotalKeys != -1) {
+        return estimatedTotalKeys;
+      }
+
+      try (ManagedOptions options = new ManagedOptions()) {
+        for (String sstFile : sstFiles) {
+          SstFileReader fileReader = new SstFileReader(options);
+          fileReader.open(sstFile);
+          estimatedSize += fileReader.getTableProperties().getNumEntries();
+        }
+      }
+      estimatedTotalKeys = estimatedSize;
+    }
+
+    return estimatedTotalKeys;
   }
 
   public Stream<String> getKeyStream() throws RocksDBException,
@@ -98,8 +125,7 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool) throws IOException, RocksDBException,
-      NativeLibraryNotLoadedException {
+      ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
@@ -116,8 +142,9 @@ public class ManagedSstFileReader {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options) {
               @Override
-              protected String getTransformedValue(KeyValue value) {
-                return value.getKey();
+              protected String getTransformedValue(Optional<KeyValue> value) {
+                return value.map(v -> StringUtils.bytes2String(v.getKey()))
+                    .orElse(null);
               }
             };
           }
@@ -174,12 +201,9 @@ public class ManagedSstFileReader {
     private String currentFile;
     private ClosableIterator<T> currentFileIterator;
 
-    private MultipleSstFileIterator(Collection<String> files)
-        throws IOException, RocksDBException,
-        NativeLibraryNotLoadedException {
+    private MultipleSstFileIterator(Collection<String> files) {
       this.fileNameIterator = files.iterator();
       init();
-      moveToNextFile();
     }
 
     protected abstract void init();
@@ -192,7 +216,8 @@ public class ManagedSstFileReader {
     public boolean hasNext() {
       try {
         do {
-          if (currentFileIterator.hasNext()) {
+          if (Objects.nonNull(currentFileIterator) &&
+              currentFileIterator.hasNext()) {
             return true;
           }
         } while (moveToNextFile());

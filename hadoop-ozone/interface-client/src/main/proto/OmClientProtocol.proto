@@ -476,6 +476,7 @@ enum Status {
 
     CONTAINS_SNAPSHOT = 88;
     SSL_CONNECTION_FAILURE = 89;
+    RENAME_OPEN_FILE = 90;
 }
 
 /**
@@ -899,6 +900,7 @@ message ListBucketsRequest {
     optional string startKey = 2;
     optional string prefix = 3;
     optional int32 count = 4;
+    optional bool hasSnapshot = 5;
 }
 
 message ListBucketsResponse {
@@ -1686,6 +1688,7 @@ message CreateSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
+  optional uint64 creationTime = 5;
 }
 
 message ListSnapshotRequest {

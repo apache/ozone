@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
+import org.apache.hadoop.ozone.om.snapshot.RequireSnapshotFeatureState;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +57,7 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles CreateSnapshot Request.
@@ -81,12 +85,15 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         possibleName,
-        snapshotId);
+        snapshotId,
+        createSnapshotRequest.getCreationTime());
     snapshotName = snapshotInfo.getName();
     snapshotPath = snapshotInfo.getSnapshotPath();
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
@@ -105,6 +112,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     return omRequest.toBuilder().setCreateSnapshotRequest(
         omRequest.getCreateSnapshotRequest().toBuilder()
             .setSnapshotId(UUID.randomUUID().toString())
+            .setCreationTime(Time.now())
             .build()).build();
   }
   
@@ -115,7 +123,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
-    omMetrics.incNumSnapshotActive();
 
     boolean acquiredBucketLock = false, acquiredSnapshotLock = false;
     IOException exception = null;
@@ -223,6 +230,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     if (exception == null) {
       LOG.info("Created snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
+      omMetrics.incNumSnapshotActive();
     } else {
       omMetrics.incNumSnapshotCreateFails();
       LOG.error("Failed to create snapshot '{}' under path '{}'",

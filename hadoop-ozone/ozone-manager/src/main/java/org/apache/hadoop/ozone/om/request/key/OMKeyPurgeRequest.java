@@ -80,10 +80,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         SnapshotInfo snapshotInfo =
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
+        // TODO: [SNAPSHOT] Revisit in HDDS-8529.
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+                getSnapshotPrefix(snapshotInfo.getName()), true);
       }
 
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),

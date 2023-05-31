@@ -277,7 +277,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void assignBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
 
     if (isOfflineRecovery()) {
       decoderOutputBuffers = bufs;
@@ -409,10 +410,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void validateBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
     int chunkSize = getRepConfig().getEcChunkSize();
     for (ByteBuffer b : bufs) {
-      Preconditions.assertTrue(b.remaining() == chunkSize);
+      Preconditions.assertSame(chunkSize, b.remaining(), "buf.remaining");
     }
   }
 
@@ -442,7 +444,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i = dataNum; i < dataNum + parityNum; i++) {
       ByteBuffer b = decoderInputBuffers[i];
       if (b != null) {
-        Preconditions.assertTrue(b.position() == paritySize);
+        Preconditions.assertSame(paritySize, b.position(), "buf.position");
       }
     }
     // The output buffers need their limit set to the parity size
@@ -764,8 +766,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
     if (isOfflineRecovery()) {
       if (!paddingIndexes.isEmpty()) {
-        paddingIndexes.forEach(i ->
-            Preconditions.assertTrue(!recoveryIndexes.contains(i)));
+        paddingIndexes.forEach(i -> Preconditions.assertTrue(
+            !recoveryIndexes.contains(i),
+            () -> "Padding index " + i + " should not be selected for recovery")
+        );
       }
 
       missingIndexes.addAll(recoveryIndexes);

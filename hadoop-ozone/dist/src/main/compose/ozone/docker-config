@@ -36,6 +36,7 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.recon.address=recon:9891
+OZONE-SITE.XML_ozone.recon.heatmap.provider=org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
@@ -53,3 +54,6 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -42,9 +43,11 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
+ * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
@@ -56,6 +59,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
@@ -79,7 +83,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       OmSnapshot omFromSnapshot = (OmSnapshot) omSnapshotManager
           .checkForSnapshot(fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),
-              getSnapshotPrefix(fromSnapshot.getName()));
+              getSnapshotPrefix(fromSnapshot.getName()), true);
 
       nextSnapshot = getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
@@ -100,7 +104,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
         omNextSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),
-                getSnapshotPrefix(nextSnapshot.getName()));
+                getSnapshotPrefix(nextSnapshot.getName()), true);
       }
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
@@ -139,6 +143,8 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
         return nextSnapshotInfo;
       }
+
+      snapInfo = nextSnapshotInfo;
     }
     return null;
   }

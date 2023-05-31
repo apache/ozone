@@ -17,16 +17,45 @@
  */
 package org.apache.hadoop.ozone.recon.api;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
+import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
+import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
+import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -36,37 +65,14 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
-import javax.inject.Inject;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
-import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
-import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -91,6 +97,7 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   private final ReconContainerManager containerManager;
+  private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -104,6 +111,7 @@ public class ContainerEndpoint {
                ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
+    this.pipelineManager = reconSCM.getPipelineManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
@@ -132,9 +140,12 @@ public class ContainerEndpoint {
       // Send back an empty response
       return Response.status(Response.Status.NOT_ACCEPTABLE).build();
     }
+
     long containersCount;
-    Collection<ContainerMetadata> containerMetaDataList =
-        containerManager.getContainers(ContainerID.valueOf(prevKey), limit)
+    List<ContainerMetadata> containerMetaDataList =
+        // Get the containers starting from the prevKey+1 which will skip the
+        // container having prevKey ID
+        containerManager.getContainers(ContainerID.valueOf(prevKey + 1), limit)
             .stream()
             .map(container -> {
               ContainerMetadata containerMetadata =
@@ -145,8 +156,15 @@ public class ContainerEndpoint {
             .collect(Collectors.toList());
 
     containersCount = containerMetaDataList.size();
+
+    // Get the last container ID from the List
+    long lastContainerID = containerMetaDataList.isEmpty() ? prevKey :
+        containerMetaDataList.get(containerMetaDataList.size() - 1)
+            .getContainerID();
+
     ContainersResponse containersResponse =
-        new ContainersResponse(containersCount, containerMetaDataList);
+        new ContainersResponse(containersCount, containerMetaDataList,
+            lastContainerID);
     return Response.ok(containersResponse).build();
   }
 
@@ -391,6 +409,72 @@ public class ContainerEndpoint {
   }
 
   /**
+   * This API will return all DELETED containers in SCM in below JSON format.
+   * {
+   * containers: [
+   * {
+   *  containerId: 1,
+   *  state: DELETED,
+   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   *  numOfKeys: 3,
+   *  inStateSince: <stateEnterTime>
+   * },
+   * {
+   *  containerId: 2,
+   *  state: DELETED,
+   *  pipelineId: "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+   *  numOfKeys: 6,
+   *  inStateSince: <stateEnterTime>
+   * }
+   * ]
+   * }
+   * @param limit limits the number of deleted containers
+   * @param prevKey previous container Id to skip
+   * @return Response of deleted containers.
+   */
+  @GET
+  @Path("/deleted")
+  public Response getSCMDeletedContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
+    List<DeletedContainerInfo> deletedContainerInfoList = new ArrayList<>();
+    try {
+      List<ContainerInfo> containers =
+          containerManager.getContainers(ContainerID.valueOf(prevKey), limit,
+              HddsProtos.LifeCycleState.DELETED);
+      containers = containers.stream()
+          .filter(containerInfo -> !(containerInfo.getContainerID() == prevKey))
+          .collect(
+              Collectors.toList());
+      containers.forEach(containerInfo -> {
+        DeletedContainerInfo deletedContainerInfo = new DeletedContainerInfo();
+        deletedContainerInfo.setContainerID(containerInfo.getContainerID());
+        deletedContainerInfo.setPipelineID(containerInfo.getPipelineID());
+        deletedContainerInfo.setNumberOfKeys(containerInfo.getNumberOfKeys());
+        deletedContainerInfo.setContainerState(containerInfo.getState().name());
+        deletedContainerInfo.setStateEnterTime(
+            containerInfo.getStateEnterTime().toEpochMilli());
+        deletedContainerInfo.setLastUsed(
+            containerInfo.getLastUsed().toEpochMilli());
+        deletedContainerInfo.setUsedBytes(containerInfo.getUsedBytes());
+        deletedContainerInfo.setReplicationConfig(
+            containerInfo.getReplicationConfig());
+        deletedContainerInfo.setReplicationFactor(
+            containerInfo.getReplicationFactor().name());
+        deletedContainerInfoList.add(deletedContainerInfo);
+      });
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(deletedContainerInfoList).build();
+  }
+
+  /**
    * Helper function to extract the blocks for a given container from a given
    * OM Key.
    * @param matchedKeys List of OM Key Info locations
@@ -414,7 +498,153 @@ public class ContainerEndpoint {
     return blockIds;
   }
 
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
+  @GET
+  @Path("/mismatch")
+  public Response getContainerMisMatchInsights() {
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(-1, -1);
+      List<Long> scmNonDeletedContainers =
+          containerManager.getContainers().stream()
+              .filter(containerInfo -> !(containerInfo.getState() ==
+                  HddsProtos.LifeCycleState.DELETED))
+              .map(containerInfo -> containerInfo.getContainerID()).collect(
+                  Collectors.toList());
+
+      // Filter list of container Ids which are present in OM but not in SCM.
+      List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
+          omContainers.entrySet().stream().filter(containerMetadataEntry ->
+                  !(scmNonDeletedContainers.contains(
+                      containerMetadataEntry.getKey())))
+              .collect(
+                  Collectors.toList());
+
+      notSCMContainers.forEach(nonSCMContainer -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonSCMContainer.getKey());
+        containerDiscrepancyInfo.setNumberOfKeys(
+            nonSCMContainer.getValue().getNumberOfKeys());
+        containerDiscrepancyInfo.setPipelines(nonSCMContainer.getValue()
+            .getPipelines());
+        containerDiscrepancyInfo.setExistsAt("OM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+
+      // Filter list of container Ids which are present in SCM but not in OM.
+      List<Long> nonOMContainers = scmNonDeletedContainers.stream()
+          .filter(containerId -> !omContainers.containsKey(containerId))
+          .collect(Collectors.toList());
+
+      List<Pipeline> pipelines = new ArrayList<>();
+      nonOMContainers.forEach(nonOMContainerId -> {
+        ContainerDiscrepancyInfo containerDiscrepancyInfo =
+            new ContainerDiscrepancyInfo();
+        containerDiscrepancyInfo.setContainerID(nonOMContainerId);
+        containerDiscrepancyInfo.setNumberOfKeys(0);
+        PipelineID pipelineID = null;
+        try {
+          pipelineID = containerManager.getContainer(
+                  ContainerID.valueOf(nonOMContainerId))
+              .getPipelineID();
+
+          if (null != pipelineID) {
+            pipelines.add(pipelineManager.getPipeline(pipelineID));
+          }
+        } catch (ContainerNotFoundException e) {
+          LOG.warn("Container {} not found in SCM: {}", nonOMContainerId, e);
+        } catch (PipelineNotFoundException e) {
+          LOG.debug("Pipeline not found for container: {} and pipelineId: {}",
+              nonOMContainerId, pipelineID, e);
+        }
+        containerDiscrepancyInfo.setPipelines(pipelines);
+        containerDiscrepancyInfo.setExistsAt("SCM");
+        containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+      });
+
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(containerDiscrepancyInfoList).build();
+  }
+
+  /** This API retrieves set of deleted containers in SCM which are present
+   * in OM to find out list of keys mapped to such DELETED state containers.
+   *
+   * limit - limits the number of such SCM DELETED containers present in OM.
+   * prevKey - Skip containers till it seeks correctly to the previous
+   * containerId.
+   * Sample API Response:
+   * [
+   *   {
+   *     "containerId": 2,
+   *     "numberOfKeys": 2,
+   *     "pipelines": []
+   *   }
+   * ]
+   */
+  @GET
+  @Path("/mismatch/deleted")
+  public Response getOmContainersDeletedInSCM(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
+    if (prevKey < 0) {
+      // Send back an empty response
+      return Response.status(Response.Status.NOT_ACCEPTABLE).build();
+    }
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        new ArrayList<>();
+    try {
+      Map<Long, ContainerMetadata> omContainers =
+          reconContainerMetadataManager.getContainers(limit, prevKey);
+
+      List<Long> deletedStateSCMContainerIds =
+          containerManager.getContainers().stream()
+              .filter(containerInfo -> (containerInfo.getState() ==
+                  HddsProtos.LifeCycleState.DELETED))
+              .map(containerInfo -> containerInfo.getContainerID()).collect(
+                  Collectors.toList());
+
+      List<Map.Entry<Long, ContainerMetadata>>
+          omContainersDeletedInSCM =
+          omContainers.entrySet().stream().filter(containerMetadataEntry ->
+                  (deletedStateSCMContainerIds.contains(
+                      containerMetadataEntry.getKey())))
+              .collect(
+                  Collectors.toList());
+
+      omContainersDeletedInSCM.forEach(
+          containerMetadataEntry -> {
+            ContainerDiscrepancyInfo containerDiscrepancyInfo =
+                new ContainerDiscrepancyInfo();
+            containerDiscrepancyInfo.setContainerID(
+                containerMetadataEntry.getKey());
+            containerDiscrepancyInfo.setNumberOfKeys(
+                containerMetadataEntry.getValue().getNumberOfKeys());
+            containerDiscrepancyInfo.setPipelines(
+                containerMetadataEntry.getValue()
+                    .getPipelines());
+            containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
+          });
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    } catch (Exception ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return Response.ok(containerDiscrepancyInfoList).build();
   }
 }

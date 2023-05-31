@@ -134,9 +134,10 @@ public class TestOMKeyRequest {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(0);
+    when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
@@ -211,6 +212,8 @@ public class TestOMKeyRequest {
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
     OmSnapshotManager omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager())

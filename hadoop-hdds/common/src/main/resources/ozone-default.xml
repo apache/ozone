@@ -205,6 +205,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>5GB</value>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      This determines the free space to be used for closing containers
+      When the difference between volume capacity and used reaches this number,
+      containers that reside on this volume will be closed and no new containers
+      would be allocated on this volume.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>
@@ -670,6 +681,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Ozone Manager. The
+      permissions have to be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs</name>
     <value/>
     <tag>OZONE, OM, SCM, CONTAINER, STORAGE, REQUIRED</tag>
@@ -683,7 +703,15 @@
       dfs.container.ratis.datanode.storage.dir be configured separately.
     </description>
   </property>
-
+  <property>
+    <name>ozone.metadata.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
+      to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
+      default permissions for OM,SCM,Recon,Datanode are not set.
+    </description>
+  </property>
   <property>
     <name>ozone.metastore.rocksdb.statistics</name>
     <value>OFF</value>
@@ -718,6 +746,15 @@
       If undefined, then the SCM will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Storage Container Manager. The
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>
@@ -1634,7 +1671,15 @@
       or be directly or indirectly in a group defined in this property.
     </description>
   </property>
-
+  <property>
+    <name>ozone.s3g.default.bucket.layout</name>
+    <value>OBJECT_STORE</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The bucket layout that will be used when buckets are created through
+      the S3 API.
+    </description>
+  </property>
   <property>
     <name>ozone.readonly.administrators</name>
     <value/>
@@ -2568,6 +2613,41 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.client.address</name>
+    <value/>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The address of the Ozone Datanode client service.
+      It is a string in the host:port format.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.bind.host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The hostname or IP address used by the Datanode client service
+      endpoint to bind.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.port</name>
+    <value>9864</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The port number of the Ozone Datanode client service.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.handler.count</name>
+    <value>1</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The number of RPC handler threads for Datanode client
+      service endpoints.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>500</value>
     <description>
@@ -2765,6 +2845,15 @@
       If undefined, then the Recon will log a warning and fallback to
       ozone.metadata.dirs. This fallback approach is not recommended for
       production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.db.dirs.permissions</name>
+    <value>750</value>
+    <description>
+      Permissions for the metadata directories for Recon. The
+      permissions can either be octal or symbolic. If the default permissions are not set
+      then the default value of 750 will be used.
     </description>
   </property>
   <property>
@@ -3201,6 +3290,16 @@
   </property>
 
   <property>
+    <name>ozone.filesystem.snapshot.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enables Ozone filesystem snapshot feature if set to true on the OM side.
+      Disables it otherwise.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -3370,6 +3469,18 @@
     <tag>SCM, OZONE, RECON</tag>
     <description>Wait duration before which close container
       is send to DN.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
+    <value>1024</value>
+    <tag>SCM, OZONE</tag>
+    <description>Raft snapshot gap index after which snapshot can be taken.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
+    <value>600s</value>
+    <tag>SCM, OZONE</tag>
+    <description>Wait duration for flush of buffered transaction.</description>
   </property>
 
 
@@ -3541,15 +3652,6 @@
       However this parameter allows the namespace to support non-S3 compatible characters.
     </description>
   </property>
-  <property>
-    <name>ozone.om.snapshot.cache.max.size</name>
-    <value>10</value>
-    <tag>OZONE, OM</tag>
-    <description>
-      Size of the OM Snapshot LRU cache.  This is the maximum number of open OM Snapshot RocksDb instances
-      that will be held in memory at any time.
-    </description>
-  </property>
 
   <property>
     <name>ozone.om.container.location.cache.size</name>
@@ -3613,11 +3715,30 @@
   </property>
 
   <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Fully qualified heatmap provider implementation class name. If this value is not set,
+      then will use the default implementation class  "org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl".
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
     <description>
       To enable/disable filesystem write via ratis streaming.
+    </description>
+  </property>
+  <property>
+    <name>ozone.fs.datastream.auto.threshold</name>
+    <value>4MB</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      A threshold to auto select datastream to write files
+      in OzoneFileSystem.
     </description>
   </property>
 
@@ -3687,7 +3808,12 @@
     <value>10</value>
     <tag>OZONE, OM</tag>
     <description>
-      Maximum number of entries allowed in the snapshot cache.
+      Size of the OM Snapshot LRU cache.
+
+      This is a soft limit of open OM Snapshot RocksDB instances that will be
+      held.  The actual number of cached instance could exceed this limit if
+      more than this number of snapshot instances are still in-use by snapDiff
+      or other tasks.
     </description>
   </property>
 
@@ -3782,6 +3908,15 @@
     <tag>OZONE, OM</tag>
     <description>
       Buffer size for SST Dumptool Pipe which would be used for computing snapdiff when native library is enabled.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.max.allowed.keys.changed.per.job</name>
+    <value>10000000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max numbers of keys changed allowed for a snapshot diff job.
     </description>
   </property>
 </configuration>

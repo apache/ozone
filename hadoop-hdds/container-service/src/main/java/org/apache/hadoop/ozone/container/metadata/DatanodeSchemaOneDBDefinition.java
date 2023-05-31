@@ -48,27 +48,27 @@ public class DatanodeSchemaOneDBDefinition
       new DBColumnFamilyDefinition<>(
           StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
           String.class,
-          new SchemaOneKeyCodec(),
+          SchemaOneKeyCodec.get(),
           BlockData.class,
-          new BlockDataCodec());
+          BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
         METADATA =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneKeyCodec(),
+            SchemaOneKeyCodec.get(),
             Long.class,
-            new LongCodec());
+            LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
         DELETED_BLOCKS =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneKeyCodec(),
+            SchemaOneKeyCodec.get(),
             ChunkInfoList.class,
-            new SchemaOneChunkInfoListCodec());
+            SchemaOneChunkInfoListCodec.get());
 
   public DatanodeSchemaOneDBDefinition(String dbPath,
       ConfigurationSource config) {

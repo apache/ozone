@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -129,7 +128,6 @@ public class TestHSync {
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testO3fsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
@@ -145,7 +143,6 @@ public class TestHSync {
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testOfsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
@@ -231,7 +228,7 @@ public class TestHSync {
     assertEquals(data.length, offset);
   }
 
-  private void runConcurrentWriteHSync(FileSystem fs, Path file,
+  private void runConcurrentWriteHSync(Path file,
       final FSDataOutputStream out, int initialDataSize)
       throws InterruptedException, IOException {
     final byte[] data = new byte[initialDataSize];
@@ -298,7 +295,7 @@ public class TestHSync {
         try (FSDataOutputStream out =
             fs.create(file, true)) {
           int initialDataSize = 1 << i;
-          runConcurrentWriteHSync(fs, file, out, initialDataSize);
+          runConcurrentWriteHSync(file, out, initialDataSize);
         }
 
         fs.delete(file, false);

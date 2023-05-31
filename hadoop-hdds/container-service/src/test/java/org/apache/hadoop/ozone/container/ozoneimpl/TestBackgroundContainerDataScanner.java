@@ -1,0 +1,134 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ *
+ */
+package org.apache.hadoop.ozone.container.ozoneimpl;
+
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+
+/**
+ * Unit tests for the background container data scanner.
+ */
+@MockitoSettings(strictness = Strictness.LENIENT)
+public class TestBackgroundContainerDataScanner extends
+    TestContainerScannersAbstract {
+
+  private BackgroundContainerDataScanner scanner;
+
+  @BeforeEach
+  public void setup() {
+    super.setup();
+    scanner = new BackgroundContainerDataScanner(conf, controller, vol);
+  }
+
+  @Test
+  @Override
+  public void testRecentlyScannedContainerIsSkipped() {
+    setScannedTimestampRecent(healthy);
+    scanner.runIteration();
+    Mockito.verify(healthy, never()).scanData(any(), any());
+  }
+
+  @Test
+  @Override
+  public void testPreviouslyScannedContainerIsScanned() {
+    // If the last scan time is before than the configured gap, the container
+    // should be scanned.
+    setScannedTimestampOld(healthy);
+    scanner.runIteration();
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+  }
+
+  @Test
+  @Override
+  public void testUnscannedContainerIsScanned() {
+    // If there is no last scanned time, the container should be scanned.
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
+        .thenReturn(Optional.empty());
+    scanner.runIteration();
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+  }
+
+  @Test
+  @Override
+  public void testScannerMetrics() {
+    scanner.runIteration();
+
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    assertEquals(1, metrics.getNumScanIterations());
+    assertEquals(2, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testScannerMetricsUnregisters() {
+    String name = scanner.getMetrics().getName();
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource(name));
+
+    scanner.shutdown();
+    scanner.run();
+
+    assertNull(DefaultMetricsSystem.instance().getSource(name));
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainersDetected() throws Exception {
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(healthy, never());
+    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
+    verifyContainerMarkedUnhealthy(openContainer, never());
+  }
+
+  @Test
+  public void testScanTimestampUpdated() throws Exception {
+    scanner.runIteration();
+    // Open containers should not be scanned.
+    Mockito.verify(controller, never())
+        .updateDataScanTimestamp(
+            eq(openContainer.getContainerData().getContainerID()), any());
+    Mockito.verify(controller, never())
+        .updateDataScanTimestamp(
+            eq(openCorruptMetadata.getContainerData().getContainerID()), any());
+    // All other containers should have been scanned.
+    Mockito.verify(controller, atLeastOnce())
+        .updateDataScanTimestamp(
+            eq(healthy.getContainerData().getContainerID()), any());
+    Mockito.verify(controller, atLeastOnce())
+        .updateDataScanTimestamp(
+            eq(corruptData.getContainerData().getContainerID()), any());
+  }
+}
