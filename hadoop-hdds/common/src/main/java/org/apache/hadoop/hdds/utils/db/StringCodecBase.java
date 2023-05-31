@@ -120,9 +120,9 @@ abstract class StringCodecBase implements Codec<String> {
       // For compatibility, try decoding using StringUtils.
       final String decoded = StringUtils.bytes2String(buffer, charset);
       // Decoded successfully, update error message.
-      error = () -> LOG.warn("buffer = (hex) " + StringUtils.bytes2Hex(buffer, 20)
-          + "\n  Attempt: Failed to decode buffer with " + charset
-          + "\n  Retry  : Successfully decoded buffer to " + decoded, e);
+      error = () -> LOG.warn("Decode (hex) " + StringUtils.bytes2Hex(buffer, 20)
+          + "\n  Attempt failed : " + charset + " (see exception below)"
+          + "\n  Retry succeeded: decoded to " + decoded, e);
       return decoded;
     } finally {
       if (error != null) {
