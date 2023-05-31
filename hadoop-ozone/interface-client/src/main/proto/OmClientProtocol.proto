@@ -134,6 +134,7 @@ enum Type {
   TransferLeadership = 117;
   SnapshotPurge = 118;
   RecoverLease = 119;
+  SetTimes = 120;
 }
 
 message OMRequest {
@@ -252,6 +253,7 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
+  optional SetTimesRequest                   SetTimesRequest               = 120;
 }
 
 message OMResponse {
@@ -362,6 +364,7 @@ message OMResponse {
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
+  optional SetTimesResponse                   SetTimesResponse             = 120;
 }
 
 enum Status {
@@ -1876,6 +1879,15 @@ message RecoverLeaseRequest {
 
 message RecoverLeaseResponse {
   optional bool response = 1;
+}
+
+message SetTimesRequest {
+  required KeyArgs keyArgs = 1;
+  required uint64 mtime    = 2;
+  required uint64 atime    = 3;
+}
+
+message SetTimesResponse {
 }
 
 /**
