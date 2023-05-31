@@ -190,8 +190,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else if (keyCodec.supportCodecBuffer()) {
       // keyCodec.supportCodecBuffer() is enough since value is not needed.
       try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
-        // Only allocate 2 bytes since value is not needed.
-        try (CodecBuffer outValue = CodecBuffer.allocateDirect(2)) {
+        // Use zero capacity buffer since value is not needed.
+        try (CodecBuffer outValue = CodecBuffer.allocateDirect(0)) {
           return getFromTableIfExist(inKey, outValue) != null;
         }
       }

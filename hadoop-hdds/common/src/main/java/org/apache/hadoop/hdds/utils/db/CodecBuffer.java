@@ -46,9 +46,13 @@ public final class CodecBuffer implements AutoCloseable {
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
 
+  private static final CodecBuffer EMPTY_DIRECT_BUFFER
+      = new CodecBuffer(POOL.directBuffer(0, 0));
+
   /** Allocate a direct buffer. */
   public static CodecBuffer allocateDirect(int exactSize) {
-    return new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
+    return exactSize == 0? EMPTY_DIRECT_BUFFER
+        : new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
   }
 
   /** Allocate a heap buffer. */
@@ -239,6 +243,7 @@ public final class CodecBuffer implements AutoCloseable {
     final ByteBuffer buffer = buf.nioBuffer(i, writable);
     final Integer size = source.apply(buffer);
     if (size != null) {
+      Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
       if (size > 0 && size <= writable) {
         buf.setIndex(buf.readerIndex(), i + size);
       }
