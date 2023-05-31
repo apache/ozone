@@ -604,6 +604,22 @@ public final class OmUtils {
   }
 
   /**
+   * Verify if key name contains snapshot reserved word.
+   * This verification will run even when
+   * ozone.om.keyname.character.check.enabled sets to false
+   */
+  public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
+          throws OMException {
+    if (keyName != null && 
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new OMException(
+          "Cannot create key under path reserved for "
+              + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+
+  /**
    * Return configured OzoneManager service id based on the following logic.
    * Look at 'ozone.om.internal.service.id' first. If configured, return that.
    * If the above is not configured, look at 'ozone.om.service.ids'.
