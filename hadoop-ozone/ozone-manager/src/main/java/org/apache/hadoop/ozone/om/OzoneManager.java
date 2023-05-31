@@ -52,7 +52,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -70,7 +69,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
@@ -230,6 +228,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -315,8 +314,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class OzoneManager extends ServiceRuntimeInfoImpl
-    implements OzoneManagerProtocol, OMInterServiceProtocol,
-    ReconfigureProtocol, OMMXBean, Auditor {
+    implements OzoneManagerProtocol, OMInterServiceProtocol, OMMXBean, Auditor {
   public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManager.class);
 
@@ -487,10 +485,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStorage = new OMStorage(conf);
     omStorage.validateOrPersistOmNodeId(omNodeDetails.getNodeId());
     omId = omStorage.getOmId();
-    reconfigurationHandler = new ReconfigurationHandler(conf)
-        .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
-        .register(OZONE_READONLY_ADMINISTRATORS,
-            this::reconfOzoneReadOnlyAdmins);
+    reconfigurationHandler =
+        new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
+            .register(OZONE_READONLY_ADMINISTRATORS,
+                this::reconfOzoneReadOnlyAdmins);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -1229,7 +1228,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             omMetadataServerProtocol);
 
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
-        = new ReconfigureProtocolServerSideTranslatorPB(this);
+        = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
     BlockingService reconfigureService =
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
@@ -2333,13 +2332,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       authMethod = ugi.getRealUser().getAuthenticationMethod();
     }
     return authMethod;
-  }
-
-  // optimize ugi lookup for RPC operations to avoid a trip through
-  // UGI.getCurrentUser which is synch'ed
-  private static UserGroupInformation getRemoteUser() throws IOException {
-    UserGroupInformation ugi = Server.getRemoteUser();
-    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
 
   /**
@@ -4108,7 +4100,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
-  public void checkAdminUserPrivilege(String operation) throws IOException {
+  private void checkAdminUserPrivilege(String operation) throws IOException {
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to " + operation,
@@ -4594,33 +4586,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
-  }
-
-  @Override // ReconfigureProtocol
-  public String getServerName() throws IOException {
-    return "OM";
-  }
-
-  @Override // ReconfigureProtocol
-  public void startReconfigure() throws IOException {
-    String operationName = "startOmReconfiguration";
-    checkAdminUserPrivilege(operationName);
-    reconfigurationHandler.startReconfigurationTask();
-  }
-
-  @Override // ReconfigureProtocol
-  public ReconfigurationTaskStatus getReconfigureStatus()
-      throws IOException {
-    String operationName = "getOmReconfigurationStatus";
-    checkAdminUserPrivilege(operationName);
-    return reconfigurationHandler.getReconfigurationTaskStatus();
-  }
-
-  @Override // ReconfigureProtocol
-  public List<String> listReconfigureProperties() throws IOException {
-    String operationName = "listOmReconfigurableProperties";
-    checkAdminUserPrivilege(operationName);
-    return reconfigurationHandler.getReconfigurableProperties();
   }
 
   private String reconfOzoneAdmins(String newVal) {

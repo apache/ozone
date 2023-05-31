@@ -19,26 +19,38 @@ package org.apache.hadoop.hdds.conf;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurableBase;
+import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.ratis.util.function.CheckedConsumer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.unmodifiableSet;
 import static java.util.function.UnaryOperator.identity;
 
 /**
  * Keeps track of reconfigurable properties and the corresponding functions
  * that implement reconfiguration.
  */
-public class ReconfigurationHandler extends ReconfigurableBase {
+public class ReconfigurationHandler extends ReconfigurableBase
+    implements ReconfigureProtocol {
 
+  private final String name;
+  private final CheckedConsumer<String, IOException> requireAdminPrivilege;
   private final Map<String, UnaryOperator<String>> properties =
       new ConcurrentHashMap<>();
 
-  public ReconfigurationHandler(OzoneConfiguration config) {
+  public ReconfigurationHandler(String name, OzoneConfiguration config,
+      CheckedConsumer<String, IOException> requireAdminPrivilege) {
+    this.name = name;
+    this.requireAdminPrivilege = requireAdminPrivilege;
     setConf(config);
   }
 
@@ -54,13 +66,41 @@ public class ReconfigurationHandler extends ReconfigurableBase {
   }
 
   @Override
-  public List<String> getReconfigurableProperties() {
-    return new ArrayList<>(new TreeSet<>(properties.keySet()));
+  public Set<String> getReconfigurableProperties() {
+    return unmodifiableSet(properties.keySet());
   }
 
   @Override
   public String reconfigurePropertyImpl(String property, String newValue) {
     return properties.getOrDefault(property, identity())
         .apply(newValue);
+  }
+
+  @Override
+  public String getServerName() {
+    return name;
+  }
+
+  @Override
+  public void startReconfigure() throws IOException {
+    requireAdminPrivilege.accept("startReconfiguration");
+    startReconfigurationTask();
+  }
+
+  @Override
+  public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
+    requireAdminPrivilege.accept("getReconfigurationStatus");
+    return getReconfigurationTaskStatus();
+  }
+
+  @Override
+  public List<String> listReconfigureProperties() throws IOException {
+    requireAdminPrivilege.accept("listReconfigurableProperties");
+    return new ArrayList<>(new TreeSet<>(getReconfigurableProperties()));
+  }
+
+  @Override
+  public void close() throws IOException {
+    shutdownReconfigurationTask();
   }
 }

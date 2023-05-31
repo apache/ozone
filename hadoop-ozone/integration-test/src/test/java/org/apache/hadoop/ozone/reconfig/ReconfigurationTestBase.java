@@ -27,11 +27,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for Reconfiguration.
@@ -71,8 +73,14 @@ abstract class ReconfigurationTestBase {
   static void assertProperties(ReconfigurationHandler subject,
       Set<String> expected) {
 
-    assertEquals(new ArrayList<>(new TreeSet<>(expected)),
-        subject.getReconfigurableProperties());
+    assertEquals(expected, subject.getReconfigurableProperties());
+
+    try {
+      assertEquals(new ArrayList<>(new TreeSet<>(expected)),
+          subject.listReconfigureProperties());
+    } catch (IOException e) {
+      fail("Unexpected exception", e);
+    }
   }
 
 }

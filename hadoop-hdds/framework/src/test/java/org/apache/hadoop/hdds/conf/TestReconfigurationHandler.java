@@ -17,14 +17,18 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for {@link ReconfigurationHandler}.
@@ -33,20 +37,33 @@ class TestReconfigurationHandler {
 
   private static final String PROP_A = "some.test.property";
   private static final String PROP_B = "other.property";
+  private static final CheckedConsumer<String, IOException> ACCEPT = any -> { };
+  private static final CheckedConsumer<String, IOException> DENY = any -> {
+    throw new IOException("access denied");
+  };
 
   private final AtomicReference<String> refA =
       new AtomicReference<>("oldA");
   private final AtomicReference<String> refB =
       new AtomicReference<>("oldB");
-  private final ReconfigurationHandler subject =
-      new ReconfigurationHandler(new OzoneConfiguration())
-          .register(PROP_A, refA::getAndSet)
-          .register(PROP_B, refB::getAndSet);
+  private final AtomicReference<CheckedConsumer<String, IOException>> adminCheck
+      = new AtomicReference<>(ACCEPT);
+
+  private final ReconfigurationHandler subject = new ReconfigurationHandler(
+      "test", new OzoneConfiguration(), op -> adminCheck.get().accept(op))
+              .register(PROP_A, refA::getAndSet)
+              .register(PROP_B, refB::getAndSet);
 
   @Test
-  void listProperties() {
-    assertEquals(Stream.of(PROP_A, PROP_B).sorted().collect(toList()),
+  void getProperties() {
+    assertEquals(Stream.of(PROP_A, PROP_B).collect(toSet()),
         subject.getReconfigurableProperties());
+  }
+
+  @Test
+  void listProperties() throws IOException {
+    assertEquals(Stream.of(PROP_A, PROP_B).sorted().collect(toList()),
+        subject.listReconfigureProperties());
   }
 
   @Test
@@ -62,6 +79,14 @@ class TestReconfigurationHandler {
   void ignoresUnknownProperty() {
     assertDoesNotThrow(() ->
         subject.reconfigurePropertyImpl("foobar", "some value"));
+  }
+
+  @Test
+  void requiresAdminAccess() {
+    adminCheck.set(DENY);
+    assertThrows(IOException.class, subject::listReconfigureProperties);
+    assertThrows(IOException.class, subject::startReconfigure);
+    assertThrows(IOException.class, subject::getReconfigureStatus);
   }
 
 }

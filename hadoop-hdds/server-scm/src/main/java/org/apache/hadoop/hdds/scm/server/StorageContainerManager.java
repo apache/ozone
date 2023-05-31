@@ -189,6 +189,7 @@ import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -401,8 +402,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
 
-    reconfigurationHandler = new ReconfigurationHandler(conf)
-        .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
+    reconfigurationHandler =
+        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
@@ -1845,6 +1847,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       return getScmHAManager().getRatisServer().getDivision().getInfo()
           .isLeaderReady();
     }
+  }
+
+  private void checkAdminAccess(String op) throws IOException {
+    checkAdminAccess(getRemoteUser());
   }
 
   public void checkAdminAccess(UserGroupInformation remoteUser)

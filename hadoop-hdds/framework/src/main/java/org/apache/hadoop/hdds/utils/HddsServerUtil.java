@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -570,6 +571,13 @@ public final class HddsServerUtil {
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
+  }
+
+  // optimize ugi lookup for RPC operations to avoid a trip through
+  // UGI.getCurrentUser which is synch'ed
+  public static UserGroupInformation getRemoteUser() throws IOException {
+    UserGroupInformation ugi = Server.getRemoteUser();
+    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
 
   /**

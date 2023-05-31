@@ -75,6 +75,7 @@ import com.google.common.base.Preconditions;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
@@ -321,10 +322,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-      reconfigurationHandler = new ReconfigurationHandler(conf);
+      reconfigurationHandler =
+          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege);
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
-          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
+          datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
           reconfigurationHandler);
 
       // Get admin list
@@ -667,11 +669,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   /**
    * Check ozone admin privilege, throws exception if not admin.
    */
-  public void checkAdminUserPrivilege(UserGroupInformation ugi)
+  private void checkAdminPrivilege(String operation)
       throws IOException {
+    final UserGroupInformation ugi = getRemoteUser();
     if (ugi != null && !isAdmin(ugi)) {
-      throw new AccessControlException("Access denied for user "
-          + ugi.getUserName() + ". Superuser privilege is required.");
+      throw new AccessControlException(
+          "Access denied for user " + ugi.getUserName() + ". " +
+          "Superuser privilege is required for " + operation + ".");
     }
   }
 
