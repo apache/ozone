@@ -45,8 +45,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
@@ -77,15 +79,19 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
+import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.awaitility.Awaitility.with;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
@@ -118,6 +124,8 @@ public class TestOmSnapshot {
   private static OzoneManager ozoneManager;
   private static RDBStore rdbStore;
   private static OzoneBucket ozoneBucket;
+  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(500);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(10);
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -173,6 +181,9 @@ public class TestOmSnapshot {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
+        .setNumOfOzoneManagers(3)
+        .setOmLayoutVersion(OMLayoutFeature.
+          BUCKET_LAYOUT_SUPPORT.layoutVersion())
         .setOmId(omId)
         .build();
 
@@ -194,6 +205,69 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
+    preFinalizationChecks();
+    finalizeOMUpgrade();
+  }
+
+  private static void expectFailurePreFinalization(LambdaTestUtils.
+      VoidCallable eval) throws Exception {
+    OMException ex  = Assert.assertThrows(OMException.class,
+            () -> eval.call());
+    Assert.assertEquals(ex.getResult(),
+            NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+    Assert.assertTrue(ex.getMessage().contains(
+            "cannot be invoked before finalization."));
+  }
+
+  private static void preFinalizationChecks() throws Exception {
+    // None of the snapshot APIs is usable before the upgrade finalization step
+    expectFailurePreFinalization(() ->
+        store.createSnapshot(volumeName, bucketName,
+            UUID.randomUUID().toString()));
+    expectFailurePreFinalization(() ->
+        store.listSnapshot(volumeName, bucketName));
+    expectFailurePreFinalization(() ->
+        store.snapshotDiff(volumeName, bucketName,
+            UUID.randomUUID().toString(),
+            UUID.randomUUID().toString(),
+          "", 1000, false));
+    expectFailurePreFinalization(() ->
+        store.deleteSnapshot(volumeName, bucketName,
+            UUID.randomUUID().toString()));
+  }
+
+  /**
+   * Trigger OM upgrade finalization from the client and block until completion
+   * (status FINALIZATION_DONE).
+   */
+  private static void finalizeOMUpgrade() throws IOException {
+
+    // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
+    final OzoneManagerProtocol omclient = 
+        client.getObjectStore()
+        .getClientProxy().getOzoneManagerClient();
+    final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
+    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+        omclient.finalizeUpgrade(upgradeClientID);
+
+    // The status should transition as soon as the client call above returns
+    Assert.assertTrue(isStarting(finalizationResponse.status()));
+    // Wait for the finalization to be marked as done.
+    // 10s timeout should be plenty.
+    try {
+      with().atMost(POLL_MAX_DURATION)
+          .pollInterval(POLL_INTERVAL_DURATION)
+          .await()
+          .until(() -> {
+            final UpgradeFinalizer.StatusAndMessages progress =
+                omclient.queryUpgradeFinalizationProgress(
+                    upgradeClientID, false, false);
+            return isDone(progress.status());
+          });
+    } catch (Exception e) {
+      Assert.fail("Unexpected exception while waiting for "
+          + "the OM upgrade to finalize: " + e.getMessage());
+    }
   }
 
   @AfterClass
