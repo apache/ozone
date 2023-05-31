@@ -70,6 +70,13 @@ public class BackgroundContainerDataScanner extends
 
   @Override
   public void scanContainer(Container<?> c) throws IOException {
+    // There is one background container data scanner per volume.
+    // If the volume fails, its scanning thread should terminate.
+    if (volume.isFailed()) {
+      shutdown();
+      return;
+    }
+
     if (!shouldScan(c)) {
       return;
     }
