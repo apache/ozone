@@ -21,9 +21,11 @@ package org.apache.hadoop.ozone.om.request.key.acl;
 import java.io.IOException;
 import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -80,9 +82,10 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.KEY);
-
-      volume = objectParser.getVolume();
-      bucket = objectParser.getBucket();
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();
 
       // check Acl

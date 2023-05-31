@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_SUFFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.PIPELINE_DB_SUFFIX;
-
 /**
  * Recon Server constants file.
  */
@@ -35,11 +32,6 @@ public final class ReconConstants {
   public static final String CONTAINER_COUNT_KEY = "containerCount";
 
   public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
-
-  public static final String CONTAINER_KEY_TABLE = "containerKeyTable";
-
-  public static final String CONTAINER_KEY_COUNT_TABLE =
-      "containerKeyCountTable";
 
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
@@ -56,13 +48,10 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BUCKET = "bucket";
   public static final String RECON_QUERY_FILE_SIZE = "fileSize";
   public static final String RECON_QUERY_CONTAINER_SIZE = "containerSize";
+  public static final String RECON_ENTITY_PATH = "path";
+  public static final String RECON_ENTITY_TYPE = "entityType";
+  public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";
 
-  public static final String RECON_SCM_CONTAINER_DB =
-      "recon-" + CONTAINER_DB_SUFFIX;
-  public static final String RECON_SCM_PIPELINE_DB = "recon-"
-      + PIPELINE_DB_SUFFIX;
-  public static final String RECON_SCM_NODE_DB =
-      "recon-node.db";
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   // 1024 = 1KB

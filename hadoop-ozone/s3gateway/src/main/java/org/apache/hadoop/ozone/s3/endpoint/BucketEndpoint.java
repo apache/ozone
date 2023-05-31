@@ -249,9 +249,11 @@ public class BucketEndpoint extends EndpointBase {
 
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
         getAuditParameters()));
+    int keyCount =
+        response.getCommonPrefixes().size() + response.getContents().size();
     getMetrics().updateGetBucketSuccessStats(startNanos);
-    response.setKeyCount(
-        response.getCommonPrefixes().size() + response.getContents().size());
+    getMetrics().incListKeyCount(keyCount);
+    response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }
 
@@ -418,25 +420,33 @@ public class BucketEndpoint extends EndpointBase {
     MultiDeleteResponse result = new MultiDeleteResponse();
     if (request.getObjects() != null) {
       for (DeleteObject keyToDelete : request.getObjects()) {
+        long startNanos = Time.monotonicNowNanos();
         try {
           bucket.deleteKey(keyToDelete.getKey());
+          getMetrics().updateDeleteKeySuccessStats(startNanos);
 
           if (!request.isQuiet()) {
             result.addDeleted(new DeletedObject(keyToDelete.getKey()));
           }
         } catch (OMException ex) {
           if (isAccessDenied(ex)) {
+            getMetrics().updateDeleteKeyFailureStats(startNanos);
             result.addError(
                 new Error(keyToDelete.getKey(), "PermissionDenied",
                     ex.getMessage()));
           } else if (ex.getResult() != ResultCodes.KEY_NOT_FOUND) {
+            getMetrics().updateDeleteKeyFailureStats(startNanos);
             result.addError(
                 new Error(keyToDelete.getKey(), "InternalError",
                     ex.getMessage()));
-          } else if (!request.isQuiet()) {
-            result.addDeleted(new DeletedObject(keyToDelete.getKey()));
+          } else {
+            if (!request.isQuiet()) {
+              result.addDeleted(new DeletedObject(keyToDelete.getKey()));
+            }
+            getMetrics().updateDeleteKeySuccessStats(startNanos);
           }
         } catch (Exception ex) {
+          getMetrics().updateDeleteKeyFailureStats(startNanos);
           result.addError(
               new Error(keyToDelete.getKey(), "InternalError",
                   ex.getMessage()));

@@ -24,7 +24,18 @@ import java.io.IOException;
  * Codec to convert a prefixed String to/from byte array.
  * The prefix has to be of fixed-length.
  */
-public class FixedLengthStringCodec implements Codec<String> {
+public final class FixedLengthStringCodec implements Codec<String> {
+
+  private static final Codec<String> INSTANCE = new FixedLengthStringCodec();
+
+  public static Codec<String> get() {
+    return INSTANCE;
+  }
+
+  private FixedLengthStringCodec() {
+    // singleton
+  }
+
   @Override
   public byte[] toPersistedFormat(String object) throws IOException {
     if (object != null) {

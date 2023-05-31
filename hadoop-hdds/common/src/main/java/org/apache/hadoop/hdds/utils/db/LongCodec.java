@@ -18,13 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.common.primitives.Longs;
-
 import javax.annotation.Nonnull;
+import java.nio.ByteBuffer;
 import java.util.function.IntFunction;
 
 /**
- * Codec to convert Long to/from byte array.
+ * Codec to serialize/deserialize {@link Long}.
  */
 public final class LongCodec implements Codec<Long> {
   private static final LongCodec CODEC = new LongCodec();
@@ -32,6 +31,8 @@ public final class LongCodec implements Codec<Long> {
   public static LongCodec get() {
     return CODEC;
   }
+
+  private LongCodec() { }
 
   @Override
   public boolean supportCodecBuffer() {
@@ -51,17 +52,16 @@ public final class LongCodec implements Codec<Long> {
 
   @Override
   public byte[] toPersistedFormat(Long object) {
-    if (object != null) {
-      return Longs.toByteArray(object);
-    } else {
+    if (object == null) {
       return null;
     }
+    return ByteBuffer.wrap(new byte[Long.BYTES]).putLong(object).array();
   }
 
   @Override
   public Long fromPersistedFormat(byte[] rawData) {
     if (rawData != null) {
-      return Longs.fromByteArray(rawData);
+      return ByteBuffer.wrap(rawData).getLong();
     } else {
       return null;
     }

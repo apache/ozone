@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -42,6 +42,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,12 +55,26 @@ import com.google.common.base.Preconditions;
  * Represents a group of datanodes which store a container.
  */
 public final class Pipeline {
+  /**
+   * This codec is inconsistent since
+   * deserialize(serialize(original)) does not equal to original
+   * -- the creation time may change.
+   */
+  private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(HddsProtos.Pipeline.class),
+      Pipeline::getFromProtobufSetCreationTimestamp,
+      p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      DelegatedCodec.CopyType.UNSUPPORTED);
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
 
-  private PipelineState state;
+  private final PipelineState state;
   private Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
@@ -380,6 +398,14 @@ public final class Pipeline {
       }
     }
     return builder.build();
+  }
+
+  static Pipeline getFromProtobufSetCreationTimestamp(
+      HddsProtos.Pipeline proto) throws UnknownPipelineStateException {
+    final Pipeline pipeline = getFromProtobuf(proto);
+    // When SCM is restarted, set Creation time with current time.
+    pipeline.setCreationTimestamp(Instant.now());
+    return pipeline;
   }
 
   public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)

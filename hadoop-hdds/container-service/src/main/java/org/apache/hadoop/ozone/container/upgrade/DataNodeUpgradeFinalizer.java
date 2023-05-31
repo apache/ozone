@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -63,10 +62,8 @@ public class DataNodeUpgradeFinalizer extends
     // Lets be sure that we do not have any open container before we return
     // from here. This function should be called in its own finalizer thread
     // context.
-    Iterator<Container<?>> containerIt =
-        dsm.getContainer().getController().getContainers();
-    while (containerIt.hasNext()) {
-      Container ctr = containerIt.next();
+    for (Container<?> ctr :
+        dsm.getContainer().getController().getContainers()) {
       ContainerProtos.ContainerDataProto.State state = ctr.getContainerState();
       long id = ctr.getContainerData().getContainerID();
       switch (state) {
@@ -76,7 +73,6 @@ public class DataNodeUpgradeFinalizer extends
             + "state is: {}", id, state);
         return false;
       default:
-        continue;
       }
     }
     return true;

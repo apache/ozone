@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -298,9 +297,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         // see if the snapshot exists
         SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        // Block snapshot from loading when it is no longer active
-        // e.g. DELETED, unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo);
+        // Block snapshot from loading when it is no longer active e.g. DELETED,
+        // unless this is called from SnapshotDeletingService.
+        checkSnapshotActive(snapshotInfo, true);
 
         CacheValue<SnapshotInfo> cacheValue = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable()
@@ -329,7 +328,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           // metadataManager
           PrefixManagerImpl pm = new PrefixManagerImpl(snapshotMetadataManager,
               false);
-          KeyManagerImpl km = new KeyManagerImpl(null,
+          KeyManagerImpl km = new KeyManagerImpl(ozoneManager,
               ozoneManager.getScmClient(), snapshotMetadataManager, conf,
               ozoneManager.getBlockTokenSecretManager(),
               ozoneManager.getKmsProvider(), ozoneManager.getPerfMetrics());
@@ -353,9 +352,8 @@ public final class OmSnapshotManager implements AutoCloseable {
     final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
-        new OmDBDiffReportEntryCodec());
-    registry.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+        SnapshotDiffReportOzone.getDiffReportEntryCodec());
+    registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     return registry.build();
   }
 
@@ -380,10 +378,14 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     final DBCheckpoint dbCheckpoint;
 
-    // Acquire deletedTable write lock
+    // Acquire active DB deletedDirectoryTable write lock to block
+    // DirDeletingTask
+    omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
+        .writeLock().lock();
+    // Acquire active DB deletedTable write lock to block KeyDeletingTask
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
-    // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedDirectoryTable write lock
+
     try {
       // Create DB checkpoint for snapshot
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
@@ -395,14 +397,18 @@ public final class OmSnapshotManager implements AutoCloseable {
       deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
           snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
     } finally {
-      // TODO: [SNAPSHOT] HDDS-8067. Release deletedDirectoryTable write lock
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
           .writeLock().unlock();
+      // Release deletedDirectoryTable write lock
+      omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_DIR_TABLE)
+          .writeLock().unlock();
     }
 
-    LOG.info("Created checkpoint : {} for snapshot {}",
-        dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    if (dbCheckpoint != null) {
+      LOG.info("Created checkpoint : {} for snapshot {}",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+    }
 
     final RocksDBCheckpointDiffer dbCpDiffer =
         store.getRocksDBCheckpointDiffer();
@@ -582,7 +588,9 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
   public IOmMetadataReader checkForSnapshot(String volumeName,
-                                            String bucketName, String keyname)
+                                            String bucketName,
+                                            String keyname,
+                                            boolean skipActiveCheck)
       throws IOException {
     if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
@@ -600,7 +608,9 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName, snapshotName);
 
       // Block FS API reads when snapshot is not active.
-      checkSnapshotActive(ozoneManager, snapshotTableKey);
+      if (!skipActiveCheck) {
+        checkSnapshotActive(ozoneManager, snapshotTableKey);
+      }
 
       // Warn if actual cache size exceeds the soft limit already.
       if (snapshotCache.size() > softCacheSize) {
@@ -682,9 +692,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         volumeName, bucketName, toSnapshotName);
 
     // Block SnapDiff if either of the snapshots is not active.
-    checkSnapshotActive(fromSnapInfo);
-    checkSnapshotActive(toSnapInfo);
-
+    checkSnapshotActive(fromSnapInfo, false);
+    checkSnapshotActive(toSnapInfo, false);
     // Check snapshot creation time
     if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
@@ -823,6 +832,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
+    if (snapshotDiffManager != null) {
+      snapshotDiffManager.close();
+    }
+    if (snapshotCache != null) {
+      snapshotCache.invalidateAll();
+    }
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
     }

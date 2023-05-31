@@ -289,7 +289,18 @@ public final class HddsConfigKeys {
       "hdds.datanode.http-address";
   public static final String HDDS_DATANODE_HTTPS_ADDRESS_KEY =
       "hdds.datanode.https-address";
-
+  public static final String HDDS_DATANODE_CLIENT_ADDRESS_KEY =
+      "hdds.datanode.client.address";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_KEY =
+      "hdds.datanode.client.bind.host";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT =
+      "0.0.0.0";
+  public static final String HDDS_DATANODE_CLIENT_PORT_KEY =
+      "hdds.datanode.client.port";
+  public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 9864;
+  public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
+      "hdds.datanode.handler.count";
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;

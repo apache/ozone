@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -59,7 +60,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
  * which is now used by SnapshotDeletingService as well.
  */
-public abstract class AbstractKeyDeletingService extends BackgroundService {
+public abstract class AbstractKeyDeletingService extends BackgroundService
+    implements BootstrapStateHandler {
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
@@ -68,6 +70,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
   private final AtomicLong runCount;
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
 
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
@@ -380,7 +384,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
     }
 
     // TODO: need to handle delete with non-ratis
-    if (isRatisEnabled()) {
+    if (isRatisEnabled() && !purgePathRequestList.isEmpty()) {
       submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 
@@ -453,5 +457,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService {
   @VisibleForTesting
   public long getMovedFilesCount() {
     return movedFilesCount.get();
+  }
+
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
   }
 }

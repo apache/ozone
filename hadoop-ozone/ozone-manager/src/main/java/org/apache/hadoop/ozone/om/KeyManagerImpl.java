@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -165,10 +166,10 @@ public class KeyManagerImpl implements KeyManager {
   private final OzoneBlockTokenSecretManager secretManager;
   private final boolean grpcBlockTokenEnabled;
 
-  private BackgroundService keyDeletingService;
+  private KeyDeletingService keyDeletingService;
 
-  private BackgroundService snapshotSstFilteringService;
-  private BackgroundService snapshotDeletingService;
+  private SstFilteringService snapshotSstFilteringService;
+  private SnapshotDeletingService snapshotDeletingService;
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final boolean enableFileSystemPaths;
@@ -630,7 +631,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public BackgroundService getDeletingService() {
+  public KeyDeletingService getDeletingService() {
     return keyDeletingService;
   }
 
@@ -643,11 +644,11 @@ public class KeyManagerImpl implements KeyManager {
     return openKeyCleanupService;
   }
 
-  public BackgroundService getSnapshotSstFilteringService() {
+  public SstFilteringService getSnapshotSstFilteringService() {
     return snapshotSstFilteringService;
   }
 
-  public BackgroundService getSnapshotDeletingService() {
+  public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
   }
 
@@ -732,10 +733,8 @@ public class KeyManagerImpl implements KeyManager {
         throw new OMException("No Such Multipart upload exists for this key.",
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       } else {
-        TreeMap<Integer, PartKeyInfo> partKeyInfoMap =
-            multipartKeyInfo.getPartKeyInfoMap();
-        Iterator<Map.Entry<Integer, PartKeyInfo>> partKeyInfoMapIterator =
-            partKeyInfoMap.entrySet().iterator();
+        Iterator<PartKeyInfo> partKeyInfoMapIterator =
+            multipartKeyInfo.getPartKeyInfoMap().iterator();
 
         ReplicationConfig replicationConfig = null;
 
@@ -743,13 +742,11 @@ public class KeyManagerImpl implements KeyManager {
         List<OmPartInfo> omPartInfoList = new ArrayList<>();
 
         while (count < maxParts && partKeyInfoMapIterator.hasNext()) {
-          Map.Entry<Integer, PartKeyInfo> partKeyInfoEntry =
-              partKeyInfoMapIterator.next();
-          nextPartNumberMarker = partKeyInfoEntry.getKey();
+          PartKeyInfo partKeyInfo = partKeyInfoMapIterator.next();
+          nextPartNumberMarker = partKeyInfo.getPartNumber();
           // As we should return only parts with part number greater
           // than part number marker
-          if (partKeyInfoEntry.getKey() > partNumberMarker) {
-            PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
+          if (nextPartNumberMarker > partNumberMarker) {
             String partName = getPartName(partKeyInfo, volumeName, bucketName,
                 keyName);
             OmPartInfo omPartInfo = new OmPartInfo(partKeyInfo.getPartNumber(),
@@ -868,8 +865,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = obj.getKeyName();
     OmKeyInfo keyInfo;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -911,8 +910,15 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(context);
     Objects.requireNonNull(context.getClientUgi());
 
-    String volume = ozObject.getVolumeName();
-    String bucket = ozObject.getBucketName();
+    ResolvedBucket resolvedBucket;
+    try {
+      resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
+    } catch (IOException e) {
+      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    }
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = ozObject.getKeyName();
     String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
     OmKeyArgs args = new OmKeyArgs.Builder()

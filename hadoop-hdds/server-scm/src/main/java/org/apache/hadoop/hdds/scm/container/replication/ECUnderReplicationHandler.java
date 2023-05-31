@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -206,6 +207,17 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               "OverReplication handler", container);
           replicationManager.processOverReplicatedContainer(result);
         }
+
+        /* If we get here, the scenario is:
+        1. Under replicated.
+        2. Not over replicated.
+        3. Placement Policy not able to find enough targets.
+        Check if there are some UNHEALTHY replicas. In a small cluster, these
+        UNHEALTHY replicas could block DNs that could otherwise be targets
+        for new EC replicas. Deleting an UNHEALTHY replica can make its host DN
+        available as a target.
+        */
+        checkAndRemoveUnhealthyReplica(replicaCount, deletionInFlight);
         // As we want to re-queue and try again later, we just re-throw
         throw e;
       }
@@ -224,8 +236,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private Map<Integer, Pair<ContainerReplica, NodeStatus>> filterSources(
       Set<ContainerReplica> replicas, List<DatanodeDetails> deletionInFlight) {
     return replicas.stream().filter(r -> r
-            .getState() == StorageContainerDatanodeProtocolProtos
-            .ContainerReplicaProto.State.CLOSED)
+            .getState() == State.CLOSED)
         // Exclude stale and dead nodes. This is particularly important for
         // maintenance nodes, as the replicas will remain present in the
         // container manager, even when they go dead.
@@ -541,4 +552,101 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     }
     return dst;
   }
+
+  /**
+   * Deletes one UNHEALTHY replica so that its host datanode becomes available
+   * to host a healthy replica. This can be helpful if reconstruction or
+   * replication is blocked because DNs that follow the placement policy are
+   * not available as targets.
+   * @param replicaCount ECContainerReplicaCount object of this container
+   * @param deletionInFlight pending deletes of this container's replicas
+   */
+  private void checkAndRemoveUnhealthyReplica(
+      ECContainerReplicaCount replicaCount,
+      List<DatanodeDetails> deletionInFlight) {
+    LOG.debug("Finding an UNHEALTHY replica of container {} to delete so its " +
+        "host datanode can be available for replication/reconstruction.",
+        replicaCount.getContainer());
+    if (!deletionInFlight.isEmpty()) {
+      LOG.debug("There are {} pending deletes. Completing them could " +
+          "free up nodes to fix under replication. Not deleting UNHEALTHY" +
+          " replicas in this iteration.", deletionInFlight.size());
+      return;
+    }
+
+    ContainerInfo container = replicaCount.getContainer();
+    // ensure that the container is recoverable
+    if (replicaCount.isUnrecoverable()) {
+      LOG.warn("Cannot recover container {}.", container);
+      return;
+    }
+
+    // don't consider replicas that aren't on IN_SERVICE and HEALTHY DNs
+    Set<Integer> closedReplicas = new HashSet<>();
+    Set<ContainerReplica> unhealthyReplicas = new HashSet<>();
+    for (ContainerReplica replica : replicaCount.getReplicas()) {
+      try {
+        NodeStatus nodeStatus =
+            replicationManager.getNodeStatus(replica.getDatanodeDetails());
+        if (!nodeStatus.isHealthy() || !nodeStatus.isInService()) {
+          continue;
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.debug("Skipping replica {} when trying to unblock under " +
+            "replication handling.", replica, e);
+        continue;
+      }
+
+      if (replica.getState().equals(State.CLOSED)) {
+        // collect CLOSED replicas for later
+        closedReplicas.add(replica.getReplicaIndex());
+      } else if (replica.getState().equals(State.UNHEALTHY)) {
+        unhealthyReplicas.add(replica);
+      }
+    }
+
+    if (unhealthyReplicas.isEmpty()) {
+      LOG.debug("Container {} does not have any UNHEALTHY replicas.",
+          container.containerID());
+      return;
+    }
+
+    /*
+    If an index has both an UNHEALTHY and CLOSED replica, prefer deleting the
+    UNHEALTHY replica of this index and return. Otherwise, delete any UNHEALTHY
+    replica.
+    */
+    for (ContainerReplica unhealthyReplica : unhealthyReplicas) {
+      if (closedReplicas.contains(unhealthyReplica.getReplicaIndex())) {
+        try {
+          replicationManager.sendThrottledDeleteCommand(
+              replicaCount.getContainer(), unhealthyReplica.getReplicaIndex(),
+              unhealthyReplica.getDatanodeDetails(), true);
+          return;
+        } catch (NotLeaderException | CommandTargetOverloadedException e) {
+          LOG.debug("Skipping sending a delete command for replica {} to " +
+                  "Datanode {}.", unhealthyReplica,
+              unhealthyReplica.getDatanodeDetails());
+        }
+      }
+    }
+
+    /*
+     We didn't delete in the earlier loop - just delete any UNHEALTHY
+     replica now.
+    */
+    for (ContainerReplica unhealthyReplica : unhealthyReplicas) {
+      try {
+        replicationManager.sendThrottledDeleteCommand(
+            replicaCount.getContainer(), unhealthyReplica.getReplicaIndex(),
+            unhealthyReplica.getDatanodeDetails(), true);
+        return;
+      } catch (NotLeaderException | CommandTargetOverloadedException e) {
+        LOG.debug("Skipping sending a delete command for replica {} to " +
+                "Datanode {}.", unhealthyReplica,
+            unhealthyReplica.getDatanodeDetails());
+      }
+    }
+  }
+
 }
