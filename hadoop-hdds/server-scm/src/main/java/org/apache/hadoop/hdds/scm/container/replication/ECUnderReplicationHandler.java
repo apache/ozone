@@ -342,7 +342,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             " to fully reconstruct container {}. Requested {} received {}",
             container.getContainerID(), expectedTargets,
             selectedDatanodes.size());
-        throw new InsufficientDatanodesException(missingIndexes.size(),
+        throw new InsufficientDatanodesException(expectedTargets,
             selectedDatanodes.size());
       }
     } else {
