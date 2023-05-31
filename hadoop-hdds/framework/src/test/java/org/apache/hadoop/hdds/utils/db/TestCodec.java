@@ -149,6 +149,7 @@ public final class TestCodec {
 
   @Test
   public void testStringCodec() throws Exception {
+    Assertions.assertFalse(StringCodec.get().isFixedLength());
     runTestStringCodec("");
 
     for (int i = 0; i < NUM_LOOPS; i++) {
@@ -193,6 +194,7 @@ public final class TestCodec {
 
   @Test
   public void testFixedLengthStringCodec() throws Exception {
+    Assertions.assertTrue(FixedLengthStringCodec.get().isFixedLength());
     runTestFixedLengthStringCodec("");
 
     for (int i = 0; i < NUM_LOOPS; i++) {

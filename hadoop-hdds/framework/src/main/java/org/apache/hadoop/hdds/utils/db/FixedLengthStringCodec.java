@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
  * A {@link Codec} to serialize/deserialize {@link String}
  * using {@link StandardCharsets#ISO_8859_1},
  * a fixed-length one-byte-per-character encoding,
- * i.e. {@link #getSerializedSize(String)} == {@link String#length()}.
+ * i.e. the serialized size equals to {@link String#length()}.
  */
 public final class FixedLengthStringCodec extends StringCodecBase {
 
@@ -42,7 +42,7 @@ public final class FixedLengthStringCodec extends StringCodecBase {
 
   /**
    * Encode the given {@link String} to a byte array.
-   * @throws IllegalStateException in case a character encoding error occurs.
+   * @throws IllegalStateException in case an encoding error occurs.
    */
   public static byte[] string2Bytes(String string) {
     return get().string2Bytes(string, IllegalStateException::new);
@@ -53,10 +53,5 @@ public final class FixedLengthStringCodec extends StringCodecBase {
    */
   public static String bytes2String(byte[] bytes) {
     return get().fromPersistedFormat(bytes);
-  }
-
-  @Override
-  int getSerializedSize(String s) {
-    return s.length();
   }
 }

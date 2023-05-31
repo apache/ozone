@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,16 +44,20 @@ abstract class StringCodecBase implements Codec<String> {
   static final Logger LOG = LoggerFactory.getLogger(StringCodecBase.class);
 
   private final Charset charset;
+  private final boolean fixedLength;
   private final int maxBytesPerChar;
 
   StringCodecBase(Charset charset) {
     this.charset = charset;
-    final float f = charset.newEncoder().maxBytesPerChar();
-    this.maxBytesPerChar = (int) f;
-    if (maxBytesPerChar != f) {
+
+    final CharsetEncoder encoder = charset.newEncoder();
+    final float max = encoder.maxBytesPerChar();
+    this.maxBytesPerChar = (int) max;
+    if (maxBytesPerChar != max) {
       throw new ArithmeticException("Round off error in " + charset
-          + ": maxBytesPerChar = " + f + " is not an integer.");
+          + ": maxBytesPerChar = " + max + " is not an integer.");
     }
+    this.fixedLength = max == encoder.averageBytesPerChar();
   }
 
   CharsetEncoder newEncoder() {
@@ -68,26 +73,23 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   /**
-   * Return the exact serialized size of the given string.
-   * For variable-length {@link Charset}s,
-   * this method usually is more expensive than
-   * {@link #getSerializedSizeUpperBound(String)}
-   * since it may require encoding the string.
+   * Is this a fixed-length {@link Codec}?
+   * <p>
+   * For a fixed-length {@link Codec},
+   * each character is encoded to the same number of bytes and
+   * {@link #getSerializedSizeUpperBound(String)} equals to the serialized size.
    */
-  int getSerializedSize(String s) {
-    return charset.encode(s).remaining();
+  public boolean isFixedLength() {
+    return fixedLength;
   }
 
   /**
-   * Returns an upper bound of the serialized size.
-   * For variable-length {@link Charset}s,
-   * an upper bound can be obtained without encoding.
-   * This method usually is much more efficient than
-   * {@link #getSerializedSize(String)}.
-   *
-   * @return an upper bound of {@link #getSerializedSize(String)}.
+   * @return an upper bound, which can be obtained without encoding,
+   *         of the serialized size of the given {@link String}.
+   *         When {@link #isFixedLength()} is true,
+   *         the upper bound equals to the serialized size.
    */
-  final int getSerializedSizeUpperBound(String s) {
+  int getSerializedSizeUpperBound(String s) {
     return maxBytesPerChar * s.length();
   }
 
@@ -134,10 +136,29 @@ abstract class StringCodecBase implements Codec<String> {
   /** Encode the given {@link String} to a byte array. */
   <E extends Exception> byte[] string2Bytes(String string,
       Function<String, E> newE) throws E {
-    final int size = getSerializedSize(string);
-    final byte[] array = new byte[size];
-    encode(string, size, newE).apply(ByteBuffer.wrap(array));
-    return array;
+    final int upperBound = getSerializedSizeUpperBound(string);
+    final Integer serializedSize = isFixedLength() ? upperBound : null;
+    final CheckedFunction<ByteBuffer, Integer, E> encoder
+        = encode(string, serializedSize, newE);
+
+    if (serializedSize != null) {
+      // When the serialized size is known, create an array
+      // and then wrap it as a buffer for encoding.
+      final byte[] array = new byte[serializedSize];
+      final Integer encoded = encoder.apply(ByteBuffer.wrap(array));
+      Preconditions.assertSame(serializedSize, encoded, "serializedSize");
+      return array;
+    } else {
+      // When the serialized size is unknown, allocate a larger buffer
+      // and then get an array.
+      try (CodecBuffer buffer = CodecBuffer.allocateHeap(upperBound)) {
+        buffer.putFromSource(encoder);
+
+        // require a buffer copying
+        // unless upperBound equals to the serialized size.
+        return buffer.getArray();
+      }
+    }
   }
 
   @Override
@@ -149,8 +170,8 @@ abstract class StringCodecBase implements Codec<String> {
   public CodecBuffer toCodecBuffer(@Nonnull String object,
       IntFunction<CodecBuffer> allocator) throws IOException {
     // allocate a larger buffer to avoid encoding twice.
-    final int size = getSerializedSizeUpperBound(object);
-    final CodecBuffer buffer = allocator.apply(size);
+    final int upperBound = getSerializedSizeUpperBound(object);
+    final CodecBuffer buffer = allocator.apply(upperBound);
     buffer.putFromSource(encode(object, null, IOException::new));
     return buffer;
   }

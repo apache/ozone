@@ -133,6 +133,27 @@ public final class CodecBuffer implements AutoCloseable {
     return buf.nioBuffer().asReadOnlyBuffer();
   }
 
+  /**
+   * @return an array containing the readable bytes.
+   * @see #readableBytes()
+   */
+  public byte[] getArray() {
+    final int readable = readableBytes();
+    if (buf.hasArray()) {
+      // Try getting the underlying to avoid copying
+      final byte[] array = buf.array();
+      if (array.length == readable) {
+        Preconditions.assertSame(0, buf.readerIndex(), "readerIndex");
+        return array;
+      }
+    }
+
+    // Copy the readable bytes
+    final byte[] array = new byte[readable];
+    buf.readBytes(array);
+    return array;
+  }
+
   /** @return an {@link InputStream} reading from this buffer. */
   public InputStream getInputStream() {
     return new ByteBufInputStream(buf.duplicate());
@@ -239,11 +260,11 @@ public final class CodecBuffer implements AutoCloseable {
    *
    * @param source put bytes to a {@link ByteBuffer}.
    * @return the return value from the source function.
-   * @throws IOException in case the source throws an {@link IOException}.
+   * @param <E> The {@link Exception} type may be thrown by the given source.
+   * @throws E in case the source throws it.
    */
-  Integer putFromSource(
-      CheckedFunction<ByteBuffer, Integer, IOException> source)
-      throws IOException {
+  <E extends Exception> Integer putFromSource(
+      CheckedFunction<ByteBuffer, Integer, E> source) throws E {
     assertRefCnt(1);
     final int i = buf.writerIndex();
     final int writable = buf.writableBytes();
