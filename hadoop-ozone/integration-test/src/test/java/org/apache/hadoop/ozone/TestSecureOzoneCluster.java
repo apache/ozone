@@ -1298,7 +1298,6 @@ public final class TestSecureOzoneCluster {
       X509CertificateHolder certHolder = generateX509CertHolder(conf, keyPair,
           new KeyPair(scmCertClient.getPublicKey(),
               scmCertClient.getPrivateKey()), scmCert,
-          Duration.ofSeconds(certLifetime),
           "om_cert", clusterId);
       String certId = certHolder.getSerialNumber().toString();
       certCodec.writeCertificate(certHolder);
@@ -1457,7 +1456,7 @@ public final class TestSecureOzoneCluster {
 
   private static X509CertificateHolder generateX509CertHolder(
       OzoneConfiguration conf, KeyPair keyPair, KeyPair rootKeyPair,
-      X509Certificate rootCert, Duration certLifetime, String subject,
+      X509Certificate rootCert, String subject,
       String clusterId) throws Exception {
     // Generate normal certificate, signed by RootCA certificate
     SecurityConfig secConfig = new SecurityConfig(conf);
