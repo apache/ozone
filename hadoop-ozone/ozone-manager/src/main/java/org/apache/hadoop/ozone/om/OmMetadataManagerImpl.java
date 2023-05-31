@@ -98,6 +98,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
@@ -1543,7 +1544,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               RepeatedOmKeyInfo delOmKeyInfo =
                   prevDeletedTable.get(prevDelTableDBKey);
               if ((omKeyInfo != null &&
-                  info.getObjectID() == omKeyInfo.getObjectID()) ||
+                  info.getObjectID() == omKeyInfo.getObjectID() &&
+                  isBlockLocationInfoSame(omKeyInfo, info)) ||
                   delOmKeyInfo != null) {
                 // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
                 //  active DB's deletedTable if any one of the keys in

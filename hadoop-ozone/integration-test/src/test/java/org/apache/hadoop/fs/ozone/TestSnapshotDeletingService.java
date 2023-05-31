@@ -22,9 +22,11 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -48,11 +50,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -68,7 +72,8 @@ public class TestSnapshotDeletingService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestSnapshotDeletingService.class);
   private static boolean omRatisEnabled = true;
-  private static final String CONTENT = "testContent";
+  private static final ByteBuffer CONTENT =
+      ByteBuffer.allocate(1024 * 1024 * 16);
 
   private MiniOzoneCluster cluster;
   private OzoneManager om;
@@ -81,6 +86,10 @@ public class TestSnapshotDeletingService {
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        4, StorageUnit.MB);
+    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+        1, StorageUnit.MB);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
@@ -348,11 +357,14 @@ public class TestSnapshotDeletingService {
   /*
       Flow
       ----
+      create key0
       create key1
       create snapshot1
+      create key0
       create key2
       delete key1
       delete key2
+      delete key0
       create snapshot2
       create key3
       create key4
@@ -370,14 +382,21 @@ public class TestSnapshotDeletingService {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         om.getMetadataManager();
 
+    TestDataUtil.createKey(bucket1, "bucket1key0", ReplicationFactor.THREE,
+        ReplicationType.RATIS, CONTENT);
     TestDataUtil.createKey(bucket1, "bucket1key1", ReplicationFactor.THREE,
         ReplicationType.RATIS, CONTENT);
-    assertTableRowCount(keyTable, 1);
+    assertTableRowCount(keyTable, 2);
 
     // Create Snapshot 1.
     client.getProxy().createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
         "bucket1snap1");
     assertTableRowCount(snapshotInfoTable, 1);
+
+    // Overwrite bucket1key0, This is a newer version of the key which should
+    // reclaimed as this is a different version of the key.
+    TestDataUtil.createKey(bucket1, "bucket1key0", ReplicationFactor.THREE,
+        ReplicationType.RATIS, CONTENT);
     TestDataUtil.createKey(bucket1, "bucket1key2", ReplicationFactor.THREE,
         ReplicationType.RATIS, CONTENT);
 
@@ -388,6 +407,10 @@ public class TestSnapshotDeletingService {
     // it is not being referenced by previous snapshot.
     client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_ONE,
         "bucket1key2", false);
+    client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_ONE,
+        "bucket1key0", false);
+    assertTableRowCount(keyTable, 0);
+    // bucket1key0 should also be reclaimed as it not same
     assertTableRowCount(deletedTable, 1);
 
     // Create Snapshot 2.
