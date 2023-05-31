@@ -72,7 +72,7 @@ public class OzoneAdmins {
    * @return a configured OzoneAdmins instance.
    */
   public static OzoneAdmins getOzoneAdmins(String starterUser,
-                                           OzoneConfiguration configuration) {
+      OzoneConfiguration configuration) {
     Collection<String> adminUserNames =
         getOzoneAdminsFromConfig(configuration, starterUser);
     Collection<String> adminGroupNames =
