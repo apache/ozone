@@ -27,7 +27,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "fetch-key",
-    description = "CLI command to force OM to fetch the the latest secret key from SCM.",
+    description = "CLI command to force OM to fetch the latest secret key " +
+        "from SCM.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
