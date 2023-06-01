@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -84,7 +83,7 @@ public final class ContainerID implements Comparable<ContainerID> {
    */
   @Deprecated
   public byte[] getBytes() {
-    return Longs.toByteArray(id);
+    return LongCodec.get().toPersistedFormat(id);
   }
 
   public HddsProtos.ContainerID getProtobuf() {

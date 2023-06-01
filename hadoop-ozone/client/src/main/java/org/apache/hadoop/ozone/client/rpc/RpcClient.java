@@ -2341,6 +2341,16 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.setBucketOwner(builder.build());
   }
 
+  @Override
+  public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException {
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(obj.getVolumeName())
+        .setBucketName(obj.getBucketName())
+        .setKeyName(keyName);
+    ozoneManagerClient.setTimes(builder.build(), mtime, atime);
+  }
+
   public ExecutorService getECReconstructExecutor() {
     // local ref to a volatile to ensure access
     // to a completed initialized object

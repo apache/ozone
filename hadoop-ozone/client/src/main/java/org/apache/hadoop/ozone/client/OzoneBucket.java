@@ -890,6 +890,20 @@ public class OzoneBucket extends WithMetadata {
     return result;
   }
 
+  /**
+   * Builder for OmBucketInfo.
+   /**
+   * Set time to a key in this bucket.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   * @throws IOException
+   */
+  public void setTimes(String keyName, long mtime, long atime)
+      throws IOException {
+    proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }
