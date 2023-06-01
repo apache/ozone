@@ -1499,7 +1499,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmBlockManager.start();
     leaseManager.start();
 
-    // Start jvm monitor
     if (jvmPauseMonitor != null) {
       jvmPauseMonitor.start();
     }
