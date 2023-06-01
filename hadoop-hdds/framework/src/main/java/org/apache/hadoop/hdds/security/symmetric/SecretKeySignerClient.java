@@ -40,4 +40,7 @@ public interface SecretKeySignerClient {
    */
   default void stop() {
   }
+
+  default void refetchSecretKey() {
+  }
 }

@@ -61,6 +61,12 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   }
 
   @Override
+  public void refetchSecretKey() {
+    // pass duration as ZERO to force a refresh.
+    checkAndRefresh(Duration.ZERO);
+  }
+
+  @Override
   public void start(ConfigurationSource conf) throws IOException {
     final ManagedSecretKey initialKey =
         secretKeyProtocol.getCurrentSecretKey();
@@ -103,7 +109,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
         TimeUnit.MILLISECONDS);
   }
 
-  private void checkAndRefresh(Duration rotateDuration) {
+  private synchronized void checkAndRefresh(Duration rotateDuration) {
     ManagedSecretKey current = cache.get();
     Instant nextRotate = current.getCreationTime().plus(rotateDuration);
     // when the current key passes the rotation cycle, fetch the next one

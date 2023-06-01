@@ -1065,7 +1065,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public void refetchSecretKey() {
-    secretKeyClient.getCurrentSecretKey();
+    secretKeyClient.refetchSecretKey();
   }
 
   @VisibleForTesting
