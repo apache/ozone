@@ -88,6 +88,7 @@ public class EmptyContainerHandler extends AbstractCheck {
   private boolean isContainerEmptyAndClosed(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
+        !replicas.isEmpty() &&
         replicas.stream().allMatch(
             r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
                 r.isEmpty());

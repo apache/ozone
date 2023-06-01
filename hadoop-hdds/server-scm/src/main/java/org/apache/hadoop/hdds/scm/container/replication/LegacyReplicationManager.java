@@ -917,6 +917,7 @@ public class LegacyReplicationManager {
   private boolean isContainerEmpty(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == LifeCycleState.CLOSED &&
+        !replicas.isEmpty() &&
         replicas.stream().allMatch(
             r -> r.getState() == State.CLOSED && r.isEmpty());
   }

@@ -544,7 +544,8 @@ public class TestLegacyReplicationManager {
             throws IOException, TimeoutException {
       createContainer(LifeCycleState.CLOSED);
       assertReplicaScheduled(0);
-      assertEmptyReplicatedCount(1);
+      assertUnderReplicatedCount(1);
+      assertMissingCount(1);
     }
 
     /**
