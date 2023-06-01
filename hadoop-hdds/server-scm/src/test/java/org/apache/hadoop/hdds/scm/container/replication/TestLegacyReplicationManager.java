@@ -2658,13 +2658,7 @@ public class TestLegacyReplicationManager {
     Assertions.assertEquals(count, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
-
-  private void assertEmptyReplicatedCount(int count) {
-    ReplicationManagerReport report = replicationManager.getContainerReport();
-    Assertions.assertEquals(count, report.getStat(
-        ReplicationManagerReport.HealthState.EMPTY));
-  }
-
+  
   private static class DatanodeCommandHandler implements
       EventHandler<CommandForDatanode> {
 
