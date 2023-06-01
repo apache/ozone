@@ -170,8 +170,8 @@ public final class ReplicationManagerUtil {
    * Simple class to hold the excluded and used nodes lists.
    */
   public static class ExcludedAndUsedNodes {
-    private List<DatanodeDetails> excludedNodes;
-    private List<DatanodeDetails> usedNodes;
+    private final List<DatanodeDetails> excludedNodes;
+    private final List<DatanodeDetails> usedNodes;
 
     public ExcludedAndUsedNodes(List<DatanodeDetails> excludedNodes,
         List<DatanodeDetails> usedNodes) {

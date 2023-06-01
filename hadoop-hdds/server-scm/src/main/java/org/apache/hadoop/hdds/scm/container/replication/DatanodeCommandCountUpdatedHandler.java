@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public class DatanodeCommandCountUpdatedHandler implements
     EventHandler<DatanodeDetails> {
 
-  private ReplicationManager replicationManager;
+  private final ReplicationManager replicationManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeCommandCountUpdatedHandler.class);
 
