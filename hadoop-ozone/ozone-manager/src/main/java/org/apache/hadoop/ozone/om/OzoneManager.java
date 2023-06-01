@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1064,8 +1065,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void refetchSecretKey() {
+  public UUID refetchSecretKey() {
     secretKeyClient.refetchSecretKey();
+    return secretKeyClient.getCurrentSecretKey().getId();
   }
 
   @VisibleForTesting

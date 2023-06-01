@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
@@ -137,6 +138,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -949,9 +951,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private RefetchSecretKeyResponse refetchSecretKey() {
-    impl.refetchSecretKey();
+    UUID uuid = impl.refetchSecretKey();
     RefetchSecretKeyResponse response =
-        RefetchSecretKeyResponse.newBuilder().build();
+        RefetchSecretKeyResponse.newBuilder()
+            .setId(ProtobufUtils.toProtobuf(uuid)).build();
     return response;
   }
 

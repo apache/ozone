@@ -597,7 +597,7 @@ message RefetchSecretKeyRequest {
 }
 
 message RefetchSecretKeyResponse {
-
+    optional hdds.UUID id = 1;
 }
 
 /**

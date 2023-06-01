@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -996,5 +997,5 @@ public interface OzoneManagerProtocol
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
 
-  void refetchSecretKey() throws IOException;
+  UUID refetchSecretKey() throws IOException;
 }

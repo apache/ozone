@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -46,8 +47,8 @@ public class FetchKeySubCommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (OzoneManagerProtocol client = parent.createOmClient(omServiceId)) {
-      client.refetchSecretKey();
-      System.out.println("Successfully re-fetched the secret key.");
+      UUID uuid = client.refetchSecretKey();
+      System.out.println("Current Secret Key ID: " + uuid);
     }
     return null;
   }

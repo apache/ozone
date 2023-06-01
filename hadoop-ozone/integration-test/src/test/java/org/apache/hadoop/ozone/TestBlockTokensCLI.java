@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,7 +66,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration test class to verify block token CLI commands functionality in a
@@ -89,6 +90,7 @@ public final class TestBlockTokensCLI {
   private static String clusterId;
   private static String scmId;
   private static String omServiceId;
+  private static String scmServiceId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
 
@@ -104,6 +106,7 @@ public final class TestBlockTokensCLI {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test";
+    scmServiceId = "scm-service-test";
 
     startMiniKdc();
     setSecureConfig();
@@ -122,6 +125,10 @@ public final class TestBlockTokensCLI {
       cluster.stop();
     }
     DefaultConfigManager.clearDefaultConfigs();
+  }
+
+  private SecretKeyManager getScmSecretKeyManager() {
+    return cluster.getActiveSCM().getSecretKeyManager();
   }
 
   private static void setSecretKeysConfig() {
@@ -195,7 +202,21 @@ public final class TestBlockTokensCLI {
     String actualOutput = outputStream.toString("UTF-8");
     System.setOut(System.out);
 
-    assertTrue(actualOutput.contains("Successfully re-fetched the secret key"));
+    String actualUUID = testFetchKeyOMAdminCommandUtil(actualOutput);
+    String expectedUUID =
+        getScmSecretKeyManager().getCurrentSecretKey().getId().toString();
+    assertEquals(expectedUUID, actualUUID);
+  }
+
+  private String testFetchKeyOMAdminCommandUtil(String output) {
+    // Extract the current secret key id from the output
+    String[] lines = output.split(System.lineSeparator());
+    for (String line : lines) {
+      if (line.startsWith("Current Secret Key ID: ")) {
+        return line.substring("Current Secret Key ID: ".length()).trim();
+      }
+    }
+    return null;
   }
 
   private static void startCluster()
@@ -203,7 +224,7 @@ public final class TestBlockTokensCLI {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
-        .setSCMServiceId("TestSecretKey")
+        .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
         .setScmId(scmId)
         .setNumDatanodes(3)
