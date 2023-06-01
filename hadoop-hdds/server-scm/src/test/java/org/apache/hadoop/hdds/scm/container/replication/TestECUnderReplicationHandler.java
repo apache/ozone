@@ -99,9 +99,9 @@ public class TestECUnderReplicationHandler {
   private PlacementPolicy ecPlacementPolicy;
   private int remainingMaintenanceRedundancy = 1;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
-  private final AtomicBoolean throwOverloadedExceptionOnReplication
+  private AtomicBoolean throwOverloadedExceptionOnReplication
       = new AtomicBoolean(false);
-  private final AtomicBoolean throwOverloadedExceptionOnReconstruction
+  private AtomicBoolean throwOverloadedExceptionOnReconstruction
       = new AtomicBoolean(false);
 
   @BeforeEach
@@ -488,7 +488,7 @@ public class TestECUnderReplicationHandler {
               Collections.emptyList(), underRep, 2));
       Mockito.verify(replicationManager, times(1))
           .processOverReplicatedContainer(underRep);
-      Assertions.assertEquals(expectedDelete, commandsSent);
+      Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
     }
   }
 
@@ -855,7 +855,7 @@ public class TestECUnderReplicationHandler {
         availableReplicas, Collections.emptyList(), underRep, 1));
     Mockito.verify(replicationManager, times(1))
         .processOverReplicatedContainer(underRep);
-    Assertions.assertEquals(expectedDelete, commandsSent);
+    Assertions.assertEquals(true, expectedDelete.equals(commandsSent));
   }
 
   @Test

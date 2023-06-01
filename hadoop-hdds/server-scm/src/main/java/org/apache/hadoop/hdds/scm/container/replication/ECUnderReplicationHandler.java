@@ -273,6 +273,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * Processes replicas that are in maintenance nodes and should need
    * additional copies.
    * @return number of commands sent
+   * @throws IOException
    */
   private int processMissingIndexes(
       ECContainerReplicaCount replicaCount, Map<Integer,
@@ -358,6 +359,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
    * Processes replicas that are in maintenance nodes and should need
    * additional copies.
    * @return number of commands sent
+   * @throws IOException
    */
   private int processDecommissioningIndexes(
       ECContainerReplicaCount replicaCount,
@@ -427,10 +429,12 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   /**
    * Processes replicas that are in maintenance nodes and should need
    * additional copies.
+   * @param replicaCount
    * @param sources Map of Replica Index to a pair of ContainerReplica and
    *                NodeStatus. This is the list of available replicas.
    * @param excludedNodes nodes that should not be targets for new copies
-   * @return number of commands sent
+   * @@return number of commands sent
+   * @throws IOException
    */
   private int processMaintenanceOnlyIndexes(
       ECContainerReplicaCount replicaCount,
