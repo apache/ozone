@@ -646,15 +646,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("OM start with adminUsers: {}", omAdmins.getAdminUsernames());
 
     // Get read only admin list
-    Collection<String> omReadOnlyAdmins =
-        OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
-            configuration);
-    Collection<String> omReadOnlyAdminsGroups =
-        OzoneAdmins.getOzoneReadOnlyAdminsGroupsFromConfig(
-            configuration);
-
-    readOnlyAdmins = new OzoneAdmins(omReadOnlyAdmins,
-        omReadOnlyAdminsGroups);
+    readOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
 
     Collection<String> s3AdminUsernames =
             OzoneConfigUtil.getS3AdminsFromConfig(configuration);

@@ -662,7 +662,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    */
   public void checkAdminUserPrivilege(UserGroupInformation ugi)
       throws IOException {
-    admins.isAdmin(ugi);
+    admins.checkAdminUserPrivilege(ugi);
   }
 
   public String reconfigurePropertyImpl(String property, String newVal)

@@ -81,6 +81,23 @@ public class OzoneAdmins {
   }
 
   /**
+   * Creates and returns a read-only admin object. This object includes the
+   * read-only admin users and user groups obtained from the Ozone
+   * configuration.
+   *
+   * @param configuration the configuration settings to apply.
+   * @return a configured OzoneAdmins instance.
+   */
+  public static OzoneAdmins getReadonlyAdmins(
+      OzoneConfiguration configuration) {
+    Collection<String> omReadOnlyAdmins =
+        getOzoneReadOnlyAdminsFromConfig(configuration);
+    Collection<String> omReadOnlyAdminsGroups =
+        getOzoneReadOnlyAdminsGroupsFromConfig(configuration);
+    return new OzoneAdmins(omReadOnlyAdmins, omReadOnlyAdminsGroups);
+  }
+
+  /**
    * Check ozone admin privilege, throws exception if not admin.
    */
   public void checkAdminUserPrivilege(UserGroupInformation ugi)
@@ -126,7 +143,9 @@ public class OzoneAdmins {
 
   /**
    * Return list of administrators from config.
-   * The service startup user will default to an admin.
+   * The starterUser user will default to an admin.
+   * @param conf the configuration settings to apply.
+   * @param starterUser initial user to consider in admin list.
    */
   public static Collection<String> getOzoneAdminsFromConfig(
       OzoneConfiguration conf, String starterUser) {
@@ -139,20 +158,29 @@ public class OzoneAdmins {
   }
 
   /**
+   * Return list of administrators Groups from config.
+   * The service startup user will default to an admin.
+   * @param configuration the configuration settings to apply.
+   */
+  public static Collection<String> getOzoneAdminsGroupsFromConfig(
+      OzoneConfiguration configuration) {
+    return configuration.getTrimmedStringCollection(
+        OZONE_ADMINISTRATORS_GROUPS);
+  }
+
+  /**
    * Return list of Ozone Read only admin Usernames from config.
+   * @param conf the configuration settings to apply.
    */
   public static Collection<String> getOzoneReadOnlyAdminsFromConfig(
       OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
   }
 
-  private static Collection<String> getOzoneAdminsGroupsFromConfig(
-      OzoneConfiguration configuration) {
-    return configuration.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS_GROUPS);
-  }
-
-
+  /**
+   * Return list of Ozone Read only admin Groups from config.
+   * @param conf the configuration settings to apply.
+   */
   public static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     return conf.getTrimmedStringCollection(
