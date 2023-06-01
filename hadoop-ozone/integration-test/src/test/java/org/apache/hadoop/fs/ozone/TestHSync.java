@@ -21,10 +21,12 @@ package org.apache.hadoop.fs.ozone;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -53,6 +55,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -69,6 +72,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -169,6 +173,7 @@ public class TestHSync {
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
+
     final byte[] data = new byte[1];
     ThreadLocalRandom.current().nextBytes(data);
 
@@ -180,6 +185,34 @@ public class TestHSync {
         outputStream.hsync();
         assertTrue(cluster.getOzoneManager().getMetadataManager()
             .getDeletedTable().isEmpty());
+      }
+    }
+  }
+
+  @Test
+  public void testOverwriteHSyncFile() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "fileoverwrite");
+      try (FSDataOutputStream os = fs.create(file, false)) {
+        os.hsync();
+        UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+            "user2", new String[] {"group1"});
+        assertThrows(FileAlreadyExistsException.class,
+            () -> ugi.doAs((PrivilegedExceptionAction<Void>) () -> {
+              try (FSDataOutputStream os1 = fs.create(file, false)) {
+                os1.hsync();
+              }
+              return null;
+            }));
+        os.hsync();
       }
     }
   }
