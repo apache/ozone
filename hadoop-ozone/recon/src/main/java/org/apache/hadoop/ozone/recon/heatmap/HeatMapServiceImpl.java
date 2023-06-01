@@ -142,6 +142,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse volumeInfo =
         new EntityReadAccessHeatMapResponse();
     volumeInfo.setLabel(split[0]);
+    volumeInfo.setPath(split[0]);
     children.add(volumeInfo);
     addBucketAndPrefixPath(split, rootEntity, volumeInfo, readAccessCount,
         keySize);
@@ -202,6 +203,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse bucket =
         new EntityReadAccessHeatMapResponse();
     bucket.setLabel(split[1]);
+    bucket.setPath(omMetadataManager.getBucketKey(split[0], split[1]));
     bucketEntities.add(bucket);
     bucket.setMinAccessCount(readAccessCount);
     addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
@@ -219,6 +221,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse prefixPathInfo =
         new EntityReadAccessHeatMapResponse();
     prefixPathInfo.setLabel(path);
+    prefixPathInfo.setPath(bucket.getPath() + OM_KEY_PREFIX + path);
     prefixPathInfo.setAccessCount(readAccessCount);
     prefixPathInfo.setSize(keySize);
     prefixes.add(prefixPathInfo);
@@ -351,6 +354,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     rootEntity.setMinAccessCount(
         entityMetaDataList.get(0).getReadAccessCount());
     rootEntity.setLabel("root");
+    rootEntity.setPath(OM_KEY_PREFIX);
     List<EntityReadAccessHeatMapResponse> children =
         rootEntity.getChildren();
     entityMetaDataList.forEach(entityMetaData -> {
