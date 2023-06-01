@@ -293,6 +293,7 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             }
    *           ],
    *           "size": 3584,
+   *           "path": "/hivevol1676574631/hiveencbuck1676574631",
    *           "minAccessCount": 2924,
    *           "maxAccessCount": 155074
    *         },
@@ -314,11 +315,13 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             }
    *           ],
    *           "size": 3584,
+   *           "path": "/hivevol1676574631/hivebuck1676574631",
    *           "minAccessCount": 2924,
    *           "maxAccessCount": 155069
    *         }
    *       ],
-   *       "size": 7168
+   *       "size": 7168,
+   *       "path": "/hivevol1676574631"
    *     },
    *     {
    *       "label": "hivevol1675429570",
@@ -333,11 +336,13 @@ public class HeatMapServiceImpl extends HeatMapService {
    *               "color": 1
    *             }          ],
    *           "size": 3072,
+   *           "path": "/hivevol1675429570/hivebuck1675429570",
    *           "minAccessCount": 3195,
    *           "maxAccessCount": 129977
    *         }
    *       ],
-   *       "size": 6144
+   *       "size": 6144,
+   *       "path": "/hivevol1675429570"
    *     }
    *   ],
    *   "size": 25600,

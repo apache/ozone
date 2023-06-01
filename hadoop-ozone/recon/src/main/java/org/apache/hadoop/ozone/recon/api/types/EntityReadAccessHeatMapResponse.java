@@ -46,11 +46,13 @@ import java.util.Objects;
    *             }
  *            ],
  *           "size": 3072,
+ *           "path": "/hivevol1675429570/hivebuck1675429570",
  *           "minAccessCount": 3195,
  *           "maxAccessCount": 129977
  *         }
  *       ],
- *       "size": 6144
+ *       "size": 6144,
+ *       "path": "/hivevol1675429570"
  *     }
  */
 public class EntityReadAccessHeatMapResponse {
