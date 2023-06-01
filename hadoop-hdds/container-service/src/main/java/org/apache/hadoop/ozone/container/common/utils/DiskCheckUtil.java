@@ -99,7 +99,7 @@ public class DiskCheckUtil {
       int numBytesRead = fis.read(readBytes);
       if (numBytesRead != numBytesToWrite) {
         logError(log, storageDir, String.format("%d bytes written to file %s " +
-            "but %s bytes were read back.", numBytesToWrite, testFile,
+            "but %d bytes were read back.", numBytesToWrite, testFile,
             numBytesRead));
         return false;
       }
@@ -116,8 +116,8 @@ public class DiskCheckUtil {
     // Check that test file has the expected content.
     if (!Arrays.equals(writtenBytes, readBytes)) {
       logError(log, storageDir, String.format("%d Bytes read from file " +
-          "%s do not match %d bytes written.", writtenBytes.length,
-          testFile, readBytes.length));
+          "%s do not match the %d bytes that were written.",
+          writtenBytes.length, testFile, readBytes.length));
       return false;
     }
 
@@ -125,6 +125,7 @@ public class DiskCheckUtil {
     if (!testFile.delete()) {
       logError(log, storageDir, String.format("Could not delete file %s " +
           "for volume check.", testFile));
+      return false;
     }
 
     // If all checks passed, the volume is healthy.
