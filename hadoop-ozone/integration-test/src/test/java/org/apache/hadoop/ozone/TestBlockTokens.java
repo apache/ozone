@@ -280,7 +280,7 @@ public final class TestBlockTokens {
   }
 
   @Test
-  public void testGetCurrentSecretKey() throws UnsupportedEncodingException {
+  public void testFetchKeyOMAdminCommand() throws UnsupportedEncodingException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintStream printStream = new PrintStream(outputStream, true, "UTF-8");
     System.setOut(printStream);
@@ -294,7 +294,6 @@ public final class TestBlockTokens {
 
     assertTrue(actualOutput.contains("Successfully re-fetched the secret key"));
   }
-
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =

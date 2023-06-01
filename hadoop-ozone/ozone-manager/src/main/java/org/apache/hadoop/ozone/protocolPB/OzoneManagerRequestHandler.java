@@ -78,7 +78,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -311,8 +311,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
             request.getTransferOmLeadershipRequest()));
         break;
-      case GetCurrentSecretKey:
-        responseBuilder.setGetCurrentSecretKeyResponse(getCurrentSecretKey());
+      case RefetchSecretKey:
+        responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -948,10 +948,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
-  private GetCurrentSecretKeyResponse getCurrentSecretKey() {
+  private RefetchSecretKeyResponse refetchSecretKey() {
     impl.refetchSecretKey();
-    GetCurrentSecretKeyResponse response =
-        GetCurrentSecretKeyResponse.newBuilder().build();
+    RefetchSecretKeyResponse response =
+        RefetchSecretKeyResponse.newBuilder().build();
     return response;
   }
 

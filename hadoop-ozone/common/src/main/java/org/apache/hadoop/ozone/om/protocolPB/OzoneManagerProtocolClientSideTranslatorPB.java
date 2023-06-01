@@ -104,7 +104,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
@@ -1358,10 +1358,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void refetchSecretKey() throws IOException {
-    final GetCurrentSecretKeyRequest.Builder requestBuilder =
-        GetCurrentSecretKeyRequest.newBuilder();
-    final OMRequest omRequest = createOMRequest(Type.GetCurrentSecretKey)
-        .setGetCurrentSecretKeyRequest(requestBuilder)
+    final RefetchSecretKeyRequest.Builder requestBuilder =
+        RefetchSecretKeyRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.RefetchSecretKey)
+        .setRefetchSecretKeyRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
