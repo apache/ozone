@@ -274,7 +274,7 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public X509Certificate getLatestRootCACertificate() {
+  public X509Certificate getRootCACertificate() {
     return rootCert;
   }
 

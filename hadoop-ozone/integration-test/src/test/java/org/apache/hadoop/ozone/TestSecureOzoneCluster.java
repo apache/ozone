@@ -1328,7 +1328,7 @@ public final class TestSecureOzoneCluster {
       CertificateClient omCertClient = om.getCertificateClient();
       X509Certificate omCert = omCertClient.getCertificate();
       X509Certificate caCert = omCertClient.getCACertificate();
-      X509Certificate rootCaCert = omCertClient.getLatestRootCACertificate();
+      X509Certificate rootCaCert = omCertClient.getRootCACertificate();
       List certList = new ArrayList<>();
       certList.add(caCert);
       certList.add(rootCaCert);

@@ -875,8 +875,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         rootCertificateServer, scmCertificateServer,
         scmCertificateClient == null ? null :
-            scmCertificateClient.getLatestRootCACertificate() != null ?
-                scmCertificateClient.getLatestRootCACertificate() :
+            scmCertificateClient.getRootCACertificate() != null ?
+                scmCertificateClient.getRootCACertificate() :
                 scmCertificateClient.getCACertificate(), this);
 
     if (securityConfig.isContainerTokenEnabled()) {

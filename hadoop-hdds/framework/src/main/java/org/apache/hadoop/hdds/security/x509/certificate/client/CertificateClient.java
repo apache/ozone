@@ -115,9 +115,10 @@ public interface CertificateClient extends Closeable {
 
   /**
    * Return the latest Root CA certificate known to the client.
+   *
    * @return latest Root CA certificate known to the client.
    */
-  X509Certificate getLatestRootCACertificate();
+  X509Certificate getRootCACertificate();
 
   Set<X509Certificate> getAllCaCerts();
 

@@ -887,7 +887,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized X509Certificate getLatestRootCACertificate() {
+  public synchronized X509Certificate getRootCACertificate() {
     if (rootCaCertId != null) {
       return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }

@@ -125,8 +125,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     // SCM certificate client sets root CA as CA cert instead of root CA cert
-    X509Certificate rootCACert = caClient.getLatestRootCACertificate() != null ?
-        caClient.getLatestRootCACertificate() : caClient.getCACertificate();
+    X509Certificate rootCACert = caClient.getRootCACertificate() != null ?
+        caClient.getRootCACertificate() : caClient.getCACertificate();
 
     String rootCACertId = rootCACert.getSerialNumber().toString();
     // Certificate keeps the same.
