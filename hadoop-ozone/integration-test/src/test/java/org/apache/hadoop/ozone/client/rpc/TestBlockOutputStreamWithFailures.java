@@ -44,15 +44,20 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -176,33 +181,33 @@ public class TestBlockOutputStreamWithFailures {
             .getBytes(UTF_8);
     key.write(data1);
 
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 4 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -213,18 +218,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
     TestHelper.waitForContainerClose(key, cluster);
     key.write(data1);
@@ -233,22 +238,21 @@ public class TestBlockOutputStreamWithFailures {
     // rewritten plus one partial chunk plus two putBlocks for flushSize
     // and one flush for partial chunk
     key.flush();
-    Assert.assertEquals(2, keyOutputStream.getStreamEntries().size());
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof ContainerNotOpenException);
 
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
     // commitInfoMap will remain intact as there is no server failure
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
@@ -266,35 +270,35 @@ public class TestBlockOutputStreamWithFailures {
     key.write(data1);
     // since its hitting the full bufferCondition, it will call watchForCommit
     // and completes at least putBlock for first flushSize worth of data
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     // since data written is still less than flushLength, flushLength will
     // still be 0.
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast flushSize worth of data buffer
     // where each entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -304,18 +308,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     //  flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     Pipeline pipeline = raftClient.getPipeline();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
 
@@ -329,12 +333,11 @@ public class TestBlockOutputStreamWithFailures {
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
@@ -352,32 +355,32 @@ public class TestBlockOutputStreamWithFailures {
     key.write(data1);
     // since its hitting the full bufferCondition, it will call watchForCommit
     // and completes atleast putBlock for first flushSize worth of data
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // acked by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -387,18 +390,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     Pipeline pipeline = raftClient.getPipeline();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
@@ -424,24 +427,22 @@ public class TestBlockOutputStreamWithFailures {
     //    but pipeline is still not destroyed.
     // c) will fail with RaftRetryFailureException if the leader election
     //    did not finish before the request retry count finishes.
-    Assert.assertTrue(ioException instanceof RaftRetryFailureException
+    assertTrue(ioException instanceof RaftRetryFailureException
         || ioException instanceof GroupMismatchException
         || ioException instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
     // now close the stream, It will update the ack length after watchForCommit
 
     key.close();
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
+    assertEquals(0, keyOutputStream.getLocationInfoList().size());
     validateData(keyName, data1);
   }
 
@@ -455,30 +456,30 @@ public class TestBlockOutputStreamWithFailures {
             .getBytes(UTF_8);
     key.write(data1);
 
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
+    assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
 
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
     TestHelper.waitForContainerClose(key, cluster);
     key.write(data1);
@@ -488,21 +489,20 @@ public class TestBlockOutputStreamWithFailures {
     // and one flush for partial chunk
     key.flush();
 
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
 
     // commitInfoMap will remain intact as there is no server failure
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertTrue(keyOutputStream.getLocationInfoList().size() == 0);
+    assertTrue(keyOutputStream.getLocationInfoList().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
@@ -518,23 +518,23 @@ public class TestBlockOutputStreamWithFailures {
             .getBytes(UTF_8);
     key.write(data1);
 
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
-    Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
+    assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
 
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() == 0);
+    assertTrue(blockOutputStream.getTotalAckDataLength() == 0);
 
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
@@ -542,37 +542,36 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
     TestHelper.waitForContainerClose(key, cluster);
     key.write(data1);
 
     // commitInfoMap will remain intact as there is no server failure
-    Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     // now close the stream, It will hit exception
     key.close();
 
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
@@ -589,33 +588,33 @@ public class TestBlockOutputStreamWithFailures {
             .getBytes(UTF_8);
     key.write(data1);
 
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 4 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -625,18 +624,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertEquals(1, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
     TestHelper.waitForContainerClose(key, cluster);
     // 4 writeChunks = maxFlushSize + 2 putBlocks  will be discarded here
@@ -648,21 +647,20 @@ public class TestBlockOutputStreamWithFailures {
     // and one flush for partial chunk
     key.flush();
 
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertTrue(keyOutputStream.getRetryCount() == 0);
     // commitInfoMap will remain intact as there is no server failure
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
-    Assert.assertEquals(2, keyOutputStream.getStreamEntries().size());
+    assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
+    assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
@@ -681,33 +679,33 @@ public class TestBlockOutputStreamWithFailures {
     key.write(data1);
     // since its hitting the full bufferCondition, it will call watchForCommit
     // and completes at least putBlock for first flushSize worth of data
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast flushSize worth of data buffer
     // where each entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -717,18 +715,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     //  flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertEquals(1, raftClient.getCommitInfoMap().size());
     Pipeline pipeline = raftClient.getPipeline();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
 
@@ -740,21 +738,20 @@ public class TestBlockOutputStreamWithFailures {
 
     key.flush();
 
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof RaftRetryFailureException);
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertEquals(1, raftClient.getCommitInfoMap().size());
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
-    Assert.assertEquals(2, keyOutputStream.getStreamEntries().size());
+    assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
-    Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
+    assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
@@ -775,33 +772,33 @@ public class TestBlockOutputStreamWithFailures {
     key.write(data1);
     // since its hitting the full bufferCondition, it will call watchForCommit
     // and completes at least putBlock for first flushSize worth of data
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 3);
+    assertTrue(keyOutputStream.getStreamEntries().size() == 3);
     OutputStream stream =
         keyOutputStream.getStreamEntries().get(0).getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
 
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(maxFlushSize,
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
 
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
 
     // watchForCommit will clean up atleast flushSize worth of data buffer
     // where each entry corresponds to flushSize worth of data
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
     // Now do a flush. This will flush the data and update the flush length and
@@ -811,18 +808,18 @@ public class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(dataLength,
+    assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     //  flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertEquals(1, raftClient.getCommitInfoMap().size());
     Pipeline pipeline = raftClient.getPipeline();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
 
@@ -833,25 +830,56 @@ public class TestBlockOutputStreamWithFailures {
 
     key.flush();
 
-    Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
+    assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof RaftRetryFailureException);
 
     // Make sure the retryCount is reset after the exception is handled
-    Assert.assertTrue(keyOutputStream.getRetryCount() == 0);
-    Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
+    assertTrue(keyOutputStream.getRetryCount() == 0);
+    assertEquals(1, raftClient.getCommitInfoMap().size());
 
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
+    assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
     cluster.restartHddsDatanode(pipeline.getNodes().get(0), true);
     validateData(keyName, dataString.concat(dataString).getBytes(UTF_8));
+  }
+
+  @Test
+  public void testAbort() throws Exception {
+    String keyName = getKeyName();
+    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
+    int dataLength = maxFlushSize + 50;
+    // write data more than 1 chunk
+    byte[] data1 =
+        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+            .getBytes(UTF_8);
+    key.write(data1);
+
+    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
+    keyOutputStream.abort();
+    // verify that after abort, can't write.
+    assertThrows(IOException.class, () -> key.write(data1));
+    key.close();
+
+    OMException ex = assertThrows(OMException.class,
+        () -> objectStore.getVolume(volumeName)
+            .getBucket(bucketName).getKey(keyName));
+    // aborted file is not committed and thus will not be seen in namespace.
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
+
+    assertTrue(keyOutputStream.getStreamEntries().isEmpty());
+
+    // verify that abort does not affect another outputstream.
+    try (OzoneOutputStream key2 =
+        createKey(keyName, ReplicationType.RATIS, 0)) {
+      key2.write(data1);
+    }
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
