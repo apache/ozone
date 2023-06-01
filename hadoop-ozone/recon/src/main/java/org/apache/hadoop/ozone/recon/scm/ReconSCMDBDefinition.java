@@ -34,7 +34,8 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
  */
 public class ReconSCMDBDefinition extends SCMDBDefinition {
   private static final Codec<UUID> UUID_CODEC = new DelegatedCodec<>(
-      StringCodec.get(), UUID::fromString, UUID::toString, true);
+      StringCodec.get(), UUID::fromString, UUID::toString,
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static final String RECON_SCM_DB_NAME = "recon-scm.db";
 

@@ -18,43 +18,55 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.common.primitives.Ints;
-
-import javax.annotation.Nonnull;
+import java.nio.ByteBuffer;
 import java.util.function.IntFunction;
 
+import javax.annotation.Nonnull;
+
 /**
- * Codec to convert Integer to/from byte array.
+ * Codec to serialize/deserialize {@link Short}.
  */
-public final class IntegerCodec implements Codec<Integer> {
+public final class ShortCodec implements Codec<Short> {
+
+  private static final ShortCodec INSTANCE = new ShortCodec();
+
+  public static ShortCodec get() {
+    return INSTANCE;
+  }
+
+  private ShortCodec() {
+    // singleton
+  }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull Integer object,
+  public CodecBuffer toCodecBuffer(@Nonnull Short object,
       IntFunction<CodecBuffer> allocator) {
-    return allocator.apply(Integer.BYTES).putInt(object);
+    return allocator.apply(Short.BYTES).putShort(object);
   }
 
   @Override
-  public Integer fromCodecBuffer(@Nonnull CodecBuffer buffer) {
-    return buffer.asReadOnlyByteBuffer().getInt();
+  public Short fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+    return buffer.asReadOnlyByteBuffer().getShort();
+  }
+
+
+  @Override
+  public byte[] toPersistedFormat(Short object) {
+    return ByteBuffer.wrap(new byte[Short.BYTES]).putShort(object).array();
   }
 
   @Override
-  public byte[] toPersistedFormat(Integer object) {
-    return Ints.toByteArray(object);
+  public Short fromPersistedFormat(byte[] rawData) {
+    return ByteBuffer.wrap(rawData).getShort();
   }
 
   @Override
-  public Integer fromPersistedFormat(byte[] rawData) {
-    return Ints.fromByteArray(rawData);
-  }
-
-  @Override
-  public Integer copyObject(Integer object) {
+  public Short copyObject(Short object) {
     return object;
   }
 }

@@ -85,6 +85,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
     } else {
       processPaths(metadataManager, batchOp);
     }
+
+    // update bucket quota in active db
+    for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
+      metadataManager.getBucketTable().putWithBatch(batchOp,
+          metadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+              omBucketInfo.getBucketName()), omBucketInfo);
+    }
   }
 
   public void processPaths(OMMetadataManager omMetadataManager,
@@ -150,13 +157,6 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         if (LOG.isDebugEnabled()) {
           LOG.info("Purge Deleted Directory DBKey: {}", path.getDeletedDir());
         }
-      }
-
-      // update bucket usedBytes.
-      for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
-        omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-                omBucketInfo.getBucketName()), omBucketInfo);
       }
     }
   }

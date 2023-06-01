@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -864,8 +865,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = obj.getKeyName();
     OmKeyInfo keyInfo;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -907,8 +910,15 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(context);
     Objects.requireNonNull(context.getClientUgi());
 
-    String volume = ozObject.getVolumeName();
-    String bucket = ozObject.getBucketName();
+    ResolvedBucket resolvedBucket;
+    try {
+      resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
+    } catch (IOException e) {
+      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    }
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = ozObject.getKeyName();
     String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
     OmKeyArgs args = new OmKeyArgs.Builder()

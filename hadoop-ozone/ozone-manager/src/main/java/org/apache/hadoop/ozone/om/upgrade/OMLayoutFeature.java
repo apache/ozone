@@ -40,7 +40,9 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema"),
 
-  HSYNC(4, "Support hsync");
+  HSYNC(4, "Support hsync"),
+
+  FILESYSTEM_SNAPSHOT(5, "Ozone version supporting snapshot");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

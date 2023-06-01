@@ -214,7 +214,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     OmSnapshot omSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
-            getSnapshotPrefix("snap1"));
+            getSnapshotPrefix("snap1"), true);
 
     // The keys should be present in the snapshot's deletedTable
     for (String deletedKey : deletedKeyNames) {

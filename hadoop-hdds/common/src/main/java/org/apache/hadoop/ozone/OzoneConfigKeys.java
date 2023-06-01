@@ -42,6 +42,14 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
+  public static final String OZONE_METADATA_DIRS_PERMISSIONS =
+      "ozone.metadata.dirs.permissions";
+  public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
+      "ozone.om.db.dirs.permissions";
+
+
+  public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
+
   /**
    *
    * When set to true, allocate a random free port for ozone container,
@@ -102,6 +110,14 @@ public final class OzoneConfigKeys {
       = "ozone.fs.datastream.enabled";
   public static final boolean OZONE_FS_DATASTREAM_ENABLED_DEFAULT
       = false;
+
+  /**
+   * A threshold to auto select datastream to write files in OzoneFileSystem.
+   */
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD
+      = "ozone.fs.datastream.auto.threshold";
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT
+      = "4MB";
 
   /**
    * Flag to enable hsync/hflush.
