@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -62,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -91,12 +91,12 @@ public class TestSnapshotDeletingService {
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
         1, StorageUnit.MB);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
-        200, TimeUnit.MILLISECONDS);
+        500, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT,
         10000, TimeUnit.MILLISECONDS);
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 500);
     conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -142,7 +142,7 @@ public class TestSnapshotDeletingService {
         bucket1snap3.getMetadataManager()
             .getDeletedTable().getRangeKVs(null, 100,
                 "/vol1/bucket1/bucket1key1");
-    Assertions.assertEquals(1, omKeyInfos.size());
+    assertEquals(1, omKeyInfos.size());
   }
 
   @Test
@@ -218,6 +218,12 @@ public class TestSnapshotDeletingService {
           ReplicationType.RATIS, CONTENT);
     }
 
+    // Create 5 keys to overwrite
+    for (int i = 11; i <= 15; i++) {
+      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
+          ReplicationType.RATIS, CONTENT);
+    }
+
     // Create Directory and Sub
     for (int i = 1; i <= 3; i++) {
       String parent = "parent" + i;
@@ -235,13 +241,20 @@ public class TestSnapshotDeletingService {
 
     // Total 12 dirs, 19 keys.
     assertTableRowCount(dirTable, 12);
-    assertTableRowCount(keyTable, 19);
+    assertTableRowCount(keyTable, 24);
     assertTableRowCount(deletedDirTable, 0);
 
     // Create Snapshot1
     client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
         "snap1");
     assertTableRowCount(snapshotInfoTable, 1);
+
+    // Overwrite 3 keys -> Moves previous version to deletedTable
+    for (int i = 11; i <= 13; i++) {
+      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
+          ReplicationType.RATIS, CONTENT);
+    }
+    assertTableRowCount(keyTable, 24);
 
     // Delete 5 Keys
     for (int i = 1; i <= 5; i++) {
@@ -279,7 +292,7 @@ public class TestSnapshotDeletingService {
           "/renamedParent" + i, true);
     }
 
-    assertTableRowCount(deletedTable, 8);
+    assertTableRowCount(deletedTable, 11);
     assertTableRowCount(deletedDirTable, 3);
     assertTableRowCount(dirTable, 9);
     assertTableRowCount(renamedTable, 4);
@@ -295,13 +308,25 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(deletedTable, 0);
     assertTableRowCount(deletedDirTable, 0);
 
+    // Delete 3 overwritten keys
+    for (int i = 11; i <= 13; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
+          "key" + i, false);
+    }
+
+    // Overwrite 2 keys
+    for (int i = 14; i <= 15; i++) {
+      TestDataUtil.createKey(bucket2, "key" + i, ReplicationFactor.THREE,
+          ReplicationType.RATIS, CONTENT);
+    }
+
     // Delete 2 more keys
     for (int i = 9; i <= 10; i++) {
       client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
           "key" + i, false);
     }
 
-    assertTableRowCount(deletedTable, 2);
+    assertTableRowCount(deletedTable, 7);
 
     // Create Snapshot3
     client.getObjectStore().createSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
@@ -311,7 +336,7 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 0);
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(deletedTable, 0);
-    assertTableRowCount(keyTable, 9);
+    assertTableRowCount(keyTable, 11);
     SnapshotInfo deletedSnap = om.getMetadataManager()
         .getSnapshotInfoTable().get("/vol1/bucket2/snap2");
 
@@ -319,6 +344,12 @@ public class TestSnapshotDeletingService {
         "snap2");
     assertTableRowCount(snapshotInfoTable, 2);
 
+    // Delete 2 overwritten keys
+    for (int i = 14; i <= 15; i++) {
+      client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_TWO,
+          "key" + i, false);
+    }
+    assertTableRowCount(deletedTable, 2);
     // Once all the tables are moved, the snapshot is deleted
     assertTableRowCount(om.getMetadataManager().getSnapshotInfoTable(), 2);
 
@@ -337,12 +368,12 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(snapRenamedTable, 4);
     assertTableRowCount(snapDeletedDirTable, 3);
     // All the keys deleted before snapshot2 is moved to snap3
-    assertTableRowCount(snapDeletedTable, 10);
+    assertTableRowCount(snapDeletedTable, 15);
 
     // Before deleting the last snapshot
     assertTableRowCount(renamedTable, 0);
     assertTableRowCount(deletedDirTable, 0);
-    assertTableRowCount(deletedTable, 0);
+    assertTableRowCount(deletedTable, 2);
     // Delete Snapshot3 and check entries moved to active DB
     client.getObjectStore().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
         "snap3");
@@ -351,7 +382,7 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(snapshotInfoTable, 1);
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
-    assertTableRowCount(deletedTable, 10);
+    assertTableRowCount(deletedTable, 15);
   }
 
   /*
