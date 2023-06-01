@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -172,7 +171,6 @@ public class TestContainerStateManager {
         .setPipelineID(pipeline.getId())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.now())
         .setOwner("root")
         .setContainerID(1)
         .setDeleteTransactionId(0)

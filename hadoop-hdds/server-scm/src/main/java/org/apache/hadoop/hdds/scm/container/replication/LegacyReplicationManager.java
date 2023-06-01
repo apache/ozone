@@ -64,7 +64,6 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -73,6 +72,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -2260,11 +2261,11 @@ public class LegacyReplicationManager {
      * time.
      */
 
-    final long waitTime = rmConf.getInterval() * 5;
-    final long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
+    final Duration waitTime = rmConf.getInterval().multipliedBy(5);
+    final Instant closingTime = containerInfo.getStateEnterTime();
 
     try {
-      if ((Time.now() - closingTime) > waitTime) {
+      if (clock.instant().isAfter(closingTime.plus(waitTime))) {
         containerManager.updateContainerState(containerInfo.containerID(),
             HddsProtos.LifeCycleEvent.CLOSE);
       }

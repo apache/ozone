@@ -27,11 +27,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 /**
  * Class used in Replication Manager to close replicas of CLOSING containers.
@@ -41,9 +42,11 @@ public class ClosingContainerHandler extends AbstractCheck {
       LoggerFactory.getLogger(ClosingContainerHandler.class);
 
   private final ReplicationManager replicationManager;
+  private final Clock clock;
 
-  public ClosingContainerHandler(ReplicationManager replicationManager) {
-    this.replicationManager = replicationManager;
+  public ClosingContainerHandler(ReplicationManager rm, Clock clock) {
+    replicationManager = rm;
+    this.clock = clock;
   }
 
   /**
@@ -96,20 +99,24 @@ public class ClosingContainerHandler extends AbstractCheck {
      * For now, we are using ReplicationManagerThread Interval * 5 as the wait
      * time.
      */
+    if (request.getContainerReplicas().isEmpty() &&
+        containerInfo.getNumberOfKeys() == 0 &&
+        hasWaitTimeElapsed(containerInfo)) {
 
+      LOG.debug("Container appears to be empty, has no replicas, and has been "
+          + "closing, so moving to closed state: {}", containerInfo);
 
-    final Optional<ContainerInfo> emptyContainer = Optional.of(containerInfo)
-        .filter(c -> c.getReplicationType().equals(ReplicationType.RATIS))
-        .filter(c -> request.getContainerReplicas().isEmpty())
-        .filter(c -> c.getNumberOfKeys() == 0)
-        .filter(c -> {
-          long waitTime = replicationManager.getConfig().getInterval() * 5;
-          long closingTime = containerInfo.getStateEnterTime().toEpochMilli();
-          return (Time.now() - closingTime) > waitTime;
-        });
+      replicationManager.updateContainerState(
+          containerInfo.containerID(), LifeCycleEvent.CLOSE);
+    }
 
-    emptyContainer.ifPresent(c -> replicationManager.updateContainerState(
-        c.containerID(), LifeCycleEvent.CLOSE));
     return true;
+  }
+
+  private boolean hasWaitTimeElapsed(ContainerInfo containerInfo) {
+    Duration waitTime = replicationManager.getConfig().getInterval()
+        .multipliedBy(5);
+    Instant closingTime = containerInfo.getStateEnterTime();
+    return clock.instant().isAfter(closingTime.plus(waitTime));
   }
 }
