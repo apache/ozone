@@ -210,6 +210,7 @@ public class TestOmSnapshot {
     keyManager.stop();
     preFinalizationChecks();
     finalizeOMUpgrade();
+    counter = new AtomicInteger();
   }
 
   private static void expectFailurePreFinalization(LambdaTestUtils.
