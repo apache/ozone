@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -268,6 +269,14 @@ public final class ReplicationSupervisor {
     return counter == null ? 0 : counter.get();
   }
 
+  public Map<String, Integer> getInFlightReplicationSummary() {
+    Map<String, Integer> result = new HashMap<>();
+    for (Map.Entry<Class<?>, AtomicInteger> entry : taskCounter.entrySet()) {
+      result.put(entry.getKey().getSimpleName(), entry.getValue().get());
+    }
+    return result;
+  }
+
   /**
    * Returns a count of all inflight replication tasks across all task types.
    * Note that `getInFlightReplications(Class taskClass) allows for the .count
@@ -411,6 +420,14 @@ public final class ReplicationSupervisor {
       return ((ThreadPoolExecutor)executor).getQueue().size();
     } else {
       return 0;
+    }
+  }
+
+  public long getMaxReplicationStreams() {
+    if (executor instanceof ThreadPoolExecutor) {
+      return ((ThreadPoolExecutor) executor).getMaximumPoolSize();
+    } else {
+      return 1;
     }
   }
 
