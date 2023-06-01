@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -56,11 +55,8 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.Objects;
@@ -116,7 +112,6 @@ public final class TestBlockTokens {
   public Timeout timeout = Timeout.seconds(180);
 
   private static MiniKdc miniKdc;
-  private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
   private static File workDir;
   private static File ozoneKeytab;
@@ -126,7 +121,6 @@ public final class TestBlockTokens {
   private static String host;
   private static String clusterId;
   private static String scmId;
-  private static String omServiceId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static BlockInputStreamFactory blockInputStreamFactory =
@@ -143,7 +137,6 @@ public final class TestBlockTokens {
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
-    omServiceId = "om-service-test";
 
     startMiniKdc();
     setSecureConfig();
@@ -151,7 +144,6 @@ public final class TestBlockTokens {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
-    ozoneAdmin = new OzoneAdmin(conf);
     createTestData();
   }
 
@@ -279,22 +271,6 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
-  @Test
-  public void testFetchKeyOMAdminCommand() throws UnsupportedEncodingException {
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    PrintStream printStream = new PrintStream(outputStream, true, "UTF-8");
-    System.setOut(printStream);
-
-    String[] args =
-        new String[]{"om", "fetch-key", "--service-id=" + omServiceId};
-    ozoneAdmin.execute(args);
-
-    String actualOutput = outputStream.toString("UTF-8");
-    System.setOut(System.out);
-
-    assertTrue(actualOutput.contains("Successfully re-fetched the secret key"));
-  }
-
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
         keyInfo.getKeyLocationVersions().get(0).getLocationList().get(0);
@@ -406,7 +382,6 @@ public final class TestBlockTokens {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
-        .setOMServiceId("om-service-test")
         .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
