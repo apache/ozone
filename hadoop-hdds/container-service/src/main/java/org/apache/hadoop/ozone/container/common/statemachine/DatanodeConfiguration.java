@@ -44,6 +44,8 @@ public class DatanodeConfiguration {
       "hdds.datanode.periodic.disk.check.interval.minutes";
   public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.data.volumes.tolerated";
+  public static final String CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_KEY =
+      "hdds.datanode.consecutive.volume.io.failures.tolerated";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.metadata.volumes.tolerated";
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
@@ -63,6 +65,8 @@ public class DatanodeConfiguration {
   static final long PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT = 60;
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
+
+  public static final int CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT = 3;
 
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
@@ -269,6 +273,17 @@ public class DatanodeConfiguration {
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
+  @Config(key = "consecutive.volume.io.failures.tolerated",
+      defaultValue = "3",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of consecutive disk health checks that can " +
+          "fail due to a read/write error before the volume is considered " +
+          "failed."
+  )
+  private int consecutiveVolumeIOFailuresTolerated =
+      CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -451,6 +466,15 @@ public class DatanodeConfiguration {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
+    if (consecutiveVolumeIOFailuresTolerated < 1) {
+      LOG.warn(CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_KEY +
+              "must be at least 1 and was set to {}. Defaulting to {}",
+          consecutiveVolumeIOFailuresTolerated,
+          CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
+      consecutiveVolumeIOFailuresTolerated =
+          CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+    }
+
     if (diskCheckMinGap < 0) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -529,6 +553,14 @@ public class DatanodeConfiguration {
 
   public void setFailedDbVolumesTolerated(int failedVolumesTolerated) {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public int getConsecutiveVolumeIOFailuresTolerated() {
+    return consecutiveVolumeIOFailuresTolerated;
+  }
+
+  public void setConsecutiveVolumeIOFailuresTolerated(int failuresToTolerate) {
+    this.consecutiveVolumeIOFailuresTolerated = failuresToTolerate;
   }
 
   public Duration getDiskCheckMinGap() {

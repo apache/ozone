@@ -27,6 +27,7 @@ import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.util.DiskChecker;
@@ -124,6 +125,14 @@ public abstract class StorageVolume
   private final VolumeSet volumeSet;
 
 
+  /*
+  The number of consecutive times this volume encountered an IO error
+  during a volume check. If this number crosses a configured threshold,
+  the volume will be failed. A passing check will reset this counter.
+   */
+  private int consecutiveIOFailureCount;
+  private int consecutiveIOFailureTolerance;
+
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
       StorageLocation location = StorageLocation.parse(b.volumeRootStr);
@@ -138,6 +147,10 @@ public abstract class StorageVolume
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.conf = b.conf;
+      this.consecutiveIOFailureCount = 0;
+      this.consecutiveIOFailureTolerance =
+          conf.getObject(DatanodeConfiguration.class)
+          .getConsecutiveVolumeIOFailuresTolerated();
     } else {
       storageDir = new File(b.volumeRootStr);
       this.volumeInfo = Optional.empty();
@@ -502,16 +515,34 @@ public abstract class StorageVolume
    */
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
-    boolean checkPassed = DiskCheckUtil.checkExistence(LOG, storageDir) &&
-        DiskCheckUtil.checkPermissions(LOG, storageDir) &&
-        // TODO get correct tmp dir.
-        // TODO configure num bytes to write.
-        DiskCheckUtil.checkReadWrite(LOG, storageDir, storageDir, 100);
-    if (checkPassed) {
-      return VolumeCheckResult.HEALTHY;
-    } else {
+    boolean directoryChecksPassed =
+        DiskCheckUtil.checkExistence(LOG, storageDir) &&
+        DiskCheckUtil.checkPermissions(LOG, storageDir);
+    // If the directory is not present or has incorrect permissions, fail the
+    // volume immediately since this is not an intermittent error.
+    if (!directoryChecksPassed) {
       return VolumeCheckResult.FAILED;
     }
+
+    // TODO get correct tmp dir.
+    // TODO configure num bytes to write.
+    boolean diskChecksPassed =
+        DiskCheckUtil.checkReadWrite(LOG, storageDir, storageDir, 100);
+    if (diskChecksPassed) {
+      // Reset consecutive IO failure count when IO succeeds.
+      // Volume remains healthy.
+      consecutiveIOFailureCount = 0;
+    } else {
+      consecutiveIOFailureCount++;
+      if (consecutiveIOFailureCount > consecutiveIOFailureTolerance) {
+        // After too many repeated IO failures, the volume should be failed.
+        return VolumeCheckResult.FAILED;
+      }
+      // Volume remains healthy until the threshold of consecutive failures
+      // is crossed.
+    }
+
+    return VolumeCheckResult.HEALTHY;
   }
 
   @Override

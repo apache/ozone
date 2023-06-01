@@ -318,6 +318,7 @@ public class StorageVolumeChecker {
         switch (result) {
         case HEALTHY:
         case DEGRADED:
+          // Ozone does not currently use this state.
           if (LOG.isDebugEnabled()) {
             LOG.debug("Volume {} is {}.", volume, result);
           }
