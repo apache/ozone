@@ -46,6 +46,8 @@ public class DatanodeConfiguration {
       "hdds.datanode.failed.data.volumes.tolerated";
   public static final String CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_KEY =
       "hdds.datanode.consecutive.volume.io.failures.tolerated";
+  public static final String VOLUME_HEALTH_CHECK_FILE_SIZE_KEY =
+      "hdds.datanode.volume.health.check.file.size";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.metadata.volumes.tolerated";
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY =
@@ -67,6 +69,8 @@ public class DatanodeConfiguration {
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
   public static final int CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT = 3;
+
+  public static final int VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT = 100;
 
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
@@ -284,6 +288,18 @@ public class DatanodeConfiguration {
   private int consecutiveVolumeIOFailuresTolerated =
       CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
 
+  @Config(key = "volume.health.check.file.size",
+      defaultValue = "100B",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "The size of the temporary file that will be synced to " +
+          "the disk and " +
+          "read back to assess its health. The contents of the " +
+          "file will be stored in memory during the duration of the check."
+  )
+  private int volumeHealthCheckFileSize =
+      VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -475,6 +491,15 @@ public class DatanodeConfiguration {
           CONSECUTIVE_VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
     }
 
+    if (volumeHealthCheckFileSize < 1) {
+      LOG.warn(VOLUME_HEALTH_CHECK_FILE_SIZE_KEY +
+              "must be at least 1 byte and was set to {}. Defaulting to {}",
+          volumeHealthCheckFileSize,
+          VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT);
+      volumeHealthCheckFileSize =
+          VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+    }
+
     if (diskCheckMinGap < 0) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -511,7 +536,6 @@ public class DatanodeConfiguration {
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
-
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
@@ -561,6 +585,14 @@ public class DatanodeConfiguration {
 
   public void setConsecutiveVolumeIOFailuresTolerated(int failuresToTolerate) {
     this.consecutiveVolumeIOFailuresTolerated = failuresToTolerate;
+  }
+
+  public int getVolumeHealthCheckFileSize() {
+    return volumeHealthCheckFileSize;
+  }
+
+  public void getVolumeHealthCheckFileSize(int fileSizeBytes) {
+    this.volumeHealthCheckFileSize = fileSizeBytes;
   }
 
   public Duration getDiskCheckMinGap() {
