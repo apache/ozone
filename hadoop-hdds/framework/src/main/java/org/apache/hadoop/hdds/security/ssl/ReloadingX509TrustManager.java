@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.ssl;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +139,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    for (X509Certificate cert : caClient.getAllCaCerts()) {
+    for (String certString : caClient.listCA()) {
+      X509Certificate cert = CertificateCodec.getX509Certificate(certString);
       String certId = cert.getSerialNumber().toString();
       ks.setCertificateEntry(certId, cert);
     }

@@ -111,7 +111,7 @@ public interface CertificateClient extends Closeable {
    * Return all certificates in this component's trust chain,
    * the last one is the root CA certificate.
    */
-  List<X509Certificate> getTrustChain() throws CertificateException;
+  List<X509Certificate> getTrustChain() throws IOException;
 
   /**
    * Return the latest Root CA certificate known to the client.
@@ -120,7 +120,7 @@ public interface CertificateClient extends Closeable {
    */
   X509Certificate getRootCACertificate();
 
-  Set<X509Certificate> getAllCaCerts();
+  Set<X509Certificate> getAllRootCaCerts();
 
   /**
    * Return the pem encoded CA certificate list.
