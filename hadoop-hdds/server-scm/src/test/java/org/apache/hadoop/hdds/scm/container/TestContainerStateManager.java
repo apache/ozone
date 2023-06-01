@@ -96,7 +96,7 @@ public class TestContainerStateManager {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            conf, Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault())))
         .build();
 
   }
