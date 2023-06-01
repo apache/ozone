@@ -204,6 +204,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
@@ -298,7 +299,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     if (threadLocalS3Auth.get() != null) {
       if (!Strings.isNullOrEmpty(threadLocalS3Auth.get().getAccessID())) {
-        String caller = "S3Auth:S3G|" +
+        String caller = OM_S3_CALLER_CONTEXT_PREFIX +
             threadLocalS3Auth.get().getAccessID();
         CallerContext callerContext =
             new CallerContext.Builder(caller).build();

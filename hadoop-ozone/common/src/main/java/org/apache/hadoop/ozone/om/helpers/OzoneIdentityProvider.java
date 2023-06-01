@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
+
 /**
  * Ozone implementation of IdentityProvider used by
  * Hadoop DecayRpcScheduler.
@@ -60,8 +62,10 @@ public class OzoneIdentityProvider implements IdentityProvider {
       // and the value should be ignored.
       if (Objects.nonNull(callerContext) &&
           !StringUtil.isNullOrEmpty(callerContext.getContext()) &&
-          callerContext.getContext().startsWith("S3Auth:S3G|")) {
-        return callerContext.getContext().substring(11);
+          callerContext.getContext()
+              .startsWith(OM_S3_CALLER_CONTEXT_PREFIX)) {
+        return callerContext.getContext()
+            .substring(OM_S3_CALLER_CONTEXT_PREFIX.length());
       }
     } catch (UnsupportedOperationException ex) {
       LOG.error("Trying to access CallerContext from a Schedulable " +

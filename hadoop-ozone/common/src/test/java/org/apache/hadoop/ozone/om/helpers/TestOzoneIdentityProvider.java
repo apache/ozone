@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
+
 /**
  * Test class for {@link OzoneIdentityProvider}.
  */
@@ -59,7 +61,9 @@ public class TestOzoneIdentityProvider {
 
         @Override
         public CallerContext getCallerContext() {
-          return new CallerContext.Builder("S3Auth:S3G|" + ACCESS_ID).build();
+          return new CallerContext
+              .Builder(OM_S3_CALLER_CONTEXT_PREFIX + ACCESS_ID)
+              .build();
         }
 
         @Override
@@ -112,6 +116,10 @@ public class TestOzoneIdentityProvider {
     String identity = identityProvider
         .makeIdentity(NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE);
 
+    Assertions.assertFalse(
+        NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE
+            .getCallerContext().getContext()
+            .startsWith(OM_S3_CALLER_CONTEXT_PREFIX));
     Assertions.assertEquals(
         NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE
             .getUserGroupInformation()
