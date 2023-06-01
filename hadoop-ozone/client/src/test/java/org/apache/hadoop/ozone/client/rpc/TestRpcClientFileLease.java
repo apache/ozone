@@ -37,6 +37,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Test cases for RpcClientFileLease.
+ */
 public class TestRpcClientFileLease {
   public static final Logger LOG =
       LoggerFactory.getLogger(TestRpcClientFileLease.class);
@@ -91,7 +94,8 @@ public class TestRpcClientFileLease {
         new RpcClientFileLease.KeyIdentifier(keyInfo2);
     KeyOutputStream outputStream = Mockito.mock(KeyOutputStream.class);
 
-    UserGroupInformation ugi = UserGroupInformation.createUserForTesting("user1", new String[] {"group1"});
+    UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+        "user1", new String[] {"group1"});
 
     OzoneManagerClientProtocol client =
         Mockito.mock(OzoneManagerClientProtocol.class);
