@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -62,6 +63,9 @@ public abstract class StorageVolume
 
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolume.class);
+
+  // The name of the directory used for temporary files on the volume.
+  private static final String TMP_DIR_NAME = "tmp";
 
   /**
    * Type for StorageVolume.
@@ -105,12 +109,13 @@ public abstract class StorageVolume
   private ConfigurationSource conf;
 
   private final File storageDir;
+  private String workingDirName;
+  private Path tmpDir;
 
   private final Optional<VolumeInfo> volumeInfo;
 
   private final VolumeSet volumeSet;
 
-  private String workingDir;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
@@ -180,19 +185,27 @@ public abstract class StorageVolume
   }
 
   /**
-   * Create working directory for cluster io loads.
-   * @param workingDirName scmID or clusterID according to SCM HA config
-   * @param dbVolumeSet optional dbVolumes
+   * Create the working directory for the volume at
+   * <volume>/<hdds>/<workingDirName>.
+   * Creates necessary subdirectories of the working directory as well. This
+   * includes the tmp directory at <volume>/<hdds>/<workingDirName>/tmp.
+   * Child classes may override this method to add volume specific
+   * subdirectories, but they should call the parent method first to make
+   * sure initial directories are constructed.
+   *
+   * @param workingDirName scmID or clusterID according to SCM HA
+   *    layout feature upgrade finalization status.
    * @throws IOException
    */
-  public void createWorkingDir(String workingDirName,
+  public void createWorkingDirs(String workingDirName,
       MutableVolumeSet dbVolumeSet) throws IOException {
     File idDir = new File(getStorageDir(), workingDirName);
     if (!idDir.mkdir()) {
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
-    this.workingDir = workingDirName;
+    this.workingDirName = workingDirName;
+    this.tmpDir = new File(idDir, TMP_DIR_NAME).toPath();
   }
 
   private VolumeState analyzeVolumeState() {
@@ -392,8 +405,12 @@ public abstract class StorageVolume
     return this.storageDir;
   }
 
-  public String getWorkingDir() {
-    return this.workingDir;
+  public String getWorkingDirName() {
+    return this.workingDirName;
+  }
+
+  public Path getTmpDir() {
+    return this.tmpDir;
   }
 
   public void refreshVolumeInfo() {

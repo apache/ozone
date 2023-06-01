@@ -392,7 +392,7 @@ public class TestContainerPersistence {
       hddsVolume = volumeBuilder.build();
 
       hddsVolume.format(SCM_ID);
-      hddsVolume.createWorkingDir(SCM_ID, null);
+      hddsVolume.createWorkingDirs(SCM_ID, null);
     }
 
     long testContainerID1 = getTestContainerID();

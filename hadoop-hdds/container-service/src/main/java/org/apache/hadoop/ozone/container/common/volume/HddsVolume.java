@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,9 +74,8 @@ public class HddsVolume extends StorageVolume {
   private static final Logger LOG = LoggerFactory.getLogger(HddsVolume.class);
 
   public static final String HDDS_VOLUME_DIR = "hdds";
-  private static final Path TMP_DIR = Paths.get("tmp");
-  private static final Path TMP_DELETE_SERVICE_DIR =
-      Paths.get("container_delete_service");
+  private static final String TMP_CONTAINER_DELETE_DIR_NAME =
+      "container_delete_service";
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
@@ -93,7 +91,6 @@ public class HddsVolume extends StorageVolume {
   // container db path. This is initialized only once together with dbVolume,
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
-  private Path tmpDirPath;
   private Path deleteServiceDirPath;
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
 
@@ -144,16 +141,32 @@ public class HddsVolume extends StorageVolume {
   }
 
   @Override
-  public void createWorkingDir(String workingDirName,
+  public void createWorkingDirs(String workingDirName,
       MutableVolumeSet dbVolumeSet) throws IOException {
-    super.createWorkingDir(workingDirName, dbVolumeSet);
-
-    createTmpDir();
+    super.createWorkingDirs(workingDirName, dbVolumeSet);
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
         HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
       createDbStore(dbVolumeSet);
+    }
+
+    createDeleteServiceDir();
+  }
+
+  /**
+   * Create the directory where containers are moved before being deleted.
+   * This ensures container delete is atomic at the file system level.
+   */
+  private void createDeleteServiceDir() {
+    deleteServiceDirPath = getTmpDir().resolve(TMP_CONTAINER_DELETE_DIR_NAME);
+
+    if (Files.notExists(deleteServiceDirPath)) {
+      try {
+        Files.createDirectories(deleteServiceDirPath);
+      } catch (IOException ex) {
+        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
+      }
     }
   }
 
@@ -244,10 +257,6 @@ public class HddsVolume extends StorageVolume {
     return this.dbParentDir;
   }
 
-  public Path getTmpDirPath() {
-    return this.tmpDirPath;
-  }
-
   public Path getDeleteServiceDirPath() {
     return this.deleteServiceDirPath;
   }
@@ -312,19 +321,19 @@ public class HddsVolume extends StorageVolume {
   public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
     DbVolume chosenDbVolume = null;
     File clusterIdDir;
-    String workingDir = getWorkingDir() == null ? getClusterID() :
-        getWorkingDir();
+    String workingDirName = getWorkingDirName() == null ? getClusterID() :
+        getWorkingDirName();
 
     if (dbVolumeSet == null || dbVolumeSet.getVolumesList().isEmpty()) {
       // No extra db volumes specified, just create db under the HddsVolume.
-      clusterIdDir = new File(getStorageDir(), workingDir);
+      clusterIdDir = new File(getStorageDir(), workingDirName);
     } else {
       // Randomly choose a DbVolume for simplicity.
       List<DbVolume> dbVolumeList = StorageVolumeUtil.getDbVolumesList(
           dbVolumeSet.getVolumesList());
       chosenDbVolume = dbVolumeList.get(
           ThreadLocalRandom.current().nextInt(dbVolumeList.size()));
-      clusterIdDir = new File(chosenDbVolume.getStorageDir(), workingDir);
+      clusterIdDir = new File(chosenDbVolume.getStorageDir(), workingDirName);
     }
 
     if (!clusterIdDir.exists()) {
@@ -366,62 +375,6 @@ public class HddsVolume extends StorageVolume {
     // If SchemaV3 is disabled, close the DB instance
     if (!SchemaV3.isFinalizedAndEnabled(getConf())) {
       closeDbStore();
-    }
-  }
-
-  private String getIdDir() throws IOException {
-    try {
-      return VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-          this, getClusterID() == null ? "" : getClusterID());
-    } catch (IOException ex) {
-      String errMsg = "Cannot resolve volume container path " +
-          "ID dir for volume {} " + getStorageID() +
-          " when creating volume tmp dir";
-      LOG.error(errMsg, ex);
-      throw new IOException(errMsg, ex);
-    }
-  }
-
-  private Path createTmpPath() throws IOException {
-
-    // HddsVolume root directory path
-    String hddsRoot = getHddsRootDir().toString();
-
-    // HddsVolume path
-    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
-
-    Path volPath = Paths.get(vol);
-    Path idPath = Paths.get(getIdDir());
-
-    return volPath.resolve(idPath).resolve(TMP_DIR);
-  }
-
-  private void createTmpDir() throws IOException {
-    tmpDirPath = createTmpPath();
-
-    if (Files.notExists(tmpDirPath)) {
-      try {
-        Files.createDirectories(tmpDirPath);
-      } catch (IOException ex) {
-        LOG.error("Error creating {}", tmpDirPath.toString(), ex);
-      }
-    }
-  }
-
-  public void createDeleteServiceDir() throws IOException {
-    if (tmpDirPath == null) {
-      createTmpDir();
-    }
-
-    deleteServiceDirPath =
-        tmpDirPath.resolve(TMP_DELETE_SERVICE_DIR);
-
-    if (Files.notExists(deleteServiceDirPath)) {
-      try {
-        Files.createDirectories(deleteServiceDirPath);
-      } catch (IOException ex) {
-        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
-      }
     }
   }
 

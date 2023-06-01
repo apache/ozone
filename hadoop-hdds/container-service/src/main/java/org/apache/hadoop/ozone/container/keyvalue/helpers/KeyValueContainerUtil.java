@@ -182,7 +182,6 @@ public final class KeyValueContainerUtil {
   /**
    * Returns if there are no blocks in the container.
    * @param containerData Container to check
-   * @param conf configuration
    * @return true if the directory containing blocks is empty
    * @throws IOException
    */
@@ -548,9 +547,6 @@ public final class KeyValueContainerUtil {
         throws IOException {
       List<File> leftovers = new ArrayList<>();
 
-      // Initialize tmp and delete service directories
-      hddsVolume.createDeleteServiceDir();
-
       File tmpDir = hddsVolume.getDeleteServiceDirPath().toFile();
 
       if (tmpDir.exists() && tmpDir.isDirectory()) {
@@ -576,14 +572,6 @@ public final class KeyValueContainerUtil {
       String containerPath = keyValueContainerData.getContainerPath();
       File container = new File(containerPath);
       String containerDirName = container.getName();
-
-      // Initialize delete directory
-      try {
-        hddsVolume.createDeleteServiceDir();
-      } catch (IOException ex) {
-        LOG.error("Error initializing container-service tmp dir");
-        return false;
-      }
 
       String destinationDirPath = hddsVolume.getDeleteServiceDirPath()
           .resolve(Paths.get(containerDirName)).toString();

@@ -144,7 +144,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
                 .cleanTmpDir(hddsVolume);
           } catch (IOException ex) {
             LOG.error("Error while cleaning tmp delete directory " +
-                "under {}", hddsVolume.getWorkingDir(), ex);
+                "under {}", hddsVolume.getWorkingDirName(), ex);
           }
         }
       }

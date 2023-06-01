@@ -126,7 +126,7 @@ public class VersionEndpointTask implements
             ozoneContainer.getDbVolumeSet());
 
         if (result) {
-          // Clean <HddsVolume>/tmp/container_delete_service dir.
+          // Clean the temporary container delete directory.
           if (volume instanceof HddsVolume) {
             HddsVolume hddsVolume = (HddsVolume) volume;
             try {
@@ -134,7 +134,7 @@ public class VersionEndpointTask implements
                   .cleanTmpDir(hddsVolume);
             } catch (IOException ex) {
               LOG.error("Error while cleaning tmp delete directory " +
-                  "under {}", hddsVolume.getWorkingDir(), ex);
+                  "under {}", hddsVolume.getDeleteServiceDirPath(), ex);
             }
           }
         } else {

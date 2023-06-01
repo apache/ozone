@@ -105,9 +105,9 @@ public class TestHddsVolume {
 
     // Create a working directory
     // tmp directory should be initialized.
-    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createWorkingDirs(CLUSTER_ID, null);
 
-    File tmpDir = new File(volume.getTmpDirPath().toString());
+    File tmpDir = new File(volume.getTmpDir().toString());
     assertTrue(tmpDir.exists());
 
     // Shutdown the volume.
@@ -272,7 +272,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createWorkingDirs(CLUSTER_ID, null);
 
     // No DbVolume chosen and use the HddsVolume itself to hold
     // a db instance.
@@ -298,7 +298,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
+    volume.createWorkingDirs(CLUSTER_ID, dbVolumeSet);
 
     // DbVolume chosen.
     assertNotNull(volume.getDbVolume());
@@ -323,7 +323,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createWorkingDirs(CLUSTER_ID, null);
 
     // No DbVolume chosen and use the HddsVolume itself to hold
     // a db instance.
@@ -355,7 +355,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
+    volume.createWorkingDirs(CLUSTER_ID, dbVolumeSet);
 
     // DbVolume chosen.
     assertNotNull(volume.getDbVolume());
@@ -406,7 +406,7 @@ public class TestHddsVolume {
         CLUSTER_ID, CONF, null, StorageVolume.VolumeType.DB_VOLUME,
         null);
     dbVolumeSet.getVolumesList().get(0).format(CLUSTER_ID);
-    dbVolumeSet.getVolumesList().get(0).createWorkingDir(CLUSTER_ID, null);
+    dbVolumeSet.getVolumesList().get(0).createWorkingDirs(CLUSTER_ID, null);
     return dbVolumeSet;
   }
 }

@@ -368,7 +368,7 @@ public class TestKeyValueHandler {
           .clusterID(clusterId).datanodeUuid(datanodeId)
           .build();
       hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDir(clusterId, null);
+      hddsVolume.createWorkingDirs(clusterId, null);
 
       Mockito.when(volumeSet.getVolumesList())
           .thenReturn(Collections.singletonList(hddsVolume));

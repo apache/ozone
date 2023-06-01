@@ -225,7 +225,7 @@ public final class StorageVolumeUtil {
       String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
           scmId, clusterId);
       try {
-        volume.createWorkingDir(id, dbVolumeSet);
+        volume.createWorkingDirs(id, dbVolumeSet);
       } catch (IOException e) {
         logger.error("Prepare working dir failed for volume {}.",
             volumeRootPath, e);

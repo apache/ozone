@@ -107,7 +107,7 @@ public class TestDbVolume {
 
     // Format the volume with clusterID.
     volume.format(CLUSTER_ID);
-    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createWorkingDirs(CLUSTER_ID, null);
 
     // The clusterIdDir should be created
     File clusterIdDir = new File(volume.getStorageDir(), CLUSTER_ID);
@@ -133,7 +133,7 @@ public class TestDbVolume {
 
     DbVolume dbVolume = volumeBuilder.build();
     dbVolume.format(CLUSTER_ID);
-    dbVolume.createWorkingDir(CLUSTER_ID, null);
+    dbVolume.createWorkingDirs(CLUSTER_ID, null);
 
     MutableVolumeSet dbVolumeSet = mock(MutableVolumeSet.class);
     when(dbVolumeSet.getVolumesList())
@@ -143,7 +143,7 @@ public class TestDbVolume {
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
       hddsVolume.format(CLUSTER_ID);
-      hddsVolume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
+      hddsVolume.createWorkingDirs(CLUSTER_ID, dbVolumeSet);
     }
 
     // The db handlers should be in the cache

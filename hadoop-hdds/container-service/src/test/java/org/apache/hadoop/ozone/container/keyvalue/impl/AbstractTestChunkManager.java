@@ -81,7 +81,7 @@ public abstract class AbstractTestChunkManager {
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
         .toString()).clusterID(clusterId.toString()).build();
     hddsVolume.format(clusterId.toString());
-    hddsVolume.createWorkingDir(clusterId.toString(), null);
+    hddsVolume.createWorkingDirs(clusterId.toString(), null);
 
     VolumeSet volumeSet = mock(MutableVolumeSet.class);
 
