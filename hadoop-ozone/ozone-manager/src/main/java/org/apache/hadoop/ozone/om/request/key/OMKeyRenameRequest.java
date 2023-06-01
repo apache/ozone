@@ -230,8 +230,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
       LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-              "toKey:{}. Key: {} not found.", volumeName, bucketName,
-          fromKeyName, toKeyName, fromKeyName);
+              "toKey:{}. Exception: {}.", volumeName, bucketName,
+          fromKeyName, toKeyName, exception.getMessage());
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",

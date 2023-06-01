@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -14,21 +14,34 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
-
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.ratis.util.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.MoveDataNodePairProto;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 
-import java.io.IOException;
+import java.util.Objects;
 
 /**
  * MoveDataNodePair encapsulates the source and target
  * datanodes of a move option.
+ * <p>
+ * This class is immutable.
  */
 public class MoveDataNodePair {
+  private static final Codec<MoveDataNodePair> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(MoveDataNodePairProto.class),
+      MoveDataNodePair::getFromProtobuf,
+      pair -> pair.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      DelegatedCodec.CopyType.SHALLOW);
+
+  public static Codec<MoveDataNodePair> getCodec() {
+    return CODEC;
+  }
+
   /**
    * source datanode of current move option.
    */
@@ -52,18 +65,16 @@ public class MoveDataNodePair {
     return src;
   }
 
-  public HddsProtos.MoveDataNodePairProto getProtobufMessage(int clientVersion)
-      throws IOException {
-    HddsProtos.MoveDataNodePairProto.Builder builder =
-        HddsProtos.MoveDataNodePairProto.newBuilder()
-            .setSrc(src.toProto(clientVersion))
-            .setTgt(tgt.toProto(clientVersion));
-    return builder.build();
+  public MoveDataNodePairProto getProtobufMessage(int clientVersion) {
+    return MoveDataNodePairProto.newBuilder()
+        .setSrc(src.toProto(clientVersion))
+        .setTgt(tgt.toProto(clientVersion))
+        .build();
   }
 
   public static MoveDataNodePair getFromProtobuf(
-      HddsProtos.MoveDataNodePairProto mdnpp) {
-    Preconditions.assertNotNull(mdnpp, "MoveDataNodePair is null");
+      MoveDataNodePairProto mdnpp) {
+    Objects.requireNonNull(mdnpp, "mdnpp == null");
     DatanodeDetails src = DatanodeDetails.getFromProtoBuf(mdnpp.getSrc());
     DatanodeDetails tgt = DatanodeDetails.getFromProtoBuf(mdnpp.getTgt());
     return new MoveDataNodePair(src, tgt);

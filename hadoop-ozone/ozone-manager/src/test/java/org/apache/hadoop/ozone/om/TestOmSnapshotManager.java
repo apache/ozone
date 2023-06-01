@@ -26,8 +26,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -47,6 +50,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -91,14 +97,39 @@ public class TestOmSnapshotManager {
   @Test
   public void testCloseOnEviction() throws IOException {
 
-    // set up db table
-    SnapshotInfo first = createSnapshotInfo();
-    SnapshotInfo second = createSnapshotInfo();
+    // set up db tables
+    Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
     Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), VOLUME_TABLE, volumeTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), BUCKET_TABLE, bucketTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+
+    final String volumeName = UUID.randomUUID().toString();
+    final String dbVolumeKey = om.getMetadataManager().getVolumeKey(volumeName);
+    final OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("bilbo")
+        .setOwnerName("bilbo")
+        .build();
+    when(volumeTable.get(dbVolumeKey)).thenReturn(omVolumeArgs);
+
+    String bucketName = UUID.randomUUID().toString();
+    final String dbBucketKey = om.getMetadataManager().getBucketKey(
+        volumeName, bucketName);
+    final OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
+
+    SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    SnapshotInfo second = createSnapshotInfo(volumeName, bucketName);
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
     when(snapshotInfoTable.get(second.getTableKey())).thenReturn(second);
-    HddsWhiteboxTestUtils.setInternalState(
-        om.getMetadataManager(), "snapshotInfoTable", snapshotInfoTable);
 
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
@@ -108,7 +139,7 @@ public class TestOmSnapshotManager {
     OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
     OmSnapshot firstSnapshot = (OmSnapshot) omSnapshotManager
         .checkForSnapshot(first.getVolumeName(),
-        first.getBucketName(), getSnapshotPrefix(first.getName()));
+        first.getBucketName(), getSnapshotPrefix(first.getName()), false);
     DBStore firstSnapshotStore = mock(DBStore.class);
     HddsWhiteboxTestUtils.setInternalState(
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
@@ -123,7 +154,7 @@ public class TestOmSnapshotManager {
     // read in second snapshot to evict first
     omSnapshotManager
         .checkForSnapshot(second.getVolumeName(),
-        second.getBucketName(), getSnapshotPrefix(second.getName()));
+        second.getBucketName(), getSnapshotPrefix(second.getName()), false);
 
     // As a workaround, invalidate all cache entries in order to trigger
     // instances close in this test case, since JVM GC most likely would not
@@ -188,15 +219,14 @@ public class TestOmSnapshotManager {
     }
   }
 
-  private SnapshotInfo createSnapshotInfo() {
+  private SnapshotInfo createSnapshotInfo(
+      String volumeName, String bucketName) {
     String snapshotName = UUID.randomUUID().toString();
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
     String snapshotId = UUID.randomUUID().toString();
     return SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,
-        snapshotId);
+        snapshotId,
+        Time.now());
   }
-
 }

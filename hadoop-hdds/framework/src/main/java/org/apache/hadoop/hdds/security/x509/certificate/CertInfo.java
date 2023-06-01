@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CertInfoProto;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.jetbrains.annotations.NotNull;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.Serializable;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Comparator;
 import java.util.Objects;
@@ -33,46 +35,49 @@ import java.util.Objects;
 /**
  * Class that wraps Certificate Info.
  */
-public class CertInfo implements Comparator<CertInfo>,
-    Comparable<CertInfo>, Serializable {
+public final class CertInfo implements Comparable<CertInfo>, Serializable {
+  private static final Codec<CertInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(CertInfoProto.class),
+      CertInfo::fromProtobuf,
+      CertInfo::getProtobuf);
 
-  private X509Certificate x509Certificate;
+  public static Codec<CertInfo> getCodec() {
+    return CODEC;
+  }
+
+  static final Comparator<CertInfo> COMPARATOR
+      = Comparator.comparingLong(CertInfo::getTimestamp);
+
+  private final X509Certificate x509Certificate;
   // Timestamp when the certificate got persisted in the DB.
-  private long timestamp;
+  private final long timestamp;
 
   private CertInfo(X509Certificate x509Certificate, long timestamp) {
     this.x509Certificate = x509Certificate;
     this.timestamp = timestamp;
   }
 
-  /**
-   * Constructor for CertInfo. Needed for serialization findbugs.
-   */
-  public CertInfo() {
-  }
-
-  public static CertInfo fromProtobuf(HddsProtos.CertInfoProto info)
-      throws IOException, CertificateException {
-    CertInfo.Builder builder = new CertInfo.Builder();
-    return builder
-        .setX509Certificate(
-            CertificateCodec.getX509Certificate(info.getX509Certificate()))
+  public static CertInfo fromProtobuf(CertInfoProto info) throws IOException {
+    return new CertInfo.Builder()
+        .setX509Certificate(info.getX509Certificate())
         .setTimestamp(info.getTimestamp())
         .build();
   }
 
-  public HddsProtos.CertInfoProto getProtobuf() throws SCMSecurityException {
-    HddsProtos.CertInfoProto.Builder builder =
-        HddsProtos.CertInfoProto.newBuilder();
-
-    return builder.setX509Certificate(
-        CertificateCodec.getPEMEncodedString(getX509Certificate()))
+  public CertInfoProto getProtobuf() throws SCMSecurityException {
+    return CertInfoProto.newBuilder()
+        .setX509Certificate(getX509CertificatePEMEncodedString())
         .setTimestamp(getTimestamp())
         .build();
   }
 
   public X509Certificate getX509Certificate() {
     return x509Certificate;
+  }
+
+  public String getX509CertificatePEMEncodedString()
+      throws SCMSecurityException {
+    return CertificateCodec.getPEMEncodedString(getX509Certificate());
   }
 
   public long getTimestamp() {
@@ -92,29 +97,8 @@ public class CertInfo implements Comparator<CertInfo>,
    *                              from being compared to this object.
    */
   @Override
-  public int compareTo(@NotNull CertInfo o) {
-    return this.compare(this, o);
-  }
-
-  /**
-   * Compares its two arguments for order.  Returns a negative integer,
-   * zero, or a positive integer as the first argument is less than, equal
-   * to, or greater than the second.<p>
-   * <p>
-   *
-   * @param o1 the first object to be compared.
-   * @param o2 the second object to be compared.
-   * @return a negative integer, zero, or a positive integer as the
-   * first argument is less than, equal to, or greater than the
-   * second.
-   * @throws NullPointerException if an argument is null and this
-   *                              comparator does not permit null arguments
-   * @throws ClassCastException   if the arguments' types prevent them from
-   *                              being compared by this comparator.
-   */
-  @Override
-  public int compare(CertInfo o1, CertInfo o2) {
-    return Long.compare(o1.getTimestamp(), o2.getTimestamp());
+  public int compareTo(@Nonnull CertInfo o) {
+    return COMPARATOR.compare(this, o);
   }
 
   @Override
@@ -157,6 +141,12 @@ public class CertInfo implements Comparator<CertInfo>,
     public Builder setX509Certificate(X509Certificate x509Certificate) {
       this.x509Certificate = x509Certificate;
       return this;
+    }
+
+    public Builder setX509Certificate(String x509Certificate)
+        throws IOException {
+      return setX509Certificate(CertificateCodec.getX509Certificate(
+          x509Certificate, CertificateCodec::toIOException));
     }
 
     public Builder setTimestamp(long timestamp) {

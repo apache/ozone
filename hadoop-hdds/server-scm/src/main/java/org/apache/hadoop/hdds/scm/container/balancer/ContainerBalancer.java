@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -39,6 +40,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * under-utilized datanodes.
  */
 public class ContainerBalancer extends StatefulService {
+
+  private static final AtomicInteger ID = new AtomicInteger();
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -272,11 +275,12 @@ public class ContainerBalancer extends StatefulService {
       boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
-    currentBalancingThread = new Thread(task);
-    currentBalancingThread.setName("ContainerBalancerTask");
-    currentBalancingThread.setDaemon(true);
-    currentBalancingThread.start();
-    LOG.info("Starting Container Balancer... {}", this);
+    Thread thread = new Thread(task);
+    thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
+    thread.setDaemon(true);
+    thread.start();
+    currentBalancingThread = thread;
+    LOG.info("Starting Container Balancer {}... {}", thread, this);
   }
 
   /**
@@ -340,6 +344,7 @@ public class ContainerBalancer extends StatefulService {
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
     balancingThread.interrupt();
+    LOG.info("Container Balancer waiting for {} to stop", balancingThread);
     try {
       balancingThread.join();
     } catch (InterruptedException exception) {

@@ -213,13 +213,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
             String.valueOf(commitKeyRequest.getClientID()));
       }
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
-      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
-          locationInfoList, false);
+      List<OmKeyLocationInfo> uncommitted =
+          omKeyInfo.updateLocationInfoList(locationInfoList, false);
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -253,8 +252,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted,
-          omKeyInfo);
+      final OmKeyInfo pseudoKeyInfo = isHSync ? null
+          : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       if (pseudoKeyInfo != null) {
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(

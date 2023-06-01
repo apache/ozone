@@ -14,7 +14,8 @@
     "deletedContainers": 4,
     "volumes": 5,
     "buckets": 156,
-    "keys": 253000
+    "keys": 253000,
+    "keysPendingDeletion": 1000
   },
   "datanodes": {
     "totalCount": 12,
@@ -1089,6 +1090,24 @@
       "bucket": "bucket8",
       "fileSize": 131072,
       "count": 217
+    }
+  ],
+  "containerCount": [
+    {
+      "containerSize": 1024,
+      "count": 2
+    },
+    {
+      "containerSize": 16384,
+      "count": 3
+    },
+    {
+      "containerSize": 2097152,
+      "count": 4
+    },
+    {
+      "containerSize": 1536870912,
+      "count": 1
     }
   ],
   "root": {

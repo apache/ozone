@@ -24,9 +24,8 @@ import java.nio.ByteBuffer;
 
 /**
  * OzoneDataStreamOutput is used to write data into Ozone.
- * It uses SCM's {@link KeyDataStreamOutput} for writing the data.
  */
-public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
+public class OzoneDataStreamOutput extends ByteBufferOutputStream {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
 

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -40,36 +41,36 @@ public class DatanodeSchemaTwoDBDefinition extends
           new DBColumnFamilyDefinition<>(
                   "block_data",
                   String.class,
-                  new StringCodec(),
+                  StringCodec.get(),
                   BlockData.class,
-                  new BlockDataCodec());
+                  BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
           new DBColumnFamilyDefinition<>(
           "metadata",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   "deleted_blocks",
                   String.class,
-                  new StringCodec(),
+                  StringCodec.get(),
                   ChunkInfoList.class,
-                  new ChunkInfoListCodec());
+                  ChunkInfoList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETE_TRANSACTION =
       new DBColumnFamilyDefinition<>(
           "delete_txns",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {

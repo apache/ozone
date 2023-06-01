@@ -188,7 +188,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                       String prevBucket, int maxListResult)
+                                       String prevBucket, int maxListResult,
+                                       boolean hasSnapshot)
       throws IOException {
     return null;
   }
@@ -639,6 +640,11 @@ public class ClientProtocolStub implements ClientProtocol {
                                            boolean forceFullDiff)
       throws IOException {
     return null;
+  }
+
+  @Override
+  public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException {
   }
 
 }

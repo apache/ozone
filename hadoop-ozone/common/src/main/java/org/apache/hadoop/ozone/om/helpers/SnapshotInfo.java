@@ -20,14 +20,15 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.util.Time;
 
 import java.time.format.DateTimeFormatter;
 import java.time.Instant;
@@ -50,6 +51,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * for the snapshot path & global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable {
+  private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
+      SnapshotInfo::getFromProtobuf,
+      SnapshotInfo::getProtobuf,
+      // FIXME: HDDS-8665 Deep copy will cause failures
+      //        - TestOMSnapshotDeleteRequest           NullPointerException
+      //        - TestOMSnapshotPurgeRequestAndResponse AssertionFailedError
+      DelegatedCodec.CopyType.SHALLOW);
+
+  public static Codec<SnapshotInfo> getCodec() {
+    return CODEC;
+  }
 
   /**
    * SnapshotStatus enum composed of
@@ -479,15 +492,15 @@ public final class SnapshotInfo implements Auditable {
   public static SnapshotInfo newInstance(String volumeName,
                                          String bucketName,
                                          String snapshotName,
-                                         String snapshotId) {
+                                         String snapshotId,
+                                         long creationTime) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
-    long initialTime = Time.now();
     if (StringUtils.isBlank(snapshotName)) {
-      snapshotName = generateName(initialTime);
+      snapshotName = generateName(creationTime);
     }
     builder.setSnapshotID(snapshotId)
         .setName(snapshotName)
-        .setCreationTime(initialTime)
+        .setCreationTime(creationTime)
         .setDeletionTime(INVALID_TIMESTAMP)
         .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)

@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.util.List;
-
+import com.google.common.collect.ImmutableList;
+import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
+import com.google.inject.multibindings.Multibinder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -38,45 +39,44 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
+import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import com.google.common.collect.ImmutableList;
-import com.google.inject.AbstractModule;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
-import com.google.inject.multibindings.Multibinder;
-import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
-import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
-import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.jooq.Configuration;
 import org.jooq.DAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
 /**
  * Guice controller that defines concrete bindings.
@@ -117,6 +117,8 @@ public class ReconControllerModule extends AbstractModule {
     bind(OzoneStorageContainerManager.class)
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
     bind(MetricsServiceProviderFactory.class).in(Singleton.class);
+
+    bind(HeatMapServiceImpl.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {

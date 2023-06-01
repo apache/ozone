@@ -41,6 +41,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -54,6 +58,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -91,7 +96,9 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -108,6 +115,7 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
+  private BootstrapStateHandler.Lock lock;
   private File metaDir;
   private String snapshotDirName;
   private String snapshotDirName2;
@@ -173,6 +181,7 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
 
+    lock = new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
 
     requestMock = mock(HttpServletRequest.class);
@@ -195,6 +204,9 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
+
+    when(omDbCheckpointServletMock.getBootstrapStateLock())
+        .thenReturn(lock);
   }
 
   @Test
@@ -595,5 +607,102 @@ public class TestOMDbCheckpointServlet {
     String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
     String file1 = files[1];
     Assert.assertEquals("hl filenames are the same", file0, file1);
+  }
+
+  @Test
+  public void testBootstrapLocking() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster.waitForClusterToBeReady();
+
+    // Get the bootstrap state handlers
+    KeyManager keyManager = cluster.getOzoneManager().getKeyManager();
+    BootstrapStateHandler keyDeletingService =
+        keyManager.getDeletingService();
+    BootstrapStateHandler snapshotDeletingService =
+        keyManager.getSnapshotDeletingService();
+    BootstrapStateHandler sstFilteringService =
+        keyManager.getSnapshotSstFilteringService();
+    BootstrapStateHandler differ =
+        cluster.getOzoneManager().getMetadataManager()
+            .getStore().getRocksDBCheckpointDiffer();
+
+    ExecutorService executorService = Executors.newCachedThreadPool();
+
+    OMDBCheckpointServlet omDbCheckpointServlet = new OMDBCheckpointServlet();
+
+    OMDBCheckpointServlet spyServlet = spy(omDbCheckpointServlet);
+    ServletContext servletContext = mock(ServletContext.class);
+    when(servletContext.getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getOzoneManager());
+    doReturn(servletContext).when(spyServlet).getServletContext();
+
+    spyServlet.init();
+
+    // Confirm the other handlers are locked out when the bootstrap
+    //  servlet takes the lock.
+    try (BootstrapStateHandler.Lock lock =
+        spyServlet.getBootstrapStateLock().lock()) {
+      confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
+      confirmServletLocksOutOtherHandler(snapshotDeletingService,
+          executorService);
+      confirmServletLocksOutOtherHandler(sstFilteringService, executorService);
+      confirmServletLocksOutOtherHandler(differ, executorService);
+    }
+    // Confirm the servlet is locked out when any of the other
+    //  handlers takes the lock.
+    confirmOtherHandlerLocksOutServlet(keyDeletingService, spyServlet,
+        executorService);
+    confirmOtherHandlerLocksOutServlet(snapshotDeletingService, spyServlet,
+        executorService);
+    confirmOtherHandlerLocksOutServlet(sstFilteringService, spyServlet,
+        executorService);
+    confirmOtherHandlerLocksOutServlet(differ, spyServlet,
+        executorService);
+
+    // Confirm that servlet takes the lock when none of the other
+    //  handlers have it.
+    Future<Boolean> servletTest = checkLock(spyServlet, executorService);
+    Assert.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
+
+    executorService.shutdownNow();
+
+  }
+
+  // Confirms handler can't take look the servlet already has.  Assumes
+  // the servlet has already taken the lock.
+  private void confirmServletLocksOutOtherHandler(BootstrapStateHandler handler,
+      ExecutorService executorService) {
+    Future<Boolean> test = checkLock(handler, executorService);
+    // Handler should fail to take the lock because the servlet has taken it.
+    Assert.assertThrows(TimeoutException.class,
+         () -> test.get(500, TimeUnit.MILLISECONDS));
+  }
+
+  // Confirms Servlet can't take lock when handler has it.
+  private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
+      BootstrapStateHandler servlet, ExecutorService executorService)
+      throws InterruptedException {
+    try (BootstrapStateHandler.Lock lock =
+        handler.getBootstrapStateLock().lock()) {
+      Future<Boolean> test = checkLock(servlet, executorService);
+      // Servlet should fail to lock when other handler has taken it.
+      Assert.assertThrows(TimeoutException.class,
+          () -> test.get(500, TimeUnit.MILLISECONDS));
+    }
+  }
+
+  // Confirm lock is available by having handler take and release it.
+  private Future<Boolean> checkLock(BootstrapStateHandler handler,
+      ExecutorService executorService) {
+    return executorService.submit(() -> {
+      try {
+        handler.getBootstrapStateLock().lock();
+        handler.getBootstrapStateLock().unlock();
+        return true;
+      } catch (InterruptedException e) {
+      }
+      return false;
+    });
+
   }
 }

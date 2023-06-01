@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
@@ -264,26 +265,20 @@ public class RatisUnderReplicationHandler
     LOG.debug("Need {} target datanodes for container {}. Current " +
             "replicas: {}.", replicaCount.additionalReplicaNeeded(),
         replicaCount.getContainer().containerID(), replicaCount.getReplicas());
-    // DNs that already have replicas cannot be targets and should be excluded
-    final List<DatanodeDetails> excludeList =
-        replicaCount.getReplicas().stream()
-            .map(ContainerReplica::getDatanodeDetails)
-            .collect(Collectors.toList());
 
-    // DNs that are already waiting to receive replicas cannot be targets
-    final List<DatanodeDetails> pendingReplication =
-        pendingOps.stream()
-            .filter(containerReplicaOp -> containerReplicaOp.getOpType() ==
-                ContainerReplicaOp.PendingOpType.ADD)
-            .map(ContainerReplicaOp::getTarget)
-            .collect(Collectors.toList());
-    LOG.debug("Excluding DNs. excludeList: {}, size: {}. pendingReplication: " +
-            "{}, size: {}.", excludeList, excludeList.size(),
-        pendingReplication, pendingReplication.size());
-    excludeList.addAll(pendingReplication);
+    ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
+        ReplicationManagerUtil.getExcludedAndUsedNodes(
+            replicaCount.getReplicas(), Collections.emptySet(), pendingOps,
+            replicationManager);
+
+    List<DatanodeDetails> excluded = excludedAndUsedNodes.getExcludedNodes();
+    List<DatanodeDetails> used = excludedAndUsedNodes.getUsedNodes();
+
+    LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
+        used, used.size(), excluded, excluded.size());
 
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
-        replicaCount.additionalReplicaNeeded(), null, excludeList,
+        replicaCount.additionalReplicaNeeded(), used, excluded,
         currentContainerSize, replicaCount.getContainer());
   }
 

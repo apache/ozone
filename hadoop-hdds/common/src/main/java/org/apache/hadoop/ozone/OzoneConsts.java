@@ -291,9 +291,6 @@ public final class OzoneConsts {
   // but have containerID as key prefixes.
   public static final String SCHEMA_V3 = "3";
 
-  public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
-
   // Supported store types.
   public static final String OZONE = "ozone";
   public static final String S3 = "s3";
@@ -325,6 +322,7 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";

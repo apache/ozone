@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -80,6 +81,8 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -147,7 +150,6 @@ public class TestReplicationManager {
 
     Mockito.when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
-
     replicationManager = createReplicationManager();
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
@@ -502,6 +504,34 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.MISSING));
   }
 
+  @Test
+  public void testUnrecoverableAndEmpty()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+
+    ContainerReplica replica  = createContainerReplica(container.containerID(),
+        1, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
+        0, 0, MockDatanodeDetails.randomDatanodeDetails(), UUID.randomUUID());
+
+    storeContainerAndReplicas(container, Collections.singleton(replica));
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    // If it is unrecoverable, there is no point in putting it into the under
+    // replication list. It will be checked again on the next RM run.
+    Assert.assertEquals(0, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    // As it is marked empty in the report, it must have gone through the
+    // empty container handler, indicating is was handled as empty.
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.EMPTY));
+  }
+
+
   /**
    * A closed EC container with 3 closed and 2 unhealthy replicas is under
    * replicated. RM should add it to under replicated queue.
@@ -608,6 +638,69 @@ public class TestReplicationManager {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     Assert.assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  /**
+   * Situation: CLOSED EC container with 3 CLOSED replicas and 2 UNHEALTHY
+   * replicas. This is under replication. Mocked such that the placement
+   * policy throws an exception saying no target datanodes found.
+   * <p>
+   * Tests that EC under replication handling tries to delete an UNHEALTHY
+   * replica if no target datanodes are found. It should delete only one
+   * UNHEALTHY replica so that the replica's host DN becomes available as a
+   * target for reconstruction/replication of a healthy replica.
+   */
+  @Test
+  public void testUnderReplicationBlockedByUnhealthyReplicas()
+      throws IOException, NodeNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3);
+    ContainerReplica unhealthyReplica1 =
+        createContainerReplica(container.containerID(), 1, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica unhealthyReplica4 =
+        createContainerReplica(container.containerID(), 4, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica4);
+    replicas.add(unhealthyReplica1);
+
+    // assert that this container is seen as under replicated
+    replicationManager.processContainer(container, repQueue, repReport);
+    Assert.assertEquals(1, repQueue.underReplicatedQueueSize());
+    Assert.assertEquals(0, repQueue.overReplicatedQueueSize());
+    Assert.assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    Assert.assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+
+    // now, pass this container to ec under replication handling
+    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenReturn(NodeStatus.inServiceHealthy());
+    ECUnderReplicationHandler handler = new ECUnderReplicationHandler(
+        getNoNodesTestPlacementPolicy(nodeManager, configuration),
+        configuration, replicationManager);
+
+    // an exception should be thrown so that this container is queued again
+    assertThrows(SCMException.class,
+        () -> handler.processAndSendCommands(replicas,
+            containerReplicaPendingOps.getPendingOps(container.containerID()),
+            repQueue.dequeueUnderReplicatedContainer(), 1));
+    // a delete command should also have been sent for UNHEALTHY replica of
+    // index 1
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    Assertions.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
+        command.getValue().getType());
+    DeleteContainerCommand deleteCommand =
+        (DeleteContainerCommand) command.getValue();
+    Assert.assertEquals(unhealthyReplica1.getDatanodeDetails().getUuid(),
+        command.getKey());
+    Assert.assertEquals(container.containerID(),
+        ContainerID.valueOf(deleteCommand.getContainerID()));
+    Assert.assertEquals(unhealthyReplica1.getReplicaIndex(),
+        deleteCommand.getReplicaIndex());
   }
 
   @Test

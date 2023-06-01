@@ -85,6 +85,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
     } else {
       processPaths(metadataManager, batchOp);
     }
+
+    // update bucket quota in active db
+    for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
+      metadataManager.getBucketTable().putWithBatch(batchOp,
+          metadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+              omBucketInfo.getBucketName()), omBucketInfo);
+    }
   }
 
   public void processPaths(OMMetadataManager omMetadataManager,
@@ -130,7 +137,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, null, keyInfo.getUpdateID(), isRatisEnabled);
+            keyInfo, keyInfo.getUpdateID(), isRatisEnabled);
 
         String deletedKey = omMetadataManager
             .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
@@ -138,13 +145,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         deletedKey = omMetadataManager.getOzoneDeletePathKey(
             keyInfo.getObjectID(), deletedKey);
 
-        // TODO: [SNAPSHOT] Acquire deletedTable write table lock
-
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             deletedKey, repeatedOmKeyInfo);
-
-        // TODO: [SNAPSHOT] Release deletedTable write table lock
-
       }
 
       // Delete the visited directory from deleted directory table
@@ -155,13 +157,6 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         if (LOG.isDebugEnabled()) {
           LOG.info("Purge Deleted Directory DBKey: {}", path.getDeletedDir());
         }
-      }
-
-      // update bucket usedBytes.
-      for (OmBucketInfo omBucketInfo : volBucketInfoMap.values()) {
-        omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-                omBucketInfo.getBucketName()), omBucketInfo);
       }
     }
   }

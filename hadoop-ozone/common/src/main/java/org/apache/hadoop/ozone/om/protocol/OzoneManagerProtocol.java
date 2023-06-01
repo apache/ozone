@@ -382,11 +382,14 @@ public interface OzoneManagerProtocol
    * @param maxNumOfBuckets
    *   the maximum number of buckets to return. It ensures
    *   the size of the result will not exceed this limit.
+   * @param hasSnapshot
+   * flag to list bucket which have snapshots.
    * @return a list of buckets.
    * @throws IOException
    */
   List<OmBucketInfo> listBuckets(String volumeName,
-      String startBucketName, String bucketPrefix, int maxNumOfBuckets)
+                                 String startBucketName, String bucketPrefix,
+                                 int maxNumOfBuckets, boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -995,4 +998,16 @@ public interface OzoneManagerProtocol
    */
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
+
+  /**
+   * Update modification time and access time of a file.
+   * Access time is currently ignored by Ozone Manager.
+   *
+   * @param keyArgs - The key argument.
+   * @param mtime - modification time.
+   * @param atime - access time. Ignored by Ozone Manager.
+   * @throws IOException
+   */
+  void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
+      throws IOException;
 }

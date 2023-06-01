@@ -31,9 +31,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -45,6 +44,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link ClosedWithUnhealthyReplicasHandler}.
@@ -55,7 +57,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
   private ECReplicationConfig ecReplicationConfig;
   private ContainerCheckRequest.Builder requestBuilder;
 
-  @Before
+  @BeforeEach
   public void setup() {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -82,7 +84,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(containerInfo)
         .build();
 
-    Assert.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
   }
 
   @Test
@@ -103,7 +105,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(containerInfo)
         .build();
 
-    Assert.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
   }
 
   /**
@@ -135,8 +137,8 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(container)
         .build();
 
-    Assert.assertTrue(handler.handle(request));
-    Assert.assertEquals(1, request.getReport().getStat(
+    assertTrue(handler.handle(request));
+    assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.UNHEALTHY));
 
     ArgumentCaptor<Integer> replicaIndexCaptor =
@@ -146,7 +148,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
             DatanodeDetails.class), Mockito.eq(true));
     // replica index that delete was sent for should either be 2 or 5
     replicaIndexCaptor.getAllValues()
-        .forEach(index -> Assert.assertTrue(index == 2 || index == 5));
+        .forEach(index -> assertTrue(index == 2 || index == 5));
   }
 
   /**
@@ -167,7 +169,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(container)
         .build();
 
-    Assert.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
   }
 
   @Test
@@ -189,6 +191,6 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(container)
         .build();
 
-    Assert.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
   }
 }

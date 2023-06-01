@@ -471,8 +471,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     // clean up because the paths are part of a snapshot.
     // As a result on 1 deleted dir and 3 deleted files will
     // remain in dirTable and keyTable respectively.
+    long prevDDSRunCount = dirDeletingService.getRunCount().get();
+    long prevKDSRunCount = keyDeletingService.getRunCount().get();
     assertTableRowCount(deletedDirTable, 1);
     assertTableRowCount(deletedKeyTable, 3);
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
+        prevDDSRunCount, 100, 10000);
+    GenericTestUtils.waitFor(() -> keyDeletingService.getRunCount().get() >
+        prevKDSRunCount, 100, 10000);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);

@@ -85,6 +85,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -269,7 +270,7 @@ public class TestContainerPersistence {
   public void testAddingBlockToDeletedContainer() throws Exception {
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
-    assumeFalse(schemaVersion.contains(OzoneConsts.SCHEMA_V3));
+    assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
 
     long testContainerID = getTestContainerID();
     Thread.sleep(100);
@@ -331,7 +332,7 @@ public class TestContainerPersistence {
 
   @Test
   public void testDeleteContainer() throws IOException {
-    assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     long testContainerID = getTestContainerID();
     Container<KeyValueContainerData> container = addContainer(containerSet,
         testContainerID);
@@ -379,7 +380,7 @@ public class TestContainerPersistence {
       throws Exception {
     HddsVolume hddsVolume;
     // If !SchemaV3, build hddsVolume
-    if (!schemaVersion.contains(OzoneConsts.SCHEMA_V3)) {
+    if (!isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       Files.createDirectories(Paths.get(hddsPath));
 
       HddsVolume.Builder volumeBuilder =
