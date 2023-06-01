@@ -1092,6 +1092,24 @@
       "count": 217
     }
   ],
+  "containerCount": [
+    {
+      "containerSize": 1024,
+      "count": 2
+    },
+    {
+      "containerSize": 16384,
+      "count": 3
+    },
+    {
+      "containerSize": 2097152,
+      "count": 4
+    },
+    {
+      "containerSize": 1536870912,
+      "count": 1
+    }
+  ],
   "root": {
     "status": "OK",
     "path": "/",

@@ -360,8 +360,6 @@ public final class ReplicationTestUtil {
    * @param throwOverloaded If the atomic boolean is true, throw a
    *                        CommandTargetOverloadedException and set the boolean
    *                        to false, instead of creating the replicate command.
-   * @throws NotLeaderException
-   * @throws CommandTargetOverloadedException
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
@@ -394,8 +392,6 @@ public final class ReplicationTestUtil {
    * @param throwOverloaded If the atomic boolean is true, throw a
    *                        CommandTargetOverloadedException and set the boolean
    *                        to false, instead of creating the replicate command.
-   * @throws NotLeaderException
-   * @throws CommandTargetOverloadedException
    */
   public static void mockSendThrottledReconstructionCommand(
       ReplicationManager mock,
@@ -420,7 +416,6 @@ public final class ReplicationTestUtil {
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDatanodeCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -439,7 +434,6 @@ public final class ReplicationTestUtil {
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -463,7 +457,6 @@ public final class ReplicationTestUtil {
    * the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)

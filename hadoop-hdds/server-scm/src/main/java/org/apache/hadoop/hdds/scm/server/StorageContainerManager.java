@@ -187,6 +187,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
@@ -715,7 +716,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmContext);
 
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(conf, systemClock);
+        new ContainerReplicaPendingOps(systemClock);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -1078,16 +1079,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       BlockingService instance,
       int handlerCount)
       throws IOException {
-    RPC.Server rpcServer =
-        new RPC.Builder(conf)
-            .setProtocol(protocol)
-            .setInstance(instance)
-            .setBindAddress(addr.getHostString())
-            .setPort(addr.getPort())
-            .setNumHandlers(handlerCount)
-            .setVerbose(false)
-            .setSecretManager(null)
-            .build();
+
+    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+        .setProtocol(protocol)
+        .setInstance(instance)
+        .setBindAddress(addr.getHostString())
+        .setPort(addr.getPort())
+        .setNumHandlers(handlerCount)
+        .setVerbose(false)
+        .setSecretManager(null)
+        .build());
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
@@ -1539,20 +1540,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
-        try {
-          X509Certificate x509Certificate =
-              CertificateCodec.getX509Certificate(cert);
-          if (certificateStore.getCertificateByID(
-              x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
-            LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
-                    "{}", x509Certificate.getSerialNumber(),
-                scmStorageConfig.getScmId());
-            certificateStore.storeValidScmCertificate(
-                x509Certificate.getSerialNumber(), x509Certificate);
-          }
-        } catch (CertificateException ex) {
-          LOG.error("Error while decoding CA Certificate", ex);
-          throw new IOException(ex);
+        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
+            cert, CertificateCodec::toIOException);
+        if (certificateStore.getCertificateByID(
+            x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
+          LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
+                  "{}", x509Certificate.getSerialNumber(),
+              scmStorageConfig.getScmId());
+          certificateStore.storeValidScmCertificate(
+              x509Certificate.getSerialNumber(), x509Certificate);
         }
       }
     }

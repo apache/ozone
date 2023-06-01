@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Icon, Row, Col} from 'antd';
+import {Icon, Row, Col, Tabs} from 'antd';
 import filesize from 'filesize';
 import {showDataFetchError} from 'utils/common';
 import Plot from 'react-plotly.js';
@@ -26,8 +26,9 @@ import * as Plotly from 'plotly.js';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import './insights.less';
+const {TabPane} = Tabs;
 
-const size = filesize.partial({standard: 'iec'});
+const size = filesize.partial({standard: 'iec',round: 0});
 
 interface IFileCountResponse {
   volume: string;
@@ -36,10 +37,17 @@ interface IFileCountResponse {
   count: number;
 }
 
+interface IContainerCountResponse {
+  containerSize: number;
+  count: number;
+}
+
 interface IInsightsState {
   isLoading: boolean;
   fileCountsResponse: IFileCountResponse[];
-  plotData: Plotly.Data[];
+  containerCountResponse: IContainerCountResponse[];
+  fileCountData: Plotly.Data[];
+  containerCountData: Plotly.Data[];
   volumeBucketMap: Map<string, Set<string>>;
   selectedVolumes: IOption[];
   selectedBuckets: IOption[];
@@ -64,7 +72,9 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.state = {
       isLoading: false,
       fileCountsResponse: [],
-      plotData: [],
+      containerCountResponse: [],
+      fileCountData: [],
+      containerCountData: [],
       volumeBucketMap: new Map<string, Set<string>>(),
       selectedBuckets: [],
       selectedVolumes: [],
@@ -122,7 +132,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   };
 
   updatePlotData = () => {
-    const {fileCountsResponse, selectedVolumes, selectedBuckets} = this.state;
+    const {fileCountsResponse, selectedVolumes, selectedBuckets, containerCountResponse} = this.state;
     // Aggregate counts across volumes & buckets
     if (selectedVolumes && selectedBuckets) {
       let filteredData = fileCountsResponse;
@@ -138,7 +148,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         filteredData = filteredData.filter(item => selectedBucketValues.has(item.bucket));
       }
 
-      const xyMap: Map<number, number> = filteredData.reduce(
+      const xyFileCountMap: Map<number, number> = filteredData.reduce(
         (map: Map<number, number>, current) => {
           const fileSize = current.fileSize;
           const oldCount = map.has(fileSize) ? map.get(fileSize)! : 0;
@@ -147,7 +157,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         }, new Map<number, number>());
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
-      const xValues = Array.from(xyMap.keys()).map(value => {
+      const xFileCountValues = Array.from(xyFileCountMap.keys()).map(value => {
         const upperbound = size(value);
         const upperboundPower = Math.log2(value);
         // For 1024 which is 2^10, the lowerbound is 0, since we start binning
@@ -155,12 +165,45 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         const lowerbound = upperboundPower > 10 ? size(2 ** (upperboundPower - 1)) : size(0);
         return `${lowerbound} - ${upperbound}`;
       });
+      
+      const xyContainerCountMap: Map<number, number> = containerCountResponse.reduce(
+        (map: Map<number, number>, current) => {
+          const containerSize = current.containerSize;
+          const oldCount = map.has(containerSize) ? map.get(containerSize)! : 0;
+          map.set(containerSize, oldCount + current.count);
+          return map;
+        }, new Map<number, number>());
+      // Calculate the previous power of 2 to find the lower bound of the range
+      // Ex: for 2048, the lower bound is 1024
+      const xContainerCountValues = Array.from(xyContainerCountMap.keys()).map(value => {
+        const upperbound = size(value);
+        const upperboundPower = Math.log2(value);
+        // For 1024 which is 2^10, the lowerbound is 0, since we start binning
+        // after 2^10
+        const lowerbound = upperboundPower > 10 ? size(2 ** (upperboundPower - 1)) : size(0);
+        return `${lowerbound} - ${upperbound}`;
+      });
+
+      let keysize = [];
+      keysize = Array.from(xyContainerCountMap.keys()).map(value => {
+        return (size(value) );
+      });
+
       this.setState({
-        plotData: [{
+        fileCountData: [{
           type: 'bar',
-          x: xValues,
-          y: Array.from(xyMap.values()),
+          x: xFileCountValues,
+          y: Array.from(xyFileCountMap.values()),
           name: 'file count'
+        }],
+        containerCountData: [{
+          type: 'pie',
+          hole: 0.2,
+          values: Array.from(xyContainerCountMap.values()),  
+          customdata: Array.from(xyContainerCountMap.values()),
+          labels: xContainerCountValues, 
+          text: keysize,
+          hovertemplate: 'Container Count: %{customdata}<br>Container Size: %{text}<extra></extra>'
         }]
       });
     }
@@ -171,8 +214,13 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.setState({
       isLoading: true
     });
-    axios.get('/api/v1/utilization/fileCount').then(response => {
-      const fileCountsResponse: IFileCountResponse[] = response.data;
+
+    axios.all([
+      axios.get('/api/v1/utilization/fileCount'),
+      axios.get('/api/v1/utilization/containerCount')
+    ]).then(axios.spread((fileCountresponse, containerCountresponse) => {
+      const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
+      const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
       // Construct volume -> bucket[] map for populating filters
       // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
       const volumeBucketMap: Map<string, Set<string>> = fileCountsResponse.reduce(
@@ -199,13 +247,14 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         isLoading: false,
         volumeBucketMap,
         fileCountsResponse,
+        containerCountResponse,
         volumeOptions
       }, () => {
         this.updatePlotData();
         // Select all volumes by default
         this.handleVolumeChange([allVolumesOption, ...volumeOptions], {action: 'select-option'});
       });
-    }).catch(error => {
+    })).catch(error => {
       this.setState({
         isLoading: false
       });
@@ -214,70 +263,108 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   render() {
-    const {plotData, isLoading, selectedBuckets, volumeOptions,
-      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled} = this.state;
+    const {fileCountData, isLoading, selectedBuckets, volumeOptions,
+      selectedVolumes, fileCountsResponse, bucketOptions, isBucketSelectionDisabled, containerCountResponse, containerCountData} = this.state;
     return (
       <div className='insights-container'>
         <div className='page-header'>
           Insights
         </div>
+       
         <div className='content-div'>
-          {isLoading ? <span><Icon type='loading'/> Loading...</span> :
-            ((fileCountsResponse && fileCountsResponse.length > 0) ?
-              <div>
-                <Row>
-                  <Col xs={24} xl={18}>
-                    <Row>
-                      <Col>
-                        <div className='filter-block'>
-                          <h4>Volumes</h4>
-                          <MultiSelect
-                            allowSelectAll
-                            isMulti
-                            className='multi-select-container'
-                            options={volumeOptions}
-                            closeMenuOnSelect={false}
-                            hideSelectedOptions={false}
-                            value={selectedVolumes}
-                            allOption={allVolumesOption}
-                            onChange={this.handleVolumeChange}
-                          />
-                        </div>
-                        <div className='filter-block'>
-                          <h4>Buckets</h4>
-                          <MultiSelect
-                            allowSelectAll
-                            isMulti
-                            className='multi-select-container'
-                            options={bucketOptions}
-                            closeMenuOnSelect={false}
-                            hideSelectedOptions={false}
-                            value={selectedBuckets}
-                            allOption={allBucketsOption}
-                            isDisabled={isBucketSelectionDisabled}
-                            onChange={this.handleBucketChange}
-                          />
-                        </div>
-                      </Col>
-                    </Row>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col>
-                    <Plot
-                      data={plotData}
-                      layout={
-                        {
-                          width: 800,
-                          height: 600,
-                          title: 'File Size Distribution',
-                          showlegend: true
-                        }
-                      }/>
-                  </Col>
-                </Row>
-              </div> :
-              <div>No data to visualize file size distribution. Add files to Ozone to see a visualization on file size distribution.</div>)}
+          <Tabs defaultActiveKey='1'>
+            <TabPane key='1' tab={`File Size`}>
+              {
+                <div className='content-div'>
+                  {isLoading ? <span><Icon type='loading'/> Loading...</span> :
+                    ((fileCountsResponse && fileCountsResponse.length > 0) ?
+                      <div>
+                        <Row>
+                          <Col xs={24} xl={18}>
+                            <Row>
+                              <Col>
+                                <div className='filter-block'>
+                                  <h4>Volumes</h4>
+                                  <MultiSelect
+                                    allowSelectAll
+                                    isMulti
+                                    className='multi-select-container'
+                                    options={volumeOptions}
+                                    closeMenuOnSelect={false}
+                                    hideSelectedOptions={false}
+                                    value={selectedVolumes}
+                                    allOption={allVolumesOption}
+                                    onChange={this.handleVolumeChange}
+                                  />
+                                </div>
+                                <div className='filter-block'>
+                                  <h4>Buckets</h4>
+                                  <MultiSelect
+                                    allowSelectAll
+                                    isMulti
+                                    className='multi-select-container'
+                                    options={bucketOptions}
+                                    closeMenuOnSelect={false}
+                                    hideSelectedOptions={false}
+                                    value={selectedBuckets}
+                                    allOption={allBucketsOption}
+                                    isDisabled={isBucketSelectionDisabled}
+                                    onChange={this.handleBucketChange}
+                                  />
+                                </div>
+                              </Col>
+                            </Row>
+                          </Col>
+                        </Row>
+                        <Row>
+                          <Col>
+                            <Plot
+                              data={fileCountData}
+                              layout={
+                                {
+                                  width: 800,
+                                  height: 600,
+                                  title: 'File Size Distribution',
+                                  showlegend: false
+                                }
+                              } />
+                          </Col>
+                        </Row>
+                      </div> :
+                      <div>No data to visualize file size distribution. Add files to Ozone to see a visualization on file size distribution.</div>)}
+                </div>
+              }
+            </TabPane>
+            <TabPane key='2' tab={`Container Size`}>
+              {
+                <div className='content-div'>
+                  {isLoading ? <span><Icon type='loading'/> Loading...</span> :
+                    ((containerCountResponse && containerCountResponse.length > 0) ?
+                      <div>
+                        <Row>
+                          <Col>
+                            <Plot
+                              data={containerCountData}
+                              layout={
+                                {
+                                  width: 850,
+                                  height: 750,
+                                  font: {
+                                    family: 'Roboto, sans-serif',
+                                    size: 15
+                                  },
+                                  title: 'Container Size Distribution',
+                                  showlegend: true
+                                }
+                              }/>
+                          </Col>
+                        </Row>
+                      </div> :
+                      <div>No data available for container size distribution visualization. Add files to Ozone</div>)}
+                </div>
+              }
+            </TabPane>
+          </Tabs>
         </div>
       </div>
     );

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -57,7 +58,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "block_data",
           String.class,
-          new FixedLengthStringCodec(),
+          FixedLengthStringCodec.get(),
           BlockData.class,
           BlockData.getCodec());
 
@@ -66,7 +67,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "metadata",
           String.class,
-          new FixedLengthStringCodec(),
+          FixedLengthStringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -75,7 +76,7 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "deleted_blocks",
           String.class,
-          new FixedLengthStringCodec(),
+          FixedLengthStringCodec.get(),
           ChunkInfoList.class,
           ChunkInfoList.getCodec());
 
@@ -84,9 +85,9 @@ public class DatanodeSchemaThreeDBDefinition
       new DBColumnFamilyDefinition<>(
           "delete_txns",
           String.class,
-          new FixedLengthStringCodec(),
+          FixedLengthStringCodec.get(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   private static String separator = "";
 

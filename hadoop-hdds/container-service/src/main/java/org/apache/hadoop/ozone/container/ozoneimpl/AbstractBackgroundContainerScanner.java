@@ -31,9 +31,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * Base class for scheduled scanners on a Datanode.
  */
-public abstract class AbstractContainerScanner extends Thread {
+public abstract class AbstractBackgroundContainerScanner extends Thread {
   public static final Logger LOG =
-      LoggerFactory.getLogger(AbstractContainerScanner.class);
+      LoggerFactory.getLogger(AbstractBackgroundContainerScanner.class);
 
   private final long dataScanInterval;
 
@@ -43,7 +43,8 @@ public abstract class AbstractContainerScanner extends Thread {
    */
   private volatile boolean stopping = false;
 
-  public AbstractContainerScanner(String name, long dataScanInterval) {
+  public AbstractBackgroundContainerScanner(String name,
+      long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
     setName(name);
     setDaemon(true);

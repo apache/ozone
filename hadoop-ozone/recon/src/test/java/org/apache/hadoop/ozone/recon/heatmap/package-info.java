@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,28 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db;
-
-import java.io.IOException;
-import com.google.common.primitives.Shorts;
-
 /**
- * Codec to convert Short to/from byte array.
+ * This package contains heatmap feature related test classes.
  */
-public class ShortCodec implements Codec<Short> {
-
-  @Override
-  public byte[] toPersistedFormat(Short object) throws IOException {
-    return Shorts.toByteArray(object);
-  }
-
-  @Override
-  public Short fromPersistedFormat(byte[] rawData) throws IOException {
-    return Shorts.fromByteArray(rawData);
-  }
-
-  @Override
-  public Short copyObject(Short object) {
-    return object;
-  }
-}
+package org.apache.hadoop.ozone.recon.heatmap;

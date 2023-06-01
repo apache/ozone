@@ -230,6 +230,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
@@ -1262,7 +1263,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       BlockingService reconfigureProtocolService,
       int handlerCount)
       throws IOException {
-    RPC.Server rpcServer = new RPC.Builder(conf)
+
+    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
         .setProtocol(OzoneManagerProtocolPB.class)
         .setInstance(clientProtocolService)
         .setBindAddress(addr.getHostString())
@@ -1270,7 +1272,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setNumHandlers(handlerCount)
         .setVerbose(false)
         .setSecretManager(delegationTokenMgr)
-        .build();
+        .build());
 
     HddsServerUtil.addPBProtocol(conf, OMInterServiceProtocolPB.class,
         interOMProtocolService, rpcServer);
@@ -4497,6 +4499,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return false;
   }
 
+  @Override
+  public void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
+      throws IOException {
+  }
+
   /**
    * Write down Layout version of a finalized feature to DB on finalization.
    * @param lvm OMLayoutVersionManager
@@ -4576,18 +4583,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private IOmMetadataReader getReader(OmKeyArgs keyArgs) throws IOException {
     return omSnapshotManager.checkForSnapshot(
-        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName(),
+        false);
   }
 
   private IOmMetadataReader getReader(String volumeName, String bucketName,
       String key) throws IOException {
-    return omSnapshotManager.checkForSnapshot(volumeName, bucketName, key);
+    return omSnapshotManager.checkForSnapshot(volumeName, bucketName, key,
+        false);
   }
 
   private IOmMetadataReader getReader(OzoneObj ozoneObj) throws IOException {
     return omSnapshotManager.checkForSnapshot(
         ozoneObj.getVolumeName(), ozoneObj.getBucketName(),
-        ozoneObj.getKeyName());
+        ozoneObj.getKeyName(), false);
   }
 
   public SnapshotDiffResponse snapshotDiff(String volume,

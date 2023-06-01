@@ -71,6 +71,12 @@ public class TestPipelineChoosePolicyFactory {
         PipelineRequestInformation pri) {
       return null;
     }
+
+    @Override
+    public int choosePipelineIndex(List<Pipeline> pipelineList,
+        PipelineRequestInformation pri) {
+      return -1;
+    }
   }
 
   @Test
