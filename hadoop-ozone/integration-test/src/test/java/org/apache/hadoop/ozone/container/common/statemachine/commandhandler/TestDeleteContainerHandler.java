@@ -236,6 +236,8 @@ public class TestDeleteContainerHandler {
         5 * 2000);
     Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
+    Assert.assertEquals(1,
+        metrics.getContainerDeleteFailedNonEmpty());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
     // is true

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -168,6 +169,10 @@ public class TestBlockDeletion {
         0,
         TimeUnit.MILLISECONDS);
     conf.setInt("hdds.datanode.block.delete.threads.max", 5);
+    ReplicationManager.ReplicationManagerConfiguration replicationConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    replicationConf.setInterval(Duration.ofSeconds(300));
+    conf.setFromObject(replicationConf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setHbInterval(50)
@@ -474,14 +479,17 @@ public class TestBlockDeletion {
         scm.getContainerManager().getContainers();
     final int valueSize = value.getBytes(UTF_8).length;
     final int keyCount = 1;
+    List<Long> containerIdList = new ArrayList<>();
     containerInfos.stream().forEach(container -> {
       Assertions.assertEquals(valueSize, container.getUsedBytes());
       Assertions.assertEquals(keyCount, container.getNumberOfKeys());
+      containerIdList.add(container.getContainerID());
     });
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    Thread.sleep(2000);
+    TestHelper.waitForContainerClose(cluster,
+        containerIdList.toArray(new Long[0]));
     // make sure the containers are closed on the dn
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
@@ -601,14 +609,17 @@ public class TestBlockDeletion {
         scm.getContainerManager().getContainers();
     final int valueSize = value.getBytes(UTF_8).length;
     final int keyCount = 1;
+    List<Long> containerIdList = new ArrayList<>();
     containerInfos.stream().forEach(container -> {
       Assertions.assertEquals(valueSize, container.getUsedBytes());
       Assertions.assertEquals(keyCount, container.getNumberOfKeys());
+      containerIdList.add(container.getContainerID());
     });
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    Thread.sleep(2000);
+    TestHelper.waitForContainerClose(cluster,
+        containerIdList.toArray(new Long[0]));
     // make sure the containers are closed on the dn
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
