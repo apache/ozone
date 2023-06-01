@@ -73,7 +73,7 @@ public class DiskCheckUtil {
 
   public static boolean checkReadWrite(Logger log, File storageDir,
       File testFileDir, int numBytesToWrite) {
-    File testFile = new File(testFileDir, "volume-test-" + UUID.randomUUID());
+    File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
     byte[] writtenBytes = new byte[numBytesToWrite];
     new Random().nextBytes(writtenBytes);
     try (FileOutputStream fos = new FileOutputStream(testFile)) {
