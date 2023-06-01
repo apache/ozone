@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.IOException;
+
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 
 /**
@@ -25,5 +27,6 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 public interface LeaseEventListener {
   void beginFileLease(RpcClientFileLease.KeyIdentifier inodeId,
       KeyOutputStream out);
-  void endFileLease(RpcClientFileLease.KeyIdentifier inodeId);
+  void endFileLease(RpcClientFileLease.KeyIdentifier inodeId)
+      throws IOException;
 }

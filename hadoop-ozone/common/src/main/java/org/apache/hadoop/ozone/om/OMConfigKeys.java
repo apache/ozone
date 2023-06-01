@@ -554,7 +554,4 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
-
-  String OZONE_OM_LEASE_HARDLIMIT_KEY = "ozone.om.lease-hard-limit-sec";
-  long OZONE_OM_LEASE_HARDLIMIT_DEFAULT = TimeUnit.MINUTES.toMillis(5);
 }

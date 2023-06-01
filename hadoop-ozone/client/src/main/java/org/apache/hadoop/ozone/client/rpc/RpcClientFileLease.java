@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,7 +154,7 @@ public class RpcClientFileLease implements LeaseEventListener {
 
   @Override
   /** Stop renewal of lease for the file. */
-  public void endFileLease(final KeyIdentifier inodeId) {
+  public void endFileLease(final KeyIdentifier inodeId) throws IOException {
     synchronized (filesBeingWritten) {
       removeFileBeingWritten(inodeId);
       // remove client from renewer if no files are open
@@ -190,8 +191,14 @@ public class RpcClientFileLease implements LeaseEventListener {
   }
 
   /** Remove a file. Only called from LeaseRenewer. */
-  private void removeFileBeingWritten(final KeyIdentifier inodeId) {
-    filesBeingWritten.remove(inodeId);
+  private void removeFileBeingWritten(final KeyIdentifier inodeId)
+      throws IOException {
+    KeyOutputStream outputStream = filesBeingWritten.remove(inodeId);
+    if (outputStream == null) {
+      throw new IOException("Unble to find output stream associated with " +
+          inodeId);
+    }
+
     if (filesBeingWritten.isEmpty()) {
       lastLeaseRenewal = 0;
     }
@@ -278,5 +285,10 @@ public class RpcClientFileLease implements LeaseEventListener {
 
   private ClientId getClientId() {
     return clientId;
+  }
+
+  @VisibleForTesting
+  int numFilesBeingWritten() {
+    return filesBeingWritten.size();
   }
 }

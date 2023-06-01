@@ -332,6 +332,11 @@ public class RpcClient implements ClientProtocol {
         ozoneManagerClient, clientId, clientConfig, this);
   }
 
+  @VisibleForTesting
+  RpcClientFileLease getFileLease() {
+    return fileLease;
+  }
+
   public XceiverClientFactory getXceiverClientManager() {
     return xceiverClientManager;
   }
