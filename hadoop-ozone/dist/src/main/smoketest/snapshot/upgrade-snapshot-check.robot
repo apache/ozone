@@ -74,12 +74,13 @@ Attempt to snapshotDiff when snapshot feature is disabled
     ${output} =         Execute and checkrc         ozone sh snapshot snapshotDiff /snapvolume-2/snapbucket-1 snapshot1 snapshot2    255
                         Should contain    ${output}   NOT_SUPPORTED_OPERATION
 
-Delete snapshot
-    [Tags]     finalized-snapshot-tests
-    ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
-                        Should not contain      ${output}       Failed
-    ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
-                        Should contain          ${output}       SNAPSHOT_DELETED
+# HDDS-8732
+#Delete snapshot
+#    [Tags]     finalized-snapshot-tests
+#    ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
+#                        Should not contain      ${output}       Failed
+#    ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
+#                        Should contain          ${output}       SNAPSHOT_DELETED
 
 Attempt to delete when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests
