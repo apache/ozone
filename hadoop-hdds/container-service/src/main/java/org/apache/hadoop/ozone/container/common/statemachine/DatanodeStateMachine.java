@@ -318,7 +318,6 @@ public class DatanodeStateMachine implements Closeable {
 
     upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
 
-    // Start jvm monitor
     while (context.getState() != DatanodeStates.SHUTDOWN) {
       try {
         LOG.debug("Executing cycle Number : {}", context.getExecutionCount());
