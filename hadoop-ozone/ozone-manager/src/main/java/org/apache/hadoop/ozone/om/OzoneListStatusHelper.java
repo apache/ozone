@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.ICopyObject;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -442,8 +442,8 @@ public class OzoneListStatusHelper {
         }
 
         // Copy cache value to local copy and work on it
-        if (cacheOmInfo instanceof ICopyObject) {
-          cacheOmInfo = ((ICopyObject) cacheOmInfo).copyObject();
+        if (cacheOmInfo instanceof CopyObject) {
+          cacheOmInfo = ((CopyObject<Value>) cacheOmInfo).copyObject();
         }
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"

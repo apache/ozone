@@ -1364,4 +1364,12 @@ public class BasicRootedOzoneClientAdapterImpl
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
   }
+
+  public void setTimes(String key, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    OFSPath ofsPath = new OFSPath(key, config);
+
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    bucket.setTimes(ofsPath.getKeyName(), mtime, atime);
+  }
 }

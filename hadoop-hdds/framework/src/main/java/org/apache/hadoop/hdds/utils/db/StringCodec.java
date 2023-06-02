@@ -24,9 +24,19 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.hdds.StringUtils;
 
 /**
- * Codec to convert String to/from byte array.
+ * Codec to serialize/deserialize {@link String}.
  */
 public final class StringCodec implements Codec<String> {
+  private static final StringCodec CODEC = new StringCodec();
+
+  public static StringCodec get() {
+    return CODEC;
+  }
+
+  private StringCodec() {
+    // singleton
+  }
+
   @Override
   public boolean supportCodecBuffer() {
     return true;

@@ -28,9 +28,8 @@ import java.util.Optional;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
- * It uses SCM's {@link KeyOutputStream} for writing the data.
  */
-public class OzoneOutputStream extends OutputStream {
+public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   private final OutputStream outputStream;
   private final Syncable syncable;

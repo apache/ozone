@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Comparator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -30,6 +25,9 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.util.Time;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -41,17 +39,23 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 /**
  * Class wraps ozone container info.
  */
-public class ContainerInfo implements Comparator<ContainerInfo>,
-    Comparable<ContainerInfo>, Externalizable {
+public final class ContainerInfo implements Comparable<ContainerInfo> {
+  private static final Comparator<ContainerInfo> COMPARATOR
+      = Comparator.comparingLong(info -> info.getLastUsed().toEpochMilli());
 
-  private static final String SERIALIZATION_ERROR_MSG = "Java serialization not"
-      + " supported. Use protobuf instead.";
+  private static final Codec<ContainerInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(HddsProtos.ContainerInfoProto.class),
+      ContainerInfo::fromProtobuf,
+      ContainerInfo::getProtobuf);
 
+  public static Codec<ContainerInfo> getCodec() {
+    return CODEC;
+  }
 
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
-  private PipelineID pipelineID;
-  private ReplicationConfig replicationConfig;
+  private final PipelineID pipelineID;
+  private final ReplicationConfig replicationConfig;
   /*
   usedBytes is a volatile field. Writes and Reads of volatile long are atomic
   and each read of a volatile will see the last write to that volatile by any
@@ -62,14 +66,14 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private long numberOfKeys;
   private Instant lastUsed;
   // The wall-clock ms since the epoch at which the current state enters.
-  private Instant stateEnterTime;
+  private final Instant stateEnterTime;
   private String owner;
   // This is JsonIgnored as originally this class held a long in instead of
   // a containerID object. By emitting this in Json, it changes the JSON output.
   // Therefore the method getContainerID is annotated to return the original
   // field and hence maintain the original output.
   @JsonIgnore
-  private ContainerID containerID;
+  private final ContainerID containerID;
   // Delete Transaction Id is updated when new transaction for a container
   // is stored in SCM delete Table.
   // TODO: Replication Manager should consider deleteTransactionId so that
@@ -79,13 +83,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
-
-  /**
-   * Allows you to maintain private data on ContainerInfo. This is not
-   * serialized via protobuf, just allows us to maintain some private data.
-   */
-  @JsonIgnore
-  private byte[] data;
 
   @SuppressWarnings("parameternumber")
   ContainerInfo(
@@ -110,12 +107,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
     this.replicationConfig = repConfig;
-  }
-
-  /**
-   * Needed for serialization findbugs.
-   */
-  public ContainerInfo() {
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
@@ -335,26 +326,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   /**
-   * Compares its two arguments for order.  Returns a negative integer, zero, or
-   * a positive integer as the first argument is less than, equal to, or greater
-   * than the second.<p>
-   *
-   * @param o1 the first object to be compared.
-   * @param o2 the second object to be compared.
-   * @return a negative integer, zero, or a positive integer as the first
-   * argument is less than, equal to, or greater than the second.
-   * @throws NullPointerException if an argument is null and this comparator
-   *                              does not permit null arguments
-   * @throws ClassCastException   if the arguments' types prevent them from
-   *                              being compared by this comparator.
-   */
-  @Override
-  public int compare(ContainerInfo o1, ContainerInfo o2) {
-    return Long.compare(
-        o1.getLastUsed().toEpochMilli(), o2.getLastUsed().toEpochMilli());
-  }
-
-  /**
    * Compares this object with the specified object for order.  Returns a
    * negative integer, zero, or a positive integer as this object is less than,
    * equal to, or greater than the specified object.
@@ -368,65 +339,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    */
   @Override
   public int compareTo(ContainerInfo o) {
-    return this.compare(this, o);
-  }
-
-
-
-  /**
-   * Returns private data that is set on this containerInfo.
-   *
-   * @return blob, the user can interpret it any way they like.
-   */
-  public byte[] getData() {
-    if (this.data != null) {
-      return Arrays.copyOf(this.data, this.data.length);
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Set private data on ContainerInfo object.
-   *
-   * @param data -- private data.
-   */
-  public void setData(byte[] data) {
-    if (data != null) {
-      this.data = Arrays.copyOf(data, data.length);
-    }
-  }
-
-  /**
-   * Throws IOException as default java serialization is not supported. Use
-   * serialization via protobuf instead.
-   *
-   * @param out the stream to write the object to
-   * @throws IOException Includes any I/O exceptions that may occur
-   * @serialData Overriding methods should use this tag to describe
-   * the data layout of this Externalizable object.
-   * List the sequence of element types and, if possible,
-   * relate the element to a public/protected field and/or
-   * method of this Externalizable class.
-   */
-  @Override
-  public void writeExternal(ObjectOutput out) throws IOException {
-    throw new IOException(SERIALIZATION_ERROR_MSG);
-  }
-
-  /**
-   * Throws IOException as default java serialization is not supported. Use
-   * serialization via protobuf instead.
-   *
-   * @param in the stream to read data from in order to restore the object
-   * @throws IOException            if I/O errors occur
-   * @throws ClassNotFoundException If the class for an object being
-   *                                restored cannot be found.
-   */
-  @Override
-  public void readExternal(ObjectInput in)
-      throws IOException, ClassNotFoundException {
-    throw new IOException(SERIALIZATION_ERROR_MSG);
+    return COMPARATOR.compare(this, o);
   }
 
   /**

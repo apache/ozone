@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -34,13 +38,22 @@ import java.util.Objects;
  * path. Also, it stores directory node related metdata details.
  */
 public class OmDirectoryInfo extends WithParentObjectId
-    implements ICopyObject {
-  private String name; // directory name
+    implements CopyObject<OmDirectoryInfo> {
+  private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.class),
+      OmDirectoryInfo::getFromProtobuf,
+      OmDirectoryInfo::getProtobuf);
 
-  private long creationTime;
-  private long modificationTime;
+  public static Codec<OmDirectoryInfo> getCodec() {
+    return CODEC;
+  }
 
-  private List<OzoneAcl> acls;
+  private final String name; // directory name
+
+  private final long creationTime;
+  private final long modificationTime;
+
+  private final List<OzoneAcl> acls;
 
   public OmDirectoryInfo(Builder builder) {
     this.name = builder.name;
@@ -76,8 +89,8 @@ public class OmDirectoryInfo extends WithParentObjectId
     private long creationTime;
     private long modificationTime;
 
-    private List<OzoneAcl> acls;
-    private Map<String, String> metadata;
+    private final List<OzoneAcl> acls;
+    private final Map<String, String> metadata;
 
     public Builder() {
       //Default values
@@ -263,7 +276,7 @@ public class OmDirectoryInfo extends WithParentObjectId
             acl.getAclScope())));
 
     if (metadata != null) {
-      metadata.forEach((k, v) -> builder.addMetadata(k, v));
+      builder.addAllMetadata(metadata);
     }
 
     return builder.build();

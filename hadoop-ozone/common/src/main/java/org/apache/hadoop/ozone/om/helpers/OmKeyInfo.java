@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -53,22 +54,17 @@ import org.slf4j.LoggerFactory;
  * datanode. Also, this is the metadata written to om.db on server side.
  */
 public final class OmKeyInfo extends WithParentObjectId
-    implements ICopyObject {
+    implements CopyObject<OmKeyInfo> {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
 
   private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
-    return new DelegatedCodec<OmKeyInfo, KeyInfo>(
+    return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.class),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION)) {
-      @Override
-      public OmKeyInfo copyObject(OmKeyInfo message) {
-        return message.copyObject();
-      }
-    };
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
   }
 
   public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {

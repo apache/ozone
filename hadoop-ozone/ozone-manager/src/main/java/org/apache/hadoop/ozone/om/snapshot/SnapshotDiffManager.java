@@ -40,6 +40,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeConstants;
@@ -52,6 +54,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -120,7 +123,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
  */
 public class SnapshotDiffManager implements AutoCloseable {
   private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotDiffManager.class);
+          LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
   private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
   private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
@@ -153,7 +156,8 @@ public class SnapshotDiffManager implements AutoCloseable {
    * similar type of request at any point of time.
    */
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
-  private final ExecutorService executorService;
+  private final ExecutorService snapDiffExecutor;
+  private ExecutorService sstDumpToolExecutor;
 
   /**
    * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
@@ -223,7 +227,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         byte[].class,
         byte[].class);
 
-    this.executorService = new ThreadPoolExecutor(threadPoolSize,
+    this.snapDiffExecutor = new ThreadPoolExecutor(threadPoolSize,
         threadPoolSize,
         0,
         TimeUnit.MILLISECONDS,
@@ -579,7 +583,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
-      executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
+      snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff, forceNonNativeDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
@@ -652,8 +656,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
         bucketName, toSnapshotName);
 
-    checkSnapshotActive(fromSnapInfo);
-    checkSnapshotActive(toSnapInfo);
+    checkSnapshotActive(fromSnapInfo, false);
+    checkSnapshotActive(toSnapInfo, false);
   }
 
   @SuppressWarnings("parameternumber")
@@ -857,13 +861,12 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
-                                Table<String, ? extends WithObjectID> tsTable,
-                                Set<String> deltaFiles,
-                                boolean nativeRocksToolsLoaded,
-                                PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-                                PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-                                PersistentSet<byte[]> objectIDsToCheck,
-                                Map<String, String> tablePrefixes)
+                        Table<String, ? extends WithObjectID> tsTable,
+                        Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
+                        PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                        PersistentMap<byte[], byte[]> newObjIdToKeyMap,
+                        PersistentSet<byte[]> objectIDsToCheck,
+                        Map<String, String> tablePrefixes)
       throws IOException, NativeLibraryNotLoadedException, RocksDBException {
 
     if (deltaFiles.isEmpty()) {
@@ -1286,10 +1289,28 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
-    if (executorService != null) {
-      executorService.shutdown();
+  public void close() {
+    if (snapDiffExecutor != null) {
+      closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
     }
-    this.sstDumptoolExecService.ifPresent(ExecutorService::shutdown);
+    this.sstDumptoolExecService.ifPresent(executor ->
+        closeExecutorService(sstDumpToolExecutor, "SstDumpToolExecutor"));
+  }
+
+  private void closeExecutorService(ExecutorService executorService,
+                                    String serviceName) {
+    if (executorService != null) {
+      LOG.info("Shutting down executorService: '{}'", serviceName);
+      executorService.shutdownNow();
+      try {
+        if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+        executorService.shutdownNow();
+      }
+    }
   }
 }

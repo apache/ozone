@@ -643,4 +643,9 @@ public class ClientProtocolStub implements ClientProtocol {
     return null;
   }
 
+  @Override
+  public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException {
+  }
+
 }
