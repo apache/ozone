@@ -41,6 +41,8 @@ import java.util.Objects;
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+ *                 "path": "/hivevol1675429570/hivebuck1675429570/reg_path/
+ *                 hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 129977,
    *               "color": 1
    *             }
