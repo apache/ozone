@@ -45,6 +45,7 @@ public class SnapshotDiffJob {
   private String fromSnapshot;
   private String toSnapshot;
   private boolean forceFullDiff;
+  private boolean cancel;
   private long totalDiffEntries;
 
   // Default constructor for Jackson Serializer.
@@ -61,6 +62,7 @@ public class SnapshotDiffJob {
                          String fromSnapshot,
                          String toSnapshot,
                          boolean forceFullDiff,
+                         boolean cancel,
                          long totalDiffEntries) {
     this.creationTime = creationTime;
     this.jobId = jobId;
@@ -70,6 +72,7 @@ public class SnapshotDiffJob {
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.forceFullDiff = forceFullDiff;
+    this.cancel = cancel;
     this.totalDiffEntries = totalDiffEntries;
   }
 
@@ -137,6 +140,14 @@ public class SnapshotDiffJob {
     this.creationTime = creationTime;
   }
 
+  public boolean isCancel() {
+    return cancel;
+  }
+
+  public void setCancel(boolean cancel) {
+    this.cancel = cancel;
+  }
+
   public long getTotalDiffEntries() {
     return totalDiffEntries;
   }
@@ -155,6 +166,7 @@ public class SnapshotDiffJob {
         ", fromSnapshot: " + fromSnapshot +
         ", toSnapshot: " + toSnapshot +
         ", forceFullDiff: " + forceFullDiff +
+        ", cancel: " + cancel +
         ", totalDiffEntries: " + totalDiffEntries;
   }
 
@@ -174,6 +186,7 @@ public class SnapshotDiffJob {
           Objects.equals(this.fromSnapshot, otherJob.fromSnapshot) &&
           Objects.equals(this.toSnapshot, otherJob.toSnapshot) &&
           Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
+          Objects.equals(this.cancel, otherJob.cancel) &&
           Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries);
     }
     return false;
@@ -182,7 +195,7 @@ public class SnapshotDiffJob {
   @Override
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
-        fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
+        fromSnapshot, toSnapshot, forceFullDiff, cancel, totalDiffEntries);
   }
 
   /**

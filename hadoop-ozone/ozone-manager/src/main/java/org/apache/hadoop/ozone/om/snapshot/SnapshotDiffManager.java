@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.LoadingCache;
 
 import java.io.BufferedWriter;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.utils.NativeConstants;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -105,6 +107,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotAct
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
@@ -248,6 +251,11 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.loadJobsOnStartUp();
   }
 
+  @VisibleForTesting
+  public PersistentMap<String, SnapshotDiffJob> getSnapDiffJobTable() {
+    return snapDiffJobTable;
+  }
+
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
     if (!NativeLibraryLoader.getInstance()
@@ -371,6 +379,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         .getPath(), tablesToLookUp);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse getSnapshotDiffReport(
       final String volumeName,
       final String bucketName,
@@ -378,7 +387,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String toSnapshotName,
       final int index,
       final int pageSize,
-      final boolean forceFullDiff
+      final boolean forceFullDiff,
+      final boolean cancel
   ) throws IOException {
 
     SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
@@ -389,9 +399,19 @@ public class SnapshotDiffManager implements AutoCloseable {
     String snapDiffJobKey = fsInfo.getSnapshotID() + DELIMITER +
         tsInfo.getSnapshotID();
 
+    // Check if the job already exists in the table
+    // before getting report status.
+    if (cancel && Objects.nonNull(snapDiffJobTable.get(snapDiffJobKey)) &&
+        snapDiffJobTable.get(snapDiffJobKey).getStatus().equals(IN_PROGRESS)) {
+      LOG.info("Cancelling job with JobID: " +
+          snapDiffJobTable.get(snapDiffJobKey).getJobId());
+
+      updateJobStatus(snapDiffJobKey, IN_PROGRESS, CANCELED);
+    }
+
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
-        forceFullDiff);
+        forceFullDiff, cancel);
 
     OFSPath snapshotRoot = getSnapshotRootPath(volumeName, bucketName);
 
@@ -422,6 +442,12 @@ public class SnapshotDiffManager implements AutoCloseable {
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
               null),
           REJECTED, defaultWaitTime);
+    case CANCELED:
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
+              bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
+              null),
+          CANCELED, defaultWaitTime);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
@@ -508,11 +534,11 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
 
-    // This is only possible if another thread tired to submit the request,
+    // This is only possible if another thread tried to submit the request,
     // and it got rejected. In this scenario, return the Rejected job status
     // with wait time.
     if (snapDiffJob == null) {
-      LOG.info("Snap diff job has been removed for for volume: {}, " +
+      LOG.info("Snap diff job has been removed for volume: {}, " +
           "bucket: {}, fromSnapshot: {} and toSnapshot: {}.",
           volume, bucket, fromSnapshot, toSnapshot);
       return new SnapshotDiffResponse(
@@ -609,7 +635,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       String bucketName,
       String fromSnapshotName,
       String toSnapshotName,
-      boolean forceFullDiff
+      boolean forceFullDiff,
+      boolean cancel
   ) {
     SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
 
@@ -617,7 +644,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       String jobId = UUID.randomUUID().toString();
       snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
           QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, 0L);
+          forceFullDiff, cancel, 0L);
       snapDiffJobTable.put(jobKey, snapDiffJob);
     }
 
@@ -638,6 +665,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     checkSnapshotActive(toSnapInfo, false);
   }
 
+  @SuppressWarnings("methodlength")
   private void generateSnapshotDiffReport(final String jobKey,
                                           final String jobId,
                                           final String volumeName,
@@ -718,36 +746,63 @@ public class SnapshotDiffManager implements AutoCloseable {
       Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
           .getKeyTable(bucketLayout);
 
-      getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
-          fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
-          tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
-          objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
-          path.toString());
+      // These are the most time and resource consuming method calls.
+      // Split the calls into steps and store them in an array, to avoid
+      // repetition while constantly checking if the job is cancelled.
+      Callable<Void>[] methodCalls = new Callable[]{
+          () -> {
+            getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
+                fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
+                tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
+                objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+                path.toString());
+            return null;
+          },
+          () -> {
+            if (bucketLayout.isFileSystemOptimized()) {
+              validateSnapshotsAreActive(volumeName, bucketName,
+                  fromSnapshotName, toSnapshotName);
 
-      if (bucketLayout.isFileSystemOptimized()) {
-        validateSnapshotsAreActive(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName);
+              Table<String, OmDirectoryInfo> fsDirTable =
+                  fromSnapshot.getMetadataManager().getDirectoryTable();
+              Table<String, OmDirectoryInfo> tsDirTable =
+                  toSnapshot.getMetadataManager().getDirectoryTable();
 
-        Table<String, OmDirectoryInfo> fsDirTable =
-            fromSnapshot.getMetadataManager().getDirectoryTable();
-        Table<String, OmDirectoryInfo> tsDirTable =
-            toSnapshot.getMetadataManager().getDirectoryTable();
+              getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
+                  fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
+                  tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
+                  objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
+                  path.toString());
+            }
+            return null;
+          },
+          () -> {
+            validateSnapshotsAreActive(volumeName, bucketName,
+                fromSnapshotName, toSnapshotName);
 
-        getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
-            fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
-            tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
-            objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
-            path.toString());
+            long totalDiffEntries = generateDiffReport(jobKey,
+                jobId,
+                objectIDsToCheckMap,
+                objectIdToKeyNameMapForFromSnapshot,
+                objectIdToKeyNameMapForToSnapshot);
+            // If job is canceled, totalDiffEntries will be equal to -1.
+            if (totalDiffEntries >= 0 &&
+                !snapDiffJobTable.get(jobKey)
+                    .getStatus().equals(CANCELED)) {
+              updateJobStatusToDone(jobKey, totalDiffEntries);
+            }
+            return null;
+          }
+      };
+
+      // Check if the job is cancelled, before every method call.
+      for (Callable<Void> methodCall : methodCalls) {
+        if (snapDiffJobTable.get(jobKey).getStatus()
+            .equals(CANCELED)) {
+          return;
+        }
+        methodCall.call();
       }
-
-      validateSnapshotsAreActive(volumeName, bucketName, fromSnapshotName,
-          toSnapshotName);
-      long totalDiffEntries = generateDiffReport(jobId,
-          objectIDsToCheckMap,
-          objectIdToKeyNameMapForFromSnapshot,
-          objectIdToKeyNameMapForToSnapshot);
-
-      updateJobStatusToDone(jobKey, totalDiffEntries);
     } catch (ExecutionException | IOException | RocksDBException exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
       LOG.error("Caught checked exception during diff report generation for " +
@@ -785,7 +840,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentSet<byte[]> objectIDsToCheck,
-      final String diffDir 
+      final String diffDir
   ) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
@@ -973,6 +1028,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private long generateDiffReport(
+      final String jobKey,
       final String jobId,
       final PersistentSet<byte[]> objectIDsToCheck,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
@@ -1010,6 +1066,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       try (ClosableIterator<byte[]>
                objectIdsIterator = objectIDsToCheck.iterator()) {
         while (objectIdsIterator.hasNext()) {
+          if (snapDiffJobTable.get(jobKey).getStatus()
+              .equals(CANCELED)) {
+            return -1L;
+          }
+
           byte[] id = objectIdsIterator.next();
           /*
            * This key can be

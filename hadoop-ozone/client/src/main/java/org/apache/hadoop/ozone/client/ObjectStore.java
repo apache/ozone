@@ -600,15 +600,17 @@ public class ObjectStore {
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
     return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff);
+        token, pageSize, forceFullDiff, cancel);
   }
 }

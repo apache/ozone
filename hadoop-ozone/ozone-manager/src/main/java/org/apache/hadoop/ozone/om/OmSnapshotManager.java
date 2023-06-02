@@ -487,6 +487,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
+  @VisibleForTesting
+  public SnapshotDiffManager getSnapshotDiffManager() {
+    return snapshotDiffManager;
+  }
+
   /**
    * Helper method to locate the end key with the given prefix and iterator.
    * @param keyIter TableIterator
@@ -650,13 +655,15 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
                                                     final String toSnapshot,
                                                     final String token,
                                                     int pageSize,
-                                                    boolean forceFullDiff)
+                                                    boolean forceFullDiff,
+                                                    boolean cancel)
       throws IOException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
@@ -668,7 +675,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SnapshotDiffResponse snapshotDiffReport =
         snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
-            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff);
+            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff, cancel);
 
     // Check again to make sure that from and to snapshots are still active and
     // were not deleted in between response generation.
