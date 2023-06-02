@@ -236,14 +236,6 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     File file = getChunkFile(container, blockID, info);
 
-    // if the chunk file does not exist, it might have already been deleted.
-    // The call might be because of reapply of transactions on datanode
-    // restart.
-    if (!file.exists()) {
-      LOG.warn("Block file to be deleted does not exist: {}", file);
-      return;
-    }
-
     if (verifyLength) {
       Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
           "chunk delete");
@@ -263,6 +255,16 @@ public class FilePerBlockStrategy implements ChunkManager {
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
     long fileLength = chunkFile.length();
+    if (fileLength == 0) {
+      // if the chunk file does not exist, it might have already been deleted.
+      // The call might be because of reapply of transactions on datanode
+      // restart.
+      if (!chunkFile.exists()) {
+        LOG.warn("Block file to be deleted does not exist: {}", chunkFile);
+        return;
+      }
+    }
+
     if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
       String msg = String.format(
           "Trying to delete partial chunk %s from file %s with length %s",
