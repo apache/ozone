@@ -358,7 +358,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
       for (; ;) {
         final Integer required;
-        final int initial = -bufferSize.get();
+        final int initial = -bufferSize.get(); // allocate a resizable buffer
         try (CodecBuffer outValue = CodecBuffer.allocateDirect(initial)) {
           required = get.apply(inKey, outValue);
           if (required == null) {
@@ -380,7 +380,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
             // retry with the new capacity
             outValue.clear();
-            final int retried = getFromTableIfExist(inKey, outValue);
+            final int retried = get.apply(inKey, outValue);
             Preconditions.assertSame(required.intValue(), retried, "required");
           }
         }

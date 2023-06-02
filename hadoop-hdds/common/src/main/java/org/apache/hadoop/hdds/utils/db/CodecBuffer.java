@@ -49,11 +49,11 @@ public final class CodecBuffer implements AutoCloseable {
   
   /**
    * Allocate a direct buffer.
-   * When the given capacity is non-negative, allocate a buffer
-   * by setting initial capacity and maximum capacity to the given capacity.
+   * When the given capacity is non-negative, allocate a buffer by setting
+   * the initial capacity and the maximum capacity to the given capacity.
    * When the given capacity is negative, allocate a buffer
-   * by setting initial capacity to the given capacity
-   * and the buffer's capacity can be increased if necessary.
+   * by setting only the initial capacity to the absolute value of it
+   * and then the buffer's capacity can be increased if necessary.
    */
   public static CodecBuffer allocateDirect(int capacity) {
     final ByteBuf buf;
@@ -61,7 +61,7 @@ public final class CodecBuffer implements AutoCloseable {
       // allocate exact size
       buf = POOL.directBuffer(capacity, capacity);
     } else {
-      // allocate resizable buffer
+      // allocate a resizable buffer
       buf = POOL.directBuffer(-capacity);
     }
     return new CodecBuffer(buf);
@@ -70,10 +70,10 @@ public final class CodecBuffer implements AutoCloseable {
   /**
    * Allocate a heap buffer.
    * When the given capacity is non-negative, allocate a buffer by setting
-   * the initial capacity and the maximum capacity to capacity.
+   * the initial capacity and the maximum capacity to the given capacity.
    * When the given capacity is negative, allocate a buffer
-   * by setting the initial capacity to -capacity
-   * and the buffer's capacity can be increased if necessary.
+   * by setting only the initial capacity to the absolute value of it
+   * and then the buffer's capacity can be increased if necessary.
    */
   public static CodecBuffer allocateHeap(int capacity) {
     final ByteBuf buf;
@@ -81,7 +81,7 @@ public final class CodecBuffer implements AutoCloseable {
       // allocate exact size
       buf = POOL.heapBuffer(capacity, capacity);
     } else {
-      // allocate resizable buffer
+      // allocate a resizable buffer
       buf = POOL.heapBuffer(-capacity);
     }
     return new CodecBuffer(buf);
