@@ -282,7 +282,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
             // Delete keys From deletedTable
             processKeyDeletes(keysToPurge, omSnapshot.getKeyManager(),
-                snapInfo.getTableKey());
+                null, snapInfo.getTableKey());
             successRunCount.incrementAndGet();
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +

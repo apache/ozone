@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -382,6 +384,41 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(snapshotInfoTable, 1);
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
+
+    OmSnapshot snap1 = (OmSnapshot) om.getOmSnapshotManager()
+        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
+            getSnapshotPrefix("snap1"), true);
+    Table<String, OmKeyInfo> snap1KeyTable =
+        snap1.getMetadataManager().getFileTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String,
+        RepeatedOmKeyInfo>> iterator = deletedTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> next = iterator.next();
+        String activeDBDeletedKey = next.getKey();
+        if (activeDBDeletedKey.matches(".*/key1.*")) {
+          RepeatedOmKeyInfo activeDBDeleted = next.getValue();
+          OMMetadataManager metadataManager =
+              cluster.getOzoneManager().getMetadataManager();
+          GenericTestUtils.waitFor(() -> activeDBDeleted.getOmKeyInfoList()
+              .size() == 1, 100, 2000);
+          OmKeyInfo activeDbDeletedKeyInfo =
+              activeDBDeleted.getOmKeyInfoList().get(0);
+          long volumeId = metadataManager
+              .getVolumeId(activeDbDeletedKeyInfo.getVolumeName());
+          long bucketId = metadataManager
+              .getBucketId(activeDbDeletedKeyInfo.getVolumeName(),
+                  activeDbDeletedKeyInfo.getBucketName());
+          String keyForSnap =
+              metadataManager.getOzonePathKey(volumeId, bucketId,
+                  activeDbDeletedKeyInfo.getParentObjectID(),
+                  activeDbDeletedKeyInfo.getKeyName());
+          OmKeyInfo snap1keyInfo = snap1KeyTable.get(keyForSnap);
+          assertEquals(activeDbDeletedKeyInfo.getLatestVersionLocations()
+              .getLocationList(), snap1keyInfo.getLatestVersionLocations()
+              .getLocationList());
+        }
+      }
+    }
     assertTableRowCount(deletedTable, 15);
   }
 

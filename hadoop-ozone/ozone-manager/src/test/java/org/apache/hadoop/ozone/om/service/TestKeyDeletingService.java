@@ -144,7 +144,7 @@ public class TestKeyDeletingService {
         1000, 10000);
     Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
     Assert.assertEquals(0,
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getLeft().size());
   }
 
   @Test(timeout = 40000)
@@ -169,7 +169,8 @@ public class TestKeyDeletingService {
         () -> {
           try {
             int numPendingDeletionKeys =
-                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                    .getLeft().size();
             if (numPendingDeletionKeys != keyCount) {
               LOG.info("Expected {} keys to be pending deletion, but got {}",
                   keyCount, numPendingDeletionKeys);
@@ -188,7 +189,7 @@ public class TestKeyDeletingService {
     // Since SCM calls are failing, deletedKeyCount should be zero.
     Assert.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
     Assert.assertEquals(keyCount,
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getLeft().size());
   }
 
   @Test(timeout = 30000)
@@ -215,7 +216,8 @@ public class TestKeyDeletingService {
         () -> {
           try {
             int numPendingDeletionKeys =
-                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size();
+                keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                    .getLeft().size();
             if (numPendingDeletionKeys != keyCount) {
               LOG.info("Expected {} keys to be pending deletion, but got {}",
                   keyCount, numPendingDeletionKeys);
@@ -269,6 +271,7 @@ public class TestKeyDeletingService {
         () -> {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                .getLeft()
                 .stream()
                 .map(BlockGroup::getBlockIDList)
                 .flatMap(Collection::stream)
@@ -291,6 +294,7 @@ public class TestKeyDeletingService {
         () -> {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+                .getLeft()
                 .stream()
                 .map(BlockGroup::getBlockIDList)
                 .flatMap(Collection::stream)
@@ -342,7 +346,7 @@ public class TestKeyDeletingService {
         1000, 10000);
     Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
     Assert.assertEquals(0,
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getLeft().size());
 
     // The 1st version of the key has 1 block and the 2nd version has 2
     // blocks. Hence, the ScmBlockClient should have received atleast 3
@@ -420,7 +424,7 @@ public class TestKeyDeletingService {
         1000, 10000);
     Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
     Assert.assertEquals(0,
-        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).size());
+        keyManager.getPendingDeletionKeys(Integer.MAX_VALUE).getLeft().size());
 
     // deletedTable should have deleted key of the snapshot bucket
     Assert.assertFalse(metadataManager.getDeletedTable().isEmpty());

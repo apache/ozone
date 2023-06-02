@@ -173,8 +173,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
   }
 
-  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(List<KeyInfo> keyInfoList)
-      throws IOException {
+  public static RepeatedOmKeyInfo createRepeatedOmKeyInfo(
+      List<KeyInfo> keyInfoList) throws IOException {
     RepeatedOmKeyInfo result = null;
 
     for (KeyInfo keyInfo: keyInfoList) {
