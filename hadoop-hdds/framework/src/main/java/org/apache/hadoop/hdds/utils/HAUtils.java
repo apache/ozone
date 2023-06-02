@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Streams;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -284,7 +285,8 @@ public final class HAUtils {
 
   public static Table<String, TransactionInfo> getTransactionInfoTable(
       DBStore dbStore, DBDefinition definition) throws IOException {
-    return Arrays.stream(definition.getColumnFamilies())
+    return (Table<String, TransactionInfo>)
+        Streams.stream(definition.getColumnFamilies())
         .filter(t -> t.getValueType() == TransactionInfo.class).findFirst()
         .get().getTable(dbStore);
   }

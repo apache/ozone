@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -78,8 +77,6 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -330,12 +327,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // Get admin list
       String starterUser =
           UserGroupInformation.getCurrentUser().getShortUserName();
-      Collection<String> adminUserNames =
-          getOzoneAdminsFromConfig(conf, starterUser);
-      Collection<String> adminGroupNames =
-          getOzoneAdminsGroupsFromConfig(conf);
-      LOG.info("Datanode start with admins: {}", adminUserNames);
-      admins = new OzoneAdmins(adminUserNames, adminGroupNames);
+      admins = OzoneAdmins.getOzoneAdmins(starterUser, conf);
+      LOG.info("Datanode start with admins: {}", admins.getAdminUsernames());
 
       clientProtocolServer.start();
       startPlugins();
@@ -669,18 +662,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    */
   public void checkAdminUserPrivilege(UserGroupInformation ugi)
       throws IOException {
-    if (ugi != null && !isAdmin(ugi)) {
-      throw new AccessControlException("Access denied for user "
-          + ugi.getUserName() + ". Superuser privilege is required.");
-    }
-  }
-
-  /**
-   * Return true if a UserGroupInformation is admin, false otherwise.
-   * @param callerUgi Caller UserGroupInformation
-   */
-  public boolean isAdmin(UserGroupInformation callerUgi) {
-    return callerUgi != null && admins.isAdmin(callerUgi);
+    admins.checkAdminUserPrivilege(ugi);
   }
 
   public String reconfigurePropertyImpl(String property, String newVal)
@@ -690,26 +672,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public Collection<String> getReconfigurableProperties() {
     return reconfigurableProperties;
-  }
-
-  /**
-   * Return list of OzoneAdministrators from config.
-   * The service startup user will default to an admin.
-   */
-  private Collection<String> getOzoneAdminsFromConfig(
-      OzoneConfiguration configuration, String starterUser) {
-    Collection<String> ozAdmins = configuration.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
-  }
-
-  Collection<String> getOzoneAdminsGroupsFromConfig(
-      OzoneConfiguration configuration) {
-    return configuration.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS_GROUPS);
   }
 
 }
