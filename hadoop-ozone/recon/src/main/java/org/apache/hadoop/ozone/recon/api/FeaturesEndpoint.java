@@ -35,10 +35,11 @@ import java.util.List;
 
 
 /**
- * Endpoint for listing of disabled feature list in Recon.
- * Disabled features may represent or fall under below categories:
- *  1. Implementation Not Available
- *  2. Beta Phase
+ * Endpoint for APIs related to features in Recon.
+ * API: "api/v1/features/disabledFeatures"
+ *    Disabled features may represent or fall under below categories:
+ *      1. Implementation Not Available
+ *      2. Beta Phase
  */
 @Path("/features")
 @Produces(MediaType.APPLICATION_JSON)
@@ -55,19 +56,7 @@ public class FeaturesEndpoint {
   }
 
   /**
-   * Return the top 100 prefixes or paths
-   * in tree nested structure with root as
-   * "/" and based on top 100 paths, response
-   * will be structured as tree starting
-   * with volume, buckets under that volume,
-   * then directories, subdirectories and paths
-   * under that bucket.
-   * E.g. -------->>
-   * vol1                           vol2
-   * - bucket1                      - bucket2
-   * - dir1/dir2/key1               - dir4/dir1/key1
-   * - dir1/dir2/key2               - dir4/dir5/key2
-   * - dir1/dir3/key1               - dir5/dir3/key1
+   * This API returns the list of all disabled features in Recon.
    *
    * @return {@link Response}
    */
@@ -81,6 +70,8 @@ public class FeaturesEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+    LOG.info("List of disabled features in Recon: {}",
+        allDisabledFeatures.toString());
     return Response.ok(allDisabledFeatures).build();
   }
 }
