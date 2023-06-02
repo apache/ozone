@@ -19,28 +19,37 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Quota repair task.
@@ -52,6 +61,11 @@ public class QuotaRepairTask {
   private final Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
   private final Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
   private ExecutorService executor;
+  private final Map<String, CountPair> keyCountMap = new ConcurrentHashMap<>();
+  private final Map<String, CountPair> fileCountMap
+      = new ConcurrentHashMap<>();
+  private final Map<String, CountPair> directoryCountMap
+      = new ConcurrentHashMap<>();
 
   public QuotaRepairTask(OMMetadataManager metadataManager) {
     this.metadataManager = metadataManager;
@@ -59,9 +73,15 @@ public class QuotaRepairTask {
   
   public void repair() throws Exception {
     LOG.info("Starting quota repair task");
-    executor = Executors.newFixedThreadPool(3);
+    executor = Executors.newFixedThreadPool(12);
     prepareAllVolumeBucketInfo();
+
+    IOzoneManagerLock lock = metadataManager.getLock();
+    nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
+        BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
     repairCount();
+    nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
+        BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
     LOG.info("Completed quota repair task");
     executor.shutdown();
   }
@@ -117,19 +137,39 @@ public class QuotaRepairTask {
   private void repairCount() throws Exception {
     LOG.info("Starting quota repair for all keys, files and directories");
     try {
+      nameBucketInfoMap.keySet().stream().forEach(e -> keyCountMap.put(e,
+          new CountPair()));
+      idBucketInfoMap.keySet().stream().forEach(e -> fileCountMap.put(e,
+          new CountPair()));
+      idBucketInfoMap.keySet().stream().forEach(e -> directoryCountMap.put(e,
+          new CountPair()));
+      
       List<Future<?>> tasks = new ArrayList<>();
-      tasks.add(executor.submit(() -> recalculateKeyUsages()));
-      tasks.add(executor.submit(() -> recalculateFileUsages()));
-      tasks.add(executor.submit(() -> recalculateDirectoryUsages()));
+      tasks.add(executor.submit(() -> recalculateUsages(
+          metadataManager.getKeyTable(BucketLayout.OBJECT_STORE),
+          keyCountMap, "Key usages", true)));
+      tasks.add(executor.submit(() -> recalculateUsages(
+          metadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED),
+          fileCountMap, "File usages", true)));
+      tasks.add(executor.submit(() -> recalculateUsages(
+          metadataManager.getDirectoryTable(),
+          directoryCountMap, "Directory usages", false)));
       for (Future<?> f : tasks) {
         f.get();
       }
     } catch (UncheckedIOException ex) {
       LOG.error("quota repair failure", ex.getCause());
       throw ex.getCause();
+    } catch (UncheckedExecutionException ex) {
+      LOG.error("quota repair failure", ex.getCause());
+      throw new Exception(ex.getCause());
     }
     
     // persist bucket info
+    updateCountToBucketInfo(nameBucketInfoMap, keyCountMap);
+    updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
+    updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
+    
     try (BatchOperation batchOperation = metadataManager.getStore()
         .initBatchOperation()) {
       for (Map.Entry<String, OmBucketInfo> entry
@@ -145,75 +185,84 @@ public class QuotaRepairTask {
     LOG.info("Completed quota repair for all keys, files and directories");
   }
   
-  private void recalculateKeyUsages() throws UncheckedIOException {
-    LOG.info("Starting recalculate key usages");
-    Map<String, CountPair> prefixUsageMap = new HashMap<>();
-    Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(
-        BucketLayout.OBJECT_STORE);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             keyIter = keyTable.iterator()) {
+  private <VALUE> void recalculateUsages(
+      Table<String, VALUE> table, Map<String, CountPair> prefixUsageMap,
+      String strType, boolean haveValue) throws UncheckedIOException,
+      UncheckedExecutionException {
+    LOG.info("Starting recalculate {}", strType);
+
+    BlockingQueue<Table.KeyValue<String, VALUE>> q
+        = new ArrayBlockingQueue<>(10000);
+    List<Future<?>> tasks = new ArrayList<>();
+    AtomicBoolean isRunning = new AtomicBoolean(true);
+    for (int i = 0; i < 3; ++i) {
+      tasks.add(executor.submit(() -> captureCount(
+          prefixUsageMap, q, isRunning, haveValue)));
+    }
+    int count = 0;
+    long startTime = System.currentTimeMillis();
+    try (TableIterator<String, ? extends Table.KeyValue<String, VALUE>>
+             keyIter = table.iterator()) {
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        String prefix = getVolumeBucketPrefix(kv.getKey());
-        CountPair usage = prefixUsageMap.getOrDefault(prefix, new CountPair());
-        usage.setSpace(usage.getSpace() + kv.getValue().getReplicatedSize());
-        usage.setNamespace(usage.getNamespace() + 1L);
-        prefixUsageMap.putIfAbsent(prefix, usage);
+        count++;
+        q.put(keyIter.next());
       }
-      LOG.info("Recalculate key usages completed");
-      updateCount(nameBucketInfoMap, prefixUsageMap);
-      LOG.info("Update of recalculate key usages completed");
+      isRunning.set(false);
+      for (Future<?> f : tasks) {
+        f.get();
+      }
+      LOG.info("Recalculate {} completed, count {} time {}ms", strType,
+          count, (System.currentTimeMillis() - startTime));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException ex) {
+      throw new UncheckedExecutionException(ex);
+    }
+  }
+  
+  private <VALUE> void captureCount(
+      Map<String, CountPair> prefixUsageMap,
+      BlockingQueue<Table.KeyValue<String, VALUE>> q,
+      AtomicBoolean isRunning, boolean haveValue) throws UncheckedIOException {
+    try {
+      while (isRunning.get() || !q.isEmpty()) {
+        Table.KeyValue<String, VALUE> kv
+            = q.poll(100, TimeUnit.MILLISECONDS);
+        if (null != kv) {
+          extractCount(kv, prefixUsageMap, haveValue);
+        }
+      }
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
+  }
+  
+  private <VALUE> void extractCount(
+      Table.KeyValue<String, VALUE> kv,
+      Map<String, CountPair> prefixUsageMap,
+      boolean haveValue) {
+    try {
+      String prefix = getVolumeBucketPrefix(kv.getKey());
+      CountPair usage = prefixUsageMap.get(prefix);
+      if (null == usage) {
+        return;
+      }
+      usage.incrNamespace(1L);
+      // avoid decode of value
+      if (haveValue) {
+        VALUE value = kv.getValue();
+        if (value instanceof OmKeyInfo) {
+          usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
+        }
+      }
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
   }
   
-  private void recalculateFileUsages() throws UncheckedIOException {
-    LOG.info("Starting recalculate files usages");
-    Map<String, CountPair> prefixUsageMap = new HashMap<>();
-    Table<String, OmKeyInfo> fileTable = metadataManager.getKeyTable(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             keyIter = fileTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        String prefix = getVolumeBucketPrefix(kv.getKey());
-        CountPair usage = prefixUsageMap.getOrDefault(prefix, new CountPair());
-        usage.setSpace(usage.getSpace() + kv.getValue().getReplicatedSize());
-        usage.setNamespace(usage.getNamespace() + 1L);
-        prefixUsageMap.putIfAbsent(prefix, usage);
-      }
-      LOG.info("Recalculate file usages completed");
-      updateCount(idBucketInfoMap, prefixUsageMap);
-      LOG.info("Update of recalculate file usages completed");
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
-  }
-  
-  private void recalculateDirectoryUsages() throws UncheckedIOException {
-    LOG.info("Starting recalculate directory usages");
-    Map<String, CountPair> prefixUsageMap = new HashMap<>();
-    Table<String, OmDirectoryInfo> dirTable
-        = metadataManager.getDirectoryTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String,
-        OmDirectoryInfo>> keyIter = dirTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = keyIter.next();
-        String prefix = getVolumeBucketPrefix(kv.getKey());
-        CountPair usage = prefixUsageMap.getOrDefault(prefix, new CountPair());
-        usage.setNamespace(usage.getNamespace() + 1L);
-        prefixUsageMap.putIfAbsent(prefix, usage);
-      }
-      LOG.info("Recalculate directory usages completed");
-      updateCount(idBucketInfoMap, prefixUsageMap);
-      LOG.info("Update of recalculate directory usages completed");
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
-  }
-  
-  private synchronized void updateCount(
+  private synchronized void updateCountToBucketInfo(
       Map<String, OmBucketInfo> bucketInfoMap,
       Map<String, CountPair> prefixUsageMap) {
     for (Map.Entry<String, CountPair> entry : prefixUsageMap.entrySet()) {
@@ -241,23 +290,23 @@ public class QuotaRepairTask {
   }
   
   private static class CountPair {
-    private long space;
-    private long namespace;
+    private AtomicLong space = new AtomicLong();
+    private AtomicLong namespace = new AtomicLong();
 
-    public long getSpace() {
-      return space;
+    public void incrSpace(long val) {
+      space.getAndAdd(val);
     }
-
-    public void setSpace(long space) {
-      this.space = space;
+    
+    public void incrNamespace(long val) {
+      namespace.getAndAdd(val);
+    }
+    
+    public long getSpace() {
+      return space.get();
     }
 
     public long getNamespace() {
-      return namespace;
-    }
-
-    public void setNamespace(long namespace) {
-      this.namespace = namespace;
+      return namespace.get();
     }
   }
 }

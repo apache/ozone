@@ -35,7 +35,7 @@ import org.junit.Test;
 public class TestQuotaRepairTask extends TestOMKeyRequest {
 
   @Test
-  public void testCleanupExpiredOpenKeys() throws Exception {
+  public void testQuotaRepair() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.OBJECT_STORE);
 
