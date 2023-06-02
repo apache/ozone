@@ -281,6 +281,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hiveencbuck1676574631/enc_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 155074,
    *               "color": 1
    *             },
@@ -288,6 +290,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *               "label": "enc_path/hive_tpcds/catalog_sales/
    *               catalog_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hiveencbuck1676574631/enc_path/
+   *               hive_tpcds/catalog_sales/catalog_sales.dat",
    *               "accessCount": 68567,
    *               "color": 0.442
    *             }
@@ -303,6 +307,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hivebuck1676574631/reg_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 155069,
    *               "color": 1
    *             },
@@ -310,6 +316,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *               "label": "reg_path/hive_tpcds/catalog_sales/
    *               catalog_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hivebuck1676574631/reg_path/
+   *               hive_tpcds/catalog_sales/catalog_sales.dat",
    *               "accessCount": 68566,
    *               "color": 0.442
    *             }
@@ -332,6 +340,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1675429570/hivebuck1675429570/reg_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 129977,
    *               "color": 1
    *             }          ],
