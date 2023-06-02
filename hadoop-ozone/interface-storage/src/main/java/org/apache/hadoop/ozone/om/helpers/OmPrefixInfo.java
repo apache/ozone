@@ -19,6 +19,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
@@ -36,6 +39,14 @@ import java.util.stream.Collectors;
  */
 // TODO: support Auditable interface
 public final class OmPrefixInfo extends WithObjectID {
+  private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(PersistedPrefixInfo.class),
+      OmPrefixInfo::getFromProtobuf,
+      OmPrefixInfo::getProtobuf);
+
+  public static Codec<OmPrefixInfo> getCodec() {
+    return CODEC;
+  }
 
   private String name;
   private List<OzoneAcl> acls;

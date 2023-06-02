@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -181,7 +182,7 @@ public class TestContainerStateMachine {
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Assert.assertNull(storage.findLatestSnapshot());
+    Assert.assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
@@ -202,7 +203,7 @@ public class TestContainerStateMachine {
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    Path parentPath = getSnapshotPath(storage);
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
     Assert.assertTrue(Math.abs(ratisServerConfiguration
         .getNumSnapshotsRetained() - numSnapshots) <= 1);
@@ -222,10 +223,15 @@ public class TestContainerStateMachine {
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    parentPath = storage.findLatestSnapshot().getFile().getPath();
+    parentPath = getSnapshotPath(storage);
     numSnapshots = parentPath.getParent().toFile().listFiles().length;
     Assert.assertTrue(Math.abs(ratisServerConfiguration
         .getNumSnapshotsRetained() - numSnapshots) <= 1);
   }
 
+  static Path getSnapshotPath(SimpleStateMachineStorage storage)
+      throws IOException {
+    return StatemachineImplTestUtil.findLatestSnapshot(storage)
+        .getFile().getPath();
+  }
 }

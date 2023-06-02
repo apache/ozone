@@ -155,7 +155,6 @@ import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -578,6 +577,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 
   @Test
@@ -704,7 +704,7 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     LambdaTestUtils.intercept(OMException.class,
-        "Invalid bucket name: invalid#bucket",
+        "Bucket or Volume name has an unsupported character : #",
         () -> volume.createBucket(bucketName));
   }
 
@@ -2286,69 +2286,42 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volA = store.getVolume(volumeA);
     OzoneVolume volB = store.getVolume(volumeB);
 
+
     //Create 10 buckets in  vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameA = "bucket-a-";
     for (int i = 0; i < 10; i++) {
-      volA.createBucket(
-          bucketBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
-      volB.createBucket(
-          bucketBaseNameA + i + "-" + RandomStringUtils.randomNumeric(5));
+      String bucketName = bucketBaseNameA +
+          i + "-" + RandomStringUtils.randomNumeric(5);
+      volA.createBucket(bucketName);
+      store.createSnapshot(volumeA, bucketName, null);
+      bucketName = bucketBaseNameA +
+          i + "-" + RandomStringUtils.randomNumeric(5);
+      volB.createBucket(bucketName);
+      store.createSnapshot(volumeB, bucketName, null);
     }
     //Create 10 buckets in vol-a-<random> and 10 in vol-b-<random>
     String bucketBaseNameB = "bucket-b-";
     for (int i = 0; i < 10; i++) {
-      volA.createBucket(
-          bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
+      String bucketName = bucketBaseNameB +
+          i + "-" + RandomStringUtils.randomNumeric(5);
+      volA.createBucket(bucketName);
+      store.createSnapshot(volumeA, bucketName, null);
       volB.createBucket(
           bucketBaseNameB + i + "-" + RandomStringUtils.randomNumeric(5));
     }
-    Iterator<? extends OzoneBucket> volABucketIter =
-        volA.listBuckets("bucket-");
-    int volABucketCount = 0;
-    while (volABucketIter.hasNext()) {
-      volABucketIter.next();
-      volABucketCount++;
-    }
-    Assert.assertEquals(20, volABucketCount);
-    Iterator<? extends OzoneBucket> volBBucketIter =
-        volA.listBuckets("bucket-");
-    int volBBucketCount = 0;
-    while (volBBucketIter.hasNext()) {
-      volBBucketIter.next();
-      volBBucketCount++;
-    }
-    Assert.assertEquals(20, volBBucketCount);
+    assertBucketCount(volA, "bucket-", null, false, 20);
+    assertBucketCount(volA, "bucket-", null, true, 20);
+    assertBucketCount(volB, "bucket-", null, false, 20);
+    assertBucketCount(volB, "bucket-", null, true, 10);
+    assertBucketCount(volA, bucketBaseNameA, null, false, 10);
+    assertBucketCount(volA, bucketBaseNameA, null, true, 10);
+    assertBucketCount(volB, bucketBaseNameB, null, false, 10);
+    assertBucketCount(volB, bucketBaseNameB, null, true, 0);
+    assertBucketCount(volA, bucketBaseNameB, null, false, 10);
+    assertBucketCount(volA, bucketBaseNameB, null, true, 10);
+    assertBucketCount(volB, bucketBaseNameA, null, false, 10);
+    assertBucketCount(volB, bucketBaseNameA, null, true, 10);
 
-    Iterator<? extends OzoneBucket> volABucketAIter =
-        volA.listBuckets("bucket-a-");
-    int volABucketACount = 0;
-    while (volABucketAIter.hasNext()) {
-      volABucketAIter.next();
-      volABucketACount++;
-    }
-    Assert.assertEquals(10, volABucketACount);
-    Iterator<? extends OzoneBucket> volBBucketBIter =
-        volA.listBuckets("bucket-b-");
-    int volBBucketBCount = 0;
-    while (volBBucketBIter.hasNext()) {
-      volBBucketBIter.next();
-      volBBucketBCount++;
-    }
-    Assert.assertEquals(10, volBBucketBCount);
-    Iterator<? extends OzoneBucket> volABucketBIter = volA.listBuckets(
-        "bucket-b-");
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volABucketBIter.next().getName()
-          .startsWith(bucketBaseNameB + i + "-"));
-    }
-    Assert.assertFalse(volABucketBIter.hasNext());
-    Iterator<? extends OzoneBucket> volBBucketAIter = volB.listBuckets(
-        "bucket-a-");
-    for (int i = 0; i < 10; i++) {
-      Assert.assertTrue(volBBucketAIter.next().getName()
-          .startsWith(bucketBaseNameA + i + "-"));
-    }
-    Assert.assertFalse(volBBucketAIter.hasNext());
   }
 
   @Test
@@ -4073,6 +4046,10 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(expectedCount,
         omKeyInfo.getKeyLocationVersions().size());
 
+    // ensure flush double buffer for deleted Table
+    cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
+        .awaitDoubleBufferFlush();
+
     if (expectedCount == 1) {
       List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = cluster.getOzoneManager().getMetadataManager().getDeletedTable()
@@ -4096,8 +4073,6 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  @Flaky("HDDS-8550")
-  @Disabled("HDDS-8557")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -4165,4 +4140,21 @@ public abstract class TestOzoneRpcClientAbstract {
   private static ReplicationConfig anyReplication() {
     return RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
   }
+
+  private void assertBucketCount(OzoneVolume volume,
+                                 String bucketPrefix,
+                                 String preBucket,
+                                 boolean hasSnapshot,
+                                 int expectedBucketCount) {
+    Iterator<? extends OzoneBucket> bucketIterator =
+        volume.listBuckets(bucketPrefix, preBucket, hasSnapshot);
+    int bucketCount = 0;
+    while (bucketIterator.hasNext()) {
+      Assert.assertTrue(
+          bucketIterator.next().getName().startsWith(bucketPrefix));
+      bucketCount++;
+    }
+    Assert.assertEquals(expectedBucketCount, bucketCount);
+  }
+
 }

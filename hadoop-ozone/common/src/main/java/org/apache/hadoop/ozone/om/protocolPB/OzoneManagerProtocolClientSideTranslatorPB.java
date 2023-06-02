@@ -171,6 +171,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
@@ -601,22 +602,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * List buckets in a volume.
-   *
-   * @param volumeName
-   * @param startKey
-   * @param prefix
-   * @param count
-   * @return
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startKey, String prefix, int count) throws IOException {
+                                        String startKey, String prefix,
+                                        int count, boolean hasSnapshot)
+      throws IOException {
     List<OmBucketInfo> buckets = new ArrayList<>();
     ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setCount(count);
+    reqBuilder.setHasSnapshot(hasSnapshot);
     if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }
@@ -2212,6 +2209,27 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     RecoverLeaseResponse recoverLeaseResponse =
             handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
     return recoverLeaseResponse.getResponse();
+  }
+
+  @Override
+  public void setTimes(OmKeyArgs args, long mtime, long atime)
+      throws IOException {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .setKeyName(args.getKeyName())
+        .build();
+    SetTimesRequest setTimesRequest =
+        SetTimesRequest.newBuilder()
+            .setKeyArgs(keyArgs)
+            .setMtime(mtime)
+            .setAtime(atime)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.SetTimes)
+        .setSetTimesRequest(setTimesRequest).build();
+
+    handleError(submitRequest(omRequest));
   }
 
   @VisibleForTesting

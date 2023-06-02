@@ -30,6 +30,8 @@ import java.util.function.IntFunction;
  * @param <T> The object type.
  */
 public interface Codec<T> {
+  byte[] EMPTY_BYTE_ARRAY = {};
+
   /**
    * Does this {@link Codec} support the {@link CodecBuffer} methods?
    * If this method returns true, this class must implement both

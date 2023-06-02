@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -41,6 +43,7 @@ public final class DatanodeStoreCache {
   private final Map<String, RawDB> datanodeStoreMap;
 
   private static DatanodeStoreCache cache;
+  private boolean miniClusterMode;
 
   private DatanodeStoreCache() {
     datanodeStoreMap = new ConcurrentHashMap<>();
@@ -51,6 +54,11 @@ public final class DatanodeStoreCache {
       cache = new DatanodeStoreCache();
     }
     return cache;
+  }
+
+  @VisibleForTesting
+  public static synchronized void setMiniClusterMode() {
+    getInstance().miniClusterMode = true;
   }
 
   public void addDB(String containerDBPath, RawDB db) {
@@ -97,6 +105,14 @@ public final class DatanodeStoreCache {
   }
 
   public void shutdownCache() {
+    if (miniClusterMode) {
+      if (!datanodeStoreMap.isEmpty()) {
+        LOG.info("Skip clearing cache in mini cluster mode. Entries left: {}",
+            new TreeSet<>(datanodeStoreMap.keySet()));
+      }
+      return;
+    }
+
     for (Map.Entry<String, RawDB> entry : datanodeStoreMap.entrySet()) {
       try {
         entry.getValue().getStore().stop();

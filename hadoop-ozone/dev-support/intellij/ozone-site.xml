@@ -68,6 +68,10 @@
     <value>localhost:9891</value>
   </property>
   <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value>org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl</value>
+  </property>
+  <property>
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
   </property>

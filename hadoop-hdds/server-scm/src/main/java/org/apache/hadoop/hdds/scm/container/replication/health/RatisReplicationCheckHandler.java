@@ -187,14 +187,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
-      ContainerHealthResult.UnderReplicatedHealthResult result =
-          new ContainerHealthResult.UnderReplicatedHealthResult(
-              container, replicaCount.getRemainingRedundancy(),
-              replicaCount.inSufficientDueToDecommission(false),
-              replicaCount.isSufficientlyReplicated(true),
-              replicaCount.isUnrecoverable());
-      result.setHasHealthyReplicas(replicaCount.getHealthyReplicaCount() > 0);
-      return result;
+      return replicaCount.toUnderHealthResult();
     }
 
     /*
@@ -209,14 +202,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             minReplicasForMaintenance, true);
     boolean isOverReplicated = consideringUnhealthy.isOverReplicated(false);
     if (isOverReplicated) {
-      boolean repOkWithPending = !consideringUnhealthy.isOverReplicated(true);
-      ContainerHealthResult.OverReplicatedHealthResult result =
-          new ContainerHealthResult.OverReplicatedHealthResult(
-              container, consideringUnhealthy.getExcessRedundancy(false),
-              repOkWithPending);
-      result.setHasMismatchedReplicas(
-          consideringUnhealthy.getMisMatchedReplicaCount() > 0);
-      return result;
+      return consideringUnhealthy.toOverHealthResult();
     }
 
     int requiredNodes = container.getReplicationConfig().getRequiredNodes();
@@ -244,7 +230,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
    * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
    * and then check if the list meets the container placement policy.
    * @param replicas List of containerReplica
-   * @param replicationFactor Expected Replication Factor of the containe
+   * @param replicationFactor Expected Replication Factor of the container
    * @return ContainerPlacementStatus indicating if the policy is met or not
    */
   private ContainerPlacementStatus getPlacementStatus(

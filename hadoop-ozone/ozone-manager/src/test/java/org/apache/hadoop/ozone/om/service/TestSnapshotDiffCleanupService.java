@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -171,9 +170,8 @@ public class TestSnapshotDiffCleanupService {
     final CodecRegistry.Builder b = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
-        new OmDBDiffReportEntryCodec());
-    b.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+        SnapshotDiffReportOzone.getDiffReportEntryCodec());
+    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 

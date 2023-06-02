@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+
 /**
  * Container inspector for key value container metadata. It is capable of
  * logging metadata information about a container, and repairing the metadata
@@ -274,7 +276,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     // Count pending delete blocks.
     final PendingDelete pendingDelete;
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       long pendingDeleteBlockCountTotal = 0;
       long pendingDeleteBytes = 0;
       try (BlockIterator<BlockData> blockIter =
@@ -291,12 +293,12 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       }
       pendingDelete = new PendingDelete(
           pendingDeleteBlockCountTotal, pendingDeleteBytes);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V2)) {
       DatanodeStoreSchemaTwoImpl schemaTwoStore =
           (DatanodeStoreSchemaTwoImpl) store;
       pendingDelete =
           countPendingDeletesSchemaV2(schemaTwoStore, containerData);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       DatanodeStoreSchemaThreeImpl schemaThreeStore =
           (DatanodeStoreSchemaThreeImpl) store;
       pendingDelete =

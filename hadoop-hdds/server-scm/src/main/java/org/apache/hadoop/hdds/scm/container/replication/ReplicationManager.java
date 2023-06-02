@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -121,6 +122,10 @@ public class ReplicationManager implements SCMService {
    * ReplicationManager specific configuration.
    */
   private final ReplicationManagerConfiguration rmConf;
+  /**
+   * Datanodes' replication configuration.
+   */
+  private final ReplicationServer.ReplicationConfig replicationServerConf;
   private final NodeManager nodeManager;
 
   /**
@@ -150,7 +155,7 @@ public class ReplicationManager implements SCMService {
    * Legacy RM will hopefully be removed after completing refactor
    * for now, it is used to process non-EC container.
    */
-  private LegacyReplicationManager legacyReplicationManager;
+  private final LegacyReplicationManager legacyReplicationManager;
 
   /**
    * Set of nodes which have been excluded for replication commands due to the
@@ -209,7 +214,6 @@ public class ReplicationManager implements SCMService {
    * @param clock Clock object used to get the current time
    * @param legacyReplicationManager The legacy ReplicationManager instance
    * @param replicaPendingOps The pendingOps instance
-   * @throws IOException
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
@@ -226,6 +230,8 @@ public class ReplicationManager implements SCMService {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
     this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
+    this.replicationServerConf =
+        conf.getObject(ReplicationServer.ReplicationConfig.class);
     this.running = false;
     this.clock = clock;
     this.containerReport = new ReplicationManagerReport();
@@ -272,7 +278,7 @@ public class ReplicationManager implements SCMService {
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
     containerCheckChain
-        .addNext(new ClosingContainerHandler(this))
+        .addNext(new ClosingContainerHandler(this, clock))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
@@ -519,9 +525,6 @@ public class ReplicationManager implements SCMService {
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
-   * @return A pair containing the datanode that the command was sent to, and
-   *         the command created.
-   * @throws CommandTargetOverloadedException
    */
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
@@ -631,7 +634,6 @@ public class ReplicationManager implements SCMService {
    * @param target The target to push container replica to
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendLowPriorityReplicateContainerCommand(
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
@@ -649,7 +651,6 @@ public class ReplicationManager implements SCMService {
    * @param command The command to send.
    * @param containerInfo The container the command is for.
    * @param target The datanode which will receive the command.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
@@ -666,7 +667,6 @@ public class ReplicationManager implements SCMService {
    * @param target The datanode which will receive the command.
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target,
@@ -927,10 +927,11 @@ public class ReplicationManager implements SCMService {
    * interval and processes all the containers in the system.
    */
   private synchronized void run() {
+    final long interval = rmConf.getInterval().toMillis();
     try {
       while (running) {
         processAll();
-        wait(rmConf.getInterval());
+        wait(interval);
       }
     } catch (Throwable t) {
       if (t instanceof InterruptedException) {
@@ -949,7 +950,6 @@ public class ReplicationManager implements SCMService {
    * ContainerReplicaCount object for the container.
    * @param containerID The ID of the container
    * @return ContainerReplicaCount for the given container
-   * @throws ContainerNotFoundException
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
@@ -970,7 +970,6 @@ public class ReplicationManager implements SCMService {
    * replication health and return the health status.
    * @param containerInfo The container to check
    * @param replicas The set of replicas to use to check for the check
-   * @return
    */
   public ContainerHealthResult getContainerReplicationHealth(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
@@ -1123,12 +1122,12 @@ public class ReplicationManager implements SCMService {
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "30m",
+        defaultValue = "10m",
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = Duration.ofMinutes(30).toMillis();
+    private long eventTimeout = Duration.ofMinutes(10).toMillis();
     public void setInterval(Duration interval) {
       this.interval = interval.toMillis();
     }
@@ -1298,8 +1297,8 @@ public class ReplicationManager implements SCMService {
       return maintenanceRemainingRedundancy;
     }
 
-    public long getInterval() {
-      return interval;
+    public Duration getInterval() {
+      return Duration.ofMillis(interval);
     }
 
     public long getUnderReplicatedInterval() {
@@ -1490,7 +1489,7 @@ public class ReplicationManager implements SCMService {
     HddsProtos.NodeOperationalState state = datanode.getPersistedOpState();
     int limit = datanodeReplicationLimit;
     if (isMaintenance(state) || isDecommission(state)) {
-      limit *= 2;
+      limit = replicationServerConf.scaleOutOfServiceLimit(limit);
     }
     return limit;
   }

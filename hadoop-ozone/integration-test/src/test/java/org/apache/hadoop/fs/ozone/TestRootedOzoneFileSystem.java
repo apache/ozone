@@ -253,7 +253,7 @@ public class TestRootedOzoneFileSystem {
     } else {
       bucketLayout = BucketLayout.LEGACY;
       conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
-          OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_LEGACY);
+          OzoneConfigKeys.OZONE_BUCKET_LAYOUT_LEGACY);
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -2284,7 +2284,7 @@ public class TestRootedOzoneFileSystem {
     String bucketNameLocal = RandomStringUtils.randomNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     ofs.mkdirs(volume);
-    LambdaTestUtils.intercept(FileNotFoundException.class,
+    LambdaTestUtils.intercept(OMException.class,
         () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
     ofs.delete(volume, true);
@@ -2515,5 +2515,32 @@ public class TestRootedOzoneFileSystem {
     LambdaTestUtils.intercept(IllegalArgumentException.class, errorMsg,
         () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
             finalToSnap));
+  }
+
+  @Test
+  public void testSetTimes() throws Exception {
+    // Create a file
+    OzoneBucket bucket1 =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
+    Path bucketPath1 = new Path(volumePath1, bucket1.getName());
+    Path path = new Path(bucketPath1, "key1");
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    long mtime = 1000;
+    fs.setTimes(path, mtime, 2000);
+
+    FileStatus fileStatus = fs.getFileStatus(path);
+    // verify that mtime is updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
+
+    long mtimeDontUpdate = -1;
+    fs.setTimes(path, mtimeDontUpdate, 2000);
+
+    fileStatus = fs.getFileStatus(path);
+    // verify that mtime is NOT updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
 }

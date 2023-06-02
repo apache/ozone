@@ -141,19 +141,19 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     if (!replicaCount.isSufficientlyReplicated(false)) {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
-      boolean dueToDecommission = true;
+      boolean dueToOutOfService = true;
       if (missingIndexes.size() > 0) {
         // The container has reduced redundancy and will need reconstructed
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under
         // replication is not caused only by decommission, we say it is not
         // due to decommission/
-        dueToDecommission = false;
+        dueToOutOfService = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
       ContainerHealthResult.UnderReplicatedHealthResult result =
           new ContainerHealthResult.UnderReplicatedHealthResult(
-              container, remainingRedundancy, dueToDecommission,
+              container, remainingRedundancy, dueToOutOfService,
               replicaCount.isSufficientlyReplicated(true),
               replicaCount.isUnrecoverable());
       if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
@@ -188,7 +188,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
    * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
    * and then check if the list meets the container placement policy.
    * @param replicas List of containerReplica
-   * @param replicationFactor Expected Replication Factor of the containe
+   * @param replicationFactor Expected Replication Factor of the container
    * @return ContainerPlacementStatus indicating if the policy is met or not
    */
   private ContainerPlacementStatus getPlacementStatus(

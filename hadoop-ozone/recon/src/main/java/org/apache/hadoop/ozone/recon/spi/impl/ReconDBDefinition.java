@@ -24,19 +24,21 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
-import org.apache.hadoop.ozone.recon.codec.ContainerReplicaHistoryListCodec;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 
+import java.util.Map;
+
 /**
  * RocksDB definition for the DB internal to Recon.
  */
-public class ReconDBDefinition implements DBDefinition {
+public class ReconDBDefinition extends DBDefinition.WithMap {
 
-  private String dbName;
+  private final String dbName;
 
   public ReconDBDefinition(String dbName) {
+    super(COLUMN_FAMILIES);
     this.dbName = dbName;
   }
 
@@ -45,44 +47,44 @@ public class ReconDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "containerKeyTable",
           ContainerKeyPrefix.class,
-          new ContainerKeyPrefixCodec(),
+          ContainerKeyPrefixCodec.get(),
           Integer.class,
-          new IntegerCodec());
+          IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<KeyPrefixContainer, Integer>
       KEY_CONTAINER =
       new DBColumnFamilyDefinition<>(
           "keyContainerTable",
           KeyPrefixContainer.class,
-          new KeyPrefixContainerCodec(),
+          KeyPrefixContainerCodec.get(),
           Integer.class,
-          new IntegerCodec());
+          IntegerCodec.get());
 
   public static final DBColumnFamilyDefinition<Long, Long>
       CONTAINER_KEY_COUNT =
       new DBColumnFamilyDefinition<>(
           "containerKeyCountTable",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition
       <Long, ContainerReplicaHistoryList> REPLICA_HISTORY =
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, NSSummary>
       NAMESPACE_SUMMARY = new DBColumnFamilyDefinition<Long, NSSummary>(
           "namespaceSummaryTable",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           NSSummary.class,
-          new NSSummaryCodec());
+          NSSummaryCodec.get());
 
   // Container Replica History with bcsId tracking.
   public static final DBColumnFamilyDefinition
@@ -90,9 +92,18 @@ public class ReconDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(
           "replica_history_v2",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           ContainerReplicaHistoryList.class,
-          new ContainerReplicaHistoryListCodec());
+          ContainerReplicaHistoryList.getCodec());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINER_KEY,
+          CONTAINER_KEY_COUNT,
+          KEY_CONTAINER,
+          NAMESPACE_SUMMARY,
+          REPLICA_HISTORY,
+          REPLICA_HISTORY_V2);
 
   @Override
   public String getName() {
@@ -102,12 +113,5 @@ public class ReconDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {
-        CONTAINER_KEY, KEY_CONTAINER, CONTAINER_KEY_COUNT, REPLICA_HISTORY,
-        NAMESPACE_SUMMARY, REPLICA_HISTORY_V2};
   }
 }

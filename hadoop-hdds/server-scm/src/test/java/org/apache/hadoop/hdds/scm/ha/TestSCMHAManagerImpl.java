@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -168,8 +170,6 @@ class TestSCMHAManagerImpl {
           scm2.removePeerFromHARing(randomScmId));
       assertTrue(ex.getMessage().contains("Peer"));
 
-      // TODO: try removing primordial node from ratis ring
-
       // try removing leader scm from ratis ring
       ex = assertThrows(IOException.class, () ->
           scm2.removePeerFromHARing(scm2.getScmId()));
@@ -255,6 +255,7 @@ class TestSCMHAManagerImpl {
     when(dbStore.initBatchOperation()).thenReturn(batchOperation);
     when(nodeDetails.getRatisHostPortStr()).thenReturn("localhost:" +
         conf.get(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY));
+    when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
 
     final SCMHAManager manager = new SCMHAManagerImpl(conf, scm);
     when(scm.getScmHAManager()).thenReturn(manager);
