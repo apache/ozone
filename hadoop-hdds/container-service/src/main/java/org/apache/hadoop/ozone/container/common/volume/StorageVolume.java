@@ -484,6 +484,7 @@ public abstract class StorageVolume
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
     volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
+    // TODO clear health check dir here.
   }
 
   /**
