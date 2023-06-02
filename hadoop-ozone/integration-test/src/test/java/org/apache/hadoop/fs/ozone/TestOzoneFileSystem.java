@@ -1752,4 +1752,28 @@ public class TestOzoneFileSystem {
     assertHasPathCapabilities(fs, root, FS_ACLS);
     assertHasPathCapabilities(fs, root, FS_CHECKSUMS);
   }
+
+  @Test
+  public void testSetTimes() throws Exception {
+    // Create a file
+    String testKeyName = "testKey1";
+    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    long mtime = 1000;
+    fs.setTimes(path, mtime, 2000);
+
+    FileStatus fileStatus = fs.getFileStatus(path);
+    // verify that mtime is updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
+
+    long mtimeDontUpdate = -1;
+    fs.setTimes(path, mtimeDontUpdate, 2000);
+
+    fileStatus = fs.getFileStatus(path);
+    // verify that mtime is NOT updated as expected.
+    Assert.assertEquals(mtime, fileStatus.getModificationTime());
+  }
 }

@@ -94,7 +94,7 @@ public final class KeyPrefixContainerCodec
     long containerIdFromDB = ByteBuffer.wrap(ArrayUtils.subarray(rawData,
         rawData.length - Long.BYTES,
         rawData.length)).getLong();
-    return new KeyPrefixContainer(keyPrefix, version, containerIdFromDB);
+    return KeyPrefixContainer.get(keyPrefix, version, containerIdFromDB);
   }
 
   @Override

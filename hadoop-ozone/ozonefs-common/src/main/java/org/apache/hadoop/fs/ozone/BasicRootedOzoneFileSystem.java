@@ -1549,4 +1549,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return adapterImpl.recoverLease(f);
   }
 
+  @Override
+  public void setTimes(Path f, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    statistics.incrementWriteOps(1);
+    LOG.trace("setTimes() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    // Handle DistCp /NONE path
+    if (key.equals("NONE")) {
+      throw new FileNotFoundException("File not found. path /NONE.");
+    }
+    adapter.setTimes(key, mtime, atime);
+  }
+
 }

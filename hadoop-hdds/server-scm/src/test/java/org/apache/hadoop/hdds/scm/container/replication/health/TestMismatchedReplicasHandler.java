@@ -67,7 +67,7 @@ public class TestMismatchedReplicasHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ecReplicationConfig, 1, OPEN);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(Collections.emptySet())
@@ -87,7 +87,7 @@ public class TestMismatchedReplicasHandler {
         ReplicationTestUtil.createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
@@ -122,7 +122,7 @@ public class TestMismatchedReplicasHandler {
     containerReplicas.add(mismatch2);
     containerReplicas.add(mismatch3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
@@ -149,7 +149,7 @@ public class TestMismatchedReplicasHandler {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         ratisReplicationConfig, 1, OPEN);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(Collections.emptySet())
@@ -169,7 +169,7 @@ public class TestMismatchedReplicasHandler {
         ReplicationTestUtil.createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
@@ -202,7 +202,7 @@ public class TestMismatchedReplicasHandler {
     containerReplicas.add(mismatch2);
     containerReplicas.add(mismatch3);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)

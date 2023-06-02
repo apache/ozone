@@ -998,4 +998,16 @@ public interface OzoneManagerProtocol
    */
   boolean recoverLease(String volumeName, String bucketName,
                               String keyName) throws IOException;
+
+  /**
+   * Update modification time and access time of a file.
+   * Access time is currently ignored by Ozone Manager.
+   *
+   * @param keyArgs - The key argument.
+   * @param mtime - modification time.
+   * @param atime - access time. Ignored by Ozone Manager.
+   * @throws IOException
+   */
+  void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
+      throws IOException;
 }
