@@ -142,6 +142,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse volumeInfo =
         new EntityReadAccessHeatMapResponse();
     volumeInfo.setLabel(split[0]);
+    volumeInfo.setPath(split[0]);
     children.add(volumeInfo);
     addBucketAndPrefixPath(split, rootEntity, volumeInfo, readAccessCount,
         keySize);
@@ -202,6 +203,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse bucket =
         new EntityReadAccessHeatMapResponse();
     bucket.setLabel(split[1]);
+    bucket.setPath(omMetadataManager.getBucketKey(split[0], split[1]));
     bucketEntities.add(bucket);
     bucket.setMinAccessCount(readAccessCount);
     addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
@@ -219,6 +221,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     EntityReadAccessHeatMapResponse prefixPathInfo =
         new EntityReadAccessHeatMapResponse();
     prefixPathInfo.setLabel(path);
+    prefixPathInfo.setPath(bucket.getPath() + OM_KEY_PREFIX + path);
     prefixPathInfo.setAccessCount(readAccessCount);
     prefixPathInfo.setSize(keySize);
     prefixes.add(prefixPathInfo);
@@ -278,6 +281,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hiveencbuck1676574631/enc_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 155074,
    *               "color": 1
    *             },
@@ -285,11 +290,14 @@ public class HeatMapServiceImpl extends HeatMapService {
    *               "label": "enc_path/hive_tpcds/catalog_sales/
    *               catalog_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hiveencbuck1676574631/enc_path/
+   *               hive_tpcds/catalog_sales/catalog_sales.dat",
    *               "accessCount": 68567,
    *               "color": 0.442
    *             }
    *           ],
    *           "size": 3584,
+   *           "path": "/hivevol1676574631/hiveencbuck1676574631",
    *           "minAccessCount": 2924,
    *           "maxAccessCount": 155074
    *         },
@@ -299,6 +307,8 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hivebuck1676574631/reg_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 155069,
    *               "color": 1
    *             },
@@ -306,16 +316,20 @@ public class HeatMapServiceImpl extends HeatMapService {
    *               "label": "reg_path/hive_tpcds/catalog_sales/
    *               catalog_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1676574631/hivebuck1676574631/reg_path/
+   *               hive_tpcds/catalog_sales/catalog_sales.dat",
    *               "accessCount": 68566,
    *               "color": 0.442
    *             }
    *           ],
    *           "size": 3584,
+   *           "path": "/hivevol1676574631/hivebuck1676574631",
    *           "minAccessCount": 2924,
    *           "maxAccessCount": 155069
    *         }
    *       ],
-   *       "size": 7168
+   *       "size": 7168,
+   *       "path": "/hivevol1676574631"
    *     },
    *     {
    *       "label": "hivevol1675429570",
@@ -326,15 +340,19 @@ public class HeatMapServiceImpl extends HeatMapService {
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+   *               "path": "/hivevol1675429570/hivebuck1675429570/reg_path/
+   *               hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 129977,
    *               "color": 1
    *             }          ],
    *           "size": 3072,
+   *           "path": "/hivevol1675429570/hivebuck1675429570",
    *           "minAccessCount": 3195,
    *           "maxAccessCount": 129977
    *         }
    *       ],
-   *       "size": 6144
+   *       "size": 6144,
+   *       "path": "/hivevol1675429570"
    *     }
    *   ],
    *   "size": 25600,
@@ -351,6 +369,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     rootEntity.setMinAccessCount(
         entityMetaDataList.get(0).getReadAccessCount());
     rootEntity.setLabel("root");
+    rootEntity.setPath(OM_KEY_PREFIX);
     List<EntityReadAccessHeatMapResponse> children =
         rootEntity.getChildren();
     entityMetaDataList.forEach(entityMetaData -> {
