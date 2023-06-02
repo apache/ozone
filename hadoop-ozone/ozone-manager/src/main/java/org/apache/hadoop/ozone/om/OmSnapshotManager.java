@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -487,6 +487,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
+  @VisibleForTesting
+  public SnapshotDiffManager getSnapshotDiffManager() {
+    return snapshotDiffManager;
+  }
+
   /**
    * Helper method to locate the end key with the given prefix and iterator.
    * @param keyIter TableIterator
@@ -679,6 +684,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
+                                                   final String bucketName,
+                                                   final String jobStatus) {
+    return snapshotDiffManager.getSnapshotDiffJobList(
+        volumeName, bucketName, jobStatus);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

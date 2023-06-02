@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -639,6 +640,12 @@ public class ClientProtocolStub implements ClientProtocol {
                                            int pageSize,
                                            boolean forceFullDiff)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(
+      String volumeName, String bucketName, String jobStatus) {
     return null;
   }
 

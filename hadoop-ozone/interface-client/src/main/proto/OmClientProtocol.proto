@@ -135,6 +135,7 @@ enum Type {
   SnapshotPurge = 118;
   RecoverLease = 119;
   SetTimes = 120;
+  ListSnapshotDiffJob = 121;
 }
 
 message OMRequest {
@@ -254,6 +255,8 @@ message OMRequest {
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
+
+  optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest   = 121;
 }
 
 message OMResponse {
@@ -365,6 +368,8 @@ message OMResponse {
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
+
+  optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 121;
 }
 
 enum Status {
@@ -788,6 +793,18 @@ message SnapshotInfo {
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
  }
+
+message SnapshotDiffJobProto {
+  optional uint64 creationTime = 1;
+  optional string jobId = 2;
+  optional SnapshotDiffResponse.JobStatusProto status = 3;
+  optional string volume = 4;
+  optional string bucket = 5;
+  optional string fromSnapshot = 6;
+  optional string toSnapshot = 7;
+  optional bool forceFullDiff = 8;
+  optional uint64 totalDiffEntries = 9;
+}
 
 message OzoneObj {
   enum ObjectType {
@@ -1709,6 +1726,12 @@ message SnapshotDiffRequest {
   optional bool forceFullDiff = 7;
 }
 
+message ListSnapshotDiffJobRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string jobStatus = 3;
+}
+
 message DeleteSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -1789,6 +1812,10 @@ message SnapshotDiffResponse {
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
+}
+
+message ListSnapshotDiffJobResponse {
+  repeated SnapshotDiffJobProto snapshotDiffJob = 1;
 }
 
 message DeleteSnapshotResponse {

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.helpers;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffJobProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 
 /**
@@ -183,6 +184,34 @@ public class SnapshotDiffJob {
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
         fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
+  }
+
+  public SnapshotDiffJobProto toProtoBuf() {
+    return SnapshotDiffJobProto.newBuilder()
+        .setCreationTime(creationTime)
+        .setJobId(jobId)
+        .setStatus(status.toProtobuf())
+        .setVolume(volume)
+        .setBucket(bucket)
+        .setFromSnapshot(fromSnapshot)
+        .setToSnapshot(toSnapshot)
+        .setForceFullDiff(forceFullDiff)
+        .setTotalDiffEntries(totalDiffEntries)
+        .build();
+  }
+
+  public static SnapshotDiffJob getFromProtoBuf(
+      SnapshotDiffJobProto diffJobProto) {
+    return new SnapshotDiffJob(
+        diffJobProto.getCreationTime(),
+        diffJobProto.getJobId(),
+        JobStatus.fromProtobuf(diffJobProto.getStatus()),
+        diffJobProto.getVolume(),
+        diffJobProto.getBucket(),
+        diffJobProto.getFromSnapshot(),
+        diffJobProto.getToSnapshot(),
+        diffJobProto.getForceFullDiff(),
+        diffJobProto.getTotalDiffEntries());
   }
 
   /**

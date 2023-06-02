@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -1070,6 +1071,19 @@ public interface ClientProtocol {
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
                                     boolean forceFullDiff)
+      throws IOException;
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @return a list of SnapshotDiffJob objects
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+                                             String bucketName,
+                                             String jobStatus)
       throws IOException;
 
   /**

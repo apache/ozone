@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -1229,6 +1230,33 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus)
+      throws IOException {
+    final OzoneManagerProtocolProtos
+        .ListSnapshotDiffJobRequest.Builder requestBuilder =
+        OzoneManagerProtocolProtos
+            .ListSnapshotDiffJobRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setJobStatus(jobStatus);
+
+    final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJob)
+        .setListSnapshotDiffJobRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    return omResponse.getListSnapshotDiffJobResponse()
+        .getSnapshotDiffJobList().stream()
+        .map(SnapshotDiffJob::getFromProtoBuf)
+        .collect(Collectors.toList());
   }
 
   /**

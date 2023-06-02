@@ -41,6 +41,15 @@ public class SnapshotDiffResponse {
     public static JobStatus fromProtobuf(JobStatusProto jobStatusProto) {
       return JobStatus.valueOf(jobStatusProto.name());
     }
+
+    public static JobStatus getJobStatusFromString(String jobStatus) {
+      for (JobStatus status : JobStatus.values()) {
+        if (status.toString().equalsIgnoreCase(jobStatus)) {
+          return status;
+        }
+      }
+      return null;
+    }
   }
 
   private final SnapshotDiffReportOzone snapshotDiffReport;

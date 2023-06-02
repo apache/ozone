@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.LoadingCache;
 
 import java.io.BufferedWriter;
@@ -70,6 +71,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -248,6 +250,11 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.loadJobsOnStartUp();
   }
 
+  @VisibleForTesting
+  public PersistentMap<String, SnapshotDiffJob> getSnapDiffJobTable() {
+    return snapDiffJobTable;
+  }
+
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
     if (!NativeLibraryLoader.getInstance()
@@ -369,6 +376,34 @@ public class SnapshotDiffManager implements AutoCloseable {
     return RdbUtil.getSSTFilesForComparison(snapshot
         .getMetadataManager().getStore().getDbLocation()
         .getPath(), tablesToLookUp);
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffJobList(
+      String volumeName, String bucketName, String jobStatus) {
+    List<SnapshotDiffJob> jobList = new ArrayList<>();
+
+    try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
+             snapDiffJobTable.iterator()) {
+      while (iterator.hasNext()) {
+        SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
+        if (snapshotDiffJob.getVolume().equals(volumeName) &&
+            snapshotDiffJob.getBucket().equals(bucketName)) {
+          if (jobStatus.equalsIgnoreCase("all")) {
+            jobList.add(snapshotDiffJob);
+            continue;
+          }
+
+          // If provided job status is invalid,
+          // then all jobs on the table will be ignored.
+          // No need to check if getJobStatusFromString doesn't return null.
+          if (snapshotDiffJob.getStatus().equals(
+              JobStatus.getJobStatusFromString(jobStatus))) {
+            jobList.add(snapshotDiffJob);
+          }
+        }
+      }
+    }
+    return jobList;
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(

@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -68,6 +69,8 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
@@ -301,6 +304,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
             request.getSnapshotDiffRequest());
         responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
+        break;
+      case ListSnapshotDiffJob:
+        ListSnapshotDiffJobResponse listSnapDiffResponse =
+            listSnapshotDiffJobs(request.getListSnapshotDiffJobRequest());
+        responseBuilder.setListSnapshotDiffJobResponse(listSnapDiffResponse);
         break;
       case EchoRPC:
         EchoRPCResponse echoRPCResponse =
@@ -1242,6 +1250,21 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           response.getSnapshotDiffReport().toProtobuf());
     }
 
+    return builder.build();
+  }
+
+  private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest) {
+    List<SnapshotDiffJob> snapshotDiffJobs =
+        impl.listSnapshotDiffJobs(
+            listSnapshotDiffJobRequest.getVolumeName(),
+            listSnapshotDiffJobRequest.getBucketName(),
+            listSnapshotDiffJobRequest.getJobStatus());
+    ListSnapshotDiffJobResponse.Builder builder =
+        ListSnapshotDiffJobResponse.newBuilder();
+    for (SnapshotDiffJob diffJob : snapshotDiffJobs) {
+      builder.addSnapshotDiffJob(diffJob.toProtoBuf());
+    }
     return builder.build();
   }
 

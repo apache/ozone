@@ -134,6 +134,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -994,6 +995,20 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+  }
+
+  @Override
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus)
+      throws IOException {
+    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+
+    return ozoneManagerClient.listSnapshotDiffJobs(
+        volumeName, bucketName, jobStatus);
   }
 
   /**

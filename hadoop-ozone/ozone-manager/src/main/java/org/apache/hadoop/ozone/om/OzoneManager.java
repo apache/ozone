@@ -87,6 +87,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -4529,6 +4530,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+  }
+
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
+                                                String bucket,
+                                                String jobStatus) {
+    return omSnapshotManager.getSnapshotDiffList(volume,
+        bucket, jobStatus);
   }
 
   @Override // ReconfigureProtocol
