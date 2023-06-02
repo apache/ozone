@@ -172,11 +172,11 @@ public class TestDBStoreBuilder {
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-          new DBColumnFamilyDefinition<>(sampleTableName,
-              String.class, StringCodec.get(), Long.class, LongCodec.get());
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            String.class, StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       {
         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
@@ -193,11 +193,6 @@ public class TestDBStoreBuilder {
       @Override
       public String getLocationConfigKey() {
         return null;
-      }
-
-      @Override
-      public DBColumnFamilyDefinition[] getColumnFamilies() {
-        return new DBColumnFamilyDefinition[]{sampleTable};
       }
 
       @Override
@@ -249,13 +244,11 @@ public class TestDBStoreBuilder {
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-              new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-                      StringCodec.get(), Long.class, LongCodec.get());
-
-
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
+            StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
       public String getName() {
         return "sampleDB";
@@ -264,11 +257,6 @@ public class TestDBStoreBuilder {
       @Override
       public String getLocationConfigKey() {
         return null;
-      }
-
-      @Override
-      public DBColumnFamilyDefinition[] getColumnFamilies() {
-        return new DBColumnFamilyDefinition[]{sampleTable};
       }
 
       @Override
