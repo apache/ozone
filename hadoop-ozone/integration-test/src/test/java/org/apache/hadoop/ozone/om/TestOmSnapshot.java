@@ -883,7 +883,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)
+            SnapshotDiffReport.DiffType.RENAME, key1, renamedKey)
     ));
   }
 
@@ -917,10 +917,6 @@ public class TestOmSnapshot {
             activeSnap);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap1, activeSnap);
-    cluster.getOzoneManager().getKeyManager()
-            .getDeletingService().runPeriodicalTaskNow();
-    cluster.getOzoneManager().getKeyManager()
-            .getDirDeletingService().runPeriodicalTaskNow();
     Assert.assertEquals(diff.getDiffList().size(), 0);
     diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap2, activeSnap);
