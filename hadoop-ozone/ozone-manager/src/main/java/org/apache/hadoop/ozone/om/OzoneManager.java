@@ -4533,10 +4533,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
-                                                String bucket,
-                                                String jobStatus) {
+                                                    String bucket,
+                                                    String jobStatus,
+                                                    boolean listAll) {
     return omSnapshotManager.getSnapshotDiffList(volume,
-        bucket, jobStatus);
+        bucket, jobStatus, listAll);
   }
 
   @Override // ReconfigureProtocol

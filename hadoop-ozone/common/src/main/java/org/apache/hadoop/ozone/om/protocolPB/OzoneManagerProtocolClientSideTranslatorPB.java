@@ -1238,7 +1238,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
-                                                    String jobStatus)
+                                                    String jobStatus,
+                                                    boolean listAll)
       throws IOException {
     final OzoneManagerProtocolProtos
         .ListSnapshotDiffJobRequest.Builder requestBuilder =
@@ -1246,7 +1247,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .ListSnapshotDiffJobRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setJobStatus(jobStatus);
+            .setJobStatus(jobStatus)
+            .setListAll(listAll);
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJob)
         .setListSnapshotDiffJobRequest(requestBuilder)

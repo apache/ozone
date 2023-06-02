@@ -379,7 +379,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   public List<SnapshotDiffJob> getSnapshotDiffJobList(
-      String volumeName, String bucketName, String jobStatus) {
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
     List<SnapshotDiffJob> jobList = new ArrayList<>();
 
     try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
@@ -388,7 +389,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
         if (snapshotDiffJob.getVolume().equals(volumeName) &&
             snapshotDiffJob.getBucket().equals(bucketName)) {
-          if (jobStatus.equalsIgnoreCase("all")) {
+          if (listAll) {
             jobList.add(snapshotDiffJob);
             continue;
           }

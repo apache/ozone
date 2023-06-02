@@ -1259,7 +1259,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.listSnapshotDiffJobs(
             listSnapshotDiffJobRequest.getVolumeName(),
             listSnapshotDiffJobRequest.getBucketName(),
-            listSnapshotDiffJobRequest.getJobStatus());
+            listSnapshotDiffJobRequest.getJobStatus(),
+            listSnapshotDiffJobRequest.getListAll());
     ListSnapshotDiffJobResponse.Builder builder =
         ListSnapshotDiffJobResponse.newBuilder();
     for (SnapshotDiffJob diffJob : snapshotDiffJobs) {

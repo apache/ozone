@@ -1730,6 +1730,7 @@ message ListSnapshotDiffJobRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string jobStatus = 3;
+  optional bool listAll = 4;
 }
 
 message DeleteSnapshotRequest {

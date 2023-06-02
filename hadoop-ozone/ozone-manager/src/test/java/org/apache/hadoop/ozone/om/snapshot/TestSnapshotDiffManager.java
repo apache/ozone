@@ -112,19 +112,19 @@ public class TestSnapshotDiffManager {
     // There are no jobs in the table, therefore
     // the response list should be empty.
     List<SnapshotDiffJob> jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "queued");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "queued", false);
     Assertions.assertTrue(jobList.isEmpty());
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "done");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "done", false);
     Assertions.assertTrue(jobList.isEmpty());
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "in_progress");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "in_progress", false);
     Assertions.assertTrue(jobList.isEmpty());
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "all");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "", true);
     Assertions.assertTrue(jobList.isEmpty());
 
     // Submit a job.
@@ -146,27 +146,32 @@ public class TestSnapshotDiffManager {
 
     // Response list for 'queued' and 'done' should be empty.
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "queued");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "queued", false);
     Assertions.assertTrue(jobList.isEmpty());
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "done");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "done", false);
     Assertions.assertTrue(jobList.isEmpty());
 
     // SnapshotDiffJob in the response list should be the same
     // as the one we got from the table.
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "in_progress");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "in_progress", false);
     Assertions.assertTrue(jobList.contains(diffJob));
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "all");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "", true);
     Assertions.assertTrue(jobList.contains(diffJob));
 
     // Providing an invalid jobStatus results in an empty list.
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid", false);
     Assertions.assertTrue(jobList.isEmpty());
+
+    // If listAll is true, jobStatus will be ignored even if it's invalid.
+    jobList = snapshotDiffManager
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid", true);
+    Assertions.assertEquals(1, jobList.size());
 
     // Set up new snapshots to submit a second snapshot diff job.
     String fromSnapshotName2 = "snap-" + RandomStringUtils.randomNumeric(5);
@@ -184,7 +189,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob diffJob2 = snapDiffJobTable.get(diffJobKey2);
 
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "all");
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "", true);
 
     Assertions.assertEquals(2, jobList.size());
     Assertions.assertTrue(jobList.contains(diffJob2));

@@ -688,9 +688,10 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
                                                    final String bucketName,
-                                                   final String jobStatus) {
+                                                   final String jobStatus,
+                                                   final boolean listAll) {
     return snapshotDiffManager.getSnapshotDiffJobList(
-        volumeName, bucketName, jobStatus);
+        volumeName, bucketName, jobStatus, listAll);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

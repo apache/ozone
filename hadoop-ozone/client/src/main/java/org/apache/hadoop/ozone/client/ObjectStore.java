@@ -623,8 +623,10 @@ public class ObjectStore {
    */
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
-                                                    String jobStatus)
+                                                    String jobStatus,
+                                                    boolean listAll)
       throws IOException {
-    return proxy.listSnapshotDiffJobs(volumeName, bucketName, jobStatus);
+    return proxy.listSnapshotDiffJobs(volumeName,
+        bucketName, jobStatus, listAll);
   }
 }

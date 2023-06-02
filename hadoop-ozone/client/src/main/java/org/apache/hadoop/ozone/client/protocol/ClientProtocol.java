@@ -1083,7 +1083,8 @@ public interface ClientProtocol {
    */
   List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
                                              String bucketName,
-                                             String jobStatus)
+                                             String jobStatus,
+                                             boolean listAll)
       throws IOException;
 
   /**

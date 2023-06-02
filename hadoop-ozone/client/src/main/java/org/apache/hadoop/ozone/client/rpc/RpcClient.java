@@ -1000,7 +1000,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
-                                                    String jobStatus)
+                                                    String jobStatus,
+                                                    boolean listAll)
       throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
@@ -1008,7 +1009,7 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
 
     return ozoneManagerClient.listSnapshotDiffJobs(
-        volumeName, bucketName, jobStatus);
+        volumeName, bucketName, jobStatus, listAll);
   }
 
   /**

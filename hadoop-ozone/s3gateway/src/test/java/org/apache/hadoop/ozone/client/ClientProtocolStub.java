@@ -645,7 +645,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<SnapshotDiffJob> listSnapshotDiffJobs(
-      String volumeName, String bucketName, String jobStatus) {
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
     return null;
   }
 

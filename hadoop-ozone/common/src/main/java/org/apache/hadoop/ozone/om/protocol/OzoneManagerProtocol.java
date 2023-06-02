@@ -735,7 +735,8 @@ public interface OzoneManagerProtocol
    */
   default List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
                                                      String bucketName,
-                                                     String jobStatus)
+                                                     String jobStatus,
+                                                     boolean listAll)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
