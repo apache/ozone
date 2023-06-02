@@ -24,6 +24,7 @@ export COMPOSE_DIR
 source "$COMPOSE_DIR/../testlib.sh"
 
 export SECURITY_ENABLED=true
+export COMPOSE_FILE=docker-compose.yaml:vault.yaml
 
 start_docker_env
 
