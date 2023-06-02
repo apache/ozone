@@ -211,7 +211,7 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
                 options);
           } else {
             LOG.warn("Failed to find cf {} in DB {}", entry.getKey(),
-                getDbDef().getDBLocation(null));
+                getDbDef().getClass());
           }
         }
       }

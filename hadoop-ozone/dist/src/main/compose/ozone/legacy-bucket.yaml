@@ -14,7 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_OPTS=
+version: "3.4"
+
+x-legacy-bucket-config:
+  &legacy-bucket-config
+  environment:
+    - OZONE-SITE.XML_ozone.om.enable.filesystem.paths=true
+    - OZONE-SITE.XML_ozone.default.bucket.layout=LEGACY
+
+services:
+  datanode:
+    <<: *legacy-bucket-config
+  om:
+    <<: *legacy-bucket-config
+  scm:
+    <<: *legacy-bucket-config
+  s3g:
+    <<: *legacy-bucket-config
+  recon:
+    <<: *legacy-bucket-config
