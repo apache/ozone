@@ -82,7 +82,7 @@ public interface DBDefinition {
   }
 
   /**
-   * Define a {@link WithMapInterface#getMap()} methods
+   * Define a {@link WithMapInterface#getMap()} method
    * to implement {@link #getColumnFamily(String)}
    * and {@link #getColumnFamilies()}.
    */
@@ -109,10 +109,6 @@ public interface DBDefinition {
    */
   abstract class WithMap implements WithMapInterface {
     private final Map<String, DBColumnFamilyDefinition<?, ?>> map;
-
-    protected WithMap(DBColumnFamilyDefinition<?, ?> def) {
-      this(DBColumnFamilyDefinition.newUnmodifiableMap(def));
-    }
 
     protected WithMap(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
       this.map = map;

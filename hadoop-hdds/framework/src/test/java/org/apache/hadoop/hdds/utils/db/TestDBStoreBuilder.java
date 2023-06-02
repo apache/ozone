@@ -175,7 +175,8 @@ public class TestDBStoreBuilder {
     final DBColumnFamilyDefinition<String, Long> sampleTable =
         new DBColumnFamilyDefinition<>(sampleTableName,
             String.class, StringCodec.get(), Long.class, LongCodec.get());
-    final DBDefinition sampleDB = new DBDefinition.WithMap(sampleTable) {
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       {
         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
@@ -246,7 +247,8 @@ public class TestDBStoreBuilder {
     final DBColumnFamilyDefinition<String, Long> sampleTable =
         new DBColumnFamilyDefinition<>(sampleTableName, String.class,
             StringCodec.get(), Long.class, LongCodec.get());
-    final DBDefinition sampleDB = new DBDefinition.WithMap(sampleTable) {
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
       public String getName() {
         return "sampleDB";

@@ -60,24 +60,29 @@ public interface CollectionUtils {
   static <T> Iterator<T> newIterator(Collection<List<T>> values) {
     final Iterator<List<T>> listIterator = values.iterator();
     return new Iterator<T>() {
-      private Iterator<T> i;
+      private Iterator<T> i = Collections.emptyIterator();
 
-      private boolean hasNextItem() {
-        return i != null && i.hasNext();
+      private Iterator<T> nextIterator() {
+        if (i.hasNext()) {
+          return i;
+        }
+        while (listIterator.hasNext()) {
+          i = listIterator.next().iterator();
+          if (i.hasNext()) {
+            return i;
+          }
+        }
+        return Collections.emptyIterator();
       }
 
       @Override
       public boolean hasNext() {
-        return listIterator.hasNext() || hasNextItem();
+        return nextIterator().hasNext();
       }
 
       @Override
       public T next() {
-        if (hasNextItem()) {
-          return i.next();
-        }
-        if (listIterator.hasNext()) {
-          i = listIterator.next().iterator();
+        if (hasNext()) {
           return i.next();
         }
         throw new NoSuchElementException();
