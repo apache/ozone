@@ -23,11 +23,20 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 
+/**
+ * Volume choosing policy with support of pre-filtering of the DataNodes.
+ */
 public class FilteredVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
   private final VolumeChoosingPolicy delegate;
   private final Predicate<HddsVolume> volumeFilter;
 
+  /**
+   *
+   * @param delegate the volume choosing policy implementation that will do
+   *                 the real work
+   * @param volumeFilter predicate to pre-filter a list of {@link HddsVolume}
+   */
   public FilteredVolumeChoosingPolicy(VolumeChoosingPolicy delegate,
                                       Predicate<HddsVolume> volumeFilter) {
     this.delegate = delegate;
@@ -42,4 +51,9 @@ public class FilteredVolumeChoosingPolicy implements VolumeChoosingPolicy {
                                      .collect(Collectors.toList()),
                                  maxContainerSize);
   }
+
+  public VolumeChoosingPolicy getDelegate() {
+    return delegate;
+  }
+
 }

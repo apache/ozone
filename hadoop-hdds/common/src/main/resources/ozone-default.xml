@@ -4044,4 +4044,15 @@
       https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
     </description>
   </property>
+  <property>
+    <name>hdds.datanode.volume.replica.choosing.policy</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      The class name of the policy for choosing volumes in the list of
+      directories to replicate containers.  Defaults to
+      org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy.
+      This volume choosing policy selects volumes in a round-robin order.
+    </description>
+  </property>
 </configuration>

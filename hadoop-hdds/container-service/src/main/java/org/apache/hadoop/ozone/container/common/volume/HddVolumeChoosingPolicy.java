@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.fs.StorageType;
 
+/**
+ * Policy to choose [DISK] labeled volumes.
+ */
 public class HddVolumeChoosingPolicy extends FilteredVolumeChoosingPolicy {
 
   public HddVolumeChoosingPolicy() {

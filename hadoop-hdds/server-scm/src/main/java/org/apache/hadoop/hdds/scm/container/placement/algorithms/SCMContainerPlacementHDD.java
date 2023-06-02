@@ -24,6 +24,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
+/**
+ * Container placement policy to store containers on [DISK] labeled storages.
+ */
 public class SCMContainerPlacementHDD extends SCMContainerPlacementRandom {
 
   /**

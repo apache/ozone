@@ -26,7 +26,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
-public class StorageUtils {
+/**
+ * Storage/Datanode/Volume util methods.
+ */
+public final class StorageUtils {
   private StorageUtils() {
   }
 

@@ -49,11 +49,10 @@ import java.util.stream.Collectors;
  * 4. Choose an anchor node among the viable nodes.
  * 5. Choose other nodes around the anchor node based on network topology
  */
-public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
+public class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   static final Logger LOG =
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
-  private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
   private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
@@ -76,7 +75,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
                                  final PipelineStateManager stateManager,
                                  final ConfigurationSource conf) {
     super(nodeManager, conf);
-    this.nodeManager = nodeManager;
     this.conf = conf;
     this.stateManager = stateManager;
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
@@ -136,7 +134,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throws SCMException {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
-        nodeManager.getNodes(NodeStatus.inServiceHealthy());
+        getNodeManager().getNodes(NodeStatus.inServiceHealthy());
     String msg;
     if (healthyNodes.size() == 0) {
       msg = "No healthy node found to allocate container.";
@@ -174,10 +172,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // TODO check if sorting could cause performance issue: HDDS-3466.
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
-            new DnWithPipelines(d, currentRatisThreePipelineCount(nodeManager,
-                stateManager, d)))
+            new DnWithPipelines(d, currentRatisThreePipelineCount(
+                getNodeManager(), stateManager, d)))
         .filter(d ->
-            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
+            (d.getPipelines() < getNodeManager().pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());
@@ -200,7 +198,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-    if (!checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
+    if (!checkAllNodesAreEqual(getNodeManager()
+        .getClusterNetworkTopologyMap())) {
       boolean multipleRacksAfterFilter = multipleRacksAvailable(healthyList);
       if (multipleRacks && !multipleRacksAfterFilter) {
         LOG.debug(MULTIPLE_RACK_PIPELINE_MSG);
@@ -218,7 +217,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param dns List of datanodes to check
    * @return True if there are multiple racks, false otherwise
    */
-  private boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
+  protected boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
     if (dns.size() <= 1) {
       return false;
     }
@@ -259,7 +258,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // Randomly picks nodes when all nodes are equal or factor is ONE.
     // This happens when network topology is absent or
     // all nodes are on the same rack.
-    if (checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
+    if (checkAllNodesAreEqual(getNodeManager()
+        .getClusterNetworkTopologyMap())) {
       return super.getResultSet(nodesRequired, healthyNodes);
     } else {
       // Since topology and rack awareness are available, picks nodes
@@ -333,14 +333,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       if (rackAwareness && bCheckNodeInAnchorRack) {
         pick = chooseNodeBasedOnSameRack(
             healthyNodes, mutableExclude,
-            nodeManager.getClusterNetworkTopologyMap(), anchor);
+            getNodeManager().getClusterNetworkTopologyMap(), anchor);
         if (pick == null) {
           // No available node to pick from first anchor node
           // Make nextNode as anchor node and pick remaining node
           anchor = nextNode;
           pick = chooseNodeBasedOnSameRack(
               healthyNodes, mutableExclude,
-              nodeManager.getClusterNetworkTopologyMap(), anchor);
+              getNodeManager().getClusterNetworkTopologyMap(), anchor);
         }
       }
       // fall back protection
@@ -450,7 +450,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       // Choose the second node on different racks from anchor.
       nextNode = chooseNodeBasedOnRackAwareness(
           healthyNodes, mutableExclude,
-          nodeManager.getClusterNetworkTopologyMap(), anchor);
+          getNodeManager().getClusterNetworkTopologyMap(), anchor);
       if (nextNode != null) {
         // Rack awareness is detected.
         rackAwareness = true;
@@ -569,7 +569,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param topology network topology
    * @return true when all nodes are equal
    */
-  private boolean checkAllNodesAreEqual(NetworkTopology topology) {
+  protected boolean checkAllNodesAreEqual(NetworkTopology topology) {
     if (topology == null) {
       return true;
     }
@@ -579,6 +579,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @Override
   protected int getRequiredRackCount(int numReplicas) {
     return REQUIRED_RACKS;
+  }
+
+  protected PipelineStateManager getStateManager() {
+    return stateManager;
+  }
+
+  protected int getHeavyNodeCriteria() {
+    return heavyNodeCriteria;
   }
 
   /**

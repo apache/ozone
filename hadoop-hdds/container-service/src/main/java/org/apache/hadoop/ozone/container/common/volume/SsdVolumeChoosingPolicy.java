@@ -19,10 +19,16 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import org.apache.hadoop.fs.StorageType;
 
+/**
+ * Policy to choose SSD volumes in a round-robin manner.
+ * If no any SSD volume was found other ones will be applied in a round-robin
+ * way
+ */
 public class SsdVolumeChoosingPolicy extends FilteredVolumeChoosingPolicy {
 
   public SsdVolumeChoosingPolicy() {
     super(new RoundRobinVolumeChoosingPolicy(),
           volume -> volume.getStorageType() == StorageType.SSD);
   }
+
 }
