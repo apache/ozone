@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
@@ -67,6 +69,7 @@ public class ReconServer extends GenericCli {
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
   private Injector injector;
 
+  private JvmPauseMonitor jvmPauseMonitor;
   private ReconHttpServer httpServer;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
@@ -121,6 +124,7 @@ public class ReconServer extends GenericCli {
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
+      jvmPauseMonitor = newJvmPauseMonitor("Recon");
       this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
@@ -246,6 +250,9 @@ public class ReconServer extends GenericCli {
       if (reconStorageContainerManager != null) {
         reconStorageContainerManager.start();
       }
+      if (jvmPauseMonitor != null) {
+        jvmPauseMonitor.start();
+      }
     }
   }
 
@@ -289,6 +296,9 @@ public class ReconServer extends GenericCli {
       } catch (IOException ioe) {
         LOG.error("Failed to close certificate client.", ioe);
       }
+    }
+    if (jvmPauseMonitor != null) {
+      jvmPauseMonitor.stop();
     }
   }
 
