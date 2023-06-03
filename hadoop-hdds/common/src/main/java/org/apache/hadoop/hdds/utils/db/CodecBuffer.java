@@ -34,6 +34,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
 /**
@@ -45,46 +46,43 @@ public final class CodecBuffer implements AutoCloseable {
 
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
+  private static final IntFunction<ByteBuf> POOL_DIRECT = c -> c >= 0
+      ? POOL.directBuffer(c, c) // allocate exact size
+      : POOL.directBuffer(-c);  // allocate a resizable buffer
+  private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
+      ? POOL.heapBuffer(c, c)   // allocate exact size
+      : POOL.heapBuffer(-c);    // allocate a resizable buffer
 
-  
   /**
-   * Allocate a direct buffer.
-   * When the given capacity is non-negative, allocate a buffer by setting
-   * the initial capacity and the maximum capacity to the given capacity.
-   * When the given capacity is negative, allocate a buffer
-   * by setting only the initial capacity to the absolute value of it
-   * and then the buffer's capacity can be increased if necessary.
+   * Allocate a buffer using the given allocator.
+   *
+   * @param allocator Take a capacity parameter and return an allocated buffer.
+   *                  When the capacity is non-negative,
+   *                  allocate a buffer by setting the initial capacity
+   *                  and the maximum capacity to the given capacity.
+   *                  When the capacity is negative,
+   *                  allocate a buffer by setting only the initial capacity
+   *                  to the absolute value of it and, as a result,
+   *                  the buffer's capacity can be increased if necessary.
    */
-  public static CodecBuffer allocateDirect(int capacity) {
-    final ByteBuf buf;
-    if (capacity >= 0) {
-      // allocate exact size
-      buf = POOL.directBuffer(capacity, capacity);
-    } else {
-      // allocate a resizable buffer
-      buf = POOL.directBuffer(-capacity);
-    }
-    return new CodecBuffer(buf);
+  static CodecBuffer allocate(int capacity, IntFunction<ByteBuf> allocator) {
+    return new CodecBuffer(allocator.apply(capacity));
   }
 
   /**
-   * Allocate a heap buffer.
-   * When the given capacity is non-negative, allocate a buffer by setting
-   * the initial capacity and the maximum capacity to the given capacity.
-   * When the given capacity is negative, allocate a buffer
-   * by setting only the initial capacity to the absolute value of it
-   * and then the buffer's capacity can be increased if necessary.
+   * Allocate a pooled direct buffer.
+   * @see #allocate(int, IntFunction)
+   */
+  public static CodecBuffer allocateDirect(int capacity) {
+    return allocate(capacity, POOL_DIRECT);
+  }
+
+  /**
+   * Allocate a pooled heap buffer.
+   * @see #allocate(int, IntFunction)
    */
   public static CodecBuffer allocateHeap(int capacity) {
-    final ByteBuf buf;
-    if (capacity >= 0) {
-      // allocate exact size
-      buf = POOL.heapBuffer(capacity, capacity);
-    } else {
-      // allocate a resizable buffer
-      buf = POOL.heapBuffer(-capacity);
-    }
-    return new CodecBuffer(buf);
+    return allocate(capacity, POOL_HEAP);
   }
 
   /** Wrap the given array. */
@@ -190,22 +188,11 @@ public final class CodecBuffer implements AutoCloseable {
   }
 
   /**
-   * @return an array containing the readable bytes.
+   * @return a new array containing the readable bytes.
    * @see #readableBytes()
    */
   public byte[] getArray() {
-    final int readable = readableBytes();
-    if (buf.hasArray()) {
-      // Try getting the underlying to avoid copying
-      final byte[] array = buf.array();
-      if (array.length == readable) {
-        Preconditions.assertSame(0, buf.readerIndex(), "readerIndex");
-        return array;
-      }
-    }
-
-    // Copy the readable bytes
-    final byte[] array = new byte[readable];
+    final byte[] array = new byte[readableBytes()];
     buf.readBytes(array);
     return array;
   }
