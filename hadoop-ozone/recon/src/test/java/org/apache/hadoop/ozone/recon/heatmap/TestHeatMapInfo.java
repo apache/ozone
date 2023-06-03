@@ -769,7 +769,11 @@ public class TestHeatMapInfo {
         getMaxAccessCount());
     Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
         getLabel());
-
+    String path =
+        entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
+            .get(0).getChildren().get(0).getPath();
+    Assertions.assertEquals("/hivevol1675429570/hivebuck1675429570/" +
+        "reg_path/hive_tpcds/store_sales/store_sales.dat", path);
   }
 
 }

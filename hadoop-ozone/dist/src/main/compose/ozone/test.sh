@@ -69,7 +69,7 @@ execute_robot_test scm -v PREFIX:${prefix} ec/read.robot
 
 execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
 
-execute_robot_test scm snapshot
+execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot
 
 stop_docker_env
 

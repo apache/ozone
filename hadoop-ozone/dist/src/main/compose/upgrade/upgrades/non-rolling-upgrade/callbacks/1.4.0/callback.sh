@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,13 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_VERSION=3
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_TESTKRB5_IMAGE=${docker.ozone-testkr5b.image}
-OZONE_OPTS=
+source "$TEST_DIR"/testlib.sh
 
-VAULT_PORT=8200
-VAULT_ADDR=http://127.0.0.1:8200
-NETWORK_NAME=project_web
+
+### CALLBACKS ###
+
+with_this_version_pre_finalized() {
+  execute_robot_test "$SCM" --include pre-finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" --include pre-finalized-snapshot-tests snapshot/upgrade-snapshot-check.robot
+}
+
+with_this_version_finalized() {
+  execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$SCM" --include finalized-snapshot-tests snapshot/upgrade-snapshot-check.robot
+}
+

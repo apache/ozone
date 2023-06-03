@@ -46,14 +46,45 @@ public final class CodecBuffer implements AutoCloseable {
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
 
-  /** Allocate a direct buffer. */
-  public static CodecBuffer allocateDirect(int exactSize) {
-    return new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
+  
+  /**
+   * Allocate a direct buffer.
+   * When the given capacity is non-negative, allocate a buffer by setting
+   * the initial capacity and the maximum capacity to the given capacity.
+   * When the given capacity is negative, allocate a buffer
+   * by setting only the initial capacity to the absolute value of it
+   * and then the buffer's capacity can be increased if necessary.
+   */
+  public static CodecBuffer allocateDirect(int capacity) {
+    final ByteBuf buf;
+    if (capacity >= 0) {
+      // allocate exact size
+      buf = POOL.directBuffer(capacity, capacity);
+    } else {
+      // allocate a resizable buffer
+      buf = POOL.directBuffer(-capacity);
+    }
+    return new CodecBuffer(buf);
   }
 
-  /** Allocate a heap buffer. */
-  public static CodecBuffer allocateHeap(int exactSize) {
-    return new CodecBuffer(POOL.heapBuffer(exactSize, exactSize));
+  /**
+   * Allocate a heap buffer.
+   * When the given capacity is non-negative, allocate a buffer by setting
+   * the initial capacity and the maximum capacity to the given capacity.
+   * When the given capacity is negative, allocate a buffer
+   * by setting only the initial capacity to the absolute value of it
+   * and then the buffer's capacity can be increased if necessary.
+   */
+  public static CodecBuffer allocateHeap(int capacity) {
+    final ByteBuf buf;
+    if (capacity >= 0) {
+      // allocate exact size
+      buf = POOL.heapBuffer(capacity, capacity);
+    } else {
+      // allocate a resizable buffer
+      buf = POOL.heapBuffer(-capacity);
+    }
+    return new CodecBuffer(buf);
   }
 
   /** Wrap the given array. */
@@ -119,6 +150,31 @@ public final class CodecBuffer implements AutoCloseable {
   /** @return the future of {@link #release()}. */
   public CompletableFuture<Void> getReleaseFuture() {
     return released;
+  }
+
+  /** Clear this buffer. */
+  public void clear() {
+    buf.clear();
+  }
+
+  /**
+   * Set the capacity of this buffer.
+   *
+   * @return true iff it has successfully changed the capacity.
+   */
+  public boolean setCapacity(int newCapacity) {
+    if (newCapacity < 0) {
+      throw new IllegalArgumentException(
+          "newCapacity = " + newCapacity + " < 0");
+    }
+    LOG.debug("setCapacity: {} -> {}, max={}",
+        buf.capacity(), newCapacity, buf.maxCapacity());
+    if (newCapacity <= buf.maxCapacity()) {
+      final ByteBuf returned = buf.capacity(newCapacity);
+      Preconditions.assertSame(buf, returned, "buf");
+      return true;
+    }
+    return false;
   }
 
   /** @return the number of bytes can be read. */
@@ -272,7 +328,7 @@ public final class CodecBuffer implements AutoCloseable {
     final Integer size = source.apply(buffer);
     if (size != null) {
       Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
-      if (size <= writable) {
+      if (size > 0 && size <= writable) {
         buf.setIndex(buf.readerIndex(), i + size);
       }
     }

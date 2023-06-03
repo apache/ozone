@@ -139,7 +139,7 @@ public class TestReplicationManager {
     legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(configuration, clock);
+        new ContainerReplicaPendingOps(clock);
 
     Mockito.when(containerManager
         .getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(

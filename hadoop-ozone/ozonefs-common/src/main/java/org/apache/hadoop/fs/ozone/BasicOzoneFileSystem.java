@@ -938,6 +938,16 @@ public class BasicOzoneFileSystem extends FileSystem {
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
   }
 
+  @Override
+  public void setTimes(Path f, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    statistics.incrementWriteOps(1);
+    LOG.trace("setTimes() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    adapter.setTimes(key, mtime, atime);
+  }
+
   /**
    * A private class implementation for iterating list of file status.
    *

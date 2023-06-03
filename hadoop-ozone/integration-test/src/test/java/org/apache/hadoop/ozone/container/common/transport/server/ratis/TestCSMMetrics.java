@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
       .ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -54,6 +53,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.ratis.protocol.RaftGroupId;
@@ -63,6 +63,7 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.Assert;
@@ -71,13 +72,9 @@ import org.junit.Assert;
  * This class tests the metrics of ContainerStateMachine.
  */
 public class TestCSMMetrics {
-  static final String TEST_DIR =
+  private static final String TEST_DIR =
       GenericTestUtils.getTestDir("dfs").getAbsolutePath()
           + File.separator;
-  @FunctionalInterface
-  interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
-    OUT apply(LEFT left, RIGHT right) throws THROWABLE;
-  }
 
   @BeforeClass
   public static void setup() {
@@ -96,9 +93,9 @@ public class TestCSMMetrics {
   static void runContainerStateMachineMetrics(
       int numDatanodes,
       BiConsumer<Pipeline, OzoneConfiguration> initConf,
-      TestCSMMetrics.CheckedBiFunction<Pipeline, OzoneConfiguration,
-          XceiverClientSpi, IOException> createClient,
-      TestCSMMetrics.CheckedBiFunction<DatanodeDetails, OzoneConfiguration,
+      CheckedBiFunction<Pipeline, OzoneConfiguration,
+                XceiverClientSpi, IOException> createClient,
+      CheckedBiFunction<DatanodeDetails, OzoneConfiguration,
           XceiverServerSpi, IOException> createServer,
       CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer)
       throws Exception {
@@ -121,7 +118,7 @@ public class TestCSMMetrics {
 
       // Before Read Chunk/Write Chunk
       MetricsRecordBuilder metric = getMetrics(CSMMetrics.SOURCE_NAME +
-          RaftGroupId.valueOf(pipeline.getId().getId()).toString());
+          RaftGroupId.valueOf(pipeline.getId().getId()));
       assertCounter("NumWriteStateMachineOps", 0L, metric);
       assertCounter("NumReadStateMachineOps", 0L, metric);
       assertCounter("NumApplyTransactionOps", 0L, metric);
@@ -132,10 +129,10 @@ public class TestCSMMetrics {
       assertCounter("WriteChunkMsNumOps", 0L, metric);
       double applyTransactionLatency = getDoubleGauge(
           "ApplyTransactionNsAvgTime", metric);
-      assertTrue(applyTransactionLatency == 0.0);
+      assertEquals(0.0, applyTransactionLatency, 0.0);
       double writeStateMachineLatency = getDoubleGauge(
           "WriteStateMachineDataNsAvgTime", metric);
-      assertTrue(writeStateMachineLatency == 0.0);
+      assertEquals(0.0, writeStateMachineLatency, 0.0);
 
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(ContainerTestHelper.
@@ -149,7 +146,7 @@ public class TestCSMMetrics {
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +
-              RaftGroupId.valueOf(pipeline.getId().getId()).toString());
+          RaftGroupId.valueOf(pipeline.getId().getId()));
       assertCounter("NumWriteStateMachineOps", 1L, metric);
       assertCounter("NumBytesWrittenCount", 1024L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
@@ -167,7 +164,7 @@ public class TestCSMMetrics {
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +
-          RaftGroupId.valueOf(pipeline.getId().getId()).toString());
+          RaftGroupId.valueOf(pipeline.getId().getId()));
       assertCounter("NumQueryStateMachineOps", 1L, metric);
       assertCounter("NumApplyTransactionOps", 1L, metric);
       applyTransactionLatency = getDoubleGauge(
@@ -181,7 +178,7 @@ public class TestCSMMetrics {
       if (client != null) {
         client.close();
       }
-      servers.stream().forEach(XceiverServerSpi::stop);
+      servers.forEach(XceiverServerSpi::stop);
     }
   }
 
@@ -214,7 +211,7 @@ public class TestCSMMetrics {
 
     @Override
     public void validateContainerCommand(
-        ContainerCommandRequestProto msg) throws StorageContainerException {
+        ContainerCommandRequestProto msg) {
     }
 
     @Override
