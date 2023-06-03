@@ -1698,7 +1698,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private String getNextGreaterString(String volumeName, String bucketName,
-      String keyPrefix) {
+      String keyPrefix) throws IOException {
     // Increment the last character of the string and return the new ozone key.
     Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
         "Key prefix is null or empty");
