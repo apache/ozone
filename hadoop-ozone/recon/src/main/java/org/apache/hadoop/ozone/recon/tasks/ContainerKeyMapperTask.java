@@ -469,7 +469,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup
           .getLocationList()) {
         long containerId = omKeyLocationInfo.getContainerID();
-        ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
+        ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(
             containerId, key, keyVersion);
         if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
             containerKeyPrefix) == 0
