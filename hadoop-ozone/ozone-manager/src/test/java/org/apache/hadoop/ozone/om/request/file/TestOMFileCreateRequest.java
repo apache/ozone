@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -335,6 +338,65 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // to true
     testNonRecursivePath(key, true, false, false);
     testNonRecursivePath(key, false, false, true);
+  }
+
+  @Test
+  public void testCreateFileInheritParentDefaultAcls()
+      throws Exception {
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls();
+    Assert.assertEquals(acls, bucketAcls);
+
+    // create file inherit bucket DEFAULT acls
+    String key = "aclfile";
+    OMRequest omRequest = createFileRequest(volumeName, bucketName,
+        key, HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, false, true);
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omFileCreateResponse.getOMResponse().getStatus());
+
+    long id = modifiedOmRequest.getCreateFileRequest().getClientID();
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
+
+    verifyFileInheritAcls(omKeyInfo.getAcls(), bucketAcls);
+
+  }
+
+  /**
+   * Leaf file has ACCESS scope acls which inherited
+   * from parent DEFAULT acls.
+   */
+  private void verifyFileInheritAcls(List<OzoneAcl> keyAcls,
+      List<OzoneAcl> bucketAcls) {
+
+    Assert.assertTrue(bucketAcls.stream().allMatch(
+        acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT));
+    Assert.assertEquals("Failed to inherit parent acls!,",
+        bucketAcls.stream().map(
+                acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .collect(Collectors.toList()), keyAcls);
   }
 
   @Test
