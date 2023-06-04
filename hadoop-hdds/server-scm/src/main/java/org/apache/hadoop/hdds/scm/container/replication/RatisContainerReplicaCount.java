@@ -359,7 +359,8 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    *         for under replicated and a negative value for over replicated.
    */
   private int missingReplicas() {
-    int delta = repFactor - getAvailableReplicas();
+    int availableReplicas = getAvailableReplicas();
+    int delta = repFactor - availableReplicas;
 
     if (delta < 0) {
       // Over replicated, so may need to remove a container.
@@ -368,7 +369,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       // May be under-replicated, depending on maintenance.
       delta = Math.max(0, delta - getMaintenanceCount());
       int neededHealthy =
-          Math.max(0, minHealthyForMaintenance - getAvailableReplicas());
+          Math.max(0, minHealthyForMaintenance - availableReplicas);
       delta = Math.max(neededHealthy, delta);
       return delta;
     } else { // delta == 0
@@ -486,8 +487,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Return the delta from the expected number of replicas, optionally
    * considering inflight add and deletes.
-   * @param includePendingDelete
-   * @param includePendingAdd
    * @return zero if perfectly replicated, a negative value for over replication
    *         and a positive value for under replication. The magnitude of the
    *         return value indicates how many replias the container is over or

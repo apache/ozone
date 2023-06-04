@@ -330,7 +330,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
              reconContainerMetadataManager.getKeyContainerTableIterator()) {
 
       // Check if we have keys in this container in the DB
-      keyContainerIterator.seek(new KeyPrefixContainer(key));
+      keyContainerIterator.seek(KeyPrefixContainer.get(key));
       while (keyContainerIterator.hasNext()) {
         Table.KeyValue<KeyPrefixContainer, Integer> keyValue =
             keyContainerIterator.next();
@@ -400,7 +400,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
       for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoGroup
           .getLocationList()) {
         long containerId = omKeyLocationInfo.getContainerID();
-        ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
+        ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(
             containerId, key, keyVersion);
         if (reconContainerMetadataManager.getCountForContainerKeyPrefix(
             containerKeyPrefix) == 0

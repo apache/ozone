@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -41,7 +42,14 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 /**
  * Class defines the structure and types of the scm.db.
  */
-public class SCMDBDefinition implements DBDefinition {
+public class SCMDBDefinition extends DBDefinition.WithMap {
+  public SCMDBDefinition() {
+    this(COLUMN_FAMILIES);
+  }
+
+  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+    super(map);
+  }
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETED_BLOCKS =
@@ -57,18 +65,18 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "validCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_SCM_CERTS =
       new DBColumnFamilyDefinition<>(
           "validSCMCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   /**
    * This column family is Deprecated in favor of REVOKED_CERTS_V2.
@@ -79,16 +87,16 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "revokedCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, CertInfo>
       REVOKED_CERTS_V2 =
       new DBColumnFamilyDefinition<>(
           "revokedCertsV2",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           CertInfo.class,
           CertInfo.getCodec());
 
@@ -115,7 +123,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "scmTransactionInfos",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           TransactionInfo.class,
           TransactionInfo.getCodec());
 
@@ -132,7 +140,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -141,7 +149,7 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "sequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
           LongCodec.get());
 
@@ -163,18 +171,35 @@ public class SCMDBDefinition implements DBDefinition {
       META = new DBColumnFamilyDefinition<>(
           "meta",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           String.class,
-          new StringCodec());
+          StringCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ByteString>
       STATEFUL_SERVICE_CONFIG =
       new DBColumnFamilyDefinition<>(
           "statefulServiceConfig",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           ByteString.class,
           ByteStringCodec.getInstance());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINERS,
+          CRLS,
+          CRL_SEQUENCE_ID,
+          DELETED_BLOCKS,
+          META,
+          MOVE,
+          PIPELINES,
+          REVOKED_CERTS,
+          REVOKED_CERTS_V2,
+          SEQUENCE_ID,
+          STATEFUL_SERVICE_CONFIG,
+          TRANSACTIONINFO,
+          VALID_CERTS,
+          VALID_SCM_CERTS);
 
   @Override
   public String getName() {
@@ -184,13 +209,5 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ScmConfigKeys.OZONE_SCM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META,
-        STATEFUL_SERVICE_CONFIG};
   }
 }

@@ -28,9 +28,21 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
- * Encodes and Decodes X509Certificate Class.
+ * Codec to serialize/deserialize {@link X509Certificate}.
  */
-public class X509CertificateCodec implements Codec<X509Certificate> {
+public final class X509CertificateCodec implements Codec<X509Certificate> {
+
+  private static final Codec<X509Certificate> INSTANCE =
+      new X509CertificateCodec();
+
+  public static Codec<X509Certificate> get() {
+    return INSTANCE;
+  }
+
+  private X509CertificateCodec() {
+    // singleton
+  }
+
   @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
     try {

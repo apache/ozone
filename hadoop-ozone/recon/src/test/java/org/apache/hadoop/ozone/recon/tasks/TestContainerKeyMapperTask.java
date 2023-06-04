@@ -144,7 +144,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, keyPrefixesForContainer.size());
     String omKey = omMetadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME,
         FILE_NAME);
-    ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(1,
+    ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(1,
         omKey, 0);
     assertEquals(1,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -152,7 +152,7 @@ public class TestContainerKeyMapperTask {
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2);
     assertEquals(1, keyPrefixesForContainer.size());
-    containerKeyPrefix = new ContainerKeyPrefix(2, omKey,
+    containerKeyPrefix = ContainerKeyPrefix.get(2, omKey,
         0);
     assertEquals(1,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -219,7 +219,7 @@ public class TestContainerKeyMapperTask {
         omMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID, FILE_NAME);
     ContainerKeyPrefix containerKeyPrefix =
-        new ContainerKeyPrefix(1L, omKey, 0L);
+        ContainerKeyPrefix.get(1L, omKey, 0L);
     assertEquals(1L, keyPrefixesForContainer.size());
     assertEquals(1L,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -227,7 +227,7 @@ public class TestContainerKeyMapperTask {
     // Check the key prefixes for container 2
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2L);
-    containerKeyPrefix = new ContainerKeyPrefix(2L, omKey, 0L);
+    containerKeyPrefix = ContainerKeyPrefix.get(2L, omKey, 0L);
     assertEquals(1L, keyPrefixesForContainer.size());
     assertEquals(1L,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());

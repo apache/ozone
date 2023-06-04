@@ -33,8 +33,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS_GROUPS;
 
 /**
  * Utility class for ozone configurations.
@@ -43,20 +41,6 @@ public final class OzoneConfigUtil {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneConfigUtil.class);
   private OzoneConfigUtil() {
-  }
-
-  /**
-   * Return list of OzoneAdministrators from config.
-   * The service startup user will default to an admin.
-   */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
-      String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
   }
 
   /**
@@ -79,19 +63,6 @@ public final class OzoneConfigUtil {
     return ozAdmins;
   }
 
-  /**
-   * Return list of Ozone Read only admin Usernames from config.
-   */
-  static Collection<String> getOzoneReadOnlyAdminsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_READONLY_ADMINISTRATORS);
-  }
-
-  static Collection<String> getOzoneAdminsGroupsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
-  }
-
   static Collection<String> getS3AdminsGroupsFromConfig(
       OzoneConfiguration conf) {
     Collection<String> s3AdminsGroup =
@@ -102,12 +73,6 @@ public final class OzoneConfigUtil {
               .getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
     }
     return s3AdminsGroup;
-  }
-
-  static Collection<String> getOzoneReadOnlyAdminsGroupsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(
-        OZONE_READONLY_ADMINISTRATORS_GROUPS);
   }
 
   public static ReplicationConfig resolveReplicationConfigPreference(
