@@ -237,7 +237,7 @@ public class TestObjectGet {
     // WHEN
     final OS3Exception ex =
         Assertions.assertThrows(OS3Exception.class,
-            () -> rest.get(bucketName, keyPath, null, 0, null, body));
+            () -> rest.get(bucketName, keyPath, null, 0, null));
 
     // THEN
     Assertions.assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
