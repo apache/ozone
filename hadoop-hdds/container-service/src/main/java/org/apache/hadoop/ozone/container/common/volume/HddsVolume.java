@@ -82,7 +82,7 @@ public class HddsVolume extends StorageVolume {
 
   public static final String HDDS_VOLUME_DIR = "hdds";
   private static final String TMP_CONTAINER_DELETE_DIR_NAME =
-      "container_delete_service";
+      "deleted-containers";
 
   private final VolumeIOStats volumeIOStats;
   private final VolumeInfoMetrics volumeInfoMetrics;
@@ -216,14 +216,14 @@ public class HddsVolume extends StorageVolume {
 
   /**
    * Delete all files under
-   * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+   * <volume>/hdds/<cluster-id>/tmp/deleted-containers.
    * This is the directory where containers are moved when they are deleted
    * from the system, but before being removed from the filesystem. This
    * makes the deletion atomic.
    */
   public void cleanDeletedContainerDir() {
     // If the volume was shut down before initialization completed, skip
-    // cleanup.
+    // emptying the directory.
     if (deletedContainerDir == null) {
       return;
     }
