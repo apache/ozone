@@ -54,6 +54,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -72,9 +73,7 @@ import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
@@ -101,7 +100,8 @@ import org.slf4j.Logger;
  */
 public abstract class DefaultCertificateClient implements CertificateClient {
 
-  public static final String CERT_FILE_NAME_FORMAT = "%s.crt";
+  private static final String CERT_FILE_EXTENSION = ".crt";
+  public static final String CERT_FILE_NAME_FORMAT = "%s" + CERT_FILE_EXTENSION;
 
   private final Logger logger;
   private final SecurityConfig securityConfig;
@@ -145,81 +145,80 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Load all certificates from configured location.
    * */
   private synchronized void loadAllCertificates() {
-    // See if certs directory exists in file system.
-    Path certificatePath = securityConfig.getCertificateLocation(component);
-    if (Files.exists(certificatePath) && Files.isDirectory(certificatePath)) {
-      getLogger().info("Loading certificate from location:{}.",
-          certificatePath);
-      File[] certFiles = certificatePath.toFile().listFiles();
+    try (Stream<Path> certFiles =
+             Files.list(securityConfig.getCertificateLocation(component))) {
+      certFiles
+          .filter(Files::isRegularFile)
+          .forEach(this::readCertificateFile);
+    } catch (IOException e) {
+      getLogger().warn("Certificates could not be loaded.", e);
+      return;
+    }
 
-      if (certFiles != null) {
-        CertificateCodec certificateCodec =
-            new CertificateCodec(securityConfig, component);
-        long latestCaCertSerailId = -1L;
-        long latestRootCaCertSerialId = -1L;
-        for (File file : certFiles) {
-          if (file.isFile()) {
-            try {
-              CertPath allCertificates =
-                  certificateCodec.getCertPath(file.getName());
-              X509Certificate cert = firstCertificateFrom(allCertificates);
-              if (cert != null && cert.getSerialNumber() != null) {
-                if (cert.getSerialNumber().toString().equals(certSerialId)) {
-                  this.certPath = allCertificates;
-                }
-                certificateMap.putIfAbsent(cert.getSerialNumber().toString(),
-                    allCertificates);
-                if (file.getName().startsWith(
-                    CAType.SUBORDINATE.getFileNamePrefix())) {
-                  String certFileName = FilenameUtils.getBaseName(
-                      file.getName());
-                  long tmpCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(
-                          CAType.SUBORDINATE.getFileNamePrefix().length()));
-                  if (tmpCaCertSerailId > latestCaCertSerailId) {
-                    latestCaCertSerailId = tmpCaCertSerailId;
-                  }
-                }
-
-                if (file.getName().startsWith(
-                    CAType.ROOT.getFileNamePrefix())) {
-                  String certFileName = FilenameUtils.getBaseName(
-                      file.getName());
-                  long tmpRootCaCertSerailId = NumberUtils.toLong(
-                      certFileName.substring(
-                          CAType.ROOT.getFileNamePrefix().length()));
-                  if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
-                    latestRootCaCertSerialId = tmpRootCaCertSerailId;
-                  }
-                }
-                getLogger().info("Added certificate {} from file:{}.", cert,
-                    file.getAbsolutePath());
-              } else {
-                getLogger().error("Error reading certificate from file:{}",
-                    file);
-              }
-            } catch (java.security.cert.CertificateException | IOException e) {
-              getLogger().error("Error reading certificate from file:{}.",
-                  file.getAbsolutePath(), e);
-            }
-          }
-        }
-        if (latestCaCertSerailId != -1) {
-          caCertId = Long.toString(latestCaCertSerailId);
-        }
-        if (latestRootCaCertSerialId != -1) {
-          rootCaCertId = Long.toString(latestRootCaCertSerialId);
-        }
-
-        if (certPath != null) {
-          if (executorService == null) {
-            startCertificateMonitor();
-          }
-        } else {
-          getLogger().warn("CertificateLifetimeMonitor is not started this " +
-              "time because certificate is empty.");
-        }
+    if (certPath != null && executorService == null) {
+      startCertificateMonitor();
+    } else {
+      if (executorService != null) {
+        getLogger().debug("CertificateLifetimeMonitor is already started.");
+      } else {
+        getLogger().warn("Component certificate was not loaded.");
       }
+    }
+  }
+
+  private synchronized void readCertificateFile(Path filePath) {
+    CertificateCodec codec = new CertificateCodec(securityConfig, component);
+    String fileName = filePath.getFileName().toString();
+
+    X509Certificate cert;
+    try {
+      CertPath allCertificates = codec.getCertPath(fileName);
+      cert = firstCertificateFrom(allCertificates);
+      String readCertSerialId = cert.getSerialNumber().toString();
+
+      if (readCertSerialId.equals(certSerialId)) {
+        this.certPath = allCertificates;
+      }
+      certificateMap.putIfAbsent(readCertSerialId, allCertificates);
+
+      updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
+      updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
+
+      getLogger().info("Added certificate {} from file: {}.", cert,
+          filePath.toAbsolutePath());
+    } catch (java.security.cert.CertificateException
+             | IOException | IndexOutOfBoundsException e) {
+      getLogger().error("Error reading certificate from file: {}.",
+          filePath.toAbsolutePath(), e);
+    }
+  }
+
+  private void updateCachedData(
+      String fileName,
+      CAType tryCAType,
+      Consumer<String> updateCachedId
+  ) throws IOException {
+    String caTypePrefix = tryCAType.getFileNamePrefix();
+
+    if (fileName.startsWith(caTypePrefix)) {
+      updateCachedId.accept(
+          fileName.substring(caTypePrefix.length(),
+              fileName.length() - CERT_FILE_EXTENSION.length()
+          ));
+    }
+  }
+
+  private synchronized void updateCachedRootCAId(String s) {
+    if (rootCaCertId == null
+        || Long.parseLong(s) > Long.parseLong(rootCaCertId)) {
+      rootCaCertId = s;
+    }
+  }
+
+  private synchronized void updateCachedSubCAId(String s) {
+    if (caCertId == null
+        || Long.parseLong(s) > Long.parseLong(caCertId)) {
+      caCertId = s;
     }
   }
 
@@ -352,8 +351,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return chain;
   }
 
-  @Override
-  public synchronized CertPath getCACertPath() {
+  private synchronized CertPath getCACertPath() {
     if (caCertId != null) {
       return certificateMap.get(caCertId);
     }
@@ -1149,9 +1147,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
-  private synchronized void updateCertSerialId(String newCertSerialId) {
+  private synchronized String updateCertSerialId(String newCertSerialId) {
     certSerialId = newCertSerialId;
     loadAllCertificates();
+    return certSerialId;
   }
 
   protected abstract String signAndStoreCertificate(
@@ -1160,9 +1159,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
-    updateCertSerialId(signAndStoreCertificate(request,
+    return updateCertSerialId(signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName())));
-    return certSerialId;
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
