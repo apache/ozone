@@ -1,1 +1,1 @@
-../common/test-hadoop-3.1.sh
+../common/hadoop-3.1.sh

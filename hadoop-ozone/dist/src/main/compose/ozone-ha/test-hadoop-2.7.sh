@@ -1,1 +1,1 @@
-../common/test-hadoop-2.7.sh
+../common/hadoop-2.7.sh
